@@ -1,0 +1,42 @@
+{
+  "searchPlaceholder": "Поиск по навигации...",
+  "logout": "Выйти",
+  "items": {
+    "dashboard": "Панель управления",
+    "globalOptions": "Глобальные опции",
+    "loadBalancing": "Балансировка нагрузки",
+    "caching": "Кэширование",
+    "securityLists": "Списки безопасности",
+    "securityRules": "Правила безопасности",
+    "rateLimits": "Ограничения скорости",
+    "wafSignatures": "Сигнатуры WAF",
+    "wafLogs": "Журналы WAF",
+    "captcha": "CAPTCHA",
+    "pageArmor": "Page Armor",
+    "apiArmor": "API Armor",
+    "redirects": "Редиректы и перезапись",
+    "headers": "Заголовки",
+    "responseTransforms": "Преобразования ответов",
+    "certificates": "Сертификаты",
+    "ciphers": "Шифры",
+    "logging": "Логирование",
+    "metrics": "Метрики",
+    "auditLogs": "Журнал аудита",
+    "system": "Система",
+    "mcpGateway": "Шлюз MCP",
+    "riskScoring": "Risk Scoring"
+  },
+  "unapplied": {
+    "title": "Неприменённые изменения конфигурации",
+    "commentPlaceholder": "Необязательный комментарий к этому изменению...",
+    "reverting": "Откат...",
+    "applying": "Применение...",
+    "loading": "Загрузка...",
+    "review": "Проверить"
+  },
+  "diff": {
+    "title": "Неприменённые изменения конфигурации",
+    "noChanges": "Нет изменений"
+  },
+  "brand": "coreX Manager"
+}

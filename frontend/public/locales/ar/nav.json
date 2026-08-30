@@ -1,0 +1,42 @@
+{
+  "searchPlaceholder": "بحث في التنقل...",
+  "logout": "تسجيل الخروج",
+  "items": {
+    "dashboard": "لوحة التحكم",
+    "globalOptions": "الخيارات العامة",
+    "loadBalancing": "موازنة الحمل",
+    "caching": "التخزين المؤقت",
+    "securityLists": "قوائم الأمان",
+    "securityRules": "قواعد الأمان",
+    "rateLimits": "حدود المعدل",
+    "wafSignatures": "تواقيع WAF",
+    "wafLogs": "سجلات WAF",
+    "captcha": "CAPTCHA",
+    "pageArmor": "درع الصفحة",
+    "apiArmor": "درع API",
+    "redirects": "إعادة التوجيه وإعادة الكتابة",
+    "headers": "الترويسات",
+    "responseTransforms": "تحويلات الاستجابة",
+    "certificates": "الشهادات",
+    "ciphers": "التشفيرات",
+    "logging": "تسجيل السجلات",
+    "metrics": "المقاييس",
+    "auditLogs": "سجلات التدقيق",
+    "system": "النظام",
+    "mcpGateway": "بوابة MCP",
+    "riskScoring": "Risk Scoring"
+  },
+  "unapplied": {
+    "title": "تغييرات التكوين غير المطبّقة",
+    "commentPlaceholder": "تعليق اختياري لهذا التغيير...",
+    "reverting": "جارٍ التراجع...",
+    "applying": "جارٍ التطبيق...",
+    "loading": "جارٍ التحميل...",
+    "review": "مراجعة"
+  },
+  "diff": {
+    "title": "تغييرات التكوين غير المطبّقة",
+    "noChanges": "لا توجد تغييرات"
+  },
+  "brand": "مدير coreX"
+}

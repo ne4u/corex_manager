@@ -1,0 +1,43 @@
+coreX Manager
+Copyright 2026 Austin Kauffman
+
+This product is licensed under the Apache License, Version 2.0, with the
+"Commons Clause" License Condition v1.0. See the LICENSE file for details.
+
+---------------------------------------------------------------------------
+Vendored third-party components
+
+The following components are included in this repository and retain their
+original licenses (see the LICENSE file in each directory):
+
+  * haproxy/geoip2/
+      Vendored from haproxy-geoip2 (https://github.com/khvzak/haproxy-geoip2)
+      MIT License, Copyright (c) 2025 Alex Orlenko
+
+  * haproxy/compression/
+      Based on haproxy-brotli (https://github.com/khvzak/haproxy-brotli)
+      MIT License, Copyright (c) 2025 Alex Orlenko
+      Extended into a unified brotli + zstd compression filter.
+
+  * haproxy/img_2_webp/
+      Based on haproxy-brotli (https://github.com/khvzak/haproxy-brotli)
+      MIT License, Copyright (c) 2025 Alex Orlenko
+
+  * haproxy/req_fp/
+      Apache License 2.0, Copyright 2026 Austin Kauffman
+
+---------------------------------------------------------------------------
+Runtime dependencies (not included in this repository)
+
+coreX Manager orchestrates the following upstream projects as separate
+containers or downloaded artifacts. They are not distributed as part of this
+repository and are governed by their own licenses:
+
+  * HAProxy (https://www.haproxy.org) - GPLv2 / LGPLv2.1
+  * Coraza SPOA (https://github.com/corazawaf/coraza-spoa) - Apache 2.0
+  * OWASP Core Rule Set (https://coreruleset.org) - Apache 2.0
+  * Varnish Cache (https://varnish-cache.org) - BSD 2-Clause
+  * Valkey (https://valkey.io) - BSD 3-Clause
+  * Cap (https://capjs.js.org) - Apache 2.0
+  * MaxMind GeoLite2 databases (https://www.maxmind.com) - GeoLite2 EULA
+    (requires your own MaxMind license key)

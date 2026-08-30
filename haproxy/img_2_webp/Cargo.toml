@@ -1,0 +1,28 @@
+[package]
+name = "haproxy-img-2-webp"
+version = "0.1.0"
+edition = "2021"
+autotests = false
+readme = "README.md"
+keywords = ["haproxy", "webp", "image", "conversion"]
+license = "MIT"
+description = "HAProxy filter for on-the-fly image to WebP conversion"
+
+[workspace]
+members = [
+    "module",
+]
+
+[dependencies]
+mlua = { version = "0.11", features = ["macros"] }
+haproxy-api = { version = "0.9" }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif"] }
+webp = { version = "0.3", features = ["image"] }
+libc = "0.2"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[[test]]
+name = "test_conversion"
+path = "tests/test_conversion.rs"

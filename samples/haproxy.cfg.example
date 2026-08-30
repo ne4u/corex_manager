@@ -1,0 +1,28 @@
+# Sample generated HAProxy configuration.
+# The real config is generated at runtime by the control plane and written to
+# /app/data/haproxy.cfg. This file is for reference only.
+
+global
+    daemon
+    maxconn 4096
+    stats socket /var/run/haproxy.sock mode 600 expose-fd listeners level admin
+    stats timeout 30s
+    user haproxy
+    group haproxy
+    ssl-default-bind-ciphersuites TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256
+    ssl-default-bind-options ssl-min-ver TLSv1.2 no-tls-tickets
+    tune.ssl.default-dh-param 2048
+    nbthread 4
+
+defaults
+    mode http
+    timeout connect 5s
+    timeout client 50s
+    timeout server 50s
+    option http-server-close
+    option forwardfor except 127.0.0.0/8
+    option http-keep-alive
+    retries 3
+    default-server init-addr last,libc,none
+    option redispatch
+    http-response set-header Strict-Transport-Security max-age=31536000

@@ -1,0 +1,279 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    # Backend serves HTTPS internally. For production, bind to 127.0.0.1
+    # and access via the frontend nginx reverse proxy. Kept public here
+    # for backward compatibility with existing deploy.py access patterns.
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - haproxy-data:/app/data
+      - ./certs:/app/certs
+      - haproxy-run:/var/run
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./backend/app:/app/app
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER:-haproxy}:${POSTGRES_PASSWORD:-haproxy}@postgres:5432/${POSTGRES_DB:-haproxy_manager}
+      - HAPROXY_CONFIG_PATH=/app/data/haproxy.cfg
+      - HAPROXY_SOCKET_PATH=/var/run/haproxy.sock
+      - HAPROXY_MASTER_SOCKET_PATH=/var/run/haproxy-master.sock
+      - CORAZA_SPOE_CONFIG_PATH=/app/data/coraza.cfg
+      - CORAZA_SPOA_CONFIG_PATH=/app/data/coraza-spoa.yaml
+      - CORAZA_SPOA_LOG_PATH=/app/data/coraza-spoa.log
+      - CORAZA_SPOA_TARGETS=${CORAZA_SPOA_TARGETS:-coraza-spoa:9000}
+      - CERT_DIR=/app/certs
+      - DATAPLANE_API_URL=https://haproxy:5555/v3
+      - DATAPLANE_API_ENABLED=${DATAPLANE_API_ENABLED:-false}
+      - ACME_SH_ENABLED=true
+      - ACME_SH_HOME=/app/certs/.acme.sh
+      - ACME_SH_BIN=/app/certs/.acme.sh/acme.sh
+      - VALKEY_HOST=valkey
+      - VALKEY_PORT=6379
+      - VALKEY_PASSWORD=${VALKEY_PASSWORD:-}
+      - VARNISH_CONTAINER_NAME=varnish
+      - VARNISH_PORT=6081
+      - VARNISH_VCL_PATH=/app/data/varnish/default.vcl
+      - VARNISH_STORAGE_SIZE=${VARNISH_STORAGE_SIZE:-1G}
+      - DISK_CACHE_ENABLED=${DISK_CACHE_ENABLED:-false}
+      - HAPROXY_CONTAINER_NAME=corex
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - corex-net
+
+  corex:
+    container_name: corex
+    build:
+      context: .
+      dockerfile: haproxy/Dockerfile
+      # dataplaneapi arch is auto-detected from the build platform
+      # (TARGETARCH). Set DATAPLANEAPI_ARCH in .env (e.g. linux_arm64)
+      # to override.
+      args:
+        DATAPLANEAPI_ARCH: ${DATAPLANEAPI_ARCH:-}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+      # Stats and Data Plane API — for production hardening, bind to
+      # 127.0.0.1 (e.g. "127.0.0.1:8404:8404") to prevent public access.
+      - "8404:8404"
+      - "5555:5555"
+    volumes:
+      - haproxy-data:/app/data
+      - ./certs:/app/certs
+      - haproxy-run:/var/run
+    environment:
+      - DATAPLANE_API_ENABLED=${DATAPLANE_API_ENABLED:-false}
+      - DATAPLANEAPI_USER=${DATAPLANE_API_USER:-admin}
+      - DATAPLANEAPI_PASS=${DATAPLANE_API_PASSWORD:-}
+      - HAPROXY_STATS_USER=${HAPROXY_STATS_USER:-}
+      - HAPROXY_STATS_PASS=${HAPROXY_STATS_PASS:-}
+    restart: unless-stopped
+    networks:
+      corex-net:
+        aliases:
+          - haproxy
+    user: "0:0"
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    sysctls:
+      - net.core.somaxconn=65535
+      - net.ipv4.tcp_max_syn_backlog=65535
+
+  coraza-spoa-init:
+    image: busybox:1.37
+    command: ["sh", "/init/init.sh"]
+    volumes:
+      - haproxy-data:/app/data
+      - ./coraza-spoa/init.sh:/init/init.sh:ro
+      - ./coraza-spoa/coraza-spoa.yaml:/init/coraza-spoa.yaml:ro
+    networks:
+      - corex-net
+
+  coraza-spoa:
+    image: ghcr.io/corazawaf/coraza-spoa:0.7.2
+    # The distroless image has no shell; run the binary directly.
+    command: ["/coraza-spoa", "--config", "/app/data/coraza-spoa.yaml"]
+    user: "0:0"
+    depends_on:
+      coraza-spoa-init:
+        condition: service_completed_successfully
+    volumes:
+      - haproxy-data:/app/data
+    restart: unless-stopped
+    networks:
+      corex-net:
+        aliases:
+          - coraza-spoa
+
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-haproxy_manager}
+      - POSTGRES_USER=${POSTGRES_USER:-haproxy}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-haproxy}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-haproxy} -d ${POSTGRES_DB:-haproxy_manager}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - corex-net
+
+  valkey:
+    image: valkey/valkey:9-alpine
+    volumes:
+      - valkey-data:/data
+    # Require authentication if VALKEY_PASSWORD is set in .env
+    command: sh -c 'valkey-server --save 60 1 --loglevel warning --maxmemory-policy noeviction $${VALKEY_PASSWORD:+--requirepass $$VALKEY_PASSWORD}'
+    environment:
+      - VALKEY_PASSWORD=${VALKEY_PASSWORD:-}
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli $${VALKEY_PASSWORD:+-a $$VALKEY_PASSWORD} ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - corex-net
+
+  cap:
+    image: tiago2/cap:latest
+    # For production hardening, bind to 127.0.0.1 (e.g. "127.0.0.1:3001:3000")
+    ports:
+      - "3001:3000"
+    environment:
+      - ADMIN_KEY=${CAP_ADMIN_KEY:-}
+      - REDIS_URL=redis://valkey:6379
+    depends_on:
+      valkey:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - corex-net
+
+  varnish:
+    image: varnish:8-alpine
+    container_name: varnish
+    # Run as root so varnishd can write to the shared haproxy-data volume
+    # (owned by root from the haproxy container), allocate the file-backed
+    # storage, and create the VCL file on first boot. varnishd drops its
+    # child/worker process to the varnish user internally.
+    user: "0:0"
+    volumes:
+      - haproxy-data:/app/data
+      - varnish-data:/var/lib/varnish
+    # Create a minimal VCL file if it doesn't exist yet (the API writes the
+    # real VCL during config apply). Without this, varnishd fails to start
+    # on first boot before the API has had a chance to write the VCL.
+    command: sh -c 'mkdir -p /app/data/varnish && if [ ! -f /app/data/varnish/default.vcl ]; then printf "vcl 4.1;\n\nbackend default none;\n\nsub vcl_recv {\n    return(synth(200, \"OK\"));\n}\n" > /app/data/varnish/default.vcl; fi && exec varnishd -F -a :6081 -f /app/data/varnish/default.vcl -s file,/var/lib/varnish/varnish_storage.bin,${VARNISH_STORAGE_SIZE:-1G} -p default_ttl=120 -p default_grace=600'
+    restart: unless-stopped
+    networks:
+      - corex-net
+    tmpfs:
+      - /var/lib/varnish/varnishd:exec
+    ulimits:
+      memlock: -1
+      nofile:
+        soft: 131072
+        hard: 131072
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+      - "3443:443"
+    depends_on:
+      - api
+    restart: unless-stopped
+    networks:
+      - corex-net
+
+  mcp-gateway:
+    build:
+      context: .
+      dockerfile: mcp-gateway/Dockerfile
+    ports:
+      - "8081:8081"
+    env_file:
+      - .env
+    volumes:
+      - haproxy-data:/app/data
+    environment:
+      - MCP_GATEWAY_ENABLED=${MCP_GATEWAY_ENABLED:-false}
+      - MCP_GATEWAY_LISTEN=0.0.0.0:8081
+      - MCP_CONFIG_PATH=/app/data/mcp/config.json
+      - MCP_EVENTS_LOG_PATH=/app/data/mcp/events.ndjson
+      - MCP_SECRETS_KEY=${MCP_SECRETS_KEY:-}
+      - VALKEY_HOST=valkey
+      - VALKEY_PORT=6379
+      - VALKEY_PASSWORD=${VALKEY_PASSWORD:-}
+    depends_on:
+      valkey:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - corex-net
+
+  mcp-server:
+    build:
+      context: .
+      dockerfile: mcp-server/Dockerfile
+    ports:
+      - "8082:8082"
+    env_file:
+      - .env
+    volumes:
+      - haproxy-data:/app/data
+      - ./backend/app:/app/app
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER:-haproxy}:${POSTGRES_PASSWORD:-haproxy}@postgres:5432/${POSTGRES_DB:-haproxy_manager}
+      - SECRET_KEY=${SECRET_KEY}
+      - VALKEY_HOST=valkey
+      - VALKEY_PORT=6379
+      - VALKEY_PASSWORD=${VALKEY_PASSWORD:-}
+      - COREX_MCP_TOKEN=${COREX_MCP_TOKEN:-}
+      - MCP_SERVICE_TOKEN=${MCP_SERVICE_TOKEN:-}
+      - MCP_GATEWAY_ENABLED=${MCP_GATEWAY_ENABLED:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+      api:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - corex-net
+
+networks:
+  corex-net:
+    driver: bridge
+
+volumes:
+  haproxy-data:
+  haproxy-run:
+  valkey-data:
+  varnish-data:
+  postgres-data:

@@ -1,0 +1,75 @@
+{
+  "title": "Impostazioni di sistema",
+  "geoip": {
+    "title": "MaxMind GeoIP",
+    "description": "La chiave di licenza viene utilizzata per scaricare i database GeoLite2 Country, City e ASN ogni 24 ore. Il database City abilita ricerche regione/postale/fuso orario/lat/long nelle Regole di sicurezza e nei log di accesso. Le ricerche GeoIP utilizzano il modulo Rust Lua haproxy-geoip2 con hot-reload.",
+    "licenseKey": "Chiave di licenza",
+    "licenseKeyPlaceholder": "pH3xK7mZq9Va2N_yB4wC8rLfS1uD6gJ_eR0vQnIz",
+    "saveLicenseKey": "Salva chiave di licenza",
+    "downloadNow": "Scarica ora",
+    "downloading": "Download...",
+    "saved": "Chiave di licenza salvata.",
+    "saveFailed": "Salvataggio chiave di licenza non riuscito.",
+    "couldNotLoad": "Impossibile caricare le impostazioni",
+    "lastUpdated": "Ultimo aggiornamento:",
+    "never": "Mai",
+    "missing": "Mancante",
+    "dbSuffix": "DB",
+    "downloaded": "Scaricati {{count}} database.",
+    "downloadFailed": "Download non riuscito: {{errors}}",
+    "downloadTriggerFailed": "Impossibile avviare il download."
+  },
+  "snapshots": {
+    "title": "Snapshot di configurazione",
+    "description": "Numero massimo di snapshot di configurazione da mantenere. Gli snapshot più vecchi vengono eliminati automaticamente.",
+    "saved": "Numero massimo di snapshot salvato.",
+    "saveFailed": "Salvataggio del numero massimo di snapshot non riuscito."
+  },
+  "session": {
+    "title": "Gestione sessione",
+    "description": "Timeout della sessione e conto alla rovescia di avviso. Il timeout è la durata di una sessione GUI senza attività. L'avviso viene mostrato questo numero di secondi prima del timeout; facendo clic su OK o con qualsiasi attività la sessione viene prolungata.",
+    "timeoutLabel": "Timeout sessione (minuti)",
+    "warningLabel": "Conto alla rovescia avviso (secondi)",
+    "timeoutRange": "5 — 1440 minuti",
+    "warningRange": "5 — 120 secondi",
+    "timeoutInvalid": "Il timeout della sessione deve essere compreso tra 5 e 1440 minuti.",
+    "warningInvalid": "Il conto alla rovescia di avviso deve essere compreso tra 5 e 120 secondi.",
+    "save": "Salva impostazioni sessione",
+    "saved": "Impostazioni sessione salvate.",
+    "saveFailed": "Salvataggio impostazioni sessione non riuscito."
+  },
+  "backup": {
+    "title": "Backup e ripristino di sistema",
+    "description": "Esporta l'intera configurazione in esecuzione — tutte le tabelle del database, i certificati, le configurazioni coreX/Coraza, le liste di sicurezza, i set di regole WAF, i database GeoIP e la cronologia degli snapshot di configurazione — in un archivio scaricabile. Il ripristino sostituisce lo stato attuale del sistema e ricarica coreX.",
+    "export": {
+      "title": "Esporta",
+      "exportSecrets": "Esporta segreti (certificati, credenziali DNS, chiave MaxMind, account utente)",
+      "exportMetrics": "Esporta metriche e log (metriche coreX, eventi WAF, log di audit)",
+      "passwordLabel": "Password archivio (facoltativa — cifra con AES)",
+      "passwordPlaceholder": "Lascia vuoto per nessuna cifratura",
+      "button": "Esporta sistema",
+      "exporting": "Esportazione...",
+      "success": "Export scaricato con successo.",
+      "failed": "Esportazione non riuscita."
+    },
+    "restore": {
+      "title": "Ripristina",
+      "fileLabel": "File archivio (.zip)",
+      "chooseFile": "Scegli file",
+      "passwordLabel": "Password archivio (se protetto)",
+      "passwordPlaceholder": "Lascia vuoto se non cifrato",
+      "selectFile": "Seleziona un file archivio.",
+      "button": "Ripristina sistema",
+      "restoring": "Ripristino...",
+      "complete": "Ripristino completato: {{tables}} tabelle, {{files}} file ripristinati. {{applied}}",
+      "configApplied": "Configurazione applicata e coreX ricaricato.",
+      "configNotApplied": "Configurazione non applicata.",
+      "failed": "Ripristino non riuscito.",
+      "confirmTitle": "Conferma ripristino di sistema",
+      "confirmWarning": "Questa operazione sostituirà <strong>TUTTA</strong> la configurazione attuale, i certificati, le regole WAF e le impostazioni con i contenuti dell'archivio. Non può essere annullata. La configurazione verrà applicata e coreX verrà ricaricato automaticamente.",
+      "typeConfirm": "Digita RESTORE per confermare",
+      "confirmPlaceholder": "RESTORE",
+      "restoreNow": "Ripristina ora"
+    }
+  }
+}

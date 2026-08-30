@@ -1,0 +1,75 @@
+{
+  "title": "시스템 설정",
+  "geoip": {
+    "title": "MaxMind GeoIP",
+    "description": "라이선스 키는 24시간마다 GeoLite2 Country, City, ASN 데이터베이스를 다운로드하는 데 사용됩니다. City 데이터베이스는 시큐리티 규칙 및 액세스 로그에서 지역/우편번호/시간대/위도/경도 조회를 가능하게 합니다. GeoIP 조회는 haproxy-geoip2 Rust Lua 모듈을 사용하며 핫 리로드를 지원합니다.",
+    "licenseKey": "라이선스 키",
+    "licenseKeyPlaceholder": "pH3xK7mZq9Va2N_yB4wC8rLfS1uD6gJ_eR0vQnIz",
+    "saveLicenseKey": "라이선스 키 저장",
+    "downloadNow": "지금 다운로드",
+    "downloading": "다운로드 중...",
+    "saved": "라이선스 키가 저장되었습니다.",
+    "saveFailed": "라이선스 키 저장 실패.",
+    "couldNotLoad": "설정을 불러올 수 없습니다",
+    "lastUpdated": "최종 업데이트:",
+    "never": "없음",
+    "missing": "누락됨",
+    "dbSuffix": "DB",
+    "downloaded": "{{count}}개의 데이터베이스가 다운로드되었습니다.",
+    "downloadFailed": "다운로드 실패: {{errors}}",
+    "downloadTriggerFailed": "다운로드 트리거 실패."
+  },
+  "snapshots": {
+    "title": "구성 스냅샷",
+    "description": "유지할 구성 스냅샷의 최대 개수입니다. 오래된 스냅샷은 자동으로 정리됩니다.",
+    "saved": "최대 스냅샷 수가 저장되었습니다.",
+    "saveFailed": "최대 스냅샷 수 저장 실패."
+  },
+  "session": {
+    "title": "세션 관리",
+    "description": "세션 시간 초과 및 경고 카운트다운입니다. 시간 초과는 활동이 없는 상태에서 GUI 세션이 지속되는 시간입니다. 경고는 시간 초과 이 지정된 초 전에 나타나며, 확인을 클릭하거나 활동이 있으면 세션이 연장됩니다.",
+    "timeoutLabel": "세션 시간 초과 (분)",
+    "warningLabel": "경고 카운트다운 (초)",
+    "timeoutRange": "5 — 1440분",
+    "warningRange": "5 — 120초",
+    "timeoutInvalid": "세션 시간 초과는 5분에서 1440분 사이여야 합니다.",
+    "warningInvalid": "경고 카운트다운은 5초에서 120초 사이여야 합니다.",
+    "save": "세션 설정 저장",
+    "saved": "세션 설정이 저장되었습니다.",
+    "saveFailed": "세션 설정 저장 실패."
+  },
+  "backup": {
+    "title": "시스템 백업 & 복원",
+    "description": "실행 중인 전체 구성 — 모든 데이터베이스 테이블, 인증서, coreX/Coraza 구성, 시큐리티 리스트, WAF 규칙 세트, GeoIP 데이터베이스, 구성 스냅샷 기록 — 을 다운로드 가능한 아카이브로 내보냅니다. 복원은 현재 시스템 상태를 교체하고 coreX를 다시 로드합니다.",
+    "export": {
+      "title": "내보내기",
+      "exportSecrets": "시크릿 내보내기 (인증서, DNS 자격증명, MaxMind 키, 사용자 계정)",
+      "exportMetrics": "메트릭 & 로그 내보내기 (coreX 메트릭, WAF 이벤트, 감사 로그)",
+      "passwordLabel": "아카이브 비밀번호 (선택 사항 — AES로 암호화)",
+      "passwordPlaceholder": "암호화하지 않으려면 비워두세요",
+      "button": "시스템 내보내기",
+      "exporting": "내보내는 중...",
+      "success": "내보내기가 성공적으로 다운로드되었습니다.",
+      "failed": "내보내기 실패."
+    },
+    "restore": {
+      "title": "복원",
+      "fileLabel": "아카이브 파일 (.zip)",
+      "chooseFile": "파일 선택",
+      "passwordLabel": "아카이브 비밀번호 (보호된 경우)",
+      "passwordPlaceholder": "암호화되지 않은 경우 비워두세요",
+      "selectFile": "아카이브 파일을 선택하세요.",
+      "button": "시스템 복원",
+      "restoring": "복원 중...",
+      "complete": "복원 완료: {{tables}}개 테이블, {{files}}개 파일이 복원되었습니다. {{applied}}",
+      "configApplied": "구성이 적용되고 coreX가 다시 로드되었습니다.",
+      "configNotApplied": "구성이 적용되지 않았습니다.",
+      "failed": "복원 실패.",
+      "confirmTitle": "시스템 복원 확인",
+      "confirmWarning": "이 작업은 현재의 <strong>모든</strong> 구성, 인증서, WAF 규칙 및 설정을 아카이브의 내용으로 교체합니다. 이 작업은 되돌릴 수 없습니다. 구성이 적용되고 coreX가 자동으로 다시 로드됩니다.",
+      "typeConfirm": "확인하려면 RESTORE를 입력하세요",
+      "confirmPlaceholder": "RESTORE",
+      "restoreNow": "지금 복원"
+    }
+  }
+}

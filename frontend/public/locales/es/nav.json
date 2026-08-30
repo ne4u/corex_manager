@@ -1,0 +1,42 @@
+{
+  "searchPlaceholder": "Buscar en la navegación...",
+  "logout": "Cerrar sesión",
+  "items": {
+    "dashboard": "Panel",
+    "globalOptions": "Opciones globales",
+    "loadBalancing": "Balanceo de carga",
+    "caching": "Caché",
+    "securityLists": "Listas de seguridad",
+    "securityRules": "Reglas de seguridad",
+    "rateLimits": "Límites de tasa",
+    "wafSignatures": "Firmas WAF",
+    "wafLogs": "Logs WAF",
+    "captcha": "CAPTCHA",
+    "pageArmor": "Page Armor",
+    "apiArmor": "API Armor",
+    "redirects": "Redirecciones y reescrituras",
+    "headers": "Cabeceras",
+    "responseTransforms": "Transformaciones de respuesta",
+    "certificates": "Certificados",
+    "ciphers": "Cifrados",
+    "logging": "Logs",
+    "metrics": "Métricas",
+    "auditLogs": "Logs de auditoría",
+    "system": "Sistema",
+    "mcpGateway": "MCP Gateway",
+    "riskScoring": "Risk Scoring"
+  },
+  "unapplied": {
+    "title": "Cambios de configuración sin aplicar",
+    "commentPlaceholder": "Comentario opcional para este cambio...",
+    "reverting": "Revirtiendo...",
+    "applying": "Aplicando...",
+    "loading": "Cargando...",
+    "review": "Revisar"
+  },
+  "diff": {
+    "title": "Cambios de configuración sin aplicar",
+    "noChanges": "Sin cambios"
+  },
+  "brand": "coreX Manager"
+}

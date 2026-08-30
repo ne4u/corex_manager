@@ -1,0 +1,13 @@
+[package]
+name = "haproxy-req-fp-module"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+haproxy-api = { version = "0.9" }
+haproxy-req-fp = { path = ".." }
+mlua = "0.11"

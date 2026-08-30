@@ -1,0 +1,75 @@
+{
+  "title": "System Settings",
+  "geoip": {
+    "title": "MaxMind GeoIP",
+    "description": "The license key is used to download GeoLite2 Country, City, and ASN databases every 24 hours. The City database enables region/postal/timezone/lat/long lookups in Security Rules and access logs. GeoIP lookups use the haproxy-geoip2 Rust Lua module with hot-reload.",
+    "licenseKey": "License Key",
+    "licenseKeyPlaceholder": "pH3xK7mZq9Va2N_yB4wC8rLfS1uD6gJ_eR0vQnIz",
+    "saveLicenseKey": "Save License Key",
+    "downloadNow": "Download Now",
+    "downloading": "Downloading...",
+    "saved": "License key saved.",
+    "saveFailed": "Failed to save license key.",
+    "couldNotLoad": "Could not load settings",
+    "lastUpdated": "Last updated:",
+    "never": "Never",
+    "missing": "Missing",
+    "dbSuffix": "DB",
+    "downloaded": "Downloaded {{count}} databases.",
+    "downloadFailed": "Download failed: {{errors}}",
+    "downloadTriggerFailed": "Failed to trigger download."
+  },
+  "snapshots": {
+    "title": "Config Snapshots",
+    "description": "Maximum number of configuration snapshots to keep. Older snapshots are pruned automatically.",
+    "saved": "Max snapshots saved.",
+    "saveFailed": "Failed to save max snapshots."
+  },
+  "session": {
+    "title": "Session Management",
+    "description": "Session timeout and warning countdown. The timeout is how long a GUI session lasts without activity. The warning appears this many seconds before timeout, and clicking OK or any activity extends the session.",
+    "timeoutLabel": "Session Timeout (minutes)",
+    "warningLabel": "Warning Countdown (seconds)",
+    "timeoutRange": "5 — 1440 minutes",
+    "warningRange": "5 — 120 seconds",
+    "timeoutInvalid": "Session timeout must be between 5 and 1440 minutes.",
+    "warningInvalid": "Warning countdown must be between 5 and 120 seconds.",
+    "save": "Save Session Settings",
+    "saved": "Session settings saved.",
+    "saveFailed": "Failed to save session settings."
+  },
+  "backup": {
+    "title": "System Backup & Restore",
+    "description": "Export the full running configuration — all database tables, certificates, coreX/Coraza configs, security lists, WAF rule sets, GeoIP databases, and config snapshot history — into a downloadable archive. Restore replaces the current system state and reloads coreX.",
+    "export": {
+      "title": "Export",
+      "exportSecrets": "Export secrets (certificates, DNS credentials, MaxMind key, user accounts)",
+      "exportMetrics": "Export metrics & logs (coreX metrics, WAF events, audit log)",
+      "passwordLabel": "Archive password (optional — encrypts with AES)",
+      "passwordPlaceholder": "Leave blank for no encryption",
+      "button": "Export System",
+      "exporting": "Exporting...",
+      "success": "Export downloaded successfully.",
+      "failed": "Export failed."
+    },
+    "restore": {
+      "title": "Restore",
+      "fileLabel": "Archive file (.zip)",
+      "chooseFile": "Choose File",
+      "passwordLabel": "Archive password (if protected)",
+      "passwordPlaceholder": "Leave blank if not encrypted",
+      "selectFile": "Please select an archive file.",
+      "button": "Restore System",
+      "restoring": "Restoring...",
+      "complete": "Restore complete: {{tables}} tables, {{files}} files restored. {{applied}}",
+      "configApplied": "Config applied and coreX reloaded.",
+      "configNotApplied": "Config not applied.",
+      "failed": "Restore failed.",
+      "confirmTitle": "Confirm System Restore",
+      "confirmWarning": "This will replace <strong>ALL</strong> current configuration, certificates, WAF rules, and settings with the contents of the archive. This cannot be undone. The config will be applied and coreX will be reloaded automatically.",
+      "typeConfirm": "Type RESTORE to confirm",
+      "confirmPlaceholder": "RESTORE",
+      "restoreNow": "Restore Now"
+    }
+  }
+}

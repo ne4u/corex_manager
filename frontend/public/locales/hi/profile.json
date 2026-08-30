@@ -1,0 +1,92 @@
+{
+  "tabs": {
+    "profile": "प्रोफ़ाइल",
+    "appearance": "रूप",
+    "security": "सुरक्षा",
+    "language": "भाषा"
+  },
+  "identity": {
+    "role": "भूमिका",
+    "memberSince": "सदस्य बने",
+    "logout": "लॉगआउट"
+  },
+  "appearance": {
+    "title": "थीम",
+    "createCustom": "कस्टम थीम बनाएं",
+    "description": "इंटरफ़ेस के लिए एक रंग थीम चुनें। थीम स्थानीय रूप से सहेजी जाती है और तुरंत लागू होती है। कस्टम थीम बनाई, संपादित और हटाई जा सकती हैं।",
+    "builtinThemes": "अंतर्निर्मित थीम",
+    "customThemes": "कस्टम थीम",
+    "editTheme": "थीम संपादित करें",
+    "deleteTheme": "थीम हटाएं",
+    "background": "पृष्ठभूमि",
+    "surface": "सतह",
+    "border": "बॉर्डर",
+    "text": "टेक्स्ट",
+    "success": "सफल",
+    "error": "त्रुटि",
+    "themeEditor": {
+      "nameRequired": "थीम नाम आवश्यक है।",
+      "nameExists": "इस नाम की थीम पहले से मौजूद है। एक अलग नाम चुनें।",
+      "editTitle": "कस्टम थीम संपादित करें",
+      "themeName": "थीम नाम",
+      "themeNamePlaceholder": "उदा. मेरी कस्टम डार्क",
+      "cloneFrom": "मौजूदा से क्लोन करें (वैकल्पिक)",
+      "scratch": "— शुरुआत से —",
+      "deleteConfirm": "थीम \"{{name}}\" हटाएं? यह पूर्ववत नहीं किया जा सकता।",
+      "saveChanges": "परिवर्तन सहेजें",
+      "createTheme": "थीम बनाएं",
+      "preview": {
+        "primaryText": "प्राथमिक पाठ",
+        "secondaryText": "द्वितीयक पाठ",
+        "tertiaryText": "तृतीयक पाठ",
+        "primaryButton": "प्राथमिक बटन",
+        "secondaryButton": "द्वितीयक बटन",
+        "success": "● सफलता",
+        "warning": "● चेतावनी",
+        "error": "● त्रुटि",
+        "cardSurface": "कार्ड / सतह उदाहरण पाठ"
+      }
+    }
+  },
+  "security": {
+    "changePassword": {
+      "title": "पासवर्ड बदलें",
+      "currentPassword": "वर्तमान पासवर्ड",
+      "newPassword": "नया पासवर्ड",
+      "confirmPassword": "नए पासवर्ड की पुष्टि करें",
+      "submit": "पासवर्ड बदलें",
+      "changing": "बदला जा रहा है...",
+      "success": "पासवर्ड सफलतापूर्वक बदला गया।",
+      "wrongCurrent": "वर्तमान पासवर्ड गलत है",
+      "mismatch": "पासवर्ड मेल नहीं खाते",
+      "tooShort": "पासवर्ड कम से कम 8 अक्षर का होना चाहिए"
+    },
+    "twoFactor": {
+      "title": "द्वि-कारक प्रमाणीकरण",
+      "loading": "लोड हो रहा है...",
+      "loadFailed": "MFA स्थिति लोड नहीं हो सकी।",
+      "enabled": "MFA सक्षम है। इसे अक्षम करने के लिए अपना पासवर्ड दर्ज करें।",
+      "disabled": "MFA अक्षम है। अपना खाता सुरक्षित करने के लिए TOTP सेट करें।",
+      "setupHint": "QR कोड स्कैन करें या अपने ऑथेंटिकेटर ऐप में सीक्रेट दर्ज करें, फिर 6-अंकीय कोड दर्ज करें।",
+      "verifyEnable": "सत्यापित करें और सक्षम करें",
+      "setUpMfa": "MFA सेट करें",
+      "disableMfa": "MFA अक्षम करें",
+      "mfaEnabled": "MFA सक्षम किया गया।",
+      "mfaDisabled": "MFA अक्षम किया गया।",
+      "invalidCode": "अमान्य कोड",
+      "setupFailed": "सेटअप शुरू करना विफल",
+      "disableFailed": "MFA अक्षम करना विफल",
+      "aliasLabel": "ऑथेंटिकेटर ऐप उपनाम",
+      "aliasPlaceholder": "जैसे admin, personal, work",
+      "codePlaceholder": "123456",
+      "currentPasswordPlaceholder": "वर्तमान पासवर्ड",
+      "mfaQrCode": "MFA QR कोड"
+    }
+  },
+  "language": {
+    "title": "भाषा",
+    "description": "अपनी इंटरफ़ेस भाषा चुनें। उचित संज्ञाएं अंग्रेजी में रहती हैं।",
+    "default": "डिफ़ॉल्ट",
+    "englishNote": "अंग्रेजी सार्वभौमिक व्यावसायिक भाषा है और डिफ़ॉल्ट है।"
+  }
+}

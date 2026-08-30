@@ -1,0 +1,20 @@
+[package]
+name = "haproxy-disk-cache"
+version = "0.1.0"
+edition = "2021"
+autotests = false
+readme = "README.md"
+keywords = ["haproxy", "cache", "mmap", "disk-cache"]
+license = "MIT"
+description = "HAProxy in-process disk cache PoC using mmap shared across workers"
+
+[workspace]
+members = [
+    "module",
+]
+
+[dependencies]
+mlua = { version = "0.11", features = ["macros"] }
+haproxy-api = { version = "0.9" }
+memmap2 = "0.9"
+libc = "0.2"

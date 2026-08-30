@@ -1,0 +1,75 @@
+{
+  "title": "Paramètres système",
+  "geoip": {
+    "title": "MaxMind GeoIP",
+    "description": "La clé de licence est utilisée pour télécharger les bases de données GeoLite2 Country, City et ASN toutes les 24 heures. La base City active les recherches région/code postal/fuseau horaire/lat/long dans les règles de sécurité et les logs d'accès. Les recherches GeoIP utilisent le module Rust Lua haproxy-geoip2 avec rechargement à chaud.",
+    "licenseKey": "Clé de licence",
+    "licenseKeyPlaceholder": "pH3xK7mZq9Va2N_yB4wC8rLfS1uD6gJ_eR0vQnIz",
+    "saveLicenseKey": "Enregistrer la clé de licence",
+    "downloadNow": "Télécharger maintenant",
+    "downloading": "Téléchargement...",
+    "saved": "Clé de licence enregistrée.",
+    "saveFailed": "Échec de l'enregistrement de la clé de licence.",
+    "couldNotLoad": "Impossible de charger les paramètres",
+    "lastUpdated": "Dernière mise à jour :",
+    "never": "Jamais",
+    "missing": "Manquant",
+    "dbSuffix": "DB",
+    "downloaded": "{{count}} bases de données téléchargées.",
+    "downloadFailed": "Échec du téléchargement : {{errors}}",
+    "downloadTriggerFailed": "Échec du déclenchement du téléchargement."
+  },
+  "snapshots": {
+    "title": "Snapshots de configuration",
+    "description": "Nombre maximum de snapshots de configuration à conserver. Les snapshots les plus anciens sont élagués automatiquement.",
+    "saved": "Nombre maximum de snapshots enregistré.",
+    "saveFailed": "Échec de l'enregistrement du nombre maximum de snapshots."
+  },
+  "session": {
+    "title": "Gestion de session",
+    "description": "Délai d'expiration de session et compte à rebours d'avertissement. Le délai correspond à la durée d'une session GUI sans activité. L'avertissement apparaît ce nombre de secondes avant l'expiration, et cliquer sur OK ou toute activité prolonge la session.",
+    "timeoutLabel": "Délai de session (minutes)",
+    "warningLabel": "Compte à rebours d'avertissement (secondes)",
+    "timeoutRange": "5 — 1440 minutes",
+    "warningRange": "5 — 120 secondes",
+    "timeoutInvalid": "Le délai de session doit être compris entre 5 et 1440 minutes.",
+    "warningInvalid": "Le compte à rebours d'avertissement doit être compris entre 5 et 120 secondes.",
+    "save": "Enregistrer les paramètres de session",
+    "saved": "Paramètres de session enregistrés.",
+    "saveFailed": "Échec de l'enregistrement des paramètres de session."
+  },
+  "backup": {
+    "title": "Sauvegarde & Restauration système",
+    "description": "Exportez la configuration en cours d'exécution complète — toutes les tables de base de données, certificats, configurations coreX/Coraza, listes de sécurité, jeux de règles WAF, bases de données GeoIP et l'historique des snapshots de configuration — dans une archive téléchargeable. La restauration remplace l'état actuel du système et recharge coreX.",
+    "export": {
+      "title": "Exporter",
+      "exportSecrets": "Exporter les secrets (certificats, identifiants DNS, clé MaxMind, comptes utilisateurs)",
+      "exportMetrics": "Exporter métriques & logs (métriques coreX, événements WAF, log d'audit)",
+      "passwordLabel": "Mot de passe de l'archive (facultatif — chiffrement AES)",
+      "passwordPlaceholder": "Laisser vide pour aucun chiffrement",
+      "button": "Exporter le système",
+      "exporting": "Exportation...",
+      "success": "Export téléchargé avec succès.",
+      "failed": "Échec de l'export."
+    },
+    "restore": {
+      "title": "Restaurer",
+      "fileLabel": "Fichier d'archive (.zip)",
+      "chooseFile": "Choisir un fichier",
+      "passwordLabel": "Mot de passe de l'archive (si protégée)",
+      "passwordPlaceholder": "Laisser vide si non chiffré",
+      "selectFile": "Veuillez sélectionner un fichier d'archive.",
+      "button": "Restaurer le système",
+      "restoring": "Restauration...",
+      "complete": "Restauration terminée : {{tables}} tables, {{files}} fichiers restaurés. {{applied}}",
+      "configApplied": "Configuration appliquée et coreX rechargé.",
+      "configNotApplied": "Configuration non appliquée.",
+      "failed": "Échec de la restauration.",
+      "confirmTitle": "Confirmer la restauration système",
+      "confirmWarning": "Cela remplacera <strong>TOUTE</strong> la configuration actuelle, les certificats, les règles WAF et les paramètres par le contenu de l'archive. Cela ne peut pas être annulé. La configuration sera appliquée et coreX sera rechargé automatiquement.",
+      "typeConfirm": "Saisissez RESTORE pour confirmer",
+      "confirmPlaceholder": "RESTORE",
+      "restoreNow": "Restaurer maintenant"
+    }
+  }
+}

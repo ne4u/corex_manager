@@ -1,0 +1,12 @@
+[package]
+name = "api-armor-graphql"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+sha2 = { workspace = true }

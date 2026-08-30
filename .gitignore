@@ -1,0 +1,73 @@
+# Virtual environments
+/.venv
+/.venv-3.12
+
+# Secrets / environment — never commit real .env files
+.env
+.env.bak
+.env.local
+.env.*.local
+!.env.example
+
+# Runtime data, generated configs, and certificates
+/backend/certs/
+/backend/data/
+/data/
+certs/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+/backend/var/
+*.mmdb
+*.log
+logs/
+
+# Private keys and certificates — never commit
+*.pem
+*.key
+*.crt
+*.csr
+
+# Git backup directories (from history rewrites, etc.)
+.git.backup.*/
+
+# Build output / dependencies
+/frontend/node_modules
+/frontend/dist
+/frontend/build
+*.egg-info/
+
+# Python cache and test artifacts
+**/__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.tox/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Deploy manifest (managed by deploy.py on the remote host)
+.deploy-manifest.json
+
+# Devin local settings (machine-specific)
+.devin/config.local.json
+
+# Internal dev docs/tooling — kept locally, not part of the public repo
+/AGENTS.md
+/TODO.md
+/docs/
+/bench/
+/haproxy-fcgi-filter-bug-report.md
+/haproxy-fcgi-filter-fix.patch
+
+# Sample configs are always tracked (templates for ignored runtime files)
+!samples/

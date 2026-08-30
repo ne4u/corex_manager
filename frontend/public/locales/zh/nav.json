@@ -1,0 +1,42 @@
+{
+  "searchPlaceholder": "搜索导航...",
+  "logout": "退出登录",
+  "items": {
+    "dashboard": "仪表盘",
+    "globalOptions": "全局选项",
+    "loadBalancing": "负载均衡",
+    "caching": "缓存",
+    "securityLists": "安全列表",
+    "securityRules": "安全规则",
+    "rateLimits": "速率限制",
+    "wafSignatures": "WAF 签名",
+    "wafLogs": "WAF 日志",
+    "captcha": "验证码",
+    "pageArmor": "页面防护",
+    "apiArmor": "API 防护",
+    "redirects": "重定向与重写",
+    "headers": "请求头",
+    "responseTransforms": "响应转换",
+    "certificates": "证书",
+    "ciphers": "加密套件",
+    "logging": "日志",
+    "metrics": "指标",
+    "auditLogs": "审计日志",
+    "system": "系统",
+    "mcpGateway": "MCP 网关",
+    "riskScoring": "Risk Scoring"
+  },
+  "unapplied": {
+    "title": "未应用的配置变更",
+    "commentPlaceholder": "为此变更添加可选备注...",
+    "reverting": "回滚中...",
+    "applying": "应用中...",
+    "loading": "加载中...",
+    "review": "查看"
+  },
+  "diff": {
+    "title": "未应用的配置变更",
+    "noChanges": "无变更"
+  },
+  "brand": "coreX 管理器"
+}

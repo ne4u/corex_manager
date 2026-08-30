@@ -1,0 +1,42 @@
+{
+  "searchPlaceholder": "네비게이션 검색...",
+  "logout": "로그아웃",
+  "items": {
+    "dashboard": "대시보드",
+    "globalOptions": "전역 옵션",
+    "loadBalancing": "로드 밸런싱",
+    "caching": "캐싱",
+    "securityLists": "시큐리티 리스트",
+    "securityRules": "시큐리티 규칙",
+    "rateLimits": "요청 제한",
+    "wafSignatures": "WAF 시그니처",
+    "wafLogs": "WAF 로그",
+    "captcha": "CAPTCHA",
+    "pageArmor": "페이지 아머",
+    "apiArmor": "API 아머",
+    "redirects": "리다이렉트 & 재작성",
+    "headers": "헤더",
+    "responseTransforms": "응답 변환",
+    "certificates": "인증서",
+    "ciphers": "암호화 스위트",
+    "logging": "로깅",
+    "metrics": "메트릭",
+    "auditLogs": "감사 로그",
+    "system": "시스템",
+    "mcpGateway": "MCP 게이트웨이",
+    "riskScoring": "Risk Scoring"
+  },
+  "unapplied": {
+    "title": "미적용 구성 변경사항",
+    "commentPlaceholder": "이 변경에 대한 선택적 코멘트...",
+    "reverting": "되돌리는 중...",
+    "applying": "적용 중...",
+    "loading": "로딩 중...",
+    "review": "검토"
+  },
+  "diff": {
+    "title": "미적용 구성 변경사항",
+    "noChanges": "변경사항 없음"
+  },
+  "brand": "coreX 관리자"
+}

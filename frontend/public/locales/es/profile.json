@@ -1,0 +1,92 @@
+{
+  "tabs": {
+    "profile": "Perfil",
+    "appearance": "Apariencia",
+    "security": "Seguridad",
+    "language": "Idioma"
+  },
+  "identity": {
+    "role": "Rol",
+    "memberSince": "Miembro desde",
+    "logout": "Cerrar sesión"
+  },
+  "appearance": {
+    "title": "Tema",
+    "createCustom": "Crear tema personalizado",
+    "description": "Elige un tema de color para la interfaz. El tema se guarda localmente y se aplica al instante. Los temas personalizados se pueden crear, editar y eliminar.",
+    "builtinThemes": "Temas integrados",
+    "customThemes": "Temas personalizados",
+    "editTheme": "Editar tema",
+    "deleteTheme": "Eliminar tema",
+    "background": "Fondo",
+    "surface": "Superficie",
+    "border": "Borde",
+    "text": "Texto",
+    "success": "Éxito",
+    "error": "Error",
+    "themeEditor": {
+      "nameRequired": "El nombre del tema es obligatorio.",
+      "nameExists": "Ya existe un tema con este nombre. Elija un nombre diferente.",
+      "editTitle": "Editar tema personalizado",
+      "themeName": "Nombre del tema",
+      "themeNamePlaceholder": "p. ej. Mi tema oscuro",
+      "cloneFrom": "Clonar de existente (opcional)",
+      "scratch": "— Empezar desde cero —",
+      "deleteConfirm": "¿Eliminar tema \"{{name}}\"? Esto no se puede deshacer.",
+      "saveChanges": "Guardar cambios",
+      "createTheme": "Crear tema",
+      "preview": {
+        "primaryText": "Texto principal",
+        "secondaryText": "Texto secundario",
+        "tertiaryText": "Texto terciario",
+        "primaryButton": "Botón principal",
+        "secondaryButton": "Botón secundario",
+        "success": "● Éxito",
+        "warning": "● Advertencia",
+        "error": "● Error",
+        "cardSurface": "Texto de ejemplo de tarjeta / superficie"
+      }
+    }
+  },
+  "security": {
+    "changePassword": {
+      "title": "Cambiar contraseña",
+      "currentPassword": "Contraseña actual",
+      "newPassword": "Nueva contraseña",
+      "confirmPassword": "Confirmar nueva contraseña",
+      "submit": "Cambiar contraseña",
+      "changing": "Cambiando...",
+      "success": "Contraseña cambiada correctamente.",
+      "wrongCurrent": "La contraseña actual es incorrecta",
+      "mismatch": "Las contraseñas no coinciden",
+      "tooShort": "La contraseña debe tener al menos 8 caracteres"
+    },
+    "twoFactor": {
+      "title": "Autenticación de dos factores",
+      "loading": "Cargando...",
+      "loadFailed": "No se pudo cargar el estado de MFA.",
+      "enabled": "MFA está activado. Introduce tu contraseña para desactivarlo.",
+      "disabled": "MFA está desactivado. Configura TOTP para asegurar tu cuenta.",
+      "setupHint": "Escanea el código QR o introduce el secreto en tu aplicación de autenticación, luego introduce el código de 6 dígitos.",
+      "verifyEnable": "Verificar y activar",
+      "setUpMfa": "Configurar MFA",
+      "disableMfa": "Desactivar MFA",
+      "mfaEnabled": "MFA activado.",
+      "mfaDisabled": "MFA desactivado.",
+      "invalidCode": "Código no válido",
+      "setupFailed": "Error al iniciar la configuración",
+      "disableFailed": "Error al desactivar MFA",
+      "aliasLabel": "Alias de la aplicación de autenticación",
+      "aliasPlaceholder": "p. ej. admin, personal, trabajo",
+      "codePlaceholder": "123456",
+      "currentPasswordPlaceholder": "Contraseña actual",
+      "mfaQrCode": "Código QR de MFA"
+    }
+  },
+  "language": {
+    "title": "Idioma",
+    "description": "Elige el idioma de tu interfaz. Los nombres propios se mantienen en inglés.",
+    "default": "Predeterminado",
+    "englishNote": "El inglés es el idioma universal de negocios y el predeterminado."
+  }
+}

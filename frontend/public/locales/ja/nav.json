@@ -1,0 +1,42 @@
+{
+  "searchPlaceholder": "ナビゲーションを検索...",
+  "logout": "ログアウト",
+  "items": {
+    "dashboard": "ダッシュボード",
+    "globalOptions": "グローバルオプション",
+    "loadBalancing": "ロードバランシング",
+    "caching": "キャッシュ",
+    "securityLists": "セキュリティリスト",
+    "securityRules": "セキュリティルール",
+    "rateLimits": "レート制限",
+    "wafSignatures": "WAFシグネチャ",
+    "wafLogs": "WAFログ",
+    "captcha": "CAPTCHA",
+    "pageArmor": "ページアーマー",
+    "apiArmor": "APIアーマー",
+    "redirects": "リダイレクト & リライト",
+    "headers": "ヘッダー",
+    "responseTransforms": "レスポンストランスフォーム",
+    "certificates": "証明書",
+    "ciphers": "暗号スイート",
+    "logging": "ログ",
+    "metrics": "メトリクス",
+    "auditLogs": "監査ログ",
+    "system": "システム",
+    "mcpGateway": "MCPゲートウェイ",
+    "riskScoring": "Risk Scoring"
+  },
+  "unapplied": {
+    "title": "未適用の設定変更",
+    "commentPlaceholder": "この変更のコメント（任意）...",
+    "reverting": "元に戻しています...",
+    "applying": "適用中...",
+    "loading": "読み込み中...",
+    "review": "確認"
+  },
+  "diff": {
+    "title": "未適用の設定変更",
+    "noChanges": "変更はありません"
+  },
+  "brand": "coreXマネージャー"
+}

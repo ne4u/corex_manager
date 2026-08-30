@@ -1,0 +1,75 @@
+{
+  "title": "系统设置",
+  "geoip": {
+    "title": "MaxMind GeoIP",
+    "description": "许可证密钥用于每 24 小时下载一次 GeoLite2 国家、城市和 ASN 数据库。城市数据库支持在安全规则和访问日志中进行地区/邮编/时区/经纬度查询。GeoIP 查询使用 haproxy-geoip2 Rust Lua 模块，支持热重载。",
+    "licenseKey": "许可证密钥",
+    "licenseKeyPlaceholder": "pH3xK7mZq9Va2N_yB4wC8rLfS1uD6gJ_eR0vQnIz",
+    "saveLicenseKey": "保存许可证密钥",
+    "downloadNow": "立即下载",
+    "downloading": "下载中...",
+    "saved": "许可证密钥已保存。",
+    "saveFailed": "保存许可证密钥失败。",
+    "couldNotLoad": "无法加载设置",
+    "lastUpdated": "最后更新：",
+    "never": "从不",
+    "missing": "缺失",
+    "dbSuffix": "数据库",
+    "downloaded": "已下载 {{count}} 个数据库。",
+    "downloadFailed": "下载失败：{{errors}}",
+    "downloadTriggerFailed": "触发下载失败。"
+  },
+  "snapshots": {
+    "title": "配置快照",
+    "description": "保留的配置快照最大数量。较旧的快照会自动清理。",
+    "saved": "最大快照数已保存。",
+    "saveFailed": "保存最大快照数失败。"
+  },
+  "session": {
+    "title": "会话管理",
+    "description": "会话超时和警告倒计时。超时时间是指 GUI 会话在无操作情况下持续的时间。警告会在超时前指定秒数时出现，点击确定或任何操作都会延长会话。",
+    "timeoutLabel": "会话超时（分钟）",
+    "warningLabel": "警告倒计时（秒）",
+    "timeoutRange": "5 — 1440 分钟",
+    "warningRange": "5 — 120 秒",
+    "timeoutInvalid": "会话超时必须在 5 到 1440 分钟之间。",
+    "warningInvalid": "警告倒计时必须在 5 到 120 秒之间。",
+    "save": "保存会话设置",
+    "saved": "会话设置已保存。",
+    "saveFailed": "保存会话设置失败。"
+  },
+  "backup": {
+    "title": "系统备份与恢复",
+    "description": "导出完整的运行配置 — 包括所有数据库表、证书、coreX/Coraza 配置、安全列表、WAF 规则集、GeoIP 数据库和配置快照历史 — 为可下载的归档文件。恢复会替换当前系统状态并重新加载 coreX。",
+    "export": {
+      "title": "导出",
+      "exportSecrets": "导出密钥（证书、DNS 凭据、MaxMind 密钥、用户账户）",
+      "exportMetrics": "导出指标与日志（coreX 指标、WAF 事件、审计日志）",
+      "passwordLabel": "归档密码（可选 — 使用 AES 加密）",
+      "passwordPlaceholder": "留空则不加密",
+      "button": "导出系统",
+      "exporting": "导出中...",
+      "success": "导出文件已成功下载。",
+      "failed": "导出失败。"
+    },
+    "restore": {
+      "title": "恢复",
+      "fileLabel": "归档文件（.zip）",
+      "chooseFile": "选择文件",
+      "passwordLabel": "归档密码（如有保护）",
+      "passwordPlaceholder": "未加密则留空",
+      "selectFile": "请选择一个归档文件。",
+      "button": "恢复系统",
+      "restoring": "恢复中...",
+      "complete": "恢复完成：{{tables}} 个表，{{files}} 个文件已恢复。{{applied}}",
+      "configApplied": "配置已应用，coreX 已重新加载。",
+      "configNotApplied": "配置未应用。",
+      "failed": "恢复失败。",
+      "confirmTitle": "确认系统恢复",
+      "confirmWarning": "这将使用归档内容替换<strong>所有</strong>当前配置、证书、WAF 规则和设置。此操作不可撤销。配置将被应用，coreX 将自动重新加载。",
+      "typeConfirm": "输入 RESTORE 以确认",
+      "confirmPlaceholder": "RESTORE",
+      "restoreNow": "立即恢复"
+    }
+  }
+}

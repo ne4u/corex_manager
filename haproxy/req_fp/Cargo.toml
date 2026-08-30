@@ -1,0 +1,22 @@
+[package]
+name = "haproxy-req-fp"
+version = "0.1.0"
+edition = "2021"
+autotests = false
+readme = "README.md"
+keywords = ["haproxy", "fingerprint", "request", "security"]
+license = "Apache-2.0"
+description = "HAProxy Lua module for HTTP request/response fingerprinting"
+
+[workspace]
+members = [
+    "module",
+]
+
+[dependencies]
+mlua = { version = "0.11", features = ["macros"] }
+haproxy-api = { version = "0.9" }
+serde_json = "1"
+form_urlencoded = "1"
+regex = "1"
+once_cell = "1"

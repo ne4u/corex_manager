@@ -1,0 +1,75 @@
+{
+  "title": "Systemeinstellungen",
+  "geoip": {
+    "title": "MaxMind GeoIP",
+    "description": "Der Lizenzschlüssel wird verwendet, um alle 24 Stunden GeoLite2 Country-, City- und ASN-Datenbanken herunterzuladen. Die City-Datenbank ermöglicht Region/Postleitzahl/Zeitzone/Breiten-/Längengrad-Abfragen in Sicherheitsregeln und Zugriffslogs. GeoIP-Abfragen verwenden das haproxy-geoip2 Rust Lua-Modul mit Hot-Reload.",
+    "licenseKey": "Lizenzschlüssel",
+    "licenseKeyPlaceholder": "pH3xK7mZq9Va2N_yB4wC8rLfS1uD6gJ_eR0vQnIz",
+    "saveLicenseKey": "Lizenzschlüssel speichern",
+    "downloadNow": "Jetzt herunterladen",
+    "downloading": "Wird heruntergeladen...",
+    "saved": "Lizenzschlüssel gespeichert.",
+    "saveFailed": "Lizenzschlüssel konnte nicht gespeichert werden.",
+    "couldNotLoad": "Einstellungen konnten nicht geladen werden",
+    "lastUpdated": "Zuletzt aktualisiert:",
+    "never": "Nie",
+    "missing": "Fehlt",
+    "dbSuffix": "DB",
+    "downloaded": "{{count}} Datenbanken heruntergeladen.",
+    "downloadFailed": "Download fehlgeschlagen: {{errors}}",
+    "downloadTriggerFailed": "Download konnte nicht ausgelöst werden."
+  },
+  "snapshots": {
+    "title": "Konfigurations-Snapshots",
+    "description": "Maximale Anzahl der aufzubewahrenden Konfigurations-Snapshots. Ältere Snapshots werden automatisch entfernt.",
+    "saved": "Max. Snapshots gespeichert.",
+    "saveFailed": "Max. Snapshots konnten nicht gespeichert werden."
+  },
+  "session": {
+    "title": "Sitzungsverwaltung",
+    "description": "Sitzungs-Timeout und Warnungs-Countdown. Das Timeout gibt an, wie lange eine GUI-Sitzung ohne Aktivität besteht. Die Warnung erscheint diese Anzahl an Sekunden vor dem Timeout, und ein Klick auf OK oder jede Aktivität verlängert die Sitzung.",
+    "timeoutLabel": "Sitzungs-Timeout (Minuten)",
+    "warningLabel": "Warnungs-Countdown (Sekunden)",
+    "timeoutRange": "5 — 1440 Minuten",
+    "warningRange": "5 — 120 Sekunden",
+    "timeoutInvalid": "Sitzungs-Timeout muss zwischen 5 und 1440 Minuten liegen.",
+    "warningInvalid": "Warnungs-Countdown muss zwischen 5 und 120 Sekunden liegen.",
+    "save": "Sitzungseinstellungen speichern",
+    "saved": "Sitzungseinstellungen gespeichert.",
+    "saveFailed": "Sitzungseinstellungen konnten nicht gespeichert werden."
+  },
+  "backup": {
+    "title": "System-Backup & Wiederherstellung",
+    "description": "Exportieren Sie die gesamte laufende Konfiguration — alle Datenbanktabellen, Zertifikate, coreX/Coraza-Konfigurationen, Sicherheitslisten, WAF-Regelsätze, GeoIP-Datenbanken und die Snapshot-Historie — in ein herunterladbares Archiv. Die Wiederherstellung ersetzt den aktuellen Systemzustand und lädt coreX neu.",
+    "export": {
+      "title": "Export",
+      "exportSecrets": "Secrets exportieren (Zertifikate, DNS-Zugangsdaten, MaxMind-Schlüssel, Benutzerkonten)",
+      "exportMetrics": "Metriken & Logs exportieren (coreX-Metriken, WAF-Ereignisse, Audit-Log)",
+      "passwordLabel": "Archivpasswort (optional — verschlüsselt mit AES)",
+      "passwordPlaceholder": "Leer lassen für keine Verschlüsselung",
+      "button": "System exportieren",
+      "exporting": "Wird exportiert...",
+      "success": "Export erfolgreich heruntergeladen.",
+      "failed": "Export fehlgeschlagen."
+    },
+    "restore": {
+      "title": "Wiederherstellung",
+      "fileLabel": "Archivdatei (.zip)",
+      "chooseFile": "Datei auswählen",
+      "passwordLabel": "Archivpasswort (falls geschützt)",
+      "passwordPlaceholder": "Leer lassen, falls nicht verschlüsselt",
+      "selectFile": "Bitte wählen Sie eine Archivdatei aus.",
+      "button": "System wiederherstellen",
+      "restoring": "Wird wiederhergestellt...",
+      "complete": "Wiederherstellung abgeschlossen: {{tables}} Tabellen, {{files}} Dateien wiederhergestellt. {{applied}}",
+      "configApplied": "Konfiguration angewendet und coreX neu geladen.",
+      "configNotApplied": "Konfiguration nicht angewendet.",
+      "failed": "Wiederherstellung fehlgeschlagen.",
+      "confirmTitle": "Systemwiederherstellung bestätigen",
+      "confirmWarning": "Dadurch wird die <strong>GESAMTE</strong> aktuelle Konfiguration, alle Zertifikate, WAF-Regeln und Einstellungen durch den Inhalt des Archivs ersetzt. Dies kann nicht rückgängig gemacht werden. Die Konfiguration wird angewendet und coreX wird automatisch neu geladen.",
+      "typeConfirm": "Geben Sie RESTORE zur Bestätigung ein",
+      "confirmPlaceholder": "RESTORE",
+      "restoreNow": "Jetzt wiederherstellen"
+    }
+  }
+}

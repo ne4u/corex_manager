@@ -1,0 +1,75 @@
+{
+  "title": "システム設定",
+  "geoip": {
+    "title": "MaxMind GeoIP",
+    "description": "ライセンスキーは、24時間ごとにGeoLite2 Country、City、ASNデータベースをダウンロードするために使用されます。Cityデータベースにより、セキュリティルールとアクセスログで地域/郵便番号/タイムゾーン/緯度経度の検索が可能になります。GeoIP検索はhaproxy-geoip2 Rust Luaモジュールを使用し、ホットリロードに対応します。",
+    "licenseKey": "ライセンスキー",
+    "licenseKeyPlaceholder": "pH3xK7mZq9Va2N_yB4wC8rLfS1uD6gJ_eR0vQnIz",
+    "saveLicenseKey": "ライセンスキーを保存",
+    "downloadNow": "今すぐダウンロード",
+    "downloading": "ダウンロード中...",
+    "saved": "ライセンスキーが保存されました。",
+    "saveFailed": "ライセンスキーの保存に失敗しました。",
+    "couldNotLoad": "設定を読み込めませんでした",
+    "lastUpdated": "最終更新:",
+    "never": "なし",
+    "missing": "未設定",
+    "dbSuffix": "DB",
+    "downloaded": "{{count}}個のデータベースをダウンロードしました。",
+    "downloadFailed": "ダウンロードに失敗しました: {{errors}}",
+    "downloadTriggerFailed": "ダウンロードのトリガーに失敗しました。"
+  },
+  "snapshots": {
+    "title": "設定スナップショット",
+    "description": "保持する設定スナップショットの最大数です。古いスナップショットは自動的に削除されます。",
+    "saved": "最大スナップショット数が保存されました。",
+    "saveFailed": "最大スナップショット数の保存に失敗しました。"
+  },
+  "session": {
+    "title": "セッション管理",
+    "description": "セッションタイムアウトと警告カウントダウンです。タイムアウトは、アクティビティなしでGUIセッションが継続する時間です。警告はタイムアウトの指定秒数前に表示され、OKをクリックするかアクティビティが発生するとセッションが延長されます。",
+    "timeoutLabel": "セッションタイムアウト（分）",
+    "warningLabel": "警告カウントダウン（秒）",
+    "timeoutRange": "5 — 1440 分",
+    "warningRange": "5 — 120 秒",
+    "timeoutInvalid": "セッションタイムアウトは5〜1440分の間でなければなりません。",
+    "warningInvalid": "警告カウントダウンは5〜120秒の間でなければなりません。",
+    "save": "セッション設定を保存",
+    "saved": "セッション設定が保存されました。",
+    "saveFailed": "セッション設定の保存に失敗しました。"
+  },
+  "backup": {
+    "title": "システムバックアップ & 復元",
+    "description": "実行中の完全設定 — すべてのデータベーステーブル、証明書、coreX/Coraza設定、セキュリティリスト、WAFルールセット、GeoIPデータベース、設定スナップショット履歴 — をダウンロード可能なアーカイブとしてエクスポートします。復元は現在のシステム状態を置き換え、coreXをリロードします。",
+    "export": {
+      "title": "エクスポート",
+      "exportSecrets": "シークレットをエクスポート（証明書、DNS認証情報、MaxMindキー、ユーザーアカウント）",
+      "exportMetrics": "メトリクス & ログをエクスポート（coreXメトリクス、WAFイベント、監査ログ）",
+      "passwordLabel": "アーカイブパスワード（任意 — AESで暗号化）",
+      "passwordPlaceholder": "暗号化しない場合は空欄のままにしてください",
+      "button": "システムをエクスポート",
+      "exporting": "エクスポート中...",
+      "success": "エクスポートが正常にダウンロードされました。",
+      "failed": "エクスポートに失敗しました。"
+    },
+    "restore": {
+      "title": "復元",
+      "fileLabel": "アーカイブファイル（.zip）",
+      "chooseFile": "ファイルを選択",
+      "passwordLabel": "アーカイブパスワード（保護されている場合）",
+      "passwordPlaceholder": "暗号化されていない場合は空欄のままにしてください",
+      "selectFile": "アーカイブファイルを選択してください。",
+      "button": "システムを復元",
+      "restoring": "復元中...",
+      "complete": "復元完了: {{tables}}テーブル、{{files}}ファイルが復元されました。{{applied}}",
+      "configApplied": "設定が適用され、coreXがリロードされました。",
+      "configNotApplied": "設定は適用されませんでした。",
+      "failed": "復元に失敗しました。",
+      "confirmTitle": "システム復元の確認",
+      "confirmWarning": "これにより、現在のすべての設定、証明書、WAFルール、設定がアーカイブの内容で置き換えられます。この操作は取り消せません。設定が適用され、coreXが自動的にリロードされます。",
+      "typeConfirm": "確認するにはRESTOREと入力",
+      "confirmPlaceholder": "RESTORE",
+      "restoreNow": "今すぐ復元"
+    }
+  }
+}

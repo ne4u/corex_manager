@@ -1,0 +1,42 @@
+{
+  "searchPlaceholder": "नेविगेशन खोजें...",
+  "logout": "लॉगआउट",
+  "items": {
+    "dashboard": "डैशबोर्ड",
+    "globalOptions": "वैश्विक विकल्प",
+    "loadBalancing": "लोड बैलेंसिंग",
+    "caching": "कैशिंग",
+    "securityLists": "सुरक्षा सूचियां",
+    "securityRules": "सुरक्षा नियम",
+    "rateLimits": "रेट सीमा",
+    "wafSignatures": "WAF सिग्नेचर",
+    "wafLogs": "WAF लॉग",
+    "captcha": "CAPTCHA",
+    "pageArmor": "पेज आर्मर",
+    "apiArmor": "API आर्मर",
+    "redirects": "रीडायरेक्ट और रीराइट",
+    "headers": "हेडर",
+    "responseTransforms": "रिस्पॉन्स ट्रांसफ़ॉर्म",
+    "certificates": "प्रमाणपत्र",
+    "ciphers": "साइफर",
+    "logging": "लॉगिंग",
+    "metrics": "मेट्रिक्स",
+    "auditLogs": "ऑडिट लॉग",
+    "system": "सिस्टम",
+    "mcpGateway": "MCP गेटवे",
+    "riskScoring": "Risk Scoring"
+  },
+  "unapplied": {
+    "title": "अप्रयुक्त कॉन्फ़िगरेशन परिवर्तन",
+    "commentPlaceholder": "इस परिवर्तन के लिए वैकल्पिक टिप्पणी...",
+    "reverting": "वापस लाया जा रहा है...",
+    "applying": "लागू किया जा रहा है...",
+    "loading": "लोड हो रहा है...",
+    "review": "समीक्षा"
+  },
+  "diff": {
+    "title": "अप्रयुक्त कॉन्फ़िगरेशन परिवर्तन",
+    "noChanges": "कोई परिवर्तन नहीं"
+  },
+  "brand": "coreX प्रबंधक"
+}

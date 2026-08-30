@@ -1,0 +1,14 @@
+node_modules
+dist
+.env
+.env.example
+.git
+.gitignore
+Dockerfile
+.dockerignore
+README.md
+src/pages/__tests__
+src/**/*.test.*
+vitest.config.ts
+src/test-setup.ts
+src/vitest-globals.d.ts

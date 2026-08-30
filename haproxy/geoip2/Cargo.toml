@@ -1,0 +1,19 @@
+[package]
+name = "haproxy-geoip2"
+version = "0.2.0"
+edition = "2021"
+autotests = false
+readme = "README.md"
+keywords = ["haproxy", "geoip", "maxmind"]
+description = "HAProxy MaxMind GeoIP2 support"
+
+[workspace]
+members = [
+    "module",
+]
+
+[dependencies]
+mlua = { version = "0.11", features = ["macros"] }
+haproxy-api = { version = "0.9.0" }
+maxminddb = { version = "0.26", features = ["unsafe-str-decode"] }
+arc-swap = "1.7"

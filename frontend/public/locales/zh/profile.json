@@ -1,0 +1,92 @@
+{
+  "tabs": {
+    "profile": "个人资料",
+    "appearance": "外观",
+    "security": "安全",
+    "language": "语言"
+  },
+  "identity": {
+    "role": "角色",
+    "memberSince": "注册时间",
+    "logout": "退出登录"
+  },
+  "appearance": {
+    "title": "主题",
+    "createCustom": "创建自定义主题",
+    "description": "选择界面的配色主题。主题保存在本地并即时生效。可以创建、编辑和删除自定义主题。",
+    "builtinThemes": "内置主题",
+    "customThemes": "自定义主题",
+    "editTheme": "编辑主题",
+    "deleteTheme": "删除主题",
+    "background": "背景",
+    "surface": "表面",
+    "border": "边框",
+    "text": "文本",
+    "success": "成功",
+    "error": "错误",
+    "themeEditor": {
+      "nameRequired": "主题名称为必填项。",
+      "nameExists": "已存在同名主题。请选择其他名称。",
+      "editTitle": "编辑自定义主题",
+      "themeName": "主题名称",
+      "themeNamePlaceholder": "例如：我的自定义暗色",
+      "cloneFrom": "从现有主题克隆（可选）",
+      "scratch": "— 从头开始 —",
+      "deleteConfirm": "删除主题\"{{name}}\"？此操作无法撤销。",
+      "saveChanges": "保存更改",
+      "createTheme": "创建主题",
+      "preview": {
+        "primaryText": "主要文本",
+        "secondaryText": "次要文本",
+        "tertiaryText": "三级文本",
+        "primaryButton": "主要按钮",
+        "secondaryButton": "次要按钮",
+        "success": "● 成功",
+        "warning": "● 警告",
+        "error": "● 错误",
+        "cardSurface": "卡片/表面示例文本"
+      }
+    }
+  },
+  "security": {
+    "changePassword": {
+      "title": "修改密码",
+      "currentPassword": "当前密码",
+      "newPassword": "新密码",
+      "confirmPassword": "确认新密码",
+      "submit": "修改密码",
+      "changing": "修改中...",
+      "success": "密码修改成功。",
+      "wrongCurrent": "当前密码不正确",
+      "mismatch": "两次输入的密码不一致",
+      "tooShort": "密码至少需要 8 个字符"
+    },
+    "twoFactor": {
+      "title": "双因素认证",
+      "loading": "加载中...",
+      "loadFailed": "无法加载 MFA 状态。",
+      "enabled": "MFA 已启用。输入您的密码以禁用。",
+      "disabled": "MFA 未启用。设置 TOTP 以保护您的账户。",
+      "setupHint": "扫描二维码或在验证器应用中输入密钥，然后输入 6 位验证码。",
+      "verifyEnable": "验证并启用",
+      "setUpMfa": "设置 MFA",
+      "disableMfa": "禁用 MFA",
+      "mfaEnabled": "MFA 已启用。",
+      "mfaDisabled": "MFA 已禁用。",
+      "invalidCode": "无效的验证码",
+      "setupFailed": "启动设置失败",
+      "disableFailed": "禁用 MFA 失败",
+      "aliasLabel": "验证器应用别名",
+      "aliasPlaceholder": "例如 admin、personal、work",
+      "codePlaceholder": "123456",
+      "currentPasswordPlaceholder": "当前密码",
+      "mfaQrCode": "MFA 二维码"
+    }
+  },
+  "language": {
+    "title": "语言",
+    "description": "选择您的界面语言。专有名词保持英文。",
+    "default": "默认",
+    "englishNote": "英语是通用商业语言，也是默认语言。"
+  }
+}

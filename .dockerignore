@@ -1,0 +1,61 @@
+# Ignore Python cache to avoid stale pyc files leaking into image builds
+**/__pycache__
+*.pyc
+*.pyo
+
+# Ignore test files in all build contexts
+**/__tests__
+**/*.test.*
+**/*.spec.*
+backend/tests
+
+# Secrets and environment — never leak into image build context
+.env
+.env.*
+!.env.example
+
+# Private keys and certificates
+*.pem
+*.key
+*.crt
+*.csr
+certs/
+backend/certs/
+
+# Runtime data and databases
+data/
+backend/data/
+*.db
+*.sqlite
+*.sqlite3
+*.mmdb
+*.log
+logs/
+
+# Git backup directories (from history rewrites)
+.git.backup.*/
+
+# Dependencies and build output
+frontend/node_modules
+frontend/dist
+frontend/build
+*.egg-info/
+
+# Rust build artifacts. haproxy/Dockerfile does `COPY haproxy/<crate>/ ./` into
+# the alpine Rust builder stages, so a host-arch target/ dir would be copied in
+# for nothing — ~2.3 GB of build context across the six crates.
+**/target/
+
+# Git and IDE metadata
+.git
+.gitignore
+.vscode/
+.idea/
+.DS_Store
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv
+.venv-3.12

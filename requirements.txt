@@ -1,0 +1,24 @@
+fastapi==0.141.1
+uvicorn[standard]==0.52.1
+sqlalchemy==2.0.51
+psycopg2-binary==2.9.10
+pydantic==2.13.4
+pydantic-settings==2.15.0
+alembic==1.19.1
+python-multipart==0.0.31
+bcrypt<4.0
+PyJWT==2.13.0  # replaces python-jose; HS256 only, no ecdsa/pyasn1 transitive deps
+httpx==0.28.1
+certbot==5.7.0
+certbot-dns-cloudflare==5.7.0
+certbot-dns-route53==5.7.0
+certbot-dns-digitalocean==5.7.0
+requests==2.33.0
+pyyaml==6.0.1
+aiofiles==23.2.1
+valkey==6.1.1
+maxminddb==2.6.0
+geoip2==4.8.0
+docker==7.1.0
+pyotp==2.9.0
+qrcode==7.4.2

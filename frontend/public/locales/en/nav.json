@@ -1,0 +1,42 @@
+{
+  "searchPlaceholder": "Search navigation...",
+  "logout": "Logout",
+  "items": {
+    "dashboard": "Dashboard",
+    "globalOptions": "Global Options",
+    "loadBalancing": "Load Balancing",
+    "caching": "Caching",
+    "securityLists": "Security Lists",
+    "securityRules": "Security Rules",
+    "riskScoring": "Risk Scoring",
+    "rateLimits": "Rate Limits",
+    "wafSignatures": "WAF Signatures",
+    "wafLogs": "WAF Logs",
+    "captcha": "CAPTCHA",
+    "pageArmor": "Page Armor",
+    "apiArmor": "API Armor",
+    "redirects": "Redirects & Rewrites",
+    "headers": "Headers",
+    "responseTransforms": "Response Transforms",
+    "certificates": "Certificates",
+    "ciphers": "Ciphers",
+    "logging": "Logging",
+    "metrics": "Metrics",
+    "auditLogs": "Audit Logs",
+    "mcpGateway": "MCP Gateway",
+    "system": "System"
+  },
+  "unapplied": {
+    "title": "Unapplied configuration changes",
+    "commentPlaceholder": "Optional comment for this change...",
+    "review": "Review",
+    "reverting": "Reverting...",
+    "applying": "Applying...",
+    "loading": "Loading..."
+  },
+  "diff": {
+    "title": "Unapplied configuration changes",
+    "noChanges": "No changes"
+  },
+  "brand": "coreX Manager"
+}

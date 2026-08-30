@@ -1,0 +1,734 @@
+{
+  "comment": "DNS provider metadata for ACME certificate issuance. 'acme_sh' and 'certbot' sections define the expected credential keys. Add more providers by copying this format.",
+  "providers": [
+    {
+      "id": "cloudflare",
+      "name": "Cloudflare",
+      "acme_sh": {
+        "code": "dns_cf",
+        "env": [
+          {
+            "name": "CF_Token",
+            "label": "API Token",
+            "type": "password",
+            "required": true,
+            "help": "Cloudflare API token with Zone:Read and Zone:Edit permissions."
+          }
+        ]
+      },
+      "certbot": {
+        "plugin": "cloudflare",
+        "credentials_keys": [
+          {
+            "name": "dns_cloudflare_api_token",
+            "label": "API Token",
+            "type": "password",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "route53",
+      "name": "Amazon Route 53",
+      "acme_sh": {
+        "code": "dns_aws",
+        "env": [
+          {
+            "name": "AWS_ACCESS_KEY_ID",
+            "label": "Access Key ID",
+            "type": "text",
+            "required": true
+          },
+          {
+            "name": "AWS_SECRET_ACCESS_KEY",
+            "label": "Secret Access Key",
+            "type": "password",
+            "required": true
+          }
+        ]
+      },
+      "certbot": {
+        "plugin": "route53",
+        "credentials_keys": [
+          {
+            "name": "aws_access_key_id",
+            "label": "Access Key ID",
+            "type": "text",
+            "required": true
+          },
+          {
+            "name": "aws_secret_access_key",
+            "label": "Secret Access Key",
+            "type": "password",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "digitalocean",
+      "name": "DigitalOcean",
+      "acme_sh": {
+        "code": "dns_dgon",
+        "env": [
+          {
+            "name": "DO_API_KEY",
+            "label": "API Key",
+            "type": "password",
+            "required": true
+          }
+        ]
+      },
+      "certbot": {
+        "plugin": "digitalocean",
+        "credentials_keys": [
+          {
+            "name": "dns_digitalocean_token",
+            "label": "API Token",
+            "type": "password",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "google",
+      "name": "Google Cloud DNS",
+      "acme_sh": {
+        "code": "dns_gcloud",
+        "env": [
+          {
+            "name": "GCE_PROJECT",
+            "label": "Google Cloud Project ID",
+            "type": "text",
+            "required": true
+          },
+          {
+            "name": "GCE_SERVICE_ACCOUNT_FILE",
+            "label": "Service Account JSON Path",
+            "type": "text",
+            "required": true
+          }
+        ]
+      },
+      "certbot": {
+        "plugin": "google",
+        "credentials_keys": [
+          {
+            "name": "dns_google_credentials",
+            "label": "Service Account JSON Path",
+            "type": "text",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "linode",
+      "name": "Linode",
+      "acme_sh": {
+        "code": "dns_linode",
+        "env": [
+          {
+            "name": "LINODE_API_KEY",
+            "label": "API Key",
+            "type": "password",
+            "required": true
+          }
+        ]
+      },
+      "certbot": {
+        "plugin": "linode",
+        "credentials_keys": [
+          {
+            "name": "dns_linode_token",
+            "label": "API Token",
+            "type": "password",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "namecheap",
+      "name": "Namecheap",
+      "acme_sh": {
+        "code": "dns_namecheap",
+        "env": [
+          {
+            "name": "NAMECHEAP_API_KEY",
+            "label": "API Key",
+            "type": "password",
+            "required": true
+          },
+          {
+            "name": "NAMECHEAP_USERNAME",
+            "label": "Username",
+            "type": "text",
+            "required": true
+          }
+        ]
+      },
+      "certbot": {
+        "plugin": "namecheap",
+        "credentials_keys": [
+          {
+            "name": "dns_namecheap_api_key",
+            "label": "API Key",
+            "type": "password",
+            "required": true
+          },
+          {
+            "name": "dns_namecheap_username",
+            "label": "Username",
+            "type": "text",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "godaddy",
+      "name": "GoDaddy",
+      "acme_sh": {
+        "code": "dns_gd",
+        "env": [
+          {
+            "name": "GD_Key",
+            "label": "API Key",
+            "type": "password",
+            "required": true
+          },
+          {
+            "name": "GD_Secret",
+            "label": "API Secret",
+            "type": "password",
+            "required": true
+          }
+        ]
+      },
+      "certbot": {
+        "plugin": "godaddy",
+        "credentials_keys": [
+          {
+            "name": "dns_godaddy_key",
+            "label": "API Key",
+            "type": "password",
+            "required": true
+          },
+          {
+            "name": "dns_godaddy_secret",
+            "label": "API Secret",
+            "type": "password",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "duckdns",
+      "name": "DuckDNS",
+      "acme_sh": {
+        "code": "dns_duckdns",
+        "env": [
+          {
+            "name": "DuckDNS_Token",
+            "label": "Token",
+            "type": "password",
+            "required": true
+          }
+        ]
+      },
+      "certbot": {
+        "plugin": "duckdns",
+        "credentials_keys": [
+          {
+            "name": "dns_duckdns_token",
+            "label": "Token",
+            "type": "password",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "azure",
+      "name": "Azure DNS",
+      "acme_sh": {
+        "code": "dns_azure",
+        "env": [
+          {
+            "name": "AZUREDNS_SUBSCRIPTIONID",
+            "label": "Subscription ID",
+            "type": "text",
+            "required": true
+          },
+          {
+            "name": "AZUREDNS_TENANTID",
+            "label": "Tenant ID",
+            "type": "text",
+            "required": true
+          },
+          {
+            "name": "AZUREDNS_CLIENTID",
+            "label": "Client ID",
+            "type": "text",
+            "required": true
+          },
+          {
+            "name": "AZUREDNS_CLIENTSECRET",
+            "label": "Client Secret",
+            "type": "password",
+            "required": true
+          }
+        ]
+      },
+      "certbot": {
+        "plugin": "azure",
+        "credentials_keys": [
+          {
+            "name": "dns_azure_client_id",
+            "label": "Client ID",
+            "type": "text",
+            "required": true
+          },
+          {
+            "name": "dns_azure_client_secret",
+            "label": "Client Secret",
+            "type": "password",
+            "required": true
+          },
+          {
+            "name": "dns_azure_subscription_id",
+            "label": "Subscription ID",
+            "type": "text",
+            "required": true
+          },
+          {
+            "name": "dns_azure_tenant_id",
+            "label": "Tenant ID",
+            "type": "text",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "ovh",
+      "name": "OVH",
+      "acme_sh": {
+        "code": "dns_ovh",
+        "env": [
+          {
+            "name": "OVH_AK",
+            "label": "Application Key",
+            "type": "text",
+            "required": true
+          },
+          {
+            "name": "OVH_AS",
+            "label": "Application Secret",
+            "type": "password",
+            "required": true
+          },
+          {
+            "name": "OVH_CK",
+            "label": "Consumer Key",
+            "type": "text",
+            "required": true
+          },
+          {
+            "name": "OVH_END_POINT",
+            "label": "Endpoint",
+            "type": "select",
+            "options": ["ovh-eu", "ovh-ca", "ovh-us", "kimsufi-eu", "kimsufi-ca", "soyoustart-eu", "soyoustart-ca", "runabove-ca"],
+            "required": true
+          }
+        ]
+      },
+      "certbot": {
+        "plugin": "ovh",
+        "credentials_keys": [
+          {
+            "name": "dns_ovh_application_key",
+            "label": "Application Key",
+            "type": "text",
+            "required": true
+          },
+          {
+            "name": "dns_ovh_application_secret",
+            "label": "Application Secret",
+            "type": "password",
+            "required": true
+          },
+          {
+            "name": "dns_ovh_consumer_key",
+            "label": "Consumer Key",
+            "type": "text",
+            "required": true
+          },
+          {
+            "name": "dns_ovh_endpoint",
+            "label": "Endpoint",
+            "type": "text",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "powerdns",
+      "name": "PowerDNS",
+      "acme_sh": {
+        "code": "dns_pdns",
+        "env": [
+          {
+            "name": "PDNS_Url",
+            "label": "API URL",
+            "type": "text",
+            "required": true
+          },
+          {
+            "name": "PDNS_ServerId",
+            "label": "Server ID",
+            "type": "text",
+            "required": true
+          },
+          {
+            "name": "PDNS_Token",
+            "label": "API Token",
+            "type": "password",
+            "required": true
+          }
+        ]
+      },
+      "certbot": {
+        "plugin": "powerdns",
+        "credentials_keys": [
+          {
+            "name": "dns_powerdns_api_url",
+            "label": "API URL",
+            "type": "text",
+            "required": true
+          },
+          {
+            "name": "dns_powerdns_api_key",
+            "label": "API Key",
+            "type": "password",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "aliyun",
+      "name": "Aliyun",
+      "acme_sh": {
+        "code": "dns_ali",
+        "env": [
+          {
+            "name": "Ali_Key",
+            "label": "Access Key ID",
+            "type": "text",
+            "required": true
+          },
+          {
+            "name": "Ali_Secret",
+            "label": "Access Key Secret",
+            "type": "password",
+            "required": true
+          }
+        ]
+      },
+      "certbot": {
+        "plugin": "aliyun",
+        "credentials_keys": [
+          {
+            "name": "dns_aliyun_access_key",
+            "label": "Access Key",
+            "type": "text",
+            "required": true
+          },
+          {
+            "name": "dns_aliyun_access_key_secret",
+            "label": "Access Key Secret",
+            "type": "password",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "dnsimple",
+      "name": "DNSimple",
+      "acme_sh": {
+        "code": "dns_dnsimple",
+        "env": [
+          {
+            "name": "DNSimple_OAUTH_TOKEN",
+            "label": "OAuth Token",
+            "type": "password",
+            "required": true
+          }
+        ]
+      },
+      "certbot": {
+        "plugin": "dnsimple",
+        "credentials_keys": [
+          {
+            "name": "dns_dnsimple_token",
+            "label": "API Token",
+            "type": "password",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "ns1",
+      "name": "NS1",
+      "acme_sh": {
+        "code": "dns_nsone",
+        "env": [
+          {
+            "name": "NS1_API_KEY",
+            "label": "API Key",
+            "type": "password",
+            "required": true
+          }
+        ]
+      },
+      "certbot": {
+        "plugin": "nsone",
+        "credentials_keys": [
+          {
+            "name": "dns_nsone_api_key",
+            "label": "API Key",
+            "type": "password",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "vultr",
+      "name": "Vultr",
+      "acme_sh": {
+        "code": "dns_vultr",
+        "env": [
+          {
+            "name": "VULTR_API_KEY",
+            "label": "API Key",
+            "type": "password",
+            "required": true
+          }
+        ]
+      },
+      "certbot": {
+        "plugin": "vultr",
+        "credentials_keys": [
+          {
+            "name": "dns_vultr_api_key",
+            "label": "API Key",
+            "type": "password",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "yandex",
+      "name": "Yandex (PDD)",
+      "acme_sh": {
+        "code": "dns_yandex",
+        "env": [
+          {
+            "name": "PDD_Token",
+            "label": "PDD Token",
+            "type": "password",
+            "required": true
+          }
+        ]
+      },
+      "certbot": {
+        "plugin": "yandex",
+        "credentials_keys": [
+          {
+            "name": "dns_yandex_token",
+            "label": "PDD Token",
+            "type": "password",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "namecom",
+      "name": "Name.com",
+      "acme_sh": {
+        "code": "dns_namecom",
+        "env": [
+          {
+            "name": "NAMECOM_API_TOKEN",
+            "label": "API Token",
+            "type": "password",
+            "required": true
+          },
+          {
+            "name": "NAMECOM_USERNAME",
+            "label": "Username",
+            "type": "text",
+            "required": true
+          }
+        ]
+      },
+      "certbot": {
+        "plugin": "namecom",
+        "credentials_keys": [
+          {
+            "name": "dns_namecom_token",
+            "label": "API Token",
+            "type": "password",
+            "required": true
+          },
+          {
+            "name": "dns_namecom_username",
+            "label": "Username",
+            "type": "text",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "gandi",
+      "name": "Gandi LiveDNS",
+      "acme_sh": {
+        "code": "dns_gandi_livedns",
+        "env": [
+          {
+            "name": "GANDI_LIVEDNS_KEY",
+            "label": "API Key",
+            "type": "password",
+            "required": true
+          }
+        ]
+      },
+      "certbot": {
+        "plugin": "gandi",
+        "credentials_keys": [
+          {
+            "name": "dns_gandi_api_key",
+            "label": "API Key",
+            "type": "password",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "hetzner",
+      "name": "Hetzner",
+      "acme_sh": {
+        "code": "dns_hetzner",
+        "env": [
+          {
+            "name": "HETZNER_API_TOKEN",
+            "label": "API Token",
+            "type": "password",
+            "required": true
+          }
+        ]
+      },
+      "certbot": {
+        "plugin": "hetzner",
+        "credentials_keys": [
+          {
+            "name": "dns_hetzner_api_token",
+            "label": "API Token",
+            "type": "password",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "cloudns",
+      "name": "ClouDNS",
+      "acme_sh": {
+        "code": "dns_cloudns",
+        "env": [
+          {
+            "name": "CLOUDNS_SUB_AUTH_ID",
+            "label": "Sub Auth ID (recommended)",
+            "type": "text",
+            "required": false,
+            "help": "Use a sub user ID with limited zone access. Either this or the regular Auth ID is needed."
+          },
+          {
+            "name": "CLOUDNS_AUTH_ID",
+            "label": "Auth ID",
+            "type": "text",
+            "required": false,
+            "help": "Use a regular ClouDNS API user ID. Either this or the Sub Auth ID is needed."
+          },
+          {
+            "name": "CLOUDNS_AUTH_PASSWORD",
+            "label": "Auth Password",
+            "type": "password",
+            "required": true
+          }
+        ]
+      },
+      "certbot": {
+        "plugin": "cloudns",
+        "credentials_keys": [
+          {
+            "name": "dns_cloudns_auth_id",
+            "label": "Auth ID",
+            "type": "text",
+            "required": false,
+            "help": "Target ClouDNS user ID. Provide one of Auth ID, Sub Auth ID, or Sub Auth User."
+          },
+          {
+            "name": "dns_cloudns_sub_auth_id",
+            "label": "Sub Auth ID",
+            "type": "text",
+            "required": false,
+            "help": "Sub user ID (recommended for limited access)."
+          },
+          {
+            "name": "dns_cloudns_sub_auth_user",
+            "label": "Sub Auth User",
+            "type": "text",
+            "required": false,
+            "help": "Sub user login name if using sub-auth user."
+          },
+          {
+            "name": "dns_cloudns_auth_password",
+            "label": "Auth Password",
+            "type": "password",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "custom",
+      "name": "Custom / Other",
+      "acme_sh": {
+        "code": "",
+        "custom_code": true,
+        "env": [],
+        "custom_env": true
+      },
+      "certbot": {
+        "plugin": "",
+        "custom_plugin": true,
+        "credentials_keys": [],
+        "custom_credentials": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+select = ["I", "F401", "UP"]
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore::starlette.exceptions.StarletteDeprecationWarning",
+]

@@ -1,0 +1,117 @@
+{
+  "tabs": {
+    "profile": "Profile",
+    "appearance": "Appearance",
+    "security": "Security",
+    "language": "Language",
+    "dateTime": "Date & Time"
+  },
+  "identity": {
+    "role": "Role",
+    "memberSince": "Member since",
+    "logout": "Logout"
+  },
+  "appearance": {
+    "title": "Theme",
+    "createCustom": "Create Custom Theme",
+    "description": "Choose a color theme for the interface. The theme is saved locally and applied instantly. Custom themes can be created, edited, and deleted.",
+    "builtinThemes": "Built-in Themes",
+    "customThemes": "Custom Themes",
+    "editTheme": "Edit theme",
+    "deleteTheme": "Delete theme",
+    "background": "Background",
+    "surface": "Surface",
+    "border": "Border",
+    "text": "Text",
+    "success": "Success",
+    "error": "Error",
+    "themeEditor": {
+      "nameRequired": "Theme name is required.",
+      "nameExists": "A theme with this name already exists. Choose a different name.",
+      "editTitle": "Edit Custom Theme",
+      "themeName": "Theme Name",
+      "themeNamePlaceholder": "e.g. My Custom Dark",
+      "cloneFrom": "Clone from existing (optional)",
+      "scratch": "— Start from scratch —",
+      "deleteConfirm": "Delete theme \"{{name}}\"? This cannot be undone.",
+      "saveChanges": "Save Changes",
+      "createTheme": "Create Theme",
+      "preview": {
+        "primaryText": "Primary Text",
+        "secondaryText": "Secondary Text",
+        "tertiaryText": "Tertiary Text",
+        "primaryButton": "Primary Button",
+        "secondaryButton": "Secondary Button",
+        "success": "● Success",
+        "warning": "● Warning",
+        "error": "● Error",
+        "cardSurface": "Card / surface example text"
+      }
+    }
+  },
+  "security": {
+    "changePassword": {
+      "title": "Change Password",
+      "currentPassword": "Current password",
+      "newPassword": "New password",
+      "confirmPassword": "Confirm new password",
+      "submit": "Change Password",
+      "changing": "Changing...",
+      "success": "Password changed successfully.",
+      "wrongCurrent": "Current password is incorrect",
+      "mismatch": "Passwords do not match",
+      "tooShort": "Password must be at least 8 characters"
+    },
+    "twoFactor": {
+      "title": "Two-Factor Authentication",
+      "loading": "Loading...",
+      "loadFailed": "Could not load MFA status.",
+      "enabled": "MFA is enabled. Enter your password to disable it.",
+      "disabled": "MFA is disabled. Set up TOTP to secure your account.",
+      "setupHint": "Scan the QR code or enter the secret in your authenticator app, then enter the 6-digit code.",
+      "verifyEnable": "Verify & Enable",
+      "setUpMfa": "Set up MFA",
+      "disableMfa": "Disable MFA",
+      "mfaEnabled": "MFA enabled.",
+      "mfaDisabled": "MFA disabled.",
+      "invalidCode": "Invalid code",
+      "setupFailed": "Failed to start setup",
+      "disableFailed": "Failed to disable MFA",
+      "aliasLabel": "Authenticator app alias",
+      "aliasPlaceholder": "e.g. admin, personal, work",
+      "codePlaceholder": "123456",
+      "currentPasswordPlaceholder": "Current password",
+      "mfaQrCode": "MFA QR code"
+    }
+  },
+  "language": {
+    "title": "Language",
+    "description": "Choose your interface language. Proper nouns stay in English.",
+    "default": "Default",
+    "englishNote": "English is the universal business language and the default."
+  },
+  "dateTime": {
+    "title": "Date & Time",
+    "description": "Choose how dates and times are displayed. Times are converted from UTC to your selected timezone.",
+    "timezone": {
+      "label": "Timezone",
+      "local": "Local (browser)",
+      "utc": "UTC",
+      "iana": "Select timezone",
+      "searchPlaceholder": "Search timezones..."
+    },
+    "format": {
+      "dateLabel": "Date format",
+      "timeLabel": "Time format",
+      "preset": "Preset",
+      "custom": "Custom",
+      "customPlaceholder": "e.g. yyyy-MM-dd",
+      "tokenHelp": "Tokens: yyyy=year, MM=month, dd=day, HH=24h, hh=12h, mm=minute, ss=second, a=AM/PM",
+      "invalid": "Format must be a non-empty string (max 64 chars)."
+    },
+    "preview": {
+      "label": "Preview",
+      "now": "Now"
+    }
+  }
+}

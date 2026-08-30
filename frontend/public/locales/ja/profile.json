@@ -1,0 +1,92 @@
+{
+  "tabs": {
+    "profile": "プロフィール",
+    "appearance": "外観",
+    "security": "セキュリティ",
+    "language": "言語"
+  },
+  "identity": {
+    "role": "ロール",
+    "memberSince": "登録日",
+    "logout": "ログアウト"
+  },
+  "appearance": {
+    "title": "テーマ",
+    "createCustom": "カスタムテーマを作成",
+    "description": "インターフェースのカラーテーマを選択します。テーマはローカルに保存され、即座に適用されます。カスタムテーマは作成、編集、削除が可能です。",
+    "builtinThemes": "組み込みテーマ",
+    "customThemes": "カスタムテーマ",
+    "editTheme": "テーマを編集",
+    "deleteTheme": "テーマを削除",
+    "background": "背景",
+    "surface": "サーフェス",
+    "border": "ボーダー",
+    "text": "テキスト",
+    "success": "成功",
+    "error": "エラー",
+    "themeEditor": {
+      "nameRequired": "テーマ名は必須です。",
+      "nameExists": "この名前のテーマは既に存在します。別の名前を選択してください。",
+      "editTitle": "カスタムテーマを編集",
+      "themeName": "テーマ名",
+      "themeNamePlaceholder": "例：マイカスタムダーク",
+      "cloneFrom": "既存のものから複製（任意）",
+      "scratch": "— ゼロから始める —",
+      "deleteConfirm": "テーマ「{{name}}」を削除しますか？この操作は元に戻せません。",
+      "saveChanges": "変更を保存",
+      "createTheme": "テーマを作成",
+      "preview": {
+        "primaryText": "プライマリテキスト",
+        "secondaryText": "セカンダリテキスト",
+        "tertiaryText": "ターシャリテキスト",
+        "primaryButton": "プライマリボタン",
+        "secondaryButton": "セカンダリボタン",
+        "success": "● 成功",
+        "warning": "● 警告",
+        "error": "● エラー",
+        "cardSurface": "カード/サーフェスのサンプルテキスト"
+      }
+    }
+  },
+  "security": {
+    "changePassword": {
+      "title": "パスワード変更",
+      "currentPassword": "現在のパスワード",
+      "newPassword": "新しいパスワード",
+      "confirmPassword": "新しいパスワード（確認）",
+      "submit": "パスワードを変更",
+      "changing": "変更中...",
+      "success": "パスワードが正常に変更されました。",
+      "wrongCurrent": "現在のパスワードが正しくありません",
+      "mismatch": "パスワードが一致しません",
+      "tooShort": "パスワードは8文字以上でなければなりません"
+    },
+    "twoFactor": {
+      "title": "二要素認証",
+      "loading": "読み込み中...",
+      "loadFailed": "MFAステータスを読み込めませんでした。",
+      "enabled": "MFAが有効です。無効にするにはパスワードを入力してください。",
+      "disabled": "MFAが無効です。アカウントを保護するためにTOTPを設定してください。",
+      "setupHint": "QRコードをスキャンするか、認証アプリにシークレットを入力し、6桁のコードを入力してください。",
+      "verifyEnable": "確認して有効化",
+      "setUpMfa": "MFAを設定",
+      "disableMfa": "MFAを無効化",
+      "mfaEnabled": "MFAが有効になりました。",
+      "mfaDisabled": "MFAが無効になりました。",
+      "invalidCode": "無効なコード",
+      "setupFailed": "セットアップの開始に失敗しました",
+      "disableFailed": "MFAの無効化に失敗しました",
+      "aliasLabel": "認証アプリのエイリアス",
+      "aliasPlaceholder": "例: admin、personal、work",
+      "codePlaceholder": "123456",
+      "currentPasswordPlaceholder": "現在のパスワード",
+      "mfaQrCode": "MFA QRコード"
+    }
+  },
+  "language": {
+    "title": "言語",
+    "description": "インターフェースの言語を選択します。固有名詞は英語のまま表示されます。",
+    "default": "デフォルト",
+    "englishNote": "英語は汎用的なビジネス言語であり、デフォルト言語です。"
+  }
+}

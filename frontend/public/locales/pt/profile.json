@@ -1,0 +1,92 @@
+{
+  "tabs": {
+    "profile": "Perfil",
+    "appearance": "Aparência",
+    "security": "Segurança",
+    "language": "Idioma"
+  },
+  "identity": {
+    "role": "Função",
+    "memberSince": "Membro desde",
+    "logout": "Sair"
+  },
+  "appearance": {
+    "title": "Tema",
+    "createCustom": "Criar Tema Personalizado",
+    "description": "Escolha um tema de cores para a interface. O tema é salvo localmente e aplicado instantaneamente. Temas personalizados podem ser criados, editados e excluídos.",
+    "builtinThemes": "Temas Integrados",
+    "customThemes": "Temas Personalizados",
+    "editTheme": "Editar tema",
+    "deleteTheme": "Excluir tema",
+    "background": "Fundo",
+    "surface": "Superfície",
+    "border": "Borda",
+    "text": "Texto",
+    "success": "Sucesso",
+    "error": "Erro",
+    "themeEditor": {
+      "nameRequired": "O nome do tema é obrigatório.",
+      "nameExists": "Já existe um tema com este nome. Escolha um nome diferente.",
+      "editTitle": "Editar tema personalizado",
+      "themeName": "Nome do tema",
+      "themeNamePlaceholder": "ex. Meu tema escuro",
+      "cloneFrom": "Clonar de existente (opcional)",
+      "scratch": "— Começar do zero —",
+      "deleteConfirm": "Eliminar tema \"{{name}}\"? Isto não pode ser desfeito.",
+      "saveChanges": "Guardar alterações",
+      "createTheme": "Criar tema",
+      "preview": {
+        "primaryText": "Texto principal",
+        "secondaryText": "Texto secundário",
+        "tertiaryText": "Texto terciário",
+        "primaryButton": "Botão principal",
+        "secondaryButton": "Botão secundário",
+        "success": "● Sucesso",
+        "warning": "● Aviso",
+        "error": "● Erro",
+        "cardSurface": "Texto de exemplo de cartão / superfície"
+      }
+    }
+  },
+  "security": {
+    "changePassword": {
+      "title": "Alterar Senha",
+      "currentPassword": "Senha atual",
+      "newPassword": "Nova senha",
+      "confirmPassword": "Confirmar nova senha",
+      "submit": "Alterar Senha",
+      "changing": "Alterando...",
+      "success": "Senha alterada com sucesso.",
+      "wrongCurrent": "A senha atual está incorreta",
+      "mismatch": "As senhas não coincidem",
+      "tooShort": "A senha deve ter pelo menos 8 caracteres"
+    },
+    "twoFactor": {
+      "title": "Autenticação de Dois Fatores",
+      "loading": "Carregando...",
+      "loadFailed": "Não foi possível carregar o status do MFA.",
+      "enabled": "O MFA está ativado. Digite sua senha para desativá-lo.",
+      "disabled": "O MFA está desativado. Configure o TOTP para proteger sua conta.",
+      "setupHint": "Escaneie o código QR ou digite o segredo no seu aplicativo autenticador e, em seguida, digite o código de 6 dígitos.",
+      "verifyEnable": "Verificar & Ativar",
+      "setUpMfa": "Configurar MFA",
+      "disableMfa": "Desativar MFA",
+      "mfaEnabled": "MFA ativado.",
+      "mfaDisabled": "MFA desativado.",
+      "invalidCode": "Código inválido",
+      "setupFailed": "Falha ao iniciar a configuração",
+      "disableFailed": "Falha ao desativar o MFA",
+      "aliasLabel": "Alias do aplicativo autenticador",
+      "aliasPlaceholder": "ex. admin, pessoal, trabalho",
+      "codePlaceholder": "123456",
+      "currentPasswordPlaceholder": "Senha atual",
+      "mfaQrCode": "Código QR de MFA"
+    }
+  },
+  "language": {
+    "title": "Idioma",
+    "description": "Escolha o idioma da sua interface. Nomes próprios permanecem em inglês.",
+    "default": "Padrão",
+    "englishNote": "O inglês é a língua universal de negócios e o padrão."
+  }
+}

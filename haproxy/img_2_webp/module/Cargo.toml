@@ -1,0 +1,14 @@
+[package]
+name = "haproxy-img-2-webp-module"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+haproxy-api = { version = "0.9" }
+haproxy-img-2-webp = { path = ".." }
+mlua = "0.11"
+libc = "0.2"

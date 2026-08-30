@@ -1,0 +1,92 @@
+{
+  "tabs": {
+    "profile": "الملف الشخصي",
+    "appearance": "المظهر",
+    "security": "الأمان",
+    "language": "اللغة"
+  },
+  "identity": {
+    "role": "الدور",
+    "memberSince": "عضو منذ",
+    "logout": "تسجيل الخروج"
+  },
+  "appearance": {
+    "title": "السمة",
+    "createCustom": "إنشاء سمة مخصصة",
+    "description": "اختر سمة ألوان للواجهة. يتم حفظ السمة محلياً وتطبيقها فوراً. يمكن إنشاء السمات المخصصة وتعديلها وحذفها.",
+    "builtinThemes": "السمات المدمجة",
+    "customThemes": "السمات المخصصة",
+    "editTheme": "تعديل السمة",
+    "deleteTheme": "حذف السمة",
+    "background": "الخلفية",
+    "surface": "السطح",
+    "border": "الحد",
+    "text": "النص",
+    "success": "نجاح",
+    "error": "خطأ",
+    "themeEditor": {
+      "nameRequired": "اسم السمة مطلوب.",
+      "nameExists": "سمة بهذا الاسم موجودة بالفعل. اختر اسمًا مختلفًا.",
+      "editTitle": "تحرير السمة المخصصة",
+      "themeName": "اسم السمة",
+      "themeNamePlaceholder": "مثال: سمتي المظلمة",
+      "cloneFrom": "استنساخ من موجود (اختياري)",
+      "scratch": "— البدء من الصفر —",
+      "deleteConfirm": "حذف السمة \"{{name}}\"؟ لا يمكن التراجع عن هذا.",
+      "saveChanges": "حفظ التغييرات",
+      "createTheme": "إنشاء سمة",
+      "preview": {
+        "primaryText": "النص الأساسي",
+        "secondaryText": "النص الثانوي",
+        "tertiaryText": "النص الثالث",
+        "primaryButton": "الزر الأساسي",
+        "secondaryButton": "الزر الثانوي",
+        "success": "● نجاح",
+        "warning": "● تحذير",
+        "error": "● خطأ",
+        "cardSurface": "نص مثالي للبطاقة / السطح"
+      }
+    }
+  },
+  "security": {
+    "changePassword": {
+      "title": "تغيير كلمة المرور",
+      "currentPassword": "كلمة المرور الحالية",
+      "newPassword": "كلمة المرور الجديدة",
+      "confirmPassword": "تأكيد كلمة المرور الجديدة",
+      "submit": "تغيير كلمة المرور",
+      "changing": "جارٍ التغيير...",
+      "success": "تم تغيير كلمة المرور بنجاح.",
+      "wrongCurrent": "كلمة المرور الحالية غير صحيحة",
+      "mismatch": "كلمتا المرور غير متطابقتين",
+      "tooShort": "يجب أن تكون كلمة المرور 8 أحرف على الأقل"
+    },
+    "twoFactor": {
+      "title": "المصادقة الثنائية",
+      "loading": "جارٍ التحميل...",
+      "loadFailed": "تعذّر تحميل حالة MFA.",
+      "enabled": "MFA مفعّل. أدخل كلمة المرور لتعطيله.",
+      "disabled": "MFA معطّل. قم بإعداد TOTP لتأمين حسابك.",
+      "setupHint": "امسح رمز QR أو أدخل السر في تطبيق المصادقة الخاص بك، ثم أدخل الرمز المكوّن من 6 أرقام.",
+      "verifyEnable": "تحقق وتفعيل",
+      "setUpMfa": "إعداد MFA",
+      "disableMfa": "تعطيل MFA",
+      "mfaEnabled": "تم تفعيل MFA.",
+      "mfaDisabled": "تم تعطيل MFA.",
+      "invalidCode": "رمز غير صالح",
+      "setupFailed": "فشل بدء الإعداد",
+      "disableFailed": "فشل تعطيل MFA",
+      "aliasLabel": "اسم مستعار لتطبيق المصادقة",
+      "aliasPlaceholder": "مثال: admin، شخصي، عمل",
+      "codePlaceholder": "123456",
+      "currentPasswordPlaceholder": "كلمة المرور الحالية",
+      "mfaQrCode": "رمز MFA QR"
+    }
+  },
+  "language": {
+    "title": "اللغة",
+    "description": "اختر لغة الواجهة الخاصة بك. الأسماء الخاصة تبقى بالإنجليزية.",
+    "default": "افتراضي",
+    "englishNote": "الإنجليزية هي لغة الأعمال العالمية واللغة الافتراضية."
+  }
+}

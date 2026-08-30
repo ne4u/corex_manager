@@ -1,0 +1,22 @@
+# Coraza SPOA configuration
+# Compatible with the ghcr.io/corazawaf/coraza-spoa:main image.
+bind: 0.0.0.0:9000
+
+log_level: info
+log_file: /app/data/coraza-spoa.log
+log_format: json
+
+default_application: haproxy-waf
+
+applications:
+  - name: haproxy-waf
+    directives: |
+      Include @coraza.conf-recommended
+      Include @crs-setup.conf.example
+      Include @owasp_crs/*.conf
+      SecRuleEngine Off
+    log_level: info
+    log_file: /app/data/coraza-spoa.log
+    log_format: json
+    response_check: false
+    transaction_ttl_ms: 60000
