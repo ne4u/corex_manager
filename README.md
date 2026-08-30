@@ -1,5 +1,7 @@
 # coreX Manager
 
+**Website: [www.corex.app](https://www.corex.app)**
+
 A full-featured control plane, data plane, and modern web GUI for HAProxy —
 load balancing, TLS, WAF, caching, bot protection, and API security, managed
 from one place.
