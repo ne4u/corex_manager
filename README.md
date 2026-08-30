@@ -1,4 +1,4 @@
-# coreX Manager
+# coreX Platform
 
 **Website: [www.corex.app](https://www.corex.app)**
 
@@ -6,7 +6,7 @@ A full-featured control plane, data plane, and modern web GUI for HAProxy —
 load balancing, TLS, WAF, caching, bot protection, and API security, managed
 from one place.
 
-coreX Manager generates and hot-reloads HAProxy configuration from a friendly
+The coreX Platform generates and hot-reloads HAProxy configuration from a friendly
 UI/REST API, and orchestrates the surrounding data-plane services (Coraza WAF,
 Varnish disk cache, Valkey, CAPTCHA) via Docker Compose.
 
@@ -55,8 +55,9 @@ cp .env.example .env
 docker compose up --build -d
 ```
 
-- Web UI: [http://localhost:3000](http://localhost:3000)
-- API: [http://localhost:8000](http://localhost:8000)
+- Web UI: [https://localhost:3443](https://localhost:3443)
+- API: [https://localhost:8000](https://localhost:8000)
+- CAPTCHA: [http://localhost:3001](http://localhost:3001)
 - Managed HAProxy: ports 80/443
 
 Log in with username `admin` and the password you set in `ADMIN_PASSWORD`.
