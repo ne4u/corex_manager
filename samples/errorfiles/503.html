@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>503 Service Unavailable</title>
+  <style>
+    :root {
+      --bg-1: #1f1206;
+      --bg-2: #241a12;
+      --accent: #f59e0b;
+      --accent-2: #f97316;
+      --text: #fff7ed;
+      --text-muted: #fdba74;
+      --surface: rgba(255, 255, 255, 0.05);
+      --surface-border: rgba(255, 255, 255, 0.1);
+      --success: #34d399;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background:
+        radial-gradient(ellipse at 20% 20%, rgba(245, 158, 11, 0.14) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 80%, rgba(249, 115, 22, 0.12) 0%, transparent 50%),
+        linear-gradient(135deg, var(--bg-1), var(--bg-2));
+      color: var(--text);
+      text-align: center;
+      overflow: hidden;
+    }
+
+    .background-shapes {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .shape {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(90px);
+      opacity: 0.22;
+      animation: float 20s ease-in-out infinite;
+    }
+
+    .shape-1 {
+      width: 420px;
+      height: 420px;
+      background: var(--accent);
+      top: -140px;
+      left: -100px;
+      animation-delay: -5s;
+    }
+
+    .shape-2 {
+      width: 340px;
+      height: 340px;
+      background: var(--accent-2);
+      bottom: -100px;
+      right: -80px;
+      animation-delay: -10s;
+    }
+
+    .shape-3 {
+      width: 260px;
+      height: 260px;
+      background: #fbbf24;
+      top: 50%;
+      left: 55%;
+      animation-delay: -15s;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      33% { transform: translate(25px, -35px) scale(1.04); }
+      66% { transform: translate(-25px, 25px) scale(0.96); }
+    }
+
+    .card {
+      position: relative;
+      z-index: 1;
+      max-width: 620px;
+      width: calc(100% - 48px);
+      padding: 56px 44px;
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      border-radius: 24px;
+      backdrop-filter: blur(18px);
+      box-shadow:
+        0 24px 80px rgba(0, 0, 0, 0.32),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      animation: fadeIn 0.8s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .icon {
+      width: 100px;
+      height: 100px;
+      margin: 0 auto 28px;
+      color: var(--accent);
+      animation: pulse 3s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.85; transform: scale(1.05); }
+    }
+
+    .code {
+      display: inline-block;
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--accent);
+      background: rgba(245, 158, 11, 0.12);
+      padding: 6px 14px;
+      border-radius: 999px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(245, 158, 11, 0.22);
+    }
+
+    .title {
+      font-size: 32px;
+      font-weight: 700;
+      margin: 0 0 12px;
+      letter-spacing: -0.02em;
+    }
+
+    .message {
+      font-size: 17px;
+      line-height: 1.7;
+      color: var(--text-muted);
+      margin: 0 0 28px;
+    }
+
+    .countdown {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--accent);
+      margin: -18px 0 28px;
+      min-height: 24px;
+    }
+
+    .details {
+      background: rgba(0, 0, 0, 0.18);
+      border: 1px solid var(--surface-border);
+      border-radius: 16px;
+      padding: 20px 24px;
+      margin-bottom: 28px;
+      text-align: left;
+    }
+
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      font-size: 14px;
+    }
+
+    .detail-row:last-child {
+      border-bottom: none;
+    }
+
+    .detail-label {
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    .detail-value {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      color: var(--text);
+      word-break: break-all;
+      text-align: right;
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 24px;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 500;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      border: none;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #1f1206;
+      box-shadow: 0 8px 24px rgba(245, 158, 11, 0.28);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 32px rgba(245, 158, 11, 0.36);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+      border: 1px solid var(--surface-border);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.14);
+      transform: translateY(-2px);
+    }
+
+    .footer {
+      position: absolute;
+      bottom: 24px;
+      left: 0;
+      right: 0;
+      z-index: 1;
+      font-size: 13px;
+      color: var(--text-muted);
+      opacity: 0.7;
+    }
+
+    @media (max-width: 560px) {
+      .card {
+        padding: 40px 24px;
+      }
+
+      .detail-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+      }
+
+      .detail-value {
+        text-align: left;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="background-shapes" aria-hidden="true">
+    <div class="shape shape-1"></div>
+    <div class="shape shape-2"></div>
+    <div class="shape shape-3"></div>
+  </div>
+
+  <main class="card" role="main" aria-labelledby="error-title">
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M12 6v6l4 2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M3 12a9 9 0 0118 0" stroke-opacity="0.4" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+
+    <div class="code" id="error-code">503</div>
+    <h1 class="title" id="error-title">Service Unavailable</h1>
+    <p class="message" id="error-message">
+      The service is temporarily unavailable. We’re working to restore it as quickly as possible.
+    </p>
+
+    <div class="countdown" id="countdown" aria-live="polite"></div>
+
+    <div class="details" aria-label="Error details">
+      <div class="detail-row">
+        <span class="detail-label">Reference ID</span>
+        <span class="detail-value" id="error-ref">—</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Time</span>
+        <span class="detail-value" id="error-time">—</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Retry after</span>
+        <span class="detail-value" id="error-retry">—</span>
+      </div>
+    </div>
+
+    <div class="actions">
+      <a href="/" class="btn btn-secondary">Go home</a>
+      <button type="button" class="btn btn-primary" id="retry-btn">Retry now</button>
+    </div>
+  </main>
+
+  <footer class="footer" aria-hidden="true">
+    Maintenance or overload event logged. Reference: <span id="footer-ref">—</span>
+  </footer>
+
+  <script>
+    (function () {
+      const params = new URLSearchParams(window.location.search);
+
+      function setText(id, value, fallback) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = value || fallback;
+      }
+
+      const ref = params.get('ref') || 'UA-' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 6).toUpperCase();
+      const retryAfter = parseInt(params.get('retry_after') || params.get('retry') || '0', 10) || 60;
+      const title = params.get('title');
+      const message = params.get('message');
+
+      setText('error-ref', ref);
+      setText('error-time', new Date().toISOString());
+      setText('error-retry', retryAfter + ' seconds');
+      setText('footer-ref', ref);
+      if (title) setText('error-title', title);
+      if (message) setText('error-message', message);
+
+      const countdownEl = document.getElementById('countdown');
+      const retryBtn = document.getElementById('retry-btn');
+      let remaining = retryAfter;
+
+      function updateCountdown() {
+        if (remaining > 0) {
+          const m = Math.floor(remaining / 60);
+          const s = remaining % 60;
+          countdownEl.textContent = 'Please try again in ' + (m > 0 ? m + 'm ' : '') + s + 's';
+          retryBtn.disabled = true;
+          retryBtn.textContent = 'Retry in ' + s + 's';
+          remaining--;
+        } else {
+          countdownEl.textContent = 'Service should be available now';
+          retryBtn.disabled = false;
+          retryBtn.textContent = 'Retry now';
+          clearInterval(timer);
+        }
+      }
+
+      updateCountdown();
+      const timer = setInterval(updateCountdown, 1000);
+
+      retryBtn.addEventListener('click', function () {
+        location.reload();
+      });
+    })();
+  </script>
+</body>
+</html>

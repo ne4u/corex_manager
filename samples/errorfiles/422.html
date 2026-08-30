@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>422 Unprocessable Entity</title>
+  <style>
+    :root {
+      --bg-1: #1a1206;
+      --bg-2: #281a12;
+      --accent: #facc15;
+      --accent-2: #f97316;
+      --text: #fffbeb;
+      --text-muted: #fde68a;
+      --surface: rgba(255, 255, 255, 0.05);
+      --surface-border: rgba(255, 255, 255, 0.1);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background:
+        radial-gradient(ellipse at 20% 20%, rgba(250, 204, 21, 0.14) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 80%, rgba(249, 115, 22, 0.12) 0%, transparent 50%),
+        linear-gradient(135deg, var(--bg-1), var(--bg-2));
+      color: var(--text);
+      text-align: center;
+      overflow: hidden;
+    }
+
+    .background-shapes {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .shape {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(90px);
+      opacity: 0.22;
+      animation: float 20s ease-in-out infinite;
+    }
+
+    .shape-1 {
+      width: 420px;
+      height: 420px;
+      background: var(--accent);
+      top: -140px;
+      right: -100px;
+      animation-delay: -4s;
+    }
+
+    .shape-2 {
+      width: 340px;
+      height: 340px;
+      background: var(--accent-2);
+      bottom: -100px;
+      left: -80px;
+      animation-delay: -10s;
+    }
+
+    .shape-3 {
+      width: 260px;
+      height: 260px;
+      background: #fbbf24;
+      top: 45%;
+      right: 55%;
+      animation-delay: -16s;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      33% { transform: translate(25px, -35px) scale(1.04); }
+      66% { transform: translate(-25px, 25px) scale(0.96); }
+    }
+
+    .card {
+      position: relative;
+      z-index: 1;
+      max-width: 620px;
+      width: calc(100% - 48px);
+      padding: 56px 44px;
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      border-radius: 24px;
+      backdrop-filter: blur(18px);
+      box-shadow:
+        0 24px 80px rgba(0, 0, 0, 0.32),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      animation: fadeIn 0.8s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .icon {
+      width: 100px;
+      height: 100px;
+      margin: 0 auto 28px;
+      color: var(--accent);
+      animation: pulse 3s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.85; transform: scale(1.05); }
+    }
+
+    .code {
+      display: inline-block;
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--accent);
+      background: rgba(250, 204, 21, 0.12);
+      padding: 6px 14px;
+      border-radius: 999px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(250, 204, 21, 0.22);
+    }
+
+    .title {
+      font-size: 32px;
+      font-weight: 700;
+      margin: 0 0 12px;
+      letter-spacing: -0.02em;
+    }
+
+    .message {
+      font-size: 17px;
+      line-height: 1.7;
+      color: var(--text-muted);
+      margin: 0 0 28px;
+    }
+
+    .details {
+      background: rgba(0, 0, 0, 0.18);
+      border: 1px solid var(--surface-border);
+      border-radius: 16px;
+      padding: 20px 24px;
+      margin-bottom: 28px;
+      text-align: left;
+    }
+
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      font-size: 14px;
+    }
+
+    .detail-row:last-child {
+      border-bottom: none;
+    }
+
+    .detail-label {
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    .detail-value {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      color: var(--text);
+      word-break: break-all;
+      text-align: right;
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 24px;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 500;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      border: none;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #1a1206;
+      box-shadow: 0 8px 24px rgba(250, 204, 21, 0.28);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 32px rgba(250, 204, 21, 0.36);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+      border: 1px solid var(--surface-border);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.14);
+      transform: translateY(-2px);
+    }
+
+    .footer {
+      position: absolute;
+      bottom: 24px;
+      left: 0;
+      right: 0;
+      z-index: 1;
+      font-size: 13px;
+      color: var(--text-muted);
+      opacity: 0.7;
+    }
+
+    @media (max-width: 560px) {
+      .card {
+        padding: 40px 24px;
+      }
+
+      .detail-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+      }
+
+      .detail-value {
+        text-align: left;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="background-shapes" aria-hidden="true">
+    <div class="shape shape-1"></div>
+    <div class="shape shape-2"></div>
+    <div class="shape shape-3"></div>
+  </div>
+
+  <main class="card" role="main" aria-labelledby="error-title">
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+      <path d="M7 3h10a2 2 0 012 2v14a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M9 8h6M9 12h4M9 16h2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M17 13l-2-3.5-2 3.5h4z" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M15 14.5v.01" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+
+    <div class="code" id="error-code">422</div>
+    <h1 class="title" id="error-title">Unprocessable Entity</h1>
+    <p class="message" id="error-message">
+      The request was understood, but it failed validation. Please check the data and try again.
+    </p>
+
+    <div class="details" aria-label="Error details">
+      <div class="detail-row">
+        <span class="detail-label">Reference ID</span>
+        <span class="detail-value" id="error-ref">—</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Time</span>
+        <span class="detail-value" id="error-time">—</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Field</span>
+        <span class="detail-value" id="error-field">—</span>
+      </div>
+    </div>
+
+    <div class="actions">
+      <a href="/" class="btn btn-primary">Go home</a>
+      <a href="javascript:history.back()" class="btn btn-secondary">Go back</a>
+    </div>
+  </main>
+
+  <footer class="footer" aria-hidden="true">
+    Validation error logged. Reference: <span id="footer-ref">—</span>
+  </footer>
+
+  <script>
+    (function () {
+      const params = new URLSearchParams(window.location.search);
+
+      function setText(id, value, fallback) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = value || fallback;
+      }
+
+      const ref = params.get('ref') || 'VAL-' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 6).toUpperCase();
+      const field = params.get('field') || '—';
+      const title = params.get('title');
+      const message = params.get('message');
+
+      setText('error-ref', ref);
+      setText('error-time', new Date().toISOString());
+      setText('error-field', field);
+      setText('footer-ref', ref);
+      if (title) setText('error-title', title);
+      if (message) setText('error-message', message);
+    })();
+  </script>
+</body>
+</html>
