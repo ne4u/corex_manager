@@ -488,8 +488,9 @@ def test_write_security_list_files_writes_applied_and_cleans_stale(db, tmp_path,
 
 
 def _baseline_all_configs(db, tmp_path, monkeypatch):
-    """Write .applied baselines for haproxy.cfg + risk_rules_data.lua so the
-    only thing that can move get_config_status is a security-list edit."""
+    """Write .applied baselines for haproxy.cfg + risk_rules_data.lua +
+    resp-transform files so the only thing that can move get_config_status
+    is a security-list edit."""
     from app.core.config import get_settings
     from app.services import haproxy
     s = get_settings()
@@ -498,6 +499,11 @@ def _baseline_all_configs(db, tmp_path, monkeypatch):
     monkeypatch.setattr(s, "SECURITY_LISTS_DIR", str(lists_dir))
     monkeypatch.setattr(s, "HAPROXY_CONFIG_PATH", str(tmp_path / "haproxy.cfg"))
     monkeypatch.setattr(s, "CORAZA_SPOA_ENABLED", False)
+    # Isolate resp-transform dir so generated query_detokenize.json has a
+    # matching .applied baseline (otherwise it always shows as unapplied).
+    rt_dir = tmp_path / "resp-transform"
+    rt_dir.mkdir()
+    monkeypatch.setattr(s, "RESP_TRANSFORM_DIR", str(rt_dir))
 
     cfg_path = str(tmp_path / "haproxy.cfg")
     baseline = haproxy.generate_config(db)
@@ -516,6 +522,19 @@ def _baseline_all_configs(db, tmp_path, monkeypatch):
             f.write(rrd)
         with open(f"{rrd_path}.applied", "w") as f:
             f.write(rrd)
+    except Exception:
+        pass
+
+    # Response transform file baselines (if resp transform is importable).
+    try:
+        from app.services.resp_transform import generate_resp_transform_file_contents
+        rt_gen = generate_resp_transform_file_contents(db)
+        for fname, content in rt_gen.items():
+            fpath = str(rt_dir / fname)
+            with open(fpath, "w") as f:
+                f.write(content)
+            with open(f"{fpath}.applied", "w") as f:
+                f.write(content)
     except Exception:
         pass
 

@@ -221,8 +221,8 @@ def test_vcl_backends_point_to_haproxy(db):
     db.commit()
 
     vcl = varnish.generate_vcl(db)
-    # VCL backend should point to HAProxy, not the origin server
-    assert '.host = "haproxy"' in vcl
+    # VCL backend should point to HAProxy (container name "corex"), not the origin server
+    assert '.host = "corex"' in vcl
     # Origin server address should NOT appear in VCL
     assert '.host = "10.0.0.99"' not in vcl
     assert '.port = "8080"' not in vcl

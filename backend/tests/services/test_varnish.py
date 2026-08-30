@@ -230,8 +230,8 @@ def test_vcl_haproxy_host_from_container_name(db):
     make_server(db, backend.id)
     make_cache_config(db, backend.id, disk_cache_enabled=True)
     vcl = varnish.generate_vcl(db)
-    # Default HAPROXY_CONTAINER_NAME is "haproxy"
-    assert '.host = "haproxy";' in vcl
+    # Default HAPROXY_CONTAINER_NAME is "corex"
+    assert '.host = "corex";' in vcl
 
 
 def test_vcl_haproxy_port_from_listener(db):

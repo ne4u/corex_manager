@@ -1,5 +1,7 @@
 # coreX Platform
 
+![coreX Platform](corex.png)
+
 **Website: [www.corex.app](https://www.corex.app)**
 
 A full-featured control plane, data plane, and modern web GUI for HAProxy —

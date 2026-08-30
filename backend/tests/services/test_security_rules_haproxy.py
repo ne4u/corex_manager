@@ -708,6 +708,23 @@ def test_global_options_change_detected_by_config_status(db, monkeypatch, tmp_pa
     except Exception:
         pass  # risk scoring not configured — skip
 
+    # Baseline resp-transform files — _config_status_data always generates
+    # query_detokenize.json, so without an .applied snapshot it would falsely
+    # report unapplied.
+    try:
+        from app.services.resp_transform import generate_resp_transform_file_contents
+        rt_dir = str(tmp_path / "resp-transform")
+        os.makedirs(rt_dir, exist_ok=True)
+        rt_gen = generate_resp_transform_file_contents(db)
+        for fname, content in rt_gen.items():
+            fpath = os.path.join(rt_dir, fname)
+            with open(fpath, "w") as f:
+                f.write(content)
+            with open(f"{fpath}.applied", "w") as f:
+                f.write(content)
+    except Exception:
+        pass  # resp transform not configured — skip
+
     # 2. Status should be False (no changes)
     assert get_config_status(db) is False
 

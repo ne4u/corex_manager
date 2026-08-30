@@ -96,36 +96,44 @@ function injectAllThemeCss(customThemes: Record<string, Theme>) {
 }
 
 // ---------------------------------------------------------------------------
-// Dynamic favicon — recolor the unfold-horizontal icon to match the active
-// theme's accent color so the browser tab matches the UI.
+// Dynamic favicon — recolor the coreX logo to match the active theme's
+// accent color so the browser tab matches the UI.  The base SVG is fetched
+// once from /favicon.svg (the static file in frontend/public), then all
+// fill colors are replaced with the theme accent on each theme change.
 // ---------------------------------------------------------------------------
 
-// Path data for the lucide "unfold-horizontal" icon (8 stroke paths).
-const FAVICON_SVG_PATHS = [
-  'M16 12h6',
-  'M8 12H2',
-  'M12 2v2',
-  'M12 8v2',
-  'M12 14v2',
-  'M12 20v2',
-  'm19 15 3-3-3-3',
-  'm5 9-3 3 3 3',
-]
+let faviconSvgCache: string | null = null
+
+async function loadFaviconSvg(): Promise<string> {
+  if (faviconSvgCache) return faviconSvgCache
+  try {
+    const res = await fetch('/favicon.svg')
+    if (!res.ok) throw new Error(`favicon fetch failed: ${res.status}`)
+    faviconSvgCache = await res.text()
+  } catch {
+    // Fallback: empty SVG (the static <link> in index.html still works)
+    faviconSvgCache = ''
+  }
+  return faviconSvgCache
+}
 
 function updateFavicon(accentColor: string) {
   // accentColor is an RGB triplet like "37 99 235"
   const hex = '#' + accentColor.split(' ').map(n => parseInt(n).toString(16).padStart(2, '0')).join('')
-  const paths = FAVICON_SVG_PATHS.map(d => `<path d="${d}"/>`).join('')
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="${hex}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`
-  const dataUri = `data:image/svg+xml,${encodeURIComponent(svg)}`
-  let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
-  if (!link) {
-    link = document.createElement('link')
-    link.rel = 'icon'
-    document.head.appendChild(link)
-  }
-  link.type = 'image/svg+xml'
-  link.href = dataUri
+  loadFaviconSvg().then(svgText => {
+    if (!svgText) return
+    // Replace all fill="#..." with the theme accent color
+    const recolored = svgText.replace(/fill="#[0-9a-fA-F]{3,8}"/g, `fill="${hex}"`)
+    const dataUri = `data:image/svg+xml,${encodeURIComponent(recolored)}`
+    let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
+    if (!link) {
+      link = document.createElement('link')
+      link.rel = 'icon'
+      document.head.appendChild(link)
+    }
+    link.type = 'image/svg+xml'
+    link.href = dataUri
+  })
 }
 
 // ---------------------------------------------------------------------------
