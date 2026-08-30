@@ -1017,7 +1017,7 @@ function CategorySelect({
 
 function ExpressionEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const { t } = useTranslation(['pages', 'common'])
-  const [tab, setTab] = useState<'text' | 'builder'>('text')
+  const [tab, setTab] = useState<'text' | 'builder'>('builder')
   const [validation, setValidation] = useState<{ ok: boolean; error: string | null }>({ ok: true, error: null })
   const [validating, setValidating] = useState(false)
 
