@@ -226,7 +226,7 @@ def close_client(server_id: int) -> None:
         # Schedule close — can't await here
         import asyncio
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             loop.create_task(client.aclose())
         except RuntimeError:
             pass  # No event loop

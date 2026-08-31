@@ -1,6 +1,6 @@
 # Virtual environments
 /.venv
-/.venv-3.12
+/.venv-3.14
 
 # Secrets / environment — never commit real .env files
 .env
@@ -45,6 +45,7 @@ logs/
 *$py.class
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
 .coverage
 htmlcov/
 .tox/

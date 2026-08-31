@@ -172,7 +172,7 @@ class StdioProcess:
         self._next_id += 1
         message["id"] = internal_id
 
-        fut: asyncio.Future = asyncio.get_event_loop().create_future()
+        fut: asyncio.Future = asyncio.get_running_loop().create_future()
         self._pending[internal_id] = fut
 
         try:

@@ -1,5 +1,6 @@
 import json
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -191,7 +192,7 @@ def test_sample_waf_metrics_offset_and_truncate(db, temp_coraza_paths, monkeypat
 
     waf_metrics.sample_waf_metrics()
     assert db.query(WafMetric).count() == 0
-    assert open(offset_path).read() == "0"
+    assert Path(offset_path).read_text() == "0"
 
 
 def test_get_waf_metrics_breakdowns(db):

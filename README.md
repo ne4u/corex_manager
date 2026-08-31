@@ -68,11 +68,11 @@ and printed once in the API logs (`docker compose logs api | grep password`).
 
 ## Development Setup
 
-Requirements: Python 3.12+ and Node.js 20+.
+Requirements: Python 3.14+ and Node.js 20+.
 
 ```bash
 # 1. Backend
-python3.12 -m venv .venv
+python3.14 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cd backend

@@ -479,7 +479,8 @@ def test_write_security_list_files_writes_applied_and_cleans_stale(db, tmp_path,
     assert os.path.exists(applied)
 
     # Delete the list and re-write — stale files should be cleaned up.
-    db.query(NetworkListEntry).delete()
+    # The cascade="all, delete-orphan" on NetworkList.entries handles child
+    # deletion automatically, so we only delete the parent here.
     db.delete(nl)
     db.commit()
     security_lists.write_security_list_files(db)

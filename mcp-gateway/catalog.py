@@ -144,7 +144,7 @@ class CatalogWorker:
             return
         self._running = True
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             self._task = loop.create_task(self._run())
             logger.info("Catalog worker started (interval=%ds)", self.refresh_interval)
         except RuntimeError:

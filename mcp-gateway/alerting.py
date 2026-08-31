@@ -81,11 +81,8 @@ def _send_alert(event_type: str, count: int, threshold: int) -> None:
 
     try:
         import asyncio
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            loop.create_task(_send_webhook(payload))
-        else:
-            loop.run_until_complete(_send_webhook(payload))
+        loop = asyncio.get_running_loop()
+        loop.create_task(_send_webhook(payload))
     except Exception as e:
         logger.warning("Failed to send alert webhook: %s", e)
 
