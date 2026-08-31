@@ -173,29 +173,49 @@ def _restore_db_from_snapshot(db: Session, snapshot: Dict[str, List[Dict[str, An
         count += 1
 
     db.commit()
-    _restore_sqlite_sequences(db, snapshot)
+    _reset_sequences(db, snapshot)
     return count
 
 
-def _restore_sqlite_sequences(db: Session, snapshot: Dict[str, List[Dict[str, Any]]]) -> None:
-    """Fix sqlite_sequence table after restore so autoincrement continues correctly."""
-    if not settings.DATABASE_URL.startswith("sqlite"):
-        return
-    res = db.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='sqlite_sequence'"))
-    if not res.fetchone():
-        return
-    for table in Base.metadata.sorted_tables:
-        if table.name not in snapshot:
-            continue
-        rows = snapshot[table.name]
-        ids = [r.get("id") for r in rows if r.get("id") is not None]
-        if not ids:
-            continue
-        db.execute(
-            text("INSERT OR REPLACE INTO sqlite_sequence(name, seq) VALUES (:name, :seq)"),
-            {"name": table.name, "seq": max(ids)},
-        )
-    db.commit()
+def _reset_sequences(db: Session, snapshot: Dict[str, List[Dict[str, Any]]]) -> None:
+    """Reset auto-increment sequences after a restore.
+
+    On SQLite, updates the sqlite_sequence table so the next insert doesn't
+    reuse an ID from the restored rows. On PostgreSQL, uses setval() to
+    advance sequences past the highest restored ID.
+    """
+    if settings.DATABASE_URL.startswith("sqlite"):
+        res = db.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='sqlite_sequence'"))
+        if not res.fetchone():
+            return
+        for table in Base.metadata.sorted_tables:
+            if table.name not in snapshot:
+                continue
+            rows = snapshot[table.name]
+            ids = [r.get("id") for r in rows if r.get("id") is not None]
+            if not ids:
+                continue
+            db.execute(
+                text("INSERT OR REPLACE INTO sqlite_sequence(name, seq) VALUES (:name, :seq)"),
+                {"name": table.name, "seq": max(ids)},
+            )
+        db.commit()
+    else:
+        for table in Base.metadata.sorted_tables:
+            if table.name not in snapshot:
+                continue
+            rows = snapshot[table.name]
+            ids = [r.get("id") for r in rows if r.get("id") is not None]
+            if not ids:
+                continue
+            seq_result = db.execute(text(
+                f"SELECT pg_get_serial_sequence('{table.name}', 'id')"
+            )).scalar()
+            if seq_result:
+                db.execute(text(
+                    f"SELECT setval('{seq_result}', {max(ids)}, true)"
+                ))
+        db.commit()
 
 
 # ---------------------------------------------------------------------------

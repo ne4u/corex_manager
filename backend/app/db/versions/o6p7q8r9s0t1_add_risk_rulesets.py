@@ -54,7 +54,7 @@ def upgrade() -> None:
     if result is None:
         op.execute(
             "INSERT INTO risk_rulesets (id, name, slug, description, enabled, priority, created_at, updated_at) "
-            "VALUES (1, 'Default', 'default', 'Default risk scoring ruleset', true, 0, NOW(), NOW())"
+            "VALUES (1, 'Default', 'default', 'Default risk scoring ruleset', true, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
         )
 
     # Check if ruleset_id column already exists on risk_rules (partial migration).

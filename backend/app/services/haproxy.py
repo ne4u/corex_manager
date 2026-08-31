@@ -4257,24 +4257,49 @@ def _parse_value(value: Any, col: Any) -> Any:
     return value
 
 
-def _restore_sqlite_sequences(db: Session, snapshot: Dict[str, List[Dict[str, Any]]]) -> None:
-    if not settings.DATABASE_URL.startswith("sqlite"):
-        return
-    res = db.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='sqlite_sequence'"))
-    if not res.fetchone():
-        return
-    for table in Base.metadata.sorted_tables:
-        if table.name in _SNAPSHOT_EXCLUDED or table.name not in snapshot:
-            continue
-        rows = snapshot[table.name]
-        ids = [r.get("id") for r in rows if r.get("id") is not None]
-        if not ids:
-            continue
-        db.execute(
-            text("INSERT OR REPLACE INTO sqlite_sequence(name, seq) VALUES (:name, :seq)"),
-            {"name": table.name, "seq": max(ids)},
-        )
-    db.commit()
+def _reset_sequences(db: Session, snapshot: Dict[str, List[Dict[str, Any]]]) -> None:
+    """Reset auto-increment sequences after a snapshot restore.
+
+    On SQLite, updates the sqlite_sequence table so the next insert doesn't
+    reuse an ID from the restored rows. On PostgreSQL, uses setval() to
+    advance sequences past the highest restored ID.
+    """
+    if settings.DATABASE_URL.startswith("sqlite"):
+        res = db.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='sqlite_sequence'"))
+        if not res.fetchone():
+            return
+        for table in Base.metadata.sorted_tables:
+            if table.name in _SNAPSHOT_EXCLUDED or table.name not in snapshot:
+                continue
+            rows = snapshot[table.name]
+            ids = [r.get("id") for r in rows if r.get("id") is not None]
+            if not ids:
+                continue
+            db.execute(
+                text("INSERT OR REPLACE INTO sqlite_sequence(name, seq) VALUES (:name, :seq)"),
+                {"name": table.name, "seq": max(ids)},
+            )
+        db.commit()
+    else:
+        for table in Base.metadata.sorted_tables:
+            if table.name in _SNAPSHOT_EXCLUDED or table.name not in snapshot:
+                continue
+            rows = snapshot[table.name]
+            ids = [r.get("id") for r in rows if r.get("id") is not None]
+            if not ids:
+                continue
+            # Find the sequence backing the 'id' column (if any) and reset it.
+            pk_col = next((c for c in table.columns if c.name == "id"), None)
+            if pk_col is None:
+                continue
+            seq_result = db.execute(text(
+                f"SELECT pg_get_serial_sequence('{table.name}', 'id')"
+            )).scalar()
+            if seq_result:
+                db.execute(text(
+                    f"SELECT setval('{seq_result}', {max(ids)}, true)"
+                ))
+        db.commit()
 
 
 def _clear_excluded_table_fks(db: Session) -> None:
@@ -4341,7 +4366,7 @@ def load_config_snapshot(db: Session, path: Optional[str] = None) -> None:
             db.execute(table.insert(), cleaned_rows)
 
     db.commit()
-    _restore_sqlite_sequences(db, snapshot)
+    _reset_sequences(db, snapshot)
 
 
 def revert_to_applied_config(db: Session, created_by: Optional[str] = None) -> Dict[str, Any]:

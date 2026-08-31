@@ -147,9 +147,9 @@ def test_per_server_matching_uses_pxname_svname_key():
 def test_get_metrics_end_to_end(tmp_path, monkeypatch):
     """Two snapshots 30s apart produce one bucket with derived rates."""
     from app.models.models import MetricSnapshot
-    from app.core.database import Base, engine, SessionLocal
+    from app.core.database import SessionLocal
 
-    Base.metadata.create_all(bind=engine)
+    # Tables are created once at session scope by the _session_schema fixture.
     db = SessionLocal()
     try:
         now = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -182,4 +182,3 @@ def test_get_metrics_end_to_end(tmp_path, monkeypatch):
         assert p["frontends"]["fe1"]["responses_rate"] == pytest.approx(2.0)
     finally:
         db.close()
-        Base.metadata.drop_all(bind=engine)

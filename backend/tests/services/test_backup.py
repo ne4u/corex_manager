@@ -138,6 +138,7 @@ def test_serialize_db_includes_metrics_when_requested(db):
 def test_export_returns_valid_zip(db):
     backend = make_backend(db, name="web")
     make_server(db, backend.id)
+    db.commit()
     archive = _export_to_bytes(db, include_secrets=True, include_metrics=False)
     assert isinstance(archive, bytes)
     zf = zipfile.ZipFile(io.BytesIO(archive), "r")

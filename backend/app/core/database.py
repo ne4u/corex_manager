@@ -82,13 +82,7 @@ def _ensure_admin_user():
 
 
 def init_db():
-    """Run Alembic migrations to bring the database to the latest revision.
-
-    Existing databases created by the legacy create_all + _add_missing_columns
-    path have all baseline tables but no alembic_version table. We detect this
-    and stamp them at the baseline revision so only the follow-up data
-    migration revision runs. Fresh databases get the full upgrade from zero.
-    """
+    """Run Alembic migrations to bring the database to the latest revision."""
     import logging
     _log = logging.getLogger(__name__)
 
@@ -104,42 +98,27 @@ def init_db():
 
     _log.info("init_db: checking database state")
 
-    # If the DB has tables but no alembic_version table, it's a legacy DB
-    # created by the old create_all path. Stamp it at the baseline revision
-    # so only follow-up migrations run (not the full baseline re-creation).
-    needs_stamp = False
-    with engine.connect() as conn:
-        inspector = inspect(conn)
-        tables = set(inspector.get_table_names())
-        if tables and "alembic_version" not in tables:
-            needs_stamp = True
-        conn.commit()
-
-    _log.info("init_db: tables=%d, needs_stamp=%s", len(tables), needs_stamp)
-
     # Check the current alembic version to see if we're already at head.
     # This avoids a hanging command.upgrade() call on PostgreSQL when
     # the DB is already up-to-date (the alembic env.py creates a separate
     # NullPool engine that can deadlock with the app's engine pool).
     current_version = None
-    if "alembic_version" in tables:
-        with engine.connect() as conn:
+    with engine.connect() as conn:
+        inspector = inspect(conn)
+        tables = set(inspector.get_table_names())
+        if "alembic_version" in tables:
             from sqlalchemy import text
             row = conn.execute(text("SELECT version_num FROM alembic_version")).fetchone()
             if row:
                 current_version = row[0]
-            conn.commit()
-    _log.info("init_db: current_version=%s", current_version)
+        conn.commit()
+
+    _log.info("init_db: tables=%d, current_version=%s", len(tables), current_version)
 
     # Dispose all pooled connections so they don't block Alembic's DDL.
     # On SQLite this releases file locks; on PostgreSQL this prevents
     # idle connections from interfering with schema changes.
     engine.dispose()
-
-    if needs_stamp:
-        _log.info("init_db: stamping at baseline 8b9ba74c6828")
-        command.stamp(alembic_cfg, "8b9ba74c6828")
-        _log.info("init_db: stamp complete")
 
     # Only run upgrade if we're not already at head. On PostgreSQL,
     # command.upgrade("head") can hang even when there's nothing to do
@@ -157,50 +136,5 @@ def init_db():
         command.upgrade(alembic_cfg, "head")
         _log.info("init_db: upgrade complete")
 
-    # Fixup: ensure risk_rulesets rows have created_at/updated_at set
-    # (the initial migration INSERT may have omitted them on some DBs).
-    try:
-        with engine.connect() as conn:
-            from sqlalchemy import text
-            conn.execute(text(
-                "UPDATE risk_rulesets SET created_at = NOW() WHERE created_at IS NULL"
-            ))
-            conn.execute(text(
-                "UPDATE risk_rulesets SET updated_at = NOW() WHERE updated_at IS NULL"
-            ))
-            conn.commit()
-    except Exception as exc:
-        _log.warning("init_db: risk_rulesets timestamp fixup failed: %s", exc)
-
-    # If we're on PostgreSQL and a legacy SQLite database exists in the data
-    # volume, migrate its data now (after schema is created by Alembic).
-    if not _is_sqlite:
-        try:
-            from .sqlite_migrator import migrate_sqlite_to_postgres
-            migrated = migrate_sqlite_to_postgres(settings.DATABASE_URL)
-            if migrated:
-                _log.info("init_db: SQLite-to-PostgreSQL data migration completed")
-        except Exception as exc:
-            _log.warning("init_db: SQLite migration check failed: %s", exc)
-
-        # Always reset PostgreSQL sequences on startup. This fixes databases
-        # that were migrated from SQLite before the migrator had sequence
-        # reset logic, and is a no-op on healthy databases (setval to the
-        # same value is cheap).
-        try:
-            from .sqlite_migrator import _reset_pg_sequences
-            _reset_pg_sequences(engine)
-        except Exception as exc:
-            _log.warning("init_db: sequence reset failed: %s", exc)
-
     _ensure_admin_user()
     _log.info("init_db: done")
-
-
-def _add_missing_columns() -> None:
-    """Legacy no-op migration helper kept for test compatibility.
-
-    The production schema is now managed by Alembic. Tests still call this
-    helper after create_all, so a no-op is sufficient.
-    """
-    pass
