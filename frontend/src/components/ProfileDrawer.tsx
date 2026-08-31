@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import {
   UserCircle, X, Palette, Shield, Globe, LogOut, Plus, Pencil, Trash2, Clock,
 } from 'lucide-react'
-import { auth, totp } from '../services/api'
+import { auth, totp, users } from '../services/api'
 import { IconButton, Tabs, Badge } from './ui'
 import { CustomThemeEditor } from './CustomThemeEditor'
 import { useTheme } from '../themes/useTheme'
@@ -25,6 +25,10 @@ interface UserInfo {
   role: string
   is_admin: boolean
   totp_enabled: boolean
+  email?: string | null
+  first_name?: string | null
+  last_name?: string | null
+  organization?: string | null
   created_at: string
 }
 
@@ -108,7 +112,7 @@ export default function ProfileDrawer() {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
-          {activeTab === 'profile' && <ProfileTab user={user} />}
+          {activeTab === 'profile' && <ProfileTab user={user} onUserUpdated={setUser} />}
           {activeTab === 'appearance' && <AppearanceTab />}
           {activeTab === 'security' && <SecurityTab user={user} />}
           {activeTab === 'language' && <LanguageTab />}
@@ -120,17 +124,83 @@ export default function ProfileDrawer() {
 }
 
 // ---------------------------------------------------------------------------
-// Profile tab — identity card + logout
+// Profile tab — identity card + contact fields + logout
 // ---------------------------------------------------------------------------
-function ProfileTab({ user }: { user: UserInfo | null }) {
+function ProfileTab({ user, onUserUpdated }: { user: UserInfo | null; onUserUpdated: (u: UserInfo) => void }) {
   const { t } = useTranslation(['profile', 'common'])
   const { formatDate } = useDateTime()
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [form, setForm] = useState({
+    email: '',
+    first_name: '',
+    last_name: '',
+    organization: '',
+  })
+
+  useEffect(() => {
+    if (user) {
+      setForm({
+        email: user.email || '',
+        first_name: user.first_name || '',
+        last_name: user.last_name || '',
+        organization: user.organization || '',
+      })
+    }
+  }, [user])
+
   if (!user) return <p className="text-sm text-slate-400">{t('common:actions.loading')}</p>
+
+  const startEdit = () => {
+    setForm({
+      email: user.email || '',
+      first_name: user.first_name || '',
+      last_name: user.last_name || '',
+      organization: user.organization || '',
+    })
+    setError('')
+    setEditing(true)
+  }
+
+  const save = async () => {
+    setSaving(true)
+    setError('')
+    if (!form.email.trim() || !form.first_name.trim() || !form.last_name.trim() || !form.organization.trim()) {
+      setError(t('profile:identity.allFieldsRequired'))
+      setSaving(false)
+      return
+    }
+    try {
+      await users.update(user.id, {
+        email: form.email.trim(),
+        first_name: form.first_name.trim(),
+        last_name: form.last_name.trim(),
+        organization: form.organization.trim(),
+      })
+      const res = await auth.me()
+      onUserUpdated(res.data)
+      setEditing(false)
+    } catch (err: any) {
+      setError(err.response?.data?.detail || t('common:errors.saveFailed'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const contactComplete = !!(user.email && user.first_name && user.last_name && user.organization)
 
   return (
     <div className="space-y-6">
       <div className="card space-y-3">
-        <h3 className="text-lg font-semibold">{user.username}</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">{user.username}</h3>
+          {!editing && (
+            <button onClick={startEdit} className="text-primary text-sm hover:underline">
+              {t('profile:identity.editContact')}
+            </button>
+          )}
+        </div>
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
             <span className="text-slate-400">{t('profile:identity.role')}</span>
@@ -144,6 +214,66 @@ function ProfileTab({ user }: { user: UserInfo | null }) {
           </div>
         </div>
       </div>
+
+      <div className="card space-y-3">
+        <div className="flex items-center justify-between">
+          <h4 className="text-sm font-semibold uppercase tracking-wider text-slate-400">{t('profile:identity.contactInfo')}</h4>
+          {!contactComplete && !editing && (
+            <span className="text-xs text-amber-400">{t('profile:identity.incomplete')}</span>
+          )}
+        </div>
+        {error && <p className="text-red-400 text-sm">{error}</p>}
+        {editing ? (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">{t('profile:identity.firstName')}</label>
+                <input className="input" value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} required />
+              </div>
+              <div>
+                <label className="label">{t('profile:identity.lastName')}</label>
+                <input className="input" value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} required />
+              </div>
+            </div>
+            <div>
+              <label className="label">{t('profile:identity.email')}</label>
+              <input type="email" className="input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
+            </div>
+            <div>
+              <label className="label">{t('profile:identity.organization')}</label>
+              <input className="input" value={form.organization} onChange={(e) => setForm({ ...form, organization: e.target.value })} required />
+            </div>
+            <div className="flex gap-2">
+              <button className="btn-primary flex-1" onClick={save} disabled={saving}>
+                {saving ? t('common:actions.saving') : t('common:actions.save')}
+              </button>
+              <button className="btn-secondary" onClick={() => { setEditing(false); setError('') }}>
+                {t('common:actions.cancel')}
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-slate-400">{t('profile:identity.firstName')}</span>
+              <span className="text-slate-200">{user.first_name || '-'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-400">{t('profile:identity.lastName')}</span>
+              <span className="text-slate-200">{user.last_name || '-'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-400">{t('profile:identity.email')}</span>
+              <span className="text-slate-200">{user.email || '-'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-400">{t('profile:identity.organization')}</span>
+              <span className="text-slate-200">{user.organization || '-'}</span>
+            </div>
+          </div>
+        )}
+      </div>
+
       <button
         className="btn-secondary w-full flex items-center justify-center gap-2"
         onClick={() => {

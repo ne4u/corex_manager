@@ -143,6 +143,9 @@ class Settings(BaseSettings):
     # Security Rules
     SECURITY_RULES_BLOCK_STATUS: int = 403
 
+    # SSL Labs API (for certificate host scanning)
+    SSLLABS_API_BASE: str = "https://api.ssllabs.com/api/v4"
+
     # Lua fingerprint scripts (toggled via Global Options GUI; stored in DB settings)
     JA4_ENABLED: bool = True
     REQ_FP_ENABLED: bool = False

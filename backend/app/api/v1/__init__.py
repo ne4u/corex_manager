@@ -23,6 +23,7 @@ from .risk_rulesets import router as risk_rulesets_router
 from .security_lists import router as security_lists_router
 from .security_rules import router as security_rules_router
 from .settings import router as settings_router
+from .ssllabs import router as ssllabs_router
 from .system import router as system_router
 from .tasks import router as tasks_router
 from .users import router as users_router
@@ -56,6 +57,7 @@ def build_v1_router() -> APIRouter:
     router.include_router(security_lists_router)
     router.include_router(security_rules_router)
     router.include_router(settings_router)
+    router.include_router(ssllabs_router)
     router.include_router(system_router)
     router.include_router(tasks_router)
     router.include_router(users_router)

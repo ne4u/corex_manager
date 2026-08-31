@@ -325,7 +325,9 @@
       "username": "Имя пользователя",
       "role": "Роль",
       "createdAt": "Создано",
-      "actions": "Действия"
+      "actions": "Действия",
+      "email": "Email",
+      "organization": "Organization"
     },
     "modal": {
       "editTitle": "Редактировать пользователя",
@@ -337,7 +339,12 @@
       "passwordRequired": "Пароль обязателен для новых пользователей",
       "role": "Роль",
       "roleAdmin": "Администратор",
-      "roleUser": "Пользователь"
+      "roleUser": "Пользователь",
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "email": "Email",
+      "organization": "Organization",
+      "fieldRequired": "{{field}} is required."
     },
     "confirmDelete": "Удалить пользователя «{{username}}»?",
     "userDeleted": "Пользователь удалён.",
@@ -1067,7 +1074,8 @@
       "cn": "CN",
       "sans": "SANs",
       "provider": "Провайдер",
-      "issueStatus": "Статус выпуска"
+      "issueStatus": "Статус выпуска",
+      "sslLabs": "SSL Labs"
     },
     "sansCount": "{{count}} SAN(s)",
     "issueStatus": {
@@ -2960,6 +2968,52 @@
       "list": "List-based",
       "trust": "Trust",
       "custom": "Custom"
+    }
+  },
+  "ssllabs": {
+    "title": "SSL Labs Scan",
+    "back": "Back to Certificates",
+    "certificate": "Certificate",
+    "scannableHosts": "Scannable Hosts",
+    "noHosts": "No scannable hosts found in this certificate.",
+    "scan": "Scan",
+    "scanning": "Scanning...",
+    "polling": "polling",
+    "scanHistory": "Scan History",
+    "viewDetails": "View Details",
+    "viewOnlyAccess": "View-only access — you can view scan results but cannot submit scans.",
+    "contactFieldsRequired": "Complete your profile (email, first name, last name, organization) to submit SSL Labs scans. Update your profile via the user menu.",
+    "retention": "Retention",
+    "settingsTitle": "SSL Labs Scan Retention",
+    "settingsDescription": "Set the maximum number of completed scans to keep per host. Older completed scans are automatically deleted.",
+    "maxScansPerHost": "Max scans per host",
+    "deleteConfirmTitle": "Delete Scan",
+    "deleteConfirmText": "Are you sure you want to delete the scan for \"{{host}}\"?",
+    "reportTitle": "SSL Labs Report",
+    "table": {
+      "status": "Status",
+      "grade": "Grade",
+      "lastCompleted": "Last Completed"
+    },
+    "report": {
+      "viewOnSsllabs": "View on SSL Labs",
+      "endpoints": "Endpoints",
+      "protocols": "Protocols",
+      "cipherSuites": "Cipher Suites",
+      "namedGroups": "Named Groups",
+      "vulnerabilities": "Vulnerabilities",
+      "certificateChain": "Certificate Chain",
+      "hsts": "HSTS Policy",
+      "hpkp": "HPKP / Static PKP",
+      "clientSimulations": "Client Simulations",
+      "httpTransaction": "HTTP Transaction"
+    },
+    "errors": {
+      "loadFailed": "Failed to load SSL Labs data.",
+      "scanFailed": "Failed to start scan.",
+      "deleteFailed": "Failed to delete scan.",
+      "settingsFailed": "Failed to update settings.",
+      "serviceBusy": "SSL Labs service is temporarily busy. Try again in a few moments."
     }
   }
 }

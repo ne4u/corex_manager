@@ -2,7 +2,7 @@ FROM python:3.14-slim
 
 WORKDIR /app
 
-COPY requirements.txt .
+COPY mcp-server/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # The backend app package is mounted at runtime (shares the same code as the

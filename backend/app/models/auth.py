@@ -23,6 +23,11 @@ class User(Base):
     is_admin = Column(Boolean, default=False)
     totp_secret = Column(String, nullable=True)
     totp_enabled = Column(Boolean, default=False)
+    # SSL Labs API registration contact fields
+    email = Column(String, nullable=True)
+    first_name = Column(String, nullable=True)
+    last_name = Column(String, nullable=True)
+    organization = Column(String, nullable=True)
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 

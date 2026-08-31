@@ -9,6 +9,7 @@ import GlobalOptions from './pages/GlobalOptions'
 import LoadBalancing from './pages/LoadBalancing'
 import Caching from './pages/Caching'
 import Certificates from './pages/Certificates'
+import CertificateSslLabs from './pages/CertificateSslLabs'
 import SecurityLists from './pages/SecurityLists'
 import SecurityRules from './pages/SecurityRules'
 import RiskScoring from './pages/RiskScoring'
@@ -94,6 +95,7 @@ function App() {
         <Route path="/caching" element={<Caching />} />
         <Route path="/fastcgi" element={<Navigate to="/load-balancing" replace />} />
         <Route path="/certificates" element={<Certificates />} />
+        <Route path="/certificates/:id/ssllabs" element={<CertificateSslLabs />} />
         <Route path="/security-lists" element={<SecurityLists />} />
         <Route path="/security-rules" element={<SecurityRules />} />
         <Route path="/risk-scoring" element={<RiskScoring />} />

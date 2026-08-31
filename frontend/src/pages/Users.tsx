@@ -11,9 +11,14 @@ interface User {
   username: string
   role: string
   is_admin: boolean
+  email?: string | null
+  first_name?: string | null
+  last_name?: string | null
+  organization?: string | null
 }
 
 const ROLES = ['admin', 'operator', 'viewer']
+const DEFAULT_ORG = 'coreX Platform'
 
 export default function Users() {
   const { t } = useTranslation(['pages', 'common'])
@@ -21,19 +26,43 @@ export default function Users() {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<number | null>(null)
   const [error, setError] = useState('')
-  const initialForm = { username: '', role: 'operator', password: '' }
+  const initialForm = {
+    username: '',
+    role: 'operator',
+    password: '',
+    email: '',
+    first_name: '',
+    last_name: '',
+    organization: '',
+  }
   const [form, setForm] = useState<Record<string, string>>(initialForm)
+
+  const computeDefaultOrg = (): string => {
+    const admins = items
+      .filter((u) => u.role === 'admin')
+      .sort((a, b) => a.id - b.id)
+    const firstAdminOrg = admins[0]?.organization
+    return firstAdminOrg?.trim() || DEFAULT_ORG
+  }
 
   const openAdd = () => {
     setEditing(null)
-    setForm(initialForm)
+    setForm({ ...initialForm, organization: computeDefaultOrg() })
     setError('')
     setOpen(true)
   }
 
   const openEdit = (u: User) => {
     setEditing(u.id)
-    setForm({ username: u.username, role: u.role, password: '' })
+    setForm({
+      username: u.username,
+      role: u.role,
+      password: '',
+      email: u.email || '',
+      first_name: u.first_name || '',
+      last_name: u.last_name || '',
+      organization: u.organization || '',
+    })
     setError('')
     setOpen(true)
   }
@@ -41,17 +70,28 @@ export default function Users() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    try {
-      const payload: Record<string, unknown> = {
-        username: form.username,
-        role: form.role,
+    // Validate required contact fields
+    const requiredFields = [
+      { key: 'first_name', label: t('pages:users.modal.firstName') },
+      { key: 'last_name', label: t('pages:users.modal.lastName') },
+      { key: 'email', label: t('pages:users.modal.email') },
+      { key: 'organization', label: t('pages:users.modal.organization') },
+    ]
+    for (const f of requiredFields) {
+      if (!form[f.key]?.trim()) {
+        setError(t('pages:users.modal.fieldRequired', { field: f.label }))
+        return
       }
-      if (form.password) payload.password = form.password
+    }
+    try {
       if (editing) {
-        // Partial update: omit empty password
         const updatePayload: Record<string, unknown> = {
           username: form.username,
           role: form.role,
+          email: form.email.trim(),
+          first_name: form.first_name.trim(),
+          last_name: form.last_name.trim(),
+          organization: form.organization.trim(),
         }
         if (form.password) updatePayload.password = form.password
         await users.update(editing, updatePayload)
@@ -60,7 +100,15 @@ export default function Users() {
           setError(t('pages:users.modal.passwordRequired'))
           return
         }
-        await users.create({ username: form.username, role: form.role, password: form.password })
+        await users.create({
+          username: form.username,
+          role: form.role,
+          password: form.password,
+          email: form.email.trim(),
+          first_name: form.first_name.trim(),
+          last_name: form.last_name.trim(),
+          organization: form.organization.trim(),
+        })
       }
       setForm(initialForm)
       setEditing(null)
@@ -86,6 +134,8 @@ export default function Users() {
               <tr>
                 <th>{t('pages:users.tableHeaders.username')}</th>
                 <th>{t('pages:users.tableHeaders.role')}</th>
+                <th>{t('pages:users.tableHeaders.email')}</th>
+                <th>{t('pages:users.tableHeaders.organization')}</th>
                 <th></th>
               </tr>
             </thead>
@@ -94,6 +144,8 @@ export default function Users() {
                 <tr key={u.id} className="border-b border-slate-800 last:border-0">
                   <td className="py-2">{u.username}</td>
                   <td className="capitalize">{u.role}</td>
+                  <td className="text-slate-400">{u.email || '-'}</td>
+                  <td className="text-slate-400">{u.organization || '-'}</td>
                   <td className="space-x-1">
                     <IconButton icon={Pencil} aria-label="Edit" onClick={() => openEdit(u)} />
                     <IconButton icon={Trash2} variant="danger" aria-label="Delete" onClick={() => users.remove(u.id).then(reload)} />
@@ -117,6 +169,26 @@ export default function Users() {
               <select className="input" value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}>
                 {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">{t('pages:users.modal.firstName')} <span className="text-red-400">*</span></label>
+              <input className="input" value={form.first_name} onChange={e => setForm({ ...form, first_name: e.target.value })} required />
+            </div>
+            <div>
+              <label className="label">{t('pages:users.modal.lastName')} <span className="text-red-400">*</span></label>
+              <input className="input" value={form.last_name} onChange={e => setForm({ ...form, last_name: e.target.value })} required />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">{t('pages:users.modal.email')} <span className="text-red-400">*</span></label>
+              <input type="email" className="input" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} required />
+            </div>
+            <div>
+              <label className="label">{t('pages:users.modal.organization')} <span className="text-red-400">*</span></label>
+              <input className="input" value={form.organization} onChange={e => setForm({ ...form, organization: e.target.value })} required />
             </div>
           </div>
           <div>

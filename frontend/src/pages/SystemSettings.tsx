@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Globe, Clock, AlertTriangle, Download, Upload, Package, FileArchive } from 'lucide-react'
+import { Globe, Clock, AlertTriangle, Download, Upload, Package, FileArchive, Radar } from 'lucide-react'
 import { settings, systemBackup } from '../services/api'
 import Modal from '../components/Modal'
 import { useDateTime } from '../contexts/DateTimeContext'
@@ -28,6 +28,10 @@ export default function SystemSettings() {
   const [sessionSaving, setSessionSaving] = useState(false)
   const [sessionMessage, setSessionMessage] = useState('')
   const [geoipStatus, setGeoipStatus] = useState<{ last_download: string | null; databases: any[] } | null>(null)
+  const [ssllabsMaxScans, setSsllabsMaxScans] = useState(5)
+  const [ssllabsLoading, setSsllabsLoading] = useState(true)
+  const [ssllabsSaving, setSsllabsSaving] = useState(false)
+  const [ssllabsMessage, setSsllabsMessage] = useState('')
 
   // System Backup & Restore state
   const [exportSecrets, setExportSecrets] = useState(true)
@@ -67,6 +71,17 @@ export default function SystemSettings() {
     ]).finally(() => setSessionLoading(false))
   }, [])
 
+  useEffect(() => {
+    setSsllabsLoading(true)
+    settings.get('ssllabs_max_scans_per_host')
+      .then((r) => {
+        const val = parseInt(r.data.value, 10)
+        setSsllabsMaxScans(isNaN(val) ? 5 : Math.max(1, val))
+      })
+      .catch(() => setSsllabsMaxScans(5))
+      .finally(() => setSsllabsLoading(false))
+  }, [])
+
   const save = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
@@ -104,6 +119,24 @@ export default function SystemSettings() {
       setSessionMessage(formatError(err, t('settings:session.saveFailed')))
     } finally {
       setSessionSaving(false)
+    }
+  }
+
+  const saveSsllabs = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSsllabsMessage('')
+    if (ssllabsMaxScans < 1 || ssllabsMaxScans > 100) {
+      setSsllabsMessage(t('settings:ssllabs.invalid'))
+      return
+    }
+    setSsllabsSaving(true)
+    try {
+      await settings.update('ssllabs_max_scans_per_host', { value: String(ssllabsMaxScans) })
+      setSsllabsMessage(t('settings:ssllabs.saved'))
+    } catch (err: any) {
+      setSsllabsMessage(formatError(err, t('settings:ssllabs.saveFailed')))
+    } finally {
+      setSsllabsSaving(false)
     }
   }
 
@@ -298,6 +331,40 @@ export default function SystemSettings() {
         {sessionMessage && (
           <p className={`text-sm ${sessionMessage.startsWith(t('settings:session.saveFailed')) || sessionMessage.startsWith(t('common:errors.loadFailed')) ? 'text-red-400' : 'text-green-400'}`}>
             {sessionMessage}
+          </p>
+        )}
+      </form>
+
+      <form onSubmit={saveSsllabs} className="card space-y-4 max-w-2xl">
+        <h2 className="text-lg font-semibold flex items-center gap-2"><Radar className="h-5 w-5 text-primary" /> {t('settings:ssllabs.title')}</h2>
+        <p className="text-sm text-slate-400">
+          {t('settings:ssllabs.description')}
+        </p>
+        {ssllabsLoading ? (
+          <p className="text-sm text-slate-400">{t('common:actions.loading')}</p>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-center gap-4">
+              <label className="label w-52 shrink-0">{t('settings:ssllabs.maxScansLabel')}</label>
+              <input
+                type="number"
+                min={1}
+                max={100}
+                className="input w-32"
+                value={ssllabsMaxScans}
+                onChange={(e) => setSsllabsMaxScans(Number(e.target.value))}
+                disabled={ssllabsSaving}
+              />
+              <span className="text-xs text-slate-500">{t('settings:ssllabs.maxScansRange')}</span>
+            </div>
+          </div>
+        )}
+        <button className="btn-primary" type="submit" disabled={ssllabsSaving || ssllabsLoading}>
+          {ssllabsSaving ? t('common:actions.saving') : t('settings:ssllabs.save')}
+        </button>
+        {ssllabsMessage && (
+          <p className={`text-sm ${ssllabsMessage.startsWith(t('settings:ssllabs.saveFailed')) || ssllabsMessage.startsWith(t('settings:ssllabs.invalid')) ? 'text-red-400' : 'text-green-400'}`}>
+            {ssllabsMessage}
           </p>
         )}
       </form>

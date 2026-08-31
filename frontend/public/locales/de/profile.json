@@ -8,7 +8,15 @@
   "identity": {
     "role": "Rolle",
     "memberSince": "Mitglied seit",
-    "logout": "Abmelden"
+    "logout": "Abmelden",
+    "contactInfo": "Contact Information",
+    "editContact": "Edit",
+    "incomplete": "Incomplete — required for SSL Labs scans",
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "email": "Email",
+    "organization": "Organization",
+    "allFieldsRequired": "All contact fields are required."
   },
   "appearance": {
     "title": "Design",

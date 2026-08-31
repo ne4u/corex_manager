@@ -71,5 +71,15 @@
       "confirmPlaceholder": "RESTORE",
       "restoreNow": "Restore Now"
     }
+  },
+  "ssllabs": {
+    "title": "SSL Labs Scan Retention",
+    "description": "Maximum number of completed SSL Labs scans to keep per host. Older completed scans are automatically deleted when a new scan finishes.",
+    "maxScansLabel": "Max Scans Per Host",
+    "maxScansRange": "1 — 100",
+    "invalid": "Max scans per host must be between 1 and 100.",
+    "save": "Save SSL Labs Settings",
+    "saved": "SSL Labs settings saved.",
+    "saveFailed": "Failed to save SSL Labs settings."
   }
 }

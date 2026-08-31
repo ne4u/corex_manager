@@ -85,6 +85,11 @@ _SPECIAL_CASES = [
     (r"^/mcp/identities/(\d+)/tokens$", "POST", "issue_pat", "mcp_identity", 1),
     (r"^/mcp/skills/(\d+)/publish$", "POST", "publish_skill", "mcp_skill", 1),
     (r"^/mcp/skills/(\d+)/rollback$", "POST", "rollback_skill", "mcp_skill", 1),
+    # SSL Labs scans
+    (r"^/certificates/(\d+)/ssllabs/scans$", "POST", "start_ssllabs_scan", "ssllabs_scan", None),
+    (r"^/certificates/(\d+)/ssllabs/scans/(\d+)/poll$", "POST", "poll_ssllabs_scan", "ssllabs_scan", 2),
+    (r"^/certificates/(\d+)/ssllabs/scans/(\d+)$", "DELETE", "delete_ssllabs_scan", "ssllabs_scan", 2),
+    (r"^/certificates/(\d+)/ssllabs/settings$", "PUT", "update_ssllabs_settings", "setting", None),
 ]
 
 # Mutating paths that do NOT affect any generated config file
@@ -175,6 +180,11 @@ _NON_CONFIG_PATHS: list[tuple[str, str]] = [
     ("POST", r"^/mcp/teams/\d+/members$"),
     ("DELETE", r"^/mcp/teams/\d+/members/\d+$"),
     ("POST", r"^/mcp/skills/\d+/versions$"),
+    # --- SSL Labs scans (external API, no HAProxy/Coraza config impact) ---
+    ("POST", r"^/certificates/\d+/ssllabs/scans$"),
+    ("POST", r"^/certificates/\d+/ssllabs/scans/\d+/poll$"),
+    ("DELETE", r"^/certificates/\d+/ssllabs/scans/\d+$"),
+    ("PUT", r"^/certificates/\d+/ssllabs/settings$"),
 ]
 
 

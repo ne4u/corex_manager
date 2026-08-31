@@ -6,6 +6,10 @@ from ._base import _optional_update
 class UserBase(BaseModel):
     username: str
     role: str = "operator"
+    email: str = Field(min_length=1)
+    first_name: str = Field(min_length=1)
+    last_name: str = Field(min_length=1)
+    organization: str = Field(min_length=1)
 
 
 class UserCreate(UserBase):
@@ -16,6 +20,10 @@ class UserUpdate(BaseModel):
     username: Optional[str] = None
     role: Optional[str] = None
     password: Optional[str] = None
+    email: str = Field(min_length=1)
+    first_name: str = Field(min_length=1)
+    last_name: str = Field(min_length=1)
+    organization: str = Field(min_length=1)
 
 
 class UserResponse(BaseModel):
@@ -24,6 +32,10 @@ class UserResponse(BaseModel):
     role: str
     is_admin: bool
     totp_enabled: bool = False
+    email: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    organization: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

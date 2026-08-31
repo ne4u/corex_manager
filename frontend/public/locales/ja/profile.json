@@ -8,7 +8,15 @@
   "identity": {
     "role": "ロール",
     "memberSince": "登録日",
-    "logout": "ログアウト"
+    "logout": "ログアウト",
+    "contactInfo": "Contact Information",
+    "editContact": "Edit",
+    "incomplete": "Incomplete — required for SSL Labs scans",
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "email": "Email",
+    "organization": "Organization",
+    "allFieldsRequired": "All contact fields are required."
   },
   "appearance": {
     "title": "テーマ",

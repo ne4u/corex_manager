@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Lock, Pencil, Trash2, Upload, FileUp, Ban } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Lock, Pencil, Trash2, Upload, FileUp, Ban, Radar } from 'lucide-react'
 import { certificates, getErrorDetail, getTask } from '../services/api'
 import useApiList from '../hooks/useApiList'
 import InfoTooltip from '../components/InfoTooltip'
@@ -51,6 +52,7 @@ interface AcmeCa {
 export default function Certificates() {
   const { t } = useTranslation(['pages', 'common'])
   const { formatDateTime } = useDateTime()
+  const navigate = useNavigate()
   const { items, reload, loading } = useApiList(certificates.list)
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<number | null>(null)
@@ -563,6 +565,7 @@ export default function Certificates() {
                   </td>
                   <td className="text-end">
                     <div className="inline-flex items-center justify-end gap-2">
+                      <IconButton icon={Radar} aria-label={t('pages:certificates.tableHeaders.sslLabs')} onClick={() => navigate(`/certificates/${c.id}/ssllabs`)} />
                       <IconButton icon={Pencil} aria-label={t('common:actions.edit')} onClick={() => openEdit(c)} />
                       {c.provider === 'letsencrypt' && (
                         <IconButton

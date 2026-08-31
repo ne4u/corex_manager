@@ -9,7 +9,15 @@
   "identity": {
     "role": "Role",
     "memberSince": "Member since",
-    "logout": "Logout"
+    "logout": "Logout",
+    "contactInfo": "Contact Information",
+    "editContact": "Edit",
+    "incomplete": "Incomplete — required for SSL Labs scans",
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "email": "Email",
+    "organization": "Organization",
+    "allFieldsRequired": "All contact fields are required."
   },
   "appearance": {
     "title": "Theme",

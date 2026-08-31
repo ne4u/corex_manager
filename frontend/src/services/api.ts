@@ -101,6 +101,15 @@ export const certificates = {
   cancelIssue: (taskId: number) => api.post(`/tasks/${taskId}/cancel`),
 }
 
+export const ssllabs = {
+  hosts: (certId: number) => api.get(`/certificates/${certId}/ssllabs/hosts`),
+  listScans: (certId: number) => api.get(`/certificates/${certId}/ssllabs/scans`),
+  getScan: (certId: number, scanId: number) => api.get(`/certificates/${certId}/ssllabs/scans/${scanId}`),
+  startScan: (certId: number, host: string) => api.post(`/certificates/${certId}/ssllabs/scans`, { host }),
+  pollScan: (certId: number, scanId: number) => api.post(`/certificates/${certId}/ssllabs/scans/${scanId}/poll`),
+  deleteScan: (certId: number, scanId: number) => api.delete(`/certificates/${certId}/ssllabs/scans/${scanId}`),
+}
+
 export const haproxy = {
   globalOptions: () => api.get('/haproxy/global-options'),
   updateGlobalOptions: (data: Record<string, unknown>[]) => api.put('/haproxy/global-options', data),
