@@ -81,5 +81,23 @@
     "save": "Save SSL Labs Settings",
     "saved": "SSL Labs settings saved.",
     "saveFailed": "Failed to save SSL Labs settings."
+  },
+  "passwordPolicy": {
+    "title": "Política de Contraseñas",
+    "description": "Configura los requisitos de complejidad de contraseña y el período de rotación. Los usuarios con una contraseña expirada deberán cambiarla en su próximo inicio de sesión antes de poder acceder al sistema.",
+    "minLengthLabel": "Longitud Mínima",
+    "minLengthRange": "8 — 128",
+    "requireUppercase": "Requerir letra mayúscula",
+    "requireLowercase": "Requerir letra minúscula",
+    "requireDigit": "Requerir dígito",
+    "requireSymbol": "Requerir símbolo",
+    "rotationLabel": "Período de Rotación (meses)",
+    "rotationRange": "0 — 24 (0 = deshabilitado)",
+    "rotationHint": "Los usuarios deben cambiar su contraseña después de este número de meses. Establecer en 0 para deshabilitar la rotación.",
+    "invalidMinLength": "La longitud mínima debe estar entre 8 y 128.",
+    "invalidRotation": "El período de rotación debe estar entre 0 y 24 meses.",
+    "save": "Guardar Política de Contraseñas",
+    "saved": "Política de contraseñas guardada.",
+    "saveFailed": "Error al guardar la política de contraseñas."
   }
 }

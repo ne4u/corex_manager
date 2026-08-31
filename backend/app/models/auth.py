@@ -28,6 +28,11 @@ class User(Base):
     first_name = Column(String, nullable=True)
     last_name = Column(String, nullable=True)
     organization = Column(String, nullable=True)
+    # Password rotation + last-login tracking. password_changed_at is set on
+    # account creation and every successful password change; last_login_at is
+    # updated on each successful login.
+    last_login_at = Column(DateTime, nullable=True)
+    password_changed_at = Column(DateTime, default=utcnow)
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 

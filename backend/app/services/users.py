@@ -1,8 +1,11 @@
+from datetime import datetime, timezone
+
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from ..core.security import get_password_hash
 from ..models.auth import User
 from ..schemas.users import UserCreate, UserUpdate
+from .password_policy import validate_password_complexity
 
 
 def list_users(db: Session):
@@ -16,6 +19,7 @@ def get_user(db: Session, uid: int):
 def create_user(db: Session, u_in: UserCreate):
     if db.query(User).filter(User.username == u_in.username).first():
         raise HTTPException(status_code=400, detail="Username already exists")
+    validate_password_complexity(db, u_in.password)
     obj = User(
         username=u_in.username,
         hashed_password=get_password_hash(u_in.password),
@@ -25,6 +29,7 @@ def create_user(db: Session, u_in: UserCreate):
         first_name=u_in.first_name,
         last_name=u_in.last_name,
         organization=u_in.organization,
+        password_changed_at=datetime.now(timezone.utc),
     )
     db.add(obj)
     db.commit()
@@ -40,7 +45,11 @@ def update_user(db: Session, uid: int, u_in: UserUpdate, current_user: User):
         raise HTTPException(status_code=403, detail="Cannot edit other users")
     data = u_in.model_dump(exclude_unset=True)
     if "password" in data:
-        data["hashed_password"] = get_password_hash(data.pop("password"))
+        plain = data.pop("password")
+        if plain:
+            validate_password_complexity(db, plain)
+            data["hashed_password"] = get_password_hash(plain)
+            data["password_changed_at"] = datetime.now(timezone.utc)
     if "role" in data and current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Only admins can change roles")
     if "role" in data:

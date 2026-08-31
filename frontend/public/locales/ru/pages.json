@@ -327,7 +327,8 @@
       "createdAt": "Создано",
       "actions": "Действия",
       "email": "Email",
-      "organization": "Organization"
+      "organization": "Organization",
+      "lastLogin": "Последний вход"
     },
     "modal": {
       "editTitle": "Редактировать пользователя",

@@ -81,5 +81,23 @@
     "save": "Save SSL Labs Settings",
     "saved": "SSL Labs settings saved.",
     "saveFailed": "Failed to save SSL Labs settings."
+  },
+  "passwordPolicy": {
+    "title": "Política de Senha",
+    "description": "Configure os requisitos de complexidade de senha e o período de rotação. Usuários com senha expirada devem alterá-la no próximo login antes de acessar o sistema.",
+    "minLengthLabel": "Comprimento Mínimo",
+    "minLengthRange": "8 — 128",
+    "requireUppercase": "Exigir letra maiúscula",
+    "requireLowercase": "Exigir letra minúscula",
+    "requireDigit": "Exigir dígito",
+    "requireSymbol": "Exigir símbolo",
+    "rotationLabel": "Período de Rotação (meses)",
+    "rotationRange": "0 — 24 (0 = desativado)",
+    "rotationHint": "Os usuários devem alterar a senha após este número de meses. Defina como 0 para desativar a rotação.",
+    "invalidMinLength": "O comprimento mínimo deve estar entre 8 e 128.",
+    "invalidRotation": "O período de rotação deve estar entre 0 e 24 meses.",
+    "save": "Salvar Política de Senha",
+    "saved": "Política de senha salva.",
+    "saveFailed": "Falha ao salvar a política de senha."
   }
 }

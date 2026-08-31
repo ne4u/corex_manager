@@ -15,6 +15,7 @@ logging.basicConfig(
     format="%(levelname)s [%(name)s] %(message)s",
 )
 from .core.middleware import AuditEventMiddleware, ProxyHeadersMiddleware
+from .core.password_expiry_middleware import PasswordExpiryMiddleware
 from .api.routers import router as api_router
 from .api.v1 import build_v1_router
 from .services.metrics import start_sampler as start_metrics_sampler
@@ -149,6 +150,9 @@ cors_origins = os.environ.get("CORS_ALLOWED_ORIGINS", "http://localhost:3000")
 allowed_origins = [origin.strip() for origin in cors_origins.split(",") if origin.strip()]
 
 app.add_middleware(AuditEventMiddleware)
+# PasswordExpiryMiddleware is added after AuditEventMiddleware so it runs
+# first (outermost) — blocked requests short-circuit before audit logging.
+app.add_middleware(PasswordExpiryMiddleware)
 app.add_middleware(ProxyHeadersMiddleware)
 
 app.add_middleware(

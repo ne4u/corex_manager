@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { login } from '../services/api'
 import { Logo } from '../components/Logo'
 
-export default function Login({ onLogin }: { onLogin: (t: string) => void }) {
+export default function Login({ onLogin }: { onLogin: (t: string, passwordExpired: boolean) => void }) {
   const { t } = useTranslation('auth')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -16,7 +16,7 @@ export default function Login({ onLogin }: { onLogin: (t: string) => void }) {
     e.preventDefault()
     try {
       const res = await login(username, password, totpCode || undefined)
-      onLogin(res.data.access_token)
+      onLogin(res.data.access_token, res.data.password_expired === true)
     } catch (err: any) {
       setError(err.response?.data?.detail || t('login.loginFailed'))
     }

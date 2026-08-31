@@ -327,7 +327,8 @@
       "createdAt": "생성일시",
       "actions": "작업",
       "email": "Email",
-      "organization": "Organization"
+      "organization": "Organization",
+      "lastLogin": "최근 로그인"
     },
     "modal": {
       "editTitle": "사용자 편집",

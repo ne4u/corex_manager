@@ -81,5 +81,23 @@
     "save": "Save SSL Labs Settings",
     "saved": "SSL Labs settings saved.",
     "saveFailed": "Failed to save SSL Labs settings."
+  },
+  "passwordPolicy": {
+    "title": "密码策略",
+    "description": "配置密码复杂性要求和轮换周期。密码过期的用户必须在下次登录时更改密码，然后才能访问系统。",
+    "minLengthLabel": "最小长度",
+    "minLengthRange": "8 — 128",
+    "requireUppercase": "需要大写字母",
+    "requireLowercase": "需要小写字母",
+    "requireDigit": "需要数字",
+    "requireSymbol": "需要符号",
+    "rotationLabel": "轮换周期（月）",
+    "rotationRange": "0 — 24（0 = 禁用）",
+    "rotationHint": "用户必须在此月数后更改密码。设置为 0 可禁用轮换。",
+    "invalidMinLength": "最小长度必须在 8 到 128 之间。",
+    "invalidRotation": "轮换周期必须在 0 到 24 个月之间。",
+    "save": "保存密码策略",
+    "saved": "密码策略已保存。",
+    "saveFailed": "保存密码策略失败。"
   }
 }

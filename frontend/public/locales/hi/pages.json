@@ -327,7 +327,8 @@
       "createdAt": "बनाया गया",
       "actions": "क्रियाएं",
       "email": "Email",
-      "organization": "Organization"
+      "organization": "Organization",
+      "lastLogin": "अंतिम लॉगिन"
     },
     "modal": {
       "editTitle": "उपयोगकर्ता संपादित करें",

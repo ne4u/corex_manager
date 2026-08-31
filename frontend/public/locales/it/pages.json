@@ -327,7 +327,8 @@
       "createdAt": "Creato Il",
       "actions": "Azioni",
       "email": "Email",
-      "organization": "Organization"
+      "organization": "Organization",
+      "lastLogin": "Ultimo Accesso"
     },
     "modal": {
       "editTitle": "Modifica Utente",

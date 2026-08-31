@@ -81,5 +81,23 @@
     "save": "Save SSL Labs Settings",
     "saved": "SSL Labs settings saved.",
     "saveFailed": "Failed to save SSL Labs settings."
+  },
+  "passwordPolicy": {
+    "title": "Password Policy",
+    "description": "Configure password complexity requirements and rotation period. Users with an expired password are forced to change it on their next login before they can access the system.",
+    "minLengthLabel": "Minimum Length",
+    "minLengthRange": "8 — 128",
+    "requireUppercase": "Require uppercase letter",
+    "requireLowercase": "Require lowercase letter",
+    "requireDigit": "Require digit",
+    "requireSymbol": "Require symbol",
+    "rotationLabel": "Rotation Period (months)",
+    "rotationRange": "0 — 24 (0 = disabled)",
+    "rotationHint": "Users must change their password after this many months. Set to 0 to disable rotation.",
+    "invalidMinLength": "Minimum length must be between 8 and 128.",
+    "invalidRotation": "Rotation period must be between 0 and 24 months.",
+    "save": "Save Password Policy",
+    "saved": "Password policy saved.",
+    "saveFailed": "Failed to save password policy."
   }
 }

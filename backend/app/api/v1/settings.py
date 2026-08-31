@@ -58,6 +58,25 @@ def update_setting_endpoint(
         if val <= 4 or val >= 121:
             raise HTTPException(status_code=400, detail="session_warning_seconds must be between 5 and 120")
 
+    if key == "password_min_length":
+        try:
+            val = int(s_in.value)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="password_min_length must be an integer")
+        if val < 8 or val > 128:
+            raise HTTPException(status_code=400, detail="password_min_length must be between 8 and 128")
+    if key in ("password_require_uppercase", "password_require_lowercase",
+               "password_require_digit", "password_require_symbol"):
+        if (s_in.value or "").strip().lower() not in ("true", "1", "yes", "false", "0", "no"):
+            raise HTTPException(status_code=400, detail=f"{key} must be a boolean (true/false)")
+    if key == "password_rotation_months":
+        try:
+            val = int(s_in.value)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="password_rotation_months must be an integer")
+        if val < 0 or val > 24:
+            raise HTTPException(status_code=400, detail="password_rotation_months must be between 0 and 24 (0 = disabled)")
+
     if key == "ja4_enabled":
         enabling = (s_in.value or "").lower() in ("true", "1", "yes")
         if enabling:

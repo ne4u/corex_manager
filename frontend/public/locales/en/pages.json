@@ -331,7 +331,8 @@
       "createdAt": "Created At",
       "actions": "Actions",
       "email": "Email",
-      "organization": "Organization"
+      "organization": "Organization",
+      "lastLogin": "Last Login"
     },
     "modal": {
       "editTitle": "Edit User",

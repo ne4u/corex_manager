@@ -81,5 +81,23 @@
     "save": "Save SSL Labs Settings",
     "saved": "SSL Labs settings saved.",
     "saveFailed": "Failed to save SSL Labs settings."
+  },
+  "passwordPolicy": {
+    "title": "パスワードポリシー",
+    "description": "パスワードの複雑性要件とローテーション期間を設定します。パスワードの有効期限が切れたユーザーは、システムにアクセスする前に次回ログイン時にパスワードを変更する必要があります。",
+    "minLengthLabel": "最小文字数",
+    "minLengthRange": "8 — 128",
+    "requireUppercase": "大文字を必須",
+    "requireLowercase": "小文字を必須",
+    "requireDigit": "数字を必須",
+    "requireSymbol": "記号を必須",
+    "rotationLabel": "ローテーション期間（月）",
+    "rotationRange": "0 — 24（0 = 無効）",
+    "rotationHint": "ユーザーはこの月数が経過した後にパスワードを変更する必要があります。0に設定するとローテーションを無効にします。",
+    "invalidMinLength": "最小文字数は8〜128の間でなければなりません。",
+    "invalidRotation": "ローテーション期間は0〜24ヶ月の間でなければなりません。",
+    "save": "パスワードポリシーを保存",
+    "saved": "パスワードポリシーを保存しました。",
+    "saveFailed": "パスワードポリシーの保存に失敗しました。"
   }
 }

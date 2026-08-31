@@ -81,5 +81,23 @@
     "save": "Save SSL Labs Settings",
     "saved": "SSL Labs settings saved.",
     "saveFailed": "Failed to save SSL Labs settings."
+  },
+  "passwordPolicy": {
+    "title": "Passwortrichtlinie",
+    "description": "Konfigurieren Sie die Anforderungen an die Passwortkomplexität und den Rotationszeitraum. Benutzer mit einem abgelaufenen Passwort müssen dieses bei der nächsten Anmeldung ändern, bevor sie auf das System zugreifen können.",
+    "minLengthLabel": "Mindestlänge",
+    "minLengthRange": "8 — 128",
+    "requireUppercase": "Großbuchstabe erforderlich",
+    "requireLowercase": "Kleinbuchstabe erforderlich",
+    "requireDigit": "Ziffer erforderlich",
+    "requireSymbol": "Symbol erforderlich",
+    "rotationLabel": "Rotationszeitraum (Monate)",
+    "rotationRange": "0 — 24 (0 = deaktiviert)",
+    "rotationHint": "Benutzer müssen ihr Passwort nach dieser Anzahl von Monaten ändern. Auf 0 setzen, um die Rotation zu deaktivieren.",
+    "invalidMinLength": "Die Mindestlänge muss zwischen 8 und 128 liegen.",
+    "invalidRotation": "Der Rotationszeitraum muss zwischen 0 und 24 Monaten liegen.",
+    "save": "Passwortrichtlinie speichern",
+    "saved": "Passwortrichtlinie gespeichert.",
+    "saveFailed": "Speichern der Passwortrichtlinie fehlgeschlagen."
   }
 }

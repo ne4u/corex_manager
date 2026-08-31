@@ -327,7 +327,8 @@
       "createdAt": "تاريخ الإنشاء",
       "actions": "إجراءات",
       "email": "Email",
-      "organization": "Organization"
+      "organization": "Organization",
+      "lastLogin": "آخر تسجيل دخول"
     },
     "modal": {
       "editTitle": "تعديل المستخدم",

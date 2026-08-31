@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { NotificationProvider } from './contexts/NotificationContext'
 import Layout from './components/Layout'
 import SessionManager from './components/SessionManager'
+import ForcePasswordChange, { type PasswordPolicy } from './components/ForcePasswordChange'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import GlobalOptions from './pages/GlobalOptions'
@@ -55,6 +56,8 @@ function RoleGate({ children }: { children: React.ReactNode }) {
 
 function App() {
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'))
+  const [passwordExpired, setPasswordExpired] = useState(false)
+  const [passwordPolicy, setPasswordPolicy] = useState<PasswordPolicy | null>(null)
   const { refreshPreferences } = useTheme()
 
   useEffect(() => {
@@ -63,9 +66,57 @@ function App() {
     return () => window.removeEventListener('storage', handleStorage)
   }, [])
 
-  const setAuth = (t: string) => {
+  // On a fresh page load with an existing token, check whether the password
+  // has expired since the JWT was issued (e.g. rotation period elapsed while
+  // the user was away).
+  useEffect(() => {
+    if (!token) {
+      setPasswordExpired(false)
+      setPasswordPolicy(null)
+      return
+    }
+    auth.session()
+      .then((r) => {
+        setPasswordExpired(r.data.password_expired === true)
+        if (r.data.password_policy) {
+          setPasswordPolicy(r.data.password_policy as PasswordPolicy)
+        }
+      })
+      .catch(() => {
+        // 401 interceptor handles invalid tokens; ignore here.
+      })
+  }, [token])
+
+  // Listen for the backend 403 password_change_required signal dispatched
+  // by the api.ts response interceptor.
+  useEffect(() => {
+    const onRequired = () => {
+      // Re-fetch session to refresh the policy for the modal.
+      auth.session()
+        .then((r) => {
+          setPasswordExpired(true)
+          if (r.data.password_policy) {
+            setPasswordPolicy(r.data.password_policy as PasswordPolicy)
+          }
+        })
+        .catch(() => setPasswordExpired(true))
+    }
+    window.addEventListener('password-change-required', onRequired)
+    return () => window.removeEventListener('password-change-required', onRequired)
+  }, [])
+
+  const setAuth = (t: string, expired: boolean) => {
     localStorage.setItem('token', t)
     setToken(t)
+    setPasswordExpired(expired)
+    // Fetch the policy so the forced-change modal can show live requirements.
+    auth.session()
+      .then((r) => {
+        if (r.data.password_policy) {
+          setPasswordPolicy(r.data.password_policy as PasswordPolicy)
+        }
+      })
+      .catch(() => {})
     // The ThemeProvider's initial preferences load may have run before a token
     // existed (e.g. Safari/ITP evicted localStorage and the user just logged
     // in fresh), in which case it 401'd silently. Re-fetch now so the active
@@ -76,6 +127,7 @@ function App() {
   const handleLogout = () => {
     localStorage.removeItem('token')
     setToken(null)
+    setPasswordExpired(false)
   }
 
   if (!token) {
@@ -85,6 +137,11 @@ function App() {
   return (
     <NotificationProvider>
       <SessionManager onLogout={handleLogout} />
+      <ForcePasswordChange
+        open={passwordExpired}
+        policy={passwordPolicy}
+        onSuccess={() => setPasswordExpired(false)}
+      />
       <Layout>
         <Routes>
           <Route path="/" element={<Dashboard />} />

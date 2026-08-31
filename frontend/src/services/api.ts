@@ -18,6 +18,16 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
+    // Password expired — backend blocks all non-auth endpoints with 403.
+    // Notify the app to show the forced password-change modal instead of
+    // redirecting to login.
+    if (
+      err.response?.status === 403 &&
+      err.response?.data?.detail === 'password_change_required'
+    ) {
+      window.dispatchEvent(new CustomEvent('password-change-required'))
+      return Promise.reject(err)
+    }
     if (err.response?.status === 401 && !err.config?.url?.startsWith('/auth/')) {
       localStorage.removeItem('token')
       window.location.href = '/login'

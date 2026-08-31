@@ -327,7 +327,8 @@
       "createdAt": "创建时间",
       "actions": "操作",
       "email": "Email",
-      "organization": "Organization"
+      "organization": "Organization",
+      "lastLogin": "最后登录"
     },
     "modal": {
       "editTitle": "编辑用户",

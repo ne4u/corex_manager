@@ -81,5 +81,23 @@
     "save": "Save SSL Labs Settings",
     "saved": "SSL Labs settings saved.",
     "saveFailed": "Failed to save SSL Labs settings."
+  },
+  "passwordPolicy": {
+    "title": "पासवर्ड नीति",
+    "description": "पासवर्ड जटिलता आवश्यकताओं और रोटेशन अवधि को कॉन्फ़िगर करें। समाप्त पासवर्ड वाले उपयोगकर्ताओं को सिस्टम तक पहुँचने से पहले अगले लॉगिन पर इसे बदलना होगा।",
+    "minLengthLabel": "न्यूनतम लंबाई",
+    "minLengthRange": "8 — 128",
+    "requireUppercase": "बड़ा अक्षर आवश्यक",
+    "requireLowercase": "छोटा अक्षर आवश्यक",
+    "requireDigit": "अंक आवश्यक",
+    "requireSymbol": "प्रतीक आवश्यक",
+    "rotationLabel": "रोटेशन अवधि (महीने)",
+    "rotationRange": "0 — 24 (0 = अक्षम)",
+    "rotationHint": "उपयोगकर्ताओं को इतने महीनों बाद पासवर्ड बदलना होगा। रोटेशन को अक्षम करने के लिए 0 पर सेट करें।",
+    "invalidMinLength": "न्यूनतम लंबाई 8 से 128 के बीच होनी चाहिए।",
+    "invalidRotation": "रोटेशन अवधि 0 से 24 महीने के बीच होनी चाहिए।",
+    "save": "पासवर्ड नीति सहेजें",
+    "saved": "पासवर्ड नीति सहेजी गई।",
+    "saveFailed": "पासवर्ड नीति सहेजने में विफल।"
   }
 }

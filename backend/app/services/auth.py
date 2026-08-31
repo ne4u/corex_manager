@@ -18,6 +18,11 @@ from ..schemas.users import (
     TOTPSetupResponse,
     TOTPVerifyResponse,
 )
+from ..services.password_policy import (
+    get_password_policy,
+    is_password_expired,
+    validate_password_complexity,
+)
 from ..services.settings import get_setting
 
 settings = get_settings()
@@ -48,13 +53,26 @@ def authenticate_user(db: Session, username: str, password: str, totp_code: Opti
             raise ValueError("TOTP code required")
         if not user.totp_secret or not pyotp.TOTP(user.totp_secret).verify(totp_code.strip()):
             raise ValueError("Invalid TOTP code")
+    # Record successful login timestamp.
+    user.last_login_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(user)
     return user
 
 
 def create_token_for_user(user: User, db: Session) -> dict:
     expires = timedelta(minutes=_session_timeout_minutes(db))
-    token = create_access_token({"sub": user.username, "role": user.role}, expires_delta=expires)
-    return {"access_token": token, "token_type": "bearer", "role": user.role}
+    expired = is_password_expired(user, db)
+    token = create_access_token(
+        {"sub": user.username, "role": user.role, "pwd_exp": expired},
+        expires_delta=expires,
+    )
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "role": user.role,
+        "password_expired": expired,
+    }
 
 
 def setup_totp(user: User, alias: Optional[str] = None):
@@ -90,14 +108,18 @@ def disable_totp(user: User, password: str):
     return TOTPVerifyResponse(status="ok", enabled=False)
 
 
-def change_password(user: User, current_password: str, new_password: str):
+def change_password(db: Session, user: User, current_password: str, new_password: str):
     """Verify the current password and set a new hash on the user object.
 
-    The caller is responsible for committing the session.
+    Validates the new password against the configured complexity policy and
+    resets ``password_changed_at`` to now so rotation expiry restarts. The
+    caller is responsible for committing the session.
     """
     if not verify_password(current_password, user.hashed_password):
         raise ValueError("Current password is incorrect")
+    validate_password_complexity(db, new_password)
     user.hashed_password = get_password_hash(new_password)
+    user.password_changed_at = datetime.now(timezone.utc)
 
 
 def logout(token: str):
@@ -113,7 +135,11 @@ def logout(token: str):
 
 def refresh_token(user: User, db: Session):
     expires = timedelta(minutes=_session_timeout_minutes(db))
-    token = create_access_token({"sub": user.username, "role": user.role}, expires_delta=expires)
+    expired = is_password_expired(user, db)
+    token = create_access_token(
+        {"sub": user.username, "role": user.role, "pwd_exp": expired},
+        expires_delta=expires,
+    )
     return {"access_token": token, "token_type": "bearer"}
 
 
@@ -121,4 +147,6 @@ def get_session_settings(user: User, db: Session):
     return SessionSettingsResponse(
         timeout_minutes=_session_timeout_minutes(db),
         warning_seconds=_session_warning_seconds(db),
+        password_expired=is_password_expired(user, db),
+        password_policy=get_password_policy(db),
     )

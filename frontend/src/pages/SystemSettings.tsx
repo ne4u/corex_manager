@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Globe, Clock, AlertTriangle, Download, Upload, Package, FileArchive, Radar } from 'lucide-react'
+import { Globe, Clock, AlertTriangle, Download, Upload, Package, FileArchive, Radar, KeyRound } from 'lucide-react'
 import { settings, systemBackup } from '../services/api'
 import Modal from '../components/Modal'
 import { useDateTime } from '../contexts/DateTimeContext'
@@ -32,6 +32,17 @@ export default function SystemSettings() {
   const [ssllabsLoading, setSsllabsLoading] = useState(true)
   const [ssllabsSaving, setSsllabsSaving] = useState(false)
   const [ssllabsMessage, setSsllabsMessage] = useState('')
+
+  // Password policy state
+  const [pwMinLength, setPwMinLength] = useState(8)
+  const [pwRequireUpper, setPwRequireUpper] = useState(false)
+  const [pwRequireLower, setPwRequireLower] = useState(false)
+  const [pwRequireDigit, setPwRequireDigit] = useState(false)
+  const [pwRequireSymbol, setPwRequireSymbol] = useState(false)
+  const [pwRotationMonths, setPwRotationMonths] = useState(0)
+  const [pwLoading, setPwLoading] = useState(true)
+  const [pwSaving, setPwSaving] = useState(false)
+  const [pwMessage, setPwMessage] = useState('')
 
   // System Backup & Restore state
   const [exportSecrets, setExportSecrets] = useState(true)
@@ -80,6 +91,32 @@ export default function SystemSettings() {
       })
       .catch(() => setSsllabsMaxScans(5))
       .finally(() => setSsllabsLoading(false))
+  }, [])
+
+  useEffect(() => {
+    setPwLoading(true)
+    Promise.all([
+      settings.get('password_min_length').then((r) => {
+        const val = parseInt(r.data.value, 10)
+        setPwMinLength(isNaN(val) ? 8 : Math.max(1, val))
+      }).catch(() => setPwMinLength(8)),
+      settings.get('password_require_uppercase').then((r) => {
+        setPwRequireUpper((r.data.value || 'false').toLowerCase() === 'true')
+      }).catch(() => setPwRequireUpper(false)),
+      settings.get('password_require_lowercase').then((r) => {
+        setPwRequireLower((r.data.value || 'false').toLowerCase() === 'true')
+      }).catch(() => setPwRequireLower(false)),
+      settings.get('password_require_digit').then((r) => {
+        setPwRequireDigit((r.data.value || 'false').toLowerCase() === 'true')
+      }).catch(() => setPwRequireDigit(false)),
+      settings.get('password_require_symbol').then((r) => {
+        setPwRequireSymbol((r.data.value || 'false').toLowerCase() === 'true')
+      }).catch(() => setPwRequireSymbol(false)),
+      settings.get('password_rotation_months').then((r) => {
+        const val = parseInt(r.data.value, 10)
+        setPwRotationMonths(isNaN(val) ? 0 : Math.max(0, val))
+      }).catch(() => setPwRotationMonths(0)),
+    ]).finally(() => setPwLoading(false))
   }, [])
 
   const save = async (e: React.FormEvent) => {
@@ -137,6 +174,35 @@ export default function SystemSettings() {
       setSsllabsMessage(formatError(err, t('settings:ssllabs.saveFailed')))
     } finally {
       setSsllabsSaving(false)
+    }
+  }
+
+  const savePasswordPolicy = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setPwMessage('')
+    if (pwMinLength < 8 || pwMinLength > 128) {
+      setPwMessage(t('settings:passwordPolicy.invalidMinLength'))
+      return
+    }
+    if (pwRotationMonths < 0 || pwRotationMonths > 24) {
+      setPwMessage(t('settings:passwordPolicy.invalidRotation'))
+      return
+    }
+    setPwSaving(true)
+    try {
+      await Promise.all([
+        settings.update('password_min_length', { value: String(pwMinLength) }),
+        settings.update('password_require_uppercase', { value: String(pwRequireUpper) }),
+        settings.update('password_require_lowercase', { value: String(pwRequireLower) }),
+        settings.update('password_require_digit', { value: String(pwRequireDigit) }),
+        settings.update('password_require_symbol', { value: String(pwRequireSymbol) }),
+        settings.update('password_rotation_months', { value: String(pwRotationMonths) }),
+      ])
+      setPwMessage(t('settings:passwordPolicy.saved'))
+    } catch (err: any) {
+      setPwMessage(formatError(err, t('settings:passwordPolicy.saveFailed')))
+    } finally {
+      setPwSaving(false)
     }
   }
 
@@ -331,6 +397,94 @@ export default function SystemSettings() {
         {sessionMessage && (
           <p className={`text-sm ${sessionMessage.startsWith(t('settings:session.saveFailed')) || sessionMessage.startsWith(t('common:errors.loadFailed')) ? 'text-red-400' : 'text-green-400'}`}>
             {sessionMessage}
+          </p>
+        )}
+      </form>
+
+      <form onSubmit={savePasswordPolicy} className="card space-y-4 max-w-2xl">
+        <h2 className="text-lg font-semibold flex items-center gap-2"><KeyRound className="h-5 w-5 text-primary" /> {t('settings:passwordPolicy.title')}</h2>
+        <p className="text-sm text-slate-400">
+          {t('settings:passwordPolicy.description')}
+        </p>
+        {pwLoading ? (
+          <p className="text-sm text-slate-400">{t('common:actions.loading')}</p>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-center gap-4">
+              <label className="label w-52 shrink-0">{t('settings:passwordPolicy.minLengthLabel')}</label>
+              <input
+                type="number"
+                min={8}
+                max={128}
+                className="input w-32"
+                value={pwMinLength}
+                onChange={(e) => setPwMinLength(Number(e.target.value))}
+                disabled={pwSaving}
+              />
+              <span className="text-xs text-slate-500">{t('settings:passwordPolicy.minLengthRange')}</span>
+            </div>
+            <label className="flex items-center gap-2 text-sm text-slate-300">
+              <input
+                type="checkbox"
+                className="rounded border-slate-600 bg-slate-800 text-primary"
+                checked={pwRequireUpper}
+                onChange={(e) => setPwRequireUpper(e.target.checked)}
+                disabled={pwSaving}
+              />
+              {t('settings:passwordPolicy.requireUppercase')}
+            </label>
+            <label className="flex items-center gap-2 text-sm text-slate-300">
+              <input
+                type="checkbox"
+                className="rounded border-slate-600 bg-slate-800 text-primary"
+                checked={pwRequireLower}
+                onChange={(e) => setPwRequireLower(e.target.checked)}
+                disabled={pwSaving}
+              />
+              {t('settings:passwordPolicy.requireLowercase')}
+            </label>
+            <label className="flex items-center gap-2 text-sm text-slate-300">
+              <input
+                type="checkbox"
+                className="rounded border-slate-600 bg-slate-800 text-primary"
+                checked={pwRequireDigit}
+                onChange={(e) => setPwRequireDigit(e.target.checked)}
+                disabled={pwSaving}
+              />
+              {t('settings:passwordPolicy.requireDigit')}
+            </label>
+            <label className="flex items-center gap-2 text-sm text-slate-300">
+              <input
+                type="checkbox"
+                className="rounded border-slate-600 bg-slate-800 text-primary"
+                checked={pwRequireSymbol}
+                onChange={(e) => setPwRequireSymbol(e.target.checked)}
+                disabled={pwSaving}
+              />
+              {t('settings:passwordPolicy.requireSymbol')}
+            </label>
+            <div className="flex items-center gap-4">
+              <label className="label w-52 shrink-0">{t('settings:passwordPolicy.rotationLabel')}</label>
+              <input
+                type="number"
+                min={0}
+                max={24}
+                className="input w-32"
+                value={pwRotationMonths}
+                onChange={(e) => setPwRotationMonths(Number(e.target.value))}
+                disabled={pwSaving}
+              />
+              <span className="text-xs text-slate-500">{t('settings:passwordPolicy.rotationRange')}</span>
+            </div>
+            <p className="text-xs text-slate-500">{t('settings:passwordPolicy.rotationHint')}</p>
+          </div>
+        )}
+        <button className="btn-primary" type="submit" disabled={pwSaving || pwLoading}>
+          {pwSaving ? t('common:actions.saving') : t('settings:passwordPolicy.save')}
+        </button>
+        {pwMessage && (
+          <p className={`text-sm ${pwMessage.startsWith(t('settings:passwordPolicy.saveFailed')) || pwMessage.startsWith(t('settings:passwordPolicy.invalidMinLength')) || pwMessage.startsWith(t('settings:passwordPolicy.invalidRotation')) ? 'text-red-400' : 'text-green-400'}`}>
+            {pwMessage}
           </p>
         )}
       </form>

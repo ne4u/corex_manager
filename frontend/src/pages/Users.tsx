@@ -5,6 +5,7 @@ import { users } from '../services/api'
 import useApiList from '../hooks/useApiList'
 import Modal from '../components/Modal'
 import { IconButton } from '../components/ui'
+import { useDateTime } from '../contexts/DateTimeContext'
 
 interface User {
   id: number
@@ -15,6 +16,7 @@ interface User {
   first_name?: string | null
   last_name?: string | null
   organization?: string | null
+  last_login_at?: string | null
 }
 
 const ROLES = ['admin', 'operator', 'viewer']
@@ -22,6 +24,7 @@ const DEFAULT_ORG = 'coreX Platform'
 
 export default function Users() {
   const { t } = useTranslation(['pages', 'common'])
+  const { formatDateTime } = useDateTime()
   const { items, reload, loading } = useApiList<User>(users.list)
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<number | null>(null)
@@ -136,6 +139,7 @@ export default function Users() {
                 <th>{t('pages:users.tableHeaders.role')}</th>
                 <th>{t('pages:users.tableHeaders.email')}</th>
                 <th>{t('pages:users.tableHeaders.organization')}</th>
+                <th>{t('pages:users.tableHeaders.lastLogin')}</th>
                 <th></th>
               </tr>
             </thead>
@@ -146,6 +150,7 @@ export default function Users() {
                   <td className="capitalize">{u.role}</td>
                   <td className="text-slate-400">{u.email || '-'}</td>
                   <td className="text-slate-400">{u.organization || '-'}</td>
+                  <td className="text-slate-400">{u.last_login_at ? formatDateTime(u.last_login_at) : '-'}</td>
                   <td className="space-x-1">
                     <IconButton icon={Pencil} aria-label="Edit" onClick={() => openEdit(u)} />
                     <IconButton icon={Trash2} variant="danger" aria-label="Delete" onClick={() => users.remove(u.id).then(reload)} />
@@ -161,8 +166,8 @@ export default function Users() {
           {error && <p className="text-red-400 text-sm">{error}</p>}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">{t('pages:users.modal.username')}</label>
-              <input className="input" value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} />
+              <label className="label">{t('pages:users.modal.username')} <span className="text-red-400">*</span></label>
+              <input className="input" value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} required />
             </div>
             <div>
               <label className="label">{t('pages:users.modal.role')}</label>
@@ -192,8 +197,8 @@ export default function Users() {
             </div>
           </div>
           <div>
-            <label className="label">{editing ? t('pages:users.modal.newPassword') : t('pages:users.modal.password')}</label>
-            <input type="password" className="input" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
+            <label className="label">{editing ? t('pages:users.modal.newPassword') : t('pages:users.modal.password')} {!editing && <span className="text-red-400">*</span>}</label>
+            <input type="password" className="input" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} required={!editing} />
           </div>
           <button className="btn-primary w-full">{t('common:actions.save')}</button>
         </form>

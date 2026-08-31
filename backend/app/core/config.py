@@ -276,6 +276,16 @@ class Settings(BaseSettings):
     SESSION_TIMEOUT_MINUTES: int = 30
     SESSION_WARNING_SECONDS: int = 60
 
+    # Password complexity + rotation policy (overridable via the settings
+    # table at runtime; these are the env/config fallback defaults).
+    PASSWORD_MIN_LENGTH: int = 8
+    PASSWORD_REQUIRE_UPPERCASE: bool = False
+    PASSWORD_REQUIRE_LOWERCASE: bool = False
+    PASSWORD_REQUIRE_DIGIT: bool = False
+    PASSWORD_REQUIRE_SYMBOL: bool = False
+    # Number of months before a password is considered expired (0 = disabled).
+    PASSWORD_ROTATION_MONTHS: int = 0
+
     # MCP Gateway
     MCP_GATEWAY_ENABLED: bool = False
     MCP_GATEWAY_LISTEN: str = "0.0.0.0:8081"

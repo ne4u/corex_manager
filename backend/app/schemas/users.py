@@ -36,6 +36,8 @@ class UserResponse(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     organization: Optional[str] = None
+    last_login_at: Optional[datetime] = None
+    password_changed_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 
@@ -62,7 +64,9 @@ class UserPreferenceResponse(BaseModel):
 
 class ChangePasswordRequest(BaseModel):
     current_password: str
-    new_password: str = Field(min_length=8)
+    # min_length=1 here; the service enforces the configured complexity policy
+    # with descriptive per-rule errors.
+    new_password: str = Field(min_length=1)
 
 
 class TOTPSetupRequest(BaseModel):
@@ -91,6 +95,15 @@ class TOTPDisableRequest(BaseModel):
 class SessionSettingsResponse(BaseModel):
     timeout_minutes: int
     warning_seconds: int
+    password_expired: bool = False
+    password_policy: Dict[str, Any] = {}
 
 
-__all__ = ['SessionSettingsResponse', 'TOTPDisableRequest', 'TOTPSetupRequest', 'TOTPSetupResponse', 'TOTPVerifyRequest', 'TOTPVerifyResponse', 'UserBase', 'UserCreate', 'UserPreferenceResponse', 'UserPreferenceUpdate', 'UserResponse', 'UserUpdate', 'ChangePasswordRequest']
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    role: str
+    password_expired: bool = False
+
+
+__all__ = ['LoginResponse', 'SessionSettingsResponse', 'TOTPDisableRequest', 'TOTPSetupRequest', 'TOTPSetupResponse', 'TOTPVerifyRequest', 'TOTPVerifyResponse', 'UserBase', 'UserCreate', 'UserPreferenceResponse', 'UserPreferenceUpdate', 'UserResponse', 'UserUpdate', 'ChangePasswordRequest']

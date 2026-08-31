@@ -81,5 +81,23 @@
     "save": "Save SSL Labs Settings",
     "saved": "SSL Labs settings saved.",
     "saveFailed": "Failed to save SSL Labs settings."
+  },
+  "passwordPolicy": {
+    "title": "Criteri Password",
+    "description": "Configura i requisiti di complessità della password e il periodo di rotazione. Gli utenti con una password scaduta devono cambiarla al prossimo accesso prima di poter utilizzare il sistema.",
+    "minLengthLabel": "Lunghezza Minima",
+    "minLengthRange": "8 — 128",
+    "requireUppercase": "Richiedi lettera maiuscola",
+    "requireLowercase": "Richiedi lettera minuscola",
+    "requireDigit": "Richiedi cifra",
+    "requireSymbol": "Richiedi simbolo",
+    "rotationLabel": "Periodo di Rotazione (mesi)",
+    "rotationRange": "0 — 24 (0 = disabilitato)",
+    "rotationHint": "Gli utenti devono cambiare la password dopo questo numero di mesi. Imposta su 0 per disabilitare la rotazione.",
+    "invalidMinLength": "La lunghezza minima deve essere compresa tra 8 e 128.",
+    "invalidRotation": "Il periodo di rotazione deve essere compreso tra 0 e 24 mesi.",
+    "save": "Salva Criteri Password",
+    "saved": "Criteri password salvati.",
+    "saveFailed": "Salvataggio dei criteri password non riuscito."
   }
 }

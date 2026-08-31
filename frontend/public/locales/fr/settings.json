@@ -81,5 +81,23 @@
     "save": "Save SSL Labs Settings",
     "saved": "SSL Labs settings saved.",
     "saveFailed": "Failed to save SSL Labs settings."
+  },
+  "passwordPolicy": {
+    "title": "Politique de Mot de Passe",
+    "description": "Configurez les exigences de complexité du mot de passe et la période de rotation. Les utilisateurs avec un mot de passe expiré doivent le changer lors de leur prochaine connexion avant de pouvoir accéder au système.",
+    "minLengthLabel": "Longueur Minimum",
+    "minLengthRange": "8 — 128",
+    "requireUppercase": "Exiger une lettre majuscule",
+    "requireLowercase": "Exiger une lettre minuscule",
+    "requireDigit": "Exiger un chiffre",
+    "requireSymbol": "Exiger un symbole",
+    "rotationLabel": "Période de Rotation (mois)",
+    "rotationRange": "0 — 24 (0 = désactivé)",
+    "rotationHint": "Les utilisateurs doivent changer leur mot de passe après ce nombre de mois. Définir sur 0 pour désactiver la rotation.",
+    "invalidMinLength": "La longueur minimum doit être entre 8 et 128.",
+    "invalidRotation": "La période de rotation doit être entre 0 et 24 mois.",
+    "save": "Enregistrer la Politique de Mot de Passe",
+    "saved": "Politique de mot de passe enregistrée.",
+    "saveFailed": "Échec de l'enregistrement de la politique de mot de passe."
   }
 }

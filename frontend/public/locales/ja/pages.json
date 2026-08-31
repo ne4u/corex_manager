@@ -327,7 +327,8 @@
       "createdAt": "作成日時",
       "actions": "アクション",
       "email": "Email",
-      "organization": "Organization"
+      "organization": "Organization",
+      "lastLogin": "最終ログイン"
     },
     "modal": {
       "editTitle": "ユーザーを編集",

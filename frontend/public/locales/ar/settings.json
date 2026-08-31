@@ -81,5 +81,23 @@
     "save": "Save SSL Labs Settings",
     "saved": "SSL Labs settings saved.",
     "saveFailed": "Failed to save SSL Labs settings."
+  },
+  "passwordPolicy": {
+    "title": "سياسة كلمات المرور",
+    "description": "تكوين متطلبات تعقيد كلمة المرور وفترة التدوير. يجب على المستخدمين الذين انتهت صلاحية كلمة المرور تغييرها عند تسجيل الدخول التالي قبلتمكنهم من الوصول إلى النظام.",
+    "minLengthLabel": "الحد الأدنى للطول",
+    "minLengthRange": "8 — 128",
+    "requireUppercase": "يتطلب حرفاً كبيراً",
+    "requireLowercase": "يتطلب حرفاً صغيراً",
+    "requireDigit": "يتطلب رقماً",
+    "requireSymbol": "يتطلب رمزاً",
+    "rotationLabel": "فترة التدوير (أشهر)",
+    "rotationRange": "0 — 24 (0 = معطل)",
+    "rotationHint": "يجب على المستخدمين تغيير كلمة المرور بعد هذا عدد من الأشهر. اضبط على 0 لتعطيل التدوير.",
+    "invalidMinLength": "الحد الأدنى للطول يجب أن يكون بين 8 و 128.",
+    "invalidRotation": "فترة التدوير يجب أن تكون بين 0 و 24 شهراً.",
+    "save": "حفظ سياسة كلمات المرور",
+    "saved": "تم حفظ سياسة كلمات المرور.",
+    "saveFailed": "فشل حفظ سياسة كلمات المرور."
   }
 }

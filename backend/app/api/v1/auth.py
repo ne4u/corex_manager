@@ -7,6 +7,7 @@ from ..deps import get_current_user, get_db, oauth2_scheme, rate_limit, rate_lim
 from ...models.auth import UserPreference
 from ...schemas.users import (
     ChangePasswordRequest,
+    LoginResponse,
     TOTPDisableRequest,
     TOTPSetupRequest,
     TOTPVerifyRequest,
@@ -57,7 +58,7 @@ def _validate_datetime_format(value: str) -> None:
 router = APIRouter()
 
 
-@router.post("/auth/token")
+@router.post("/auth/token", response_model=LoginResponse)
 def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     totp_code: Optional[str] = Form(None),
@@ -148,7 +149,7 @@ def change_password_endpoint(
     _=Depends(rate_limit),
 ):
     try:
-        change_password(user, data.current_password, data.new_password)
+        change_password(db, user, data.current_password, data.new_password)
         db.commit()
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
