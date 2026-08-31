@@ -629,6 +629,24 @@ impl RespTransformFilter {
             return Ok(());
         }
 
+        // Disk cache guard: when a cache-eligible client request is
+        // routed to cache, the response coming back has already been
+        // transformed on the origin→cache fetch path. Re-applying the
+        // transform here would corrupt the body — double transformation,
+        // Content-Length removal, and the send()/set_eom() flushing mechanism
+        // can stall on cache's delivery pattern, trapping the body in the
+        // filter buffer and producing a 200 OK with an empty body.
+        //
+        // HAProxy sets txn.is_disk_cache_eligible in the backend section for
+        // cache-eligible client requests (!is_varnish_fetch). Varnish fetch
+        // requests (is_varnish_fetch) don't set it, so the filter still runs
+        // on the origin→Varnish path where transformation is needed.
+        let is_disk_cache_eligible: String = txn.get_var("txn.is_disk_cache_eligible").unwrap_or_default();
+        if !is_disk_cache_eligible.is_empty() {
+            self.active_response = false;
+            return Ok(());
+        }
+
         let headers = msg.get_headers()?;
         let ct = headers
             .get_first::<String>("content-type")?

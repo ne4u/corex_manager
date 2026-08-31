@@ -213,6 +213,18 @@ class Settings(BaseSettings):
     # HAProxy's built-in tune.bufsize default, used to derive the filter's
     # max_buffer ceiling when IMG_2_WEBP_BUFSIZE is 0.
     HAPROXY_DEFAULT_BUFSIZE: int = 16_384
+    # Minimum tune.bufsize emitted automatically when 3+ Lua response filters
+    # are active simultaneously (resp_transform + compression + img_2_webp).
+    # Each filter buffers response data, and compress's offload mode buffers
+    # the entire response before dispatching to the compression thread pool.
+    # With HAProxy's 16KB default, a fast origin (e.g. Varnish cache hit)
+    # delivering a 32KB+ response in one shot overflows the buffer during
+    # response header processing, producing PH (proxy header) termination →
+    # 500. 64KB handles 64KB responses with the full filter chain and
+    # standard response headers (CSP, HSTS, etc.). Only emitted when the
+    # user has not set tune.bufsize explicitly (via Global Options or
+    # IMG_2_WEBP_BUFSIZE). See generate_global_section in haproxy.py.
+    HAPROXY_MULTI_FILTER_BUFSIZE: int = 65_536
     # Safety margin subtracted from the effective bufsize to account for
     # tune.maxrewrite (1024) and the response header block, which share the same
     # buffer. Capped at a quarter of the bufsize so small buffers stay sane.

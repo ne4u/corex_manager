@@ -535,3 +535,90 @@ def test_detokenize_query_not_emitted_when_module_disabled(db):
     )
     cfg = haproxy.generate_config(db, resp_transform_enabled_override=False)
     assert "http-request lua.detokenize_query" not in cfg
+
+
+# ---------------------------------------------------------------------------
+# Disk cache + resp_transform interaction
+#
+# When disk cache (Varnish) is active, the `del-header Accept-Encoding` must
+# be guarded with `is_varnish_fetch` so it only strips on the Varnish→origin
+# fetch path (where resp_transform needs uncompressed content). Client→Varnish
+# requests keep Accept-Encoding so Varnish can vary on encoding and HAProxy's
+# compression filter can negotiate on delivery.
+# ---------------------------------------------------------------------------
+
+
+def test_del_accept_encoding_guarded_when_disk_cache_active(db):
+    """When disk cache is active, del-header Accept-Encoding is guarded with
+    is_varnish_fetch so it only strips on Varnish→origin fetches."""
+    from tests.factories import make_cache_config, make_cache_rule
+    from app.services.settings import set_setting
+
+    backend = make_backend(db, name="be_rt_disk")
+    make_server(db, backend.id)
+    make_response_transform(
+        db,
+        name="rt_disk",
+        backend_id=backend.id,
+        transform_type="replace",
+        find_regex="foo",
+        replace_string="bar",
+    )
+    cc = make_cache_config(db, backend.id, disk_cache_enabled=True)
+    make_cache_rule(db, cc.id, match_type="extension", pattern="css", action="cache", tier="disk")
+    set_setting(db, "disk_cache_enabled", "true")
+    db.commit()
+
+    cfg = haproxy.generate_config(db, resp_transform_enabled_override=True)
+    assert "filter lua.resp_transform" in cfg
+    # Should be guarded with is_varnish_fetch
+    assert "http-request del-header Accept-Encoding if is_varnish_fetch" in cfg
+    # Should NOT have the unguarded version
+    assert "    http-request del-header Accept-Encoding\n" not in cfg
+
+
+def test_del_accept_encoding_unguarded_when_disk_cache_inactive(db):
+    """When disk cache is NOT active, del-header Accept-Encoding is unguarded
+    (normal client→origin path always needs uncompressed content for transform)."""
+    backend = make_backend(db, name="be_rt_no_disk")
+    make_server(db, backend.id)
+    make_response_transform(
+        db,
+        name="rt_no_disk",
+        backend_id=backend.id,
+        transform_type="replace",
+        find_regex="foo",
+        replace_string="bar",
+    )
+    db.commit()
+
+    cfg = haproxy.generate_config(db, resp_transform_enabled_override=True)
+    assert "filter lua.resp_transform" in cfg
+    # Should be unguarded (no is_varnish_fetch condition)
+    assert "    http-request del-header Accept-Encoding\n" in cfg
+    assert "http-request del-header Accept-Encoding if is_varnish_fetch" not in cfg
+
+
+def test_del_accept_encoding_guarded_when_disk_cache_enabled_but_no_rules(db):
+    """When disk cache is active but no cache rules match, the guard still
+    applies (disk_cache_active is true, is_varnish_fetch ACL is emitted)."""
+    from tests.factories import make_cache_config
+    from app.services.settings import set_setting
+
+    backend = make_backend(db, name="be_rt_disk_norule")
+    make_server(db, backend.id)
+    make_response_transform(
+        db,
+        name="rt_disk_norule",
+        backend_id=backend.id,
+        transform_type="replace",
+        find_regex="foo",
+        replace_string="bar",
+    )
+    make_cache_config(db, backend.id, disk_cache_enabled=True)
+    set_setting(db, "disk_cache_enabled", "true")
+    db.commit()
+
+    cfg = haproxy.generate_config(db, resp_transform_enabled_override=True)
+    assert "filter lua.resp_transform" in cfg
+    assert "http-request del-header Accept-Encoding if is_varnish_fetch" in cfg

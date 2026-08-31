@@ -212,7 +212,10 @@ def test_disk_cache_globally_disabled(db):
 
 
 def test_both_tiers_simultaneous(db):
-    """Both memory cache and disk cache can be enabled simultaneously."""
+    """Both memory cache and disk cache can be enabled simultaneously.
+    When disk cache is active, the memory cache filter is NOT emitted (it
+    would buffer Varnish responses and cause 500 errors on large responses).
+    Varnish handles all caching in that case."""
     backend = make_backend(db, name="dual")
     make_server(db, backend.id, address="10.0.0.10", port=9090)
     cc = make_cache_config(db, backend.id, haproxy_enabled=True, disk_cache_enabled=True)
@@ -220,11 +223,12 @@ def test_both_tiers_simultaneous(db):
     from app.services.settings import set_setting
     set_setting(db, "disk_cache_enabled", "true")
     cfg = haproxy.generate_config(db)
-    # Memory cache directives
+    # Memory cache section is still declared (used by other backends potentially)
     assert "cache cache_dual" in cfg
-    assert "filter cache cache_dual" in cfg
-    assert "http-request cache-use cache_dual" in cfg
-    assert "http-response cache-store cache_dual" in cfg
+    # But the filter cache directive is NOT emitted (disk cache is active)
+    assert not any(l.strip().startswith("filter cache cache_dual") for l in cfg.split("\n"))
+    assert "cache-use" not in cfg  # memory cache skipped
+    assert "cache-store" not in cfg  # memory cache skipped
     # Disk cache routing — Varnish primary, origin as backup fallback
     assert "http-request set-header X-Cache-Backend dual" in cfg
     assert "server disk_cache varnish:6081" in cfg

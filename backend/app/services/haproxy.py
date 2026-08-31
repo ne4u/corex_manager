@@ -769,6 +769,30 @@ def generate_global_section(
         if not user_set_bufsize:
             lines.append(f"    tune.bufsize {settings.IMG_2_WEBP_BUFSIZE}")
 
+    # When 3+ Lua response filters are active simultaneously (resp_transform +
+    # compression + img_2_webp), HAProxy's default 16KB buffer is too small.
+    # Each filter buffers response data, and compress's offload mode buffers
+    # the entire response before dispatching to the compression thread pool.
+    # Combined with large response headers (CSP, HSTS, etc.) and a fast origin
+    # (e.g. Varnish cache hit) that delivers 32KB+ in one shot, the 16KB
+    # buffer overflows during response header processing, producing PH
+    # (proxy header) termination → 500. This is automatically emitted when
+    # the user has not set tune.bufsize explicitly (via Global Options or
+    # IMG_2_WEBP_BUFSIZE above). See HAPROXY_MULTI_FILTER_BUFSIZE in config.py.
+    lua_response_filter_count = sum([
+        bool(resp_transform_enabled),
+        bool(compression_enabled),
+        bool(img_2_webp_enabled),
+    ])
+    if lua_response_filter_count >= 3:
+        user_set_bufsize = any(
+            opt.get("enabled", True)
+            and _safe_token(str(opt.get("directive", ""))).strip().lower() == "tune.bufsize"
+            for opt in (global_options or [])
+        )
+        if not user_set_bufsize and not settings.IMG_2_WEBP_BUFSIZE:
+            lines.append(f"    tune.bufsize {settings.HAPROXY_MULTI_FILTER_BUFSIZE}")
+
     # Log destinations (global).
     # If no enabled LogDestination rows exist, emit a default stdout target so
     # `docker compose logs haproxy` shows request logs out of the box.
@@ -1408,9 +1432,30 @@ def _emit_cache_directives(
         acl_lines = emit_cache_rule_acls(cache_config, acl_prefix)
         lines.extend(acl_lines)
 
+    # Disk cache ACLs — emitted early (before memory cache directives) so they
+    # are available for cache-store guards. is_varnish_fetch detects Varnish's
+    # backend fetch (loop prevention); is_cache_purge routes PURGE/BAN to Varnish.
+    # Uses req.hdr_cnt (not bare hdr_cnt) because bare hdr_cnt refers to response
+    # headers in some contexts.
+    disk_cache_active = cache_config.disk_cache_enabled and disk_cache_globally_enabled
+    if disk_cache_active:
+        lines.append(f"    acl is_cache_purge method PURGE BAN")
+        lines.append(f"    acl is_varnish_fetch req.hdr_cnt(X-Varnish-Fetch) gt 0")
+
     # Memory cache (HAProxy native). Cacheability rules gate `cache-use`:
     # ordered first-match-wins, with nothing cached when no rule matches.
-    if cache_config.haproxy_enabled:
+    #
+    # When disk cache (Varnish) is active for this backend, the memory cache
+    # filter is NOT emitted at all. `filter cache` is a declarative filter —
+    # once declared, it's in the pipeline for EVERY response from the backend,
+    # including responses from the disk_cache (Varnish) server. Running both
+    # caches simultaneously is redundant (Varnish is the superior cache), and
+    # the extra filter adds buffer pressure to an already loaded pipeline
+    # (resp_transform + compress + img_2_webp). There is no way to
+    # conditionally apply a filter declaration in HAProxy, so the memory cache
+    # filter is skipped entirely when disk cache is active. Varnish handles
+    # all caching in that case.
+    if cache_config.haproxy_enabled and not disk_cache_active:
         cache_name = cache_section_names.get(backend.id, "")
         if cache_name:
             from .cache_rules import emit_haproxy_cache_rules
@@ -1439,7 +1484,7 @@ def _emit_cache_directives(
                 # cache-use/cache-store can reference a cache section.
                 lines.append(f"    filter cache {cache_name}")
                 lines.extend(rule_lines)
-                
+
                 # Check for response-phase rules (content_type, status_code)
                 from .cache_rules import emit_response_phase_cache_store_condition
                 response_store = emit_response_phase_cache_store_condition(cache_config, cache_name)
@@ -1453,20 +1498,18 @@ def _emit_cache_directives(
                 # Nothing can ever be served from this cache, so emitting the
                 # filter and cache-store would only add overhead.
                 lines.extend(rule_lines)
+    elif cache_config.haproxy_enabled and disk_cache_active:
+        # Memory cache is enabled but disk cache is also active — skip the
+        # memory cache filter to prevent buffer overflow on Varnish responses.
+        # Varnish handles all caching. Emit a comment for config readability.
+        lines.append("    # memory cache skipped: disk cache is active (filter cache would buffer Varnish responses)")
 
     # Disk cache — route cache-eligible requests to Varnish via use-server directives
     if cache_config.disk_cache_enabled and disk_cache_globally_enabled:
         from .cache_rules import emit_disk_cache_use_server_directives
-        
-        # ACL for PURGE/BAN methods (always route to Varnish)
-        lines.append(f"    acl is_cache_purge method PURGE BAN")
-        
-        # ACL to detect Varnish fetch requests (prevent routing loop).
-        # Uses req.hdr_cnt (not bare hdr_cnt) because bare hdr_cnt refers to
-        # response headers in some contexts. This ACL is only used in
-        # http-request and use-server rules (not http-response), so
-        # req.hdr_cnt is safe here.
-        lines.append(f"    acl is_varnish_fetch req.hdr_cnt(X-Varnish-Fetch) gt 0")
+
+        # ACLs (is_cache_purge, is_varnish_fetch) were emitted above, before
+        # the memory cache section, so they are available for cache-store guards.
         
         # Generate use-server directives for cache rules
         use_server_lines, acl_conditions = emit_disk_cache_use_server_directives(
@@ -1493,6 +1536,13 @@ def _emit_cache_directives(
             header_condition = "is_cache_purge"
 
         lines.append(f"    http-request set-header X-Cache-Backend {backend_name} if {header_condition} !is_varnish_fetch")
+
+        # Mark cache-eligible client requests so response filters (resp_transform)
+        # can skip processing on the Varnish→client delivery path. The response from
+        # Varnish has already been transformed on the origin→Varnish fetch path, so
+        # re-applying the transform would corrupt the body (double transformation,
+        # Content-Length removal, flushing failures → blank response).
+        lines.append(f"    http-request set-var(txn.is_disk_cache_eligible) str(1) if {header_condition} !is_varnish_fetch")
 
         # PURGE/BAN always goes to Varnish (first, so it takes precedence)
         lines.append(f"    use-server disk_cache if is_cache_purge !is_varnish_fetch")
@@ -2834,7 +2884,16 @@ def generate_backend(
                 # The resp_transform filter needs raw (uncompressed) HTML to find
                 # anchors like </head>. The lua.compress filter re-compresses the
                 # transformed response before sending to the client.
-                lines.append("    http-request del-header Accept-Encoding")
+                #
+                # When disk cache is active, guard with is_varnish_fetch so the
+                # header is only stripped on the Varnish→origin fetch path (where
+                # resp_transform needs uncompressed content). Client→Varnish
+                # requests keep Accept-Encoding so Varnish can vary on encoding
+                # and HAProxy's compression filter can negotiate on delivery.
+                if disk_cache_active:
+                    lines.append("    http-request del-header Accept-Encoding if is_varnish_fetch")
+                else:
+                    lines.append("    http-request del-header Accept-Encoding")
                 # Query-string detokenization: if any mask rule with
                 # detokenize_query=True applies to this backend, emit the Lua
                 # action + set-query to resolve tokens in URL query strings on

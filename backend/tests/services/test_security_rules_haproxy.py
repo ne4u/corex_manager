@@ -221,6 +221,57 @@ def test_generate_global_section_nbthread_disabled_override(monkeypatch):
     assert "nbthread 8" not in cfg
 
 
+def test_generate_global_section_multi_filter_bufsize():
+    """When 3+ Lua response filters are active, tune.bufsize is automatically emitted."""
+    cfg = haproxy.generate_global_section(
+        compression_enabled=True,
+        resp_transform_enabled=True,
+        img_2_webp_enabled=True,
+    )
+    assert "tune.bufsize" in cfg
+
+
+def test_generate_global_section_multi_filter_bufsize_two_filters():
+    """With only 2 Lua response filters, tune.bufsize is not auto-emitted."""
+    cfg = haproxy.generate_global_section(
+        compression_enabled=True,
+        resp_transform_enabled=True,
+        img_2_webp_enabled=False,
+    )
+    assert "tune.bufsize" not in cfg
+
+
+def test_generate_global_section_multi_filter_bufsize_user_override():
+    """User-supplied tune.bufsize takes precedence over the multi-filter default."""
+    cfg = haproxy.generate_global_section(
+        compression_enabled=True,
+        resp_transform_enabled=True,
+        img_2_webp_enabled=True,
+        global_options=[{"enabled": True, "directive": "tune.bufsize", "value": "131072"}],
+    )
+    assert "tune.bufsize 131072" in cfg
+    # The auto-emitted default should not also appear
+    assert cfg.count("tune.bufsize") == 1
+
+
+def test_generate_global_section_multi_filter_bufsize_img2webp_wins():
+    """IMG_2_WEBP_BUFSIZE takes precedence over the multi-filter default."""
+    from app.core.config import get_settings
+    s = get_settings()
+    orig = s.IMG_2_WEBP_BUFSIZE
+    try:
+        s.IMG_2_WEBP_BUFSIZE = 131072
+        cfg = haproxy.generate_global_section(
+            compression_enabled=True,
+            resp_transform_enabled=True,
+            img_2_webp_enabled=True,
+        )
+        assert "tune.bufsize 131072" in cfg
+        assert cfg.count("tune.bufsize") == 1
+    finally:
+        s.IMG_2_WEBP_BUFSIZE = orig
+
+
 def test_generate_config_with_security_rule(db):
     """Full config generation with a security rule should include the rule lines."""
     backend = make_backend(db)
