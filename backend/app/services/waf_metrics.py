@@ -304,6 +304,49 @@ def prune_waf_metrics(db: Session) -> int:
     return result
 
 
+def prune_waf_log_file(max_lines: Optional[int] = None) -> int:
+    """Truncate the raw coraza-spoa.log file to the last ``max_lines`` lines.
+
+    Returns the number of lines removed (0 if the file was already within the
+    limit or didn't exist). After truncation the sampler offset is reset to 0
+    so the next ``sample_waf_metrics`` run starts fresh from the beginning of
+    the trimmed file.
+    """
+    if max_lines is None:
+        max_lines = settings.WAF_LOG_RETENTION_LINES
+    if max_lines <= 0:
+        return 0
+
+    path = settings.CORAZA_SPOA_LOG_PATH
+    if not os.path.exists(path):
+        return 0
+
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            lines = f.readlines()
+        if len(lines) <= max_lines:
+            return 0
+
+        kept = lines[-max_lines:]
+        removed = len(lines) - len(kept)
+
+        # Atomic write: write to a temp file in the same directory, then rename.
+        dir_ = os.path.dirname(path) or "."
+        tmp_path = os.path.join(dir_, ".coraza-spoa.log.prune.tmp")
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            f.writelines(kept)
+        os.replace(tmp_path, path)
+
+        # Reset the sampler offset so the next sample run reads from the start
+        # of the truncated file instead of seeking past the (now smaller) file.
+        _write_offset(0)
+        logger.info("Pruned %d lines from %s (kept %d)", removed, path, len(kept))
+        return removed
+    except Exception as exc:
+        logger.exception("Failed to prune WAF log file: %s", exc)
+        return 0
+
+
 def _waf_sampler_loop() -> None:
     while True:
         try:
@@ -313,6 +356,12 @@ def _waf_sampler_loop() -> None:
                 db = SessionLocal()
                 prune_waf_metrics(db)
                 db.close()
+            except Exception:
+                pass
+            # Prune the raw log file after sampling so we don't drop lines
+            # the sampler hasn't ingested yet.
+            try:
+                prune_waf_log_file()
             except Exception:
                 pass
         except Exception as exc:

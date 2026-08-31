@@ -281,3 +281,68 @@ def test_prune_waf_metrics(db, monkeypatch):
     deleted = waf_metrics.prune_waf_metrics(db)
     assert deleted == 1
     assert db.query(WafMetric).count() == 1
+
+
+def test_prune_waf_log_file(temp_coraza_paths, monkeypatch):
+    """prune_waf_log_file keeps only the last N lines and resets the offset."""
+    monkeypatch.setattr(waf_metrics.settings, "WAF_LOG_RETENTION_LINES", 3)
+    log_path = temp_coraza_paths["log"]
+
+    # Write 5 lines to the log file.
+    with open(log_path, "w") as f:
+        for i in range(5):
+            f.write(f"line {i}\n")
+
+    # Set a non-zero offset to verify it gets reset.
+    waf_metrics._write_offset(999)
+
+    removed = waf_metrics.prune_waf_log_file()
+    assert removed == 2
+
+    with open(log_path) as f:
+        remaining = f.readlines()
+    assert len(remaining) == 3
+    assert remaining[0].strip() == "line 2"
+    assert remaining[-1].strip() == "line 4"
+
+    # Offset should be reset to 0 after pruning.
+    assert waf_metrics._read_offset() == 0
+
+
+def test_prune_waf_log_file_noop_when_under_limit(temp_coraza_paths, monkeypatch):
+    """prune_waf_log_file does nothing when the file is within the limit."""
+    monkeypatch.setattr(waf_metrics.settings, "WAF_LOG_RETENTION_LINES", 500)
+    log_path = temp_coraza_paths["log"]
+
+    with open(log_path, "w") as f:
+        f.write("line 0\nline 1\n")
+
+    removed = waf_metrics.prune_waf_log_file()
+    assert removed == 0
+
+    with open(log_path) as f:
+        assert len(f.readlines()) == 2
+
+
+def test_prune_waf_log_file_disabled(temp_coraza_paths, monkeypatch):
+    """WAF_LOG_RETENTION_LINES=0 disables pruning entirely."""
+    monkeypatch.setattr(waf_metrics.settings, "WAF_LOG_RETENTION_LINES", 0)
+    log_path = temp_coraza_paths["log"]
+
+    with open(log_path, "w") as f:
+        for i in range(10):
+            f.write(f"line {i}\n")
+
+    removed = waf_metrics.prune_waf_log_file()
+    assert removed == 0
+
+    with open(log_path) as f:
+        assert len(f.readlines()) == 10
+
+
+def test_prune_waf_log_file_missing_file(temp_coraza_paths, monkeypatch):
+    """prune_waf_log_file returns 0 when the log file doesn't exist."""
+    monkeypatch.setattr(waf_metrics.settings, "WAF_LOG_RETENTION_LINES", 3)
+    # Don't create the log file — temp_coraza_paths only sets the paths.
+    removed = waf_metrics.prune_waf_log_file()
+    assert removed == 0

@@ -80,6 +80,9 @@ class Settings(BaseSettings):
     CAPTCHA_CHALLENGE_RETENTION_DAYS: int = 7
     WAF_METRICS_SAMPLE_INTERVAL_SECONDS: int = 10
     WAF_METRICS_RETENTION_DAYS: int = 7
+    # Raw coraza-spoa.log retention (max lines kept; 0 = unlimited).
+    # The log file is pruned by the WAF metrics sampler on every cycle.
+    WAF_LOG_RETENTION_LINES: int = 500
 
     # WAF rule snapshot retention (per-rule max; 0 = unlimited)
     WAF_RULE_VERSION_MAX_PER_RULE: int = 10
