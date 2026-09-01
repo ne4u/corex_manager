@@ -1445,17 +1445,20 @@ def _emit_cache_directives(
     # Memory cache (HAProxy native). Cacheability rules gate `cache-use`:
     # ordered first-match-wins, with nothing cached when no rule matches.
     #
-    # When disk cache (Varnish) is active for this backend, the memory cache
-    # filter is NOT emitted at all. `filter cache` is a declarative filter —
-    # once declared, it's in the pipeline for EVERY response from the backend,
-    # including responses from the disk_cache (Varnish) server. Running both
-    # caches simultaneously is redundant (Varnish is the superior cache), and
-    # the extra filter adds buffer pressure to an already loaded pipeline
-    # (resp_transform + compress + img_2_webp). There is no way to
-    # conditionally apply a filter declaration in HAProxy, so the memory cache
-    # filter is skipped entirely when disk cache is active. Varnish handles
-    # all caching in that case.
-    if cache_config.haproxy_enabled and not disk_cache_active:
+    # When disk cache (Varnish) is also active for this backend, the memory
+    # cache filter is still emitted — but `cache-use` and `cache-store` are
+    # gated with `!is_varnish_fetch` so Varnish's internal origin fetches
+    # bypass the memory cache (they go directly to the origin server) and
+    # Varnish cache-hit responses are not double-cached in memory. This
+    # allows memory cache to serve file types that are NOT routed to Varnish
+    # (e.g. CSS/JS when only images are in the disk cache rules), while
+    # avoiding redundancy for file types that Varnish handles.
+    #
+    # The `filter cache` declaration is declarative (applies to all responses),
+    # but HAProxy's cache filter only buffers when cache-use/cache-store
+    # conditions match. With tune.bufsize 65536 (auto-emitted when 3+ Lua
+    # response filters are active), the pipeline has enough buffer headroom.
+    if cache_config.haproxy_enabled:
         cache_name = cache_section_names.get(backend.id, "")
         if cache_name:
             from .cache_rules import emit_haproxy_cache_rules
@@ -1464,6 +1467,10 @@ def _emit_cache_directives(
             extra = (cache_config.haproxy_cache_condition or "").strip() or None
             if extra:
                 extra = _REGEX_SANITIZE_RE.sub("", extra)
+            # When disk cache is active, add !is_varnish_fetch to cache-use
+            # so Varnish's internal origin fetches bypass the memory cache.
+            if disk_cache_active:
+                extra = (extra + " !is_varnish_fetch").strip() if extra else "!is_varnish_fetch"
             # emit_acls=False because we already emitted them above
             rule_lines, any_cacheable = emit_haproxy_cache_rules(
                 cache_config, cache_name, acl_prefix, extra_condition=extra, emit_acls=False
@@ -1489,20 +1496,23 @@ def _emit_cache_directives(
                 from .cache_rules import emit_response_phase_cache_store_condition
                 response_store = emit_response_phase_cache_store_condition(cache_config, cache_name)
                 if response_store:
-                    # Conditional cache-store based on response attributes
+                    # Conditional cache-store based on response attributes.
+                    # Add !is_varnish_fetch when disk cache is active to avoid
+                    # double-caching Varnish responses in memory.
+                    if disk_cache_active:
+                        response_store = response_store.replace(" if ", " if !is_varnish_fetch ", 1)
                     lines.append(response_store)
                 else:
-                    # No response-phase rules - unconditional cache-store
-                    lines.append(f"    http-response cache-store {cache_name}")
+                    # No response-phase rules - unconditional cache-store.
+                    # Add !is_varnish_fetch guard when disk cache is active.
+                    if disk_cache_active:
+                        lines.append(f"    http-response cache-store {cache_name} if !is_varnish_fetch")
+                    else:
+                        lines.append(f"    http-response cache-store {cache_name}")
             else:
                 # Nothing can ever be served from this cache, so emitting the
                 # filter and cache-store would only add overhead.
                 lines.extend(rule_lines)
-    elif cache_config.haproxy_enabled and disk_cache_active:
-        # Memory cache is enabled but disk cache is also active — skip the
-        # memory cache filter to prevent buffer overflow on Varnish responses.
-        # Varnish handles all caching. Emit a comment for config readability.
-        lines.append("    # memory cache skipped: disk cache is active (filter cache would buffer Varnish responses)")
 
     # Disk cache — route cache-eligible requests to Varnish via use-server directives
     if cache_config.disk_cache_enabled and disk_cache_globally_enabled:

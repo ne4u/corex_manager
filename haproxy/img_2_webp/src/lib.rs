@@ -253,7 +253,14 @@ impl Img2WebpFilter {
         self.chunk = self.options.max_buffer.max(MIN_SEND_CHUNK);
 
         // Emit Vary: Accept so caches create separate entries for WebP vs original.
-        msg.add_header("vary", "accept")?;
+        // Only add if not already present (case-insensitive) to avoid duplicates.
+        let vary_values = headers.get::<String>("vary")?;
+        let already_has = vary_values
+            .iter()
+            .any(|v| v.to_ascii_lowercase().contains("accept"));
+        if !already_has {
+            msg.add_header("Vary", "Accept")?;
+        }
 
         // Convert strong ETag to weak (converted body differs from original).
         match headers.get::<String>("etag")? {

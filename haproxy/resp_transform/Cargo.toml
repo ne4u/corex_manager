@@ -1,6 +1,6 @@
 [package]
 name = "haproxy-resp-transform"
-version = "0.1.0"
+version = "0.1.4"
 edition = "2021"
 autotests = false
 readme = "README.md"

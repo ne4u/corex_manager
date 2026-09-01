@@ -246,9 +246,9 @@ def test_advanced_haproxy_condition_is_anded_onto_rules(db):
 
 def test_both_tiers_share_the_same_rules(db):
     """Memory cache and disk cache use the same HAProxy ACLs.
-    When disk cache is active, memory cache filter is skipped (filter cache
-    would buffer Varnish responses), but the shared ACLs are still emitted
-    for the disk cache use-server directives."""
+    When disk cache is active, memory cache filter is still emitted but
+    cache-use/cache-store are gated with !is_varnish_fetch. The shared ACLs
+    are used by both the memory cache-use and disk cache use-server directives."""
     backend = make_backend(db, name="shared")
     make_server(db, backend.id)
     cc = make_cache_config(db, backend.id, haproxy_enabled=True, disk_cache_enabled=True)
@@ -257,12 +257,12 @@ def test_both_tiers_share_the_same_rules(db):
     db.commit()
 
     cfg = haproxy.generate_config(db)
-    # The shared ACL should be present (used by disk cache use-server directives)
+    # The shared ACL should be present (used by both memory and disk cache)
     assert "path_beg /downloads/" in cfg
-    # Memory cache filter is skipped when disk cache is active
-    assert "cache-use" not in cfg  # memory cache skipped
-    # Check that no actual filter cache directive is present (not in a comment)
-    assert not any(l.strip().startswith("filter cache") for l in cfg.split("\n"))
+    # Memory cache filter IS emitted (gated by !is_varnish_fetch on use/store)
+    assert "cache-use cache_shared" in cfg
+    assert "!is_varnish_fetch" in cfg
+    assert "filter cache cache_shared" in cfg
     assert "use-server disk_cache" in cfg  # disk cache
     # VCL should NOT have rules (they're evaluated in HAProxy)
     vcl = varnish.generate_vcl(db)
@@ -382,10 +382,9 @@ def test_disk_cache_bypass_rule_no_use_server(db):
 
 def test_memory_only_rule_not_in_disk_cache(db):
     """Rules with tier='memory' only apply to memory cache, not disk cache.
-    When disk cache is active, memory cache filter is skipped entirely, so
-    memory-only rules don't produce cache-use directives. The ACL is still
-    emitted (shared with disk cache) but no use-server is generated for
-    memory-tier rules."""
+    When disk cache is active, memory cache is still emitted but gated with
+    !is_varnish_fetch. Memory-only rules produce cache-use directives (gated)
+    but no use-server directives. The ACL is shared between tiers."""
     backend = make_backend(db, name="memonly")
     make_server(db, backend.id)
     cc = make_cache_config(db, backend.id, haproxy_enabled=True, disk_cache_enabled=True)
@@ -395,8 +394,9 @@ def test_memory_only_rule_not_in_disk_cache(db):
     db.commit()
 
     cfg = haproxy.generate_config(db)
-    # Memory cache filter is skipped when disk cache is active
-    assert "cache-use" not in cfg
+    # Memory cache IS emitted (gated with !is_varnish_fetch)
+    assert "cache-use cache_memonly" in cfg
+    assert "!is_varnish_fetch" in cfg
     # The ACL should still be present (shared between tiers)
     assert "path_end -i .jpg" in cfg
     # Should NOT have disk cache use-server for this memory-tier rule
@@ -423,7 +423,9 @@ def test_disk_only_rule_not_in_memory_cache(db):
 
 
 def test_same_pattern_both_tiers_requires_two_rules(db):
-    """To cache the same pattern in both tiers, create two separate rules."""
+    """To cache the same pattern in both tiers, create two separate rules.
+    Memory cache is still emitted (gated with !is_varnish_fetch) alongside
+    disk cache, so both tiers can cache the same pattern."""
     backend = make_backend(db, name="bothtiers")
     make_server(db, backend.id)
     cc = make_cache_config(db, backend.id, haproxy_enabled=True, disk_cache_enabled=True)
@@ -434,8 +436,9 @@ def test_same_pattern_both_tiers_requires_two_rules(db):
     db.commit()
 
     cfg = haproxy.generate_config(db)
-    # Memory cache is skipped when disk cache is active
-    assert "cache-use" not in cfg
+    # Memory cache IS emitted (gated with !is_varnish_fetch)
+    assert "cache-use cache_bothtiers" in cfg
+    assert "!is_varnish_fetch" in cfg
     # Should have disk cache use-server
     assert "use-server disk_cache if cacherule_" in cfg
     # Both ACLs are still emitted (shared between tiers)
@@ -465,9 +468,10 @@ def test_mixed_tier_rules(db):
     assert "path_end -i .iso" in cfg
     assert "path_beg /static/" in cfg
     assert "path_beg /downloads/" in cfg
-    # Memory cache is skipped when disk cache is active
+    # Memory cache IS emitted (gated with !is_varnish_fetch) for memory-tier rules
     memory_lines = [l for l in cfg.split("\n") if "cache-use" in l]
-    assert len(memory_lines) == 0  # memory cache skipped
+    assert len(memory_lines) == 2  # jpg + /static/ (memory-tier rules)
+    assert all("!is_varnish_fetch" in l for l in memory_lines)
     # Disk cache should have iso and /downloads/ (disk-tier rules only)
     disk_lines = [l for l in cfg.split("\n") if "use-server disk_cache if cacherule_" in l and "!is_cache_purge" not in l]
     assert len(disk_lines) == 2  # iso + downloads
@@ -559,8 +563,8 @@ def test_disk_cache_eligible_var_includes_purge_condition(db):
 
 def test_cache_store_guarded_when_disk_cache_active(db):
     """When both memory and disk cache are enabled, the memory cache filter
-    is NOT emitted at all — filter cache would buffer Varnish responses and
-    cause 500 errors on large responses."""
+    IS emitted but cache-store is guarded with !is_varnish_fetch so Varnish
+    responses aren't double-cached in memory."""
     backend = make_backend(db, name="dual_cache")
     make_server(db, backend.id)
     cc = make_cache_config(db, backend.id, haproxy_enabled=True, disk_cache_enabled=True)
@@ -570,13 +574,12 @@ def test_cache_store_guarded_when_disk_cache_active(db):
     db.commit()
 
     cfg = haproxy.generate_config(db)
-    # filter cache should NOT be present
-    assert not any(l.strip().startswith("filter cache") for l in cfg.split("\n"))
-    # cache-use and cache-store should NOT be present
-    assert "cache-use" not in cfg
-    assert "cache-store" not in cfg
-    # A comment should explain why
-    assert "memory cache skipped" in cfg
+    # filter cache IS present (gated by !is_varnish_fetch on use/store)
+    assert "filter cache cache_dual_cache" in cfg
+    # cache-use IS present, gated with !is_varnish_fetch
+    assert "cache-use cache_dual_cache" in cfg
+    # cache-store IS present, gated with !is_varnish_fetch
+    assert "cache-store cache_dual_cache if !is_varnish_fetch" in cfg
 
 
 def test_cache_store_unguarded_when_disk_cache_inactive(db):
@@ -595,8 +598,8 @@ def test_cache_store_unguarded_when_disk_cache_inactive(db):
 
 
 def test_cache_store_guarded_with_response_phase_rules(db):
-    """When disk cache is active, memory cache filter is skipped even with
-    response-phase rules."""
+    """When disk cache is active, memory cache filter is still emitted with
+    response-phase rules, but cache-store is guarded with !is_varnish_fetch."""
     backend = make_backend(db, name="resp_phase")
     make_server(db, backend.id)
     cc = make_cache_config(db, backend.id, haproxy_enabled=True, disk_cache_enabled=True)
@@ -608,13 +611,15 @@ def test_cache_store_guarded_with_response_phase_rules(db):
     db.commit()
 
     cfg = haproxy.generate_config(db)
-    assert not any(l.strip().startswith("filter cache") for l in cfg.split("\n"))
-    assert "cache-store" not in cfg
+    assert "filter cache cache_resp_phase" in cfg
+    # cache-store should be present and guarded with !is_varnish_fetch
+    assert "cache-store" in cfg
+    assert "!is_varnish_fetch" in cfg
 
 
 def test_cache_use_guarded_when_disk_cache_active(db):
-    """When both memory and disk cache are enabled, cache-use is NOT emitted
-    (the entire memory cache filter is skipped)."""
+    """When both memory and disk cache are enabled, cache-use IS emitted
+    but gated with !is_varnish_fetch so Varnish fetches bypass memory cache."""
     backend = make_backend(db, name="dual_cache_use")
     make_server(db, backend.id)
     cc = make_cache_config(db, backend.id, haproxy_enabled=True, disk_cache_enabled=True)
@@ -624,8 +629,9 @@ def test_cache_use_guarded_when_disk_cache_active(db):
     db.commit()
 
     cfg = haproxy.generate_config(db)
-    assert "cache-use" not in cfg
-    assert not any(l.strip().startswith("filter cache") for l in cfg.split("\n"))
+    assert "cache-use cache_dual_cache_use" in cfg
+    assert "!is_varnish_fetch" in cfg
+    assert "filter cache cache_dual_cache_use" in cfg
 
 
 def test_cache_use_unguarded_when_disk_cache_inactive(db):

@@ -225,7 +225,17 @@ impl CompressionFilter {
 
         // Update response headers.
         msg.set_header("content-encoding", self.encoding.as_str())?;
-        msg.add_header("vary", "accept-encoding")?;
+        // Add Vary: Accept-Encoding if not already present (case-insensitive).
+        // Uses add_header to append to existing Vary values (e.g. "Vary: Accept"
+        // from img_2_webp) rather than replacing them. set_header would collapse
+        // multiple Vary headers into one, losing values added by other filters.
+        let vary_values = headers.get::<String>("vary")?;
+        let already_has = vary_values
+            .iter()
+            .any(|v| v.to_ascii_lowercase().contains("accept-encoding"));
+        if !already_has {
+            msg.add_header("Vary", "Accept-Encoding")?;
+        }
         // Switch to chunked transfer encoding (compressed length is unknown).
         msg.set_body_len(None)?;
 

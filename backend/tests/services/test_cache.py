@@ -213,9 +213,10 @@ def test_disk_cache_globally_disabled(db):
 
 def test_both_tiers_simultaneous(db):
     """Both memory cache and disk cache can be enabled simultaneously.
-    When disk cache is active, the memory cache filter is NOT emitted (it
-    would buffer Varnish responses and cause 500 errors on large responses).
-    Varnish handles all caching in that case."""
+    When disk cache is active, the memory cache filter IS still emitted, but
+    cache-use and cache-store are gated with !is_varnish_fetch so Varnish's
+    internal fetches bypass memory cache and Varnish responses aren't
+    double-cached in memory."""
     backend = make_backend(db, name="dual")
     make_server(db, backend.id, address="10.0.0.10", port=9090)
     cc = make_cache_config(db, backend.id, haproxy_enabled=True, disk_cache_enabled=True)
@@ -223,12 +224,15 @@ def test_both_tiers_simultaneous(db):
     from app.services.settings import set_setting
     set_setting(db, "disk_cache_enabled", "true")
     cfg = haproxy.generate_config(db)
-    # Memory cache section is still declared (used by other backends potentially)
+    # Memory cache section is declared
     assert "cache cache_dual" in cfg
-    # But the filter cache directive is NOT emitted (disk cache is active)
-    assert not any(l.strip().startswith("filter cache cache_dual") for l in cfg.split("\n"))
-    assert "cache-use" not in cfg  # memory cache skipped
-    assert "cache-store" not in cfg  # memory cache skipped
+    # Memory cache filter IS emitted (gated by !is_varnish_fetch on use/store)
+    assert "filter cache cache_dual" in cfg
+    # cache-use is gated with !is_varnish_fetch
+    assert "cache-use cache_dual" in cfg
+    assert "!is_varnish_fetch" in cfg
+    # cache-store is gated with !is_varnish_fetch
+    assert "cache-store cache_dual if !is_varnish_fetch" in cfg
     # Disk cache routing — Varnish primary, origin as backup fallback
     assert "http-request set-header X-Cache-Backend dual" in cfg
     assert "server disk_cache varnish:6081" in cfg
