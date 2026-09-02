@@ -14,8 +14,28 @@ pub(crate) fn lookup<'a>(lua: &'a Lua, ip: IpAddr, props: &[String]) -> Option<L
 
     let db = DB.load();
     let reader = db.as_ref()?;
-    let asn = reader.lookup::<Asn>(ip).ok().flatten()?;
+
+    // Use lookup_prefix instead of lookup so we can return the network CIDR
+    // (derived from the matched prefix length) when "network" is requested.
+    let (asn_opt, prefix_len) = reader.lookup_prefix::<Asn>(ip).ok()?;
+    let asn = asn_opt?;
+
+    // "network" is derived from the lookup prefix, not the ASN record itself.
+    if props.get(0).map(|s| s.as_str()) == Some("network") {
+        return compute_network(ip, prefix_len).and_then(|v| v.into_lua(lua).ok());
+    }
+
     lookup_asn(&asn, props).and_then(|v| v.into_lua(lua).ok())
+}
+
+/// Compute the network CIDR (e.g. "74.7.242.0/24") from the looked-up IP and
+/// the prefix length returned by `lookup_prefix`. The MaxMind ASN database
+/// doesn't store the network in the record — it's the IP prefix that matched
+/// during the tree traversal.
+fn compute_network(ip: IpAddr, prefix_len: usize) -> Option<GeoValue<'static>> {
+    let prefix = prefix_len.min(128) as u8;
+    let network = ipnetwork::IpNetwork::new(ip, prefix).ok()?;
+    Some(GeoValue::String(network.to_string()))
 }
 
 fn lookup_asn<'a>(asn: &'a Asn, props: &[String]) -> Option<GeoValue<'a>> {

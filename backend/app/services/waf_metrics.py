@@ -330,12 +330,16 @@ def prune_waf_log_file(max_lines: Optional[int] = None) -> int:
         kept = lines[-max_lines:]
         removed = len(lines) - len(kept)
 
-        # Atomic write: write to a temp file in the same directory, then rename.
-        dir_ = os.path.dirname(path) or "."
-        tmp_path = os.path.join(dir_, ".coraza-spoa.log.prune.tmp")
-        with open(tmp_path, "w", encoding="utf-8") as f:
+        # In-place truncation (NOT os.replace): preserves the inode so
+        # external file-tailing agents (e.g. Vector) can track the file
+        # across prune cycles without seeing a "new" file and re-reading
+        # kept lines as duplicates.
+        with open(path, "r+", encoding="utf-8") as f:
+            f.seek(0)
             f.writelines(kept)
-        os.replace(tmp_path, path)
+            f.truncate()
+            f.flush()
+            os.fsync(f.fileno())
 
         # Reset the sampler offset so the next sample run reads from the start
         # of the truncated file instead of seeking past the (now smaller) file.

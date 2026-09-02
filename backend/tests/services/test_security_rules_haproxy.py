@@ -980,3 +980,91 @@ def test_generate_global_section_lua_module(tmp_path, monkeypatch):
     assert "insecure-fork-wanted" in cfg
     # The combined loader file should have been written
     assert (tmp_path / "modules.lua").exists()
+
+
+# ---------------------------------------------------------------------------
+# LoggedField merge tests
+# ---------------------------------------------------------------------------
+
+class _FakeLoggedField:
+    """Minimal stand-in for a LoggedField ORM row (avoids DB setup)."""
+    def __init__(self, name, field, enabled=True, listener_id=None):
+        self.name = name
+        self.field = field
+        self.enabled = enabled
+        self.listener_id = listener_id
+
+
+def test_build_json_log_format_no_custom_fields():
+    """With no custom fields, _build_json_log_format produces the same output
+    as _default_json_log_format."""
+    default = haproxy._default_json_log_format(ja4_enabled=False)
+    built = haproxy._build_json_log_format(ja4_enabled=False, custom_fields=None)
+    assert default == built
+
+
+def test_build_json_log_format_custom_field_overrides_existing():
+    """A custom field with the same name as a default key overrides the
+    expression but preserves all other default fields."""
+    custom = [_FakeLoggedField(name="client", field="%[fc_pp]")]
+    fmt = haproxy._build_json_log_format(ja4_enabled=False, custom_fields=custom)
+    # The custom expression replaced the default
+    assert '"client":"%[fc_pp]"' in fmt
+    assert '"client":"%[src]"' not in fmt
+    # All other default fields are preserved
+    assert '"unique_id":"%ID"' in fmt
+    assert '"status":"%ST"' in fmt
+    assert '"method":"%HM"' in fmt
+    assert '"req_fp"' in fmt
+
+
+def test_build_json_log_format_custom_field_adds_new():
+    """A custom field with a new name is appended alongside defaults."""
+    custom = [_FakeLoggedField(name="custom_header", field="%[req.hdr(X-Custom)]")]
+    fmt = haproxy._build_json_log_format(ja4_enabled=False, custom_fields=custom)
+    assert '"custom_header":"%[req.hdr(X-Custom)]"' in fmt
+    # Defaults still present
+    assert '"unique_id":"%ID"' in fmt
+    assert '"client":"%[src]"' in fmt
+
+
+def test_build_json_log_format_bare_field_name_wrapped():
+    """A bare field name (no %[...]) is wrapped in %[...] and sanitized."""
+    custom = [_FakeLoggedField(name="src_port", field="cp")]
+    fmt = haproxy._build_json_log_format(ja4_enabled=False, custom_fields=custom)
+    assert '"src_port":"%[cp]"' in fmt
+
+
+def test_build_json_log_format_disabled_field_ignored():
+    """A disabled LoggedField is not included in the output."""
+    custom = [_FakeLoggedField(name="client", field="%[fc_pp]", enabled=False)]
+    fmt = haproxy._build_json_log_format(ja4_enabled=False, custom_fields=custom)
+    # Default client expression is preserved (override was disabled)
+    assert '"client":"%[src]"' in fmt
+
+
+def test_build_json_log_format_multiple_custom_fields():
+    """Multiple custom fields — some override, some add new."""
+    custom = [
+        _FakeLoggedField(name="status", field="%[sc_code]"),
+        _FakeLoggedField(name="extra_field", field="%[req.hdr(X-Trace-ID)]"),
+    ]
+    fmt = haproxy._build_json_log_format(ja4_enabled=False, custom_fields=custom)
+    assert '"status":"%[sc_code]"' in fmt
+    assert '"status":"%ST"' not in fmt
+    assert '"extra_field":"%[req.hdr(X-Trace-ID)]"' in fmt
+    assert '"unique_id":"%ID"' in fmt
+
+
+def test_build_json_log_format_output_is_valid_json_structure():
+    """The merged output must still be a valid HAProxy JSON log-format string
+    (single-quoted, braces, comma-separated key:value pairs)."""
+    custom = [_FakeLoggedField(name="custom", field="%[src]")]
+    fmt = haproxy._build_json_log_format(ja4_enabled=False, custom_fields=custom)
+    assert fmt.startswith("'{")
+    assert fmt.endswith("}'")
+    # No double commas or leading/trailing commas
+    inner = fmt[2:-2]
+    assert ",," not in inner
+    assert not inner.startswith(",")
+    assert not inner.endswith(",")

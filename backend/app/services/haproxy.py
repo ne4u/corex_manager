@@ -591,75 +591,78 @@ def _escape_lua_string(s: str) -> str:
     return s
 
 
-def _default_json_log_format(ja4_enabled: bool, page_protect_enabled: bool = False) -> str:
-    """Build the default JSON log-format string.
+def _default_json_log_fields(ja4_enabled: bool, page_protect_enabled: bool = False) -> dict:
+    """Build the default JSON log-format fields as an ordered dict.
+
+    Returns a dict mapping JSON key → HAProxy log-format expression.
 
     Includes request metadata, security-rule/rate-limit/WAF action vars, and
     enrichment fields (country, ASN, JA4, req_fp) when their backing resources
-    are available. The result is a single-quoted HAProxy log-format string
-    containing a JSON object.
+    are available.
     """
-    fields = [
-        '"ts":"%t"',
-        '"client":"%[src]"',
-        '"client_port":"%cp"',
-        '"frontend":"%f"',
-        '"backend":"%b"',
-        '"host":"%[var(txn.host)]"',
-        '"method":"%HM"',
-        '"path":"%HP"',
-        '"query":"%HQ"',
-        '"user_agent":"%[capture.req.hdr(1),json]"',
-        '"status":"%ST"',
-        '"status_source":"%[var(txn.status_source)]"',
-        '"bytes_out":"%B"',
-        '"rt":"%Tr"',
-        '"ct":"%Tc"',
-        '"tt":"%Tt"',
-        '"termination":"%ts"',
-        '"action":"%[var(txn.action)]"',
-        '"sec_rule":"%[var(txn.sec.rule)]"',
-        '"risk_score":"%[var(txn.risk.score)]"',
-        '"risk_rules_hit":"%[var(txn.risk.rules_hit)]"',
-        '"risk_rules_hit_count":"%[var(txn.risk.rules_hit_count)]"',
-        '"risk_hit_density":"%[var(txn.risk.hit_density)]"',
-        '"rl_name":"%[var(txn.ratelimit.name)]"',
-        '"waf_status":"%[var(txn.coraza.status)]"',
-        '"waf_anomaly_score":"%[var(txn.coraza.anomaly_score)]"',
-        '"waf_rules_hit":"%[var(txn.coraza.rules_hit)]"',
-        '"waf_rule_ids":"%[var(txn.coraza.rule_ids)]"',
-        '"server":"%s"',
-        '"unique_id":"%ID"',
-    ]
+    fields = {
+        "ts": "%t",
+        "client": "%[src]",
+        "client_port": "%cp",
+        "frontend": "%f",
+        "backend": "%b",
+        "host": "%[var(txn.host)]",
+        "method": "%HM",
+        "path": "%HP",
+        "query": "%HQ",
+        "user_agent": "%[capture.req.hdr(1),json]",
+        "status": "%ST",
+        "status_source": "%[var(txn.status_source)]",
+        "bytes_out": "%B",
+        "rt": "%Tr",
+        "ct": "%Tc",
+        "tt": "%Tt",
+        "termination": "%ts",
+        "action": "%[var(txn.action)]",
+        "sec_rule": "%[var(txn.sec.rule)]",
+        "risk_score": "%[var(txn.risk.score)]",
+        "risk_rules_hit": "%[var(txn.risk.rules_hit)]",
+        "risk_rules_hit_count": "%[var(txn.risk.rules_hit_count)]",
+        "risk_hit_density": "%[var(txn.risk.hit_density)]",
+        "rl_name": "%[var(txn.ratelimit.name)]",
+        "waf_status": "%[var(txn.coraza.status)]",
+        "waf_anomaly_score": "%[var(txn.coraza.anomaly_score)]",
+        "waf_rules_hit": "%[var(txn.coraza.rules_hit)]",
+        "waf_rule_ids": "%[var(txn.coraza.rule_ids)]",
+        "server": "%s",
+        "unique_id": "%ID",
+    }
 
     # GeoIP enrichment — three tiers:
     #   1. Rust Lua module (primary) — covers all fields, no geoip2 build dep
     #   2. Native geoip2 converter — when HAProxy is built with geoip2 support
     #   3. map_ip fallback files — legacy last resort
     if _geoip_lua_module_available():
-        fields.append('"country":"%[src,lua.geoip2-lookup-city(\\"country\\",\\"iso_code\\")]"')
-        fields.append('"asn":"%[src,lua.geoip2-lookup-asn(\\"autonomous_system_number\\")]"')
-        fields.append('"city":"%[src,lua.geoip2-lookup-city(\\"city\\",\\"names\\",\\"en\\")]"')
+        fields["country"] = '%[src,lua.geoip2-lookup-city(\\"country\\",\\"iso_code\\")]'
+        fields["asn"] = '%[src,lua.geoip2-lookup-asn(\\"autonomous_system_number\\")]'
+        fields["asn_org"] = '%[src,lua.geoip2-lookup-asn(\\"autonomous_system_organization\\")]'
+        fields["asn_network"] = '%[src,lua.geoip2-lookup-asn(\\"network\\")]'
+        fields["city"] = '%[src,lua.geoip2-lookup-city(\\"city\\",\\"names\\",\\"en\\")]'
     elif _haproxy_supports_geoip2() and os.path.exists(settings.GEOIP_DB_PATH):
         geo_db = os.path.abspath(settings.GEOIP_DB_PATH)
-        fields.append(f'"country":"%[src,geoip2({geo_db},country.iso_code)]"')
+        fields["country"] = f"%[src,geoip2({geo_db},country.iso_code)]"
         if os.path.exists(settings.ASN_DB_PATH):
             asn_db = os.path.abspath(settings.ASN_DB_PATH)
-            fields.append(f'"asn":"%[src,geoip2({asn_db},autonomous_system_number)]"')
+            fields["asn"] = f"%[src,geoip2({asn_db},autonomous_system_number)]"
     elif not _haproxy_supports_geoip2() and os.path.exists(settings.GEOIP_COUNTRY_MAP_PATH):
         country_map = os.path.abspath(settings.GEOIP_COUNTRY_MAP_PATH)
-        fields.append(f'"country":"%[src,map_ip({country_map})]"')
+        fields["country"] = f"%[src,map_ip({country_map})]"
         if os.path.exists(settings.GEOIP_ASN_MAP_PATH):
             asn_map = os.path.abspath(settings.GEOIP_ASN_MAP_PATH)
-            fields.append(f'"asn":"%[src,map_ip({asn_map})]"')
+            fields["asn"] = f"%[src,map_ip({asn_map})]"
 
     # JA4 — only if the JA4 Lua script is loaded (ja4_enabled)
     if ja4_enabled:
-        fields.append('"ja4":"%[lua.ja4_fp]"')
+        fields["ja4"] = "%[lua.ja4_fp]"
 
     # req_fp — always safe to reference. var(txn.req_fp) returns empty when
     # the per-frontend http-response lua.req_fp action isn't emitted.
-    fields.append('"req_fp":"%[var(txn.req_fp)]"')
+    fields["req_fp"] = "%[var(txn.req_fp)]"
 
     # Page Protect — CSP report body captured in txn.csp_report for report POSTs.
     # Empty for normal requests. The sampler filters for non-empty values.
@@ -669,10 +672,74 @@ def _default_json_log_format(ja4_enabled: bool, page_protect_enabled: bool = Fal
     # valid JSON. When empty, the json converter outputs "-" inside our quotes,
     # producing "csp_report":"-" which is valid JSON (treated as "no report").
     if page_protect_enabled:
-        fields.append('"csp_report":"%[var(txn.csp_report),json]"')
-        fields.append('"asset_beacon":"%[var(txn.asset_beacon),json]"')
+        fields["csp_report"] = "%[var(txn.csp_report),json]"
+        fields["asset_beacon"] = "%[var(txn.asset_beacon),json]"
 
-    return "'{" + ",".join(fields) + "}'"
+    return fields
+
+
+def _serialize_json_log_format(fields: dict) -> str:
+    """Serialize a dict of JSON key → HAProxy expression into a HAProxy
+    log-format string that emits a JSON object.
+
+    Escapes double-quotes and backslashes in keys so they can't break the
+    emitted JSON structure.
+    """
+    parts = []
+    for key, expr in fields.items():
+        safe_key = key.replace("\\", "\\\\").replace('"', '\\"')
+        parts.append(f'"{safe_key}":"{expr}"')
+    return "'{" + ",".join(parts) + "}'"
+
+
+def _default_json_log_format(ja4_enabled: bool, page_protect_enabled: bool = False) -> str:
+    """Build the default JSON log-format string (no custom field overrides).
+
+    Thin wrapper around _default_json_log_fields + _serialize_json_log_format
+    for backwards compatibility with callers and tests that expect a string.
+    """
+    return _serialize_json_log_format(
+        _default_json_log_fields(ja4_enabled, page_protect_enabled)
+    )
+
+
+def _build_json_log_format(
+    ja4_enabled: bool,
+    page_protect_enabled: bool = False,
+    custom_fields: Optional[List[LoggedField]] = None,
+) -> str:
+    """Build a JSON log-format string, merging default fields with custom
+    LoggedField overrides.
+
+    Custom fields are merged into the default field set:
+      - If a custom field's name matches an existing default key, its
+        expression overrides the default (e.g., change "client" to use a
+        different sample fetch).
+      - If a custom field's name is new, it is appended to the JSON object.
+
+    This preserves all default fields (unique_id, ja4, req_fp, asn_org, etc.)
+    so the logging pipeline (Vector → OpenSearch) always receives the full
+    structured log line, even when a user customizes individual fields.
+    """
+    fields = _default_json_log_fields(ja4_enabled, page_protect_enabled)
+
+    for f in (custom_fields or []):
+        if not f.enabled:
+            continue
+        # Sanitize the JSON key — strip quotes/backslashes/control chars
+        key = re.sub(r'["\\\r\n]', "", f.name).strip()
+        if not key:
+            continue
+        # Sanitize the expression — wrap bare field names in %[...], pass
+        # through full %[...] expressions, and sanitize free-form tokens
+        expr = f.field.strip()
+        if not expr:
+            continue
+        if not expr.startswith("%"):
+            expr = f"%[{_safe_token(expr)}]"
+        fields[key] = expr
+
+    return _serialize_json_log_format(fields)
 
 
 def _default_nbthread() -> int:
@@ -1827,25 +1894,23 @@ def generate_frontend(
                 lines.append(f"    log {target} len {log_max_len} {facility} {level}")
 
     # Log format: TCP listeners emit option tcplog (overrides the defaults
-    # log-format with TCP-specific fields). HTTP listeners inherit the
-    # defaults log-format (the JSON default or custom override).
+    # log-format with TCP-specific fields). HTTP listeners get a per-frontend
+    # log-format (not inherited from defaults) because HAProxy 3.4+ rejects
+    # req.hdr sample fetches in the defaults log-format.
+    #
+    # LoggedField rows for this listener (or global, listener_id=None) are
+    # MERGED into the default JSON log-format — custom fields override
+    # matching keys or add new ones, but all default fields (unique_id, ja4,
+    # req_fp, asn_org, etc.) are preserved so the logging pipeline always
+    # receives structured JSON.
     if effective_mode == "tcp":
         lines.append("    option tcplog")
     else:
-        # HTTP frontends get a per-frontend log-format (not inherited from
-        # defaults) because HAProxy 3.4+ rejects req.hdr sample fetches in
-        # the defaults log-format. If any LoggedField rows are enabled,
-        # build a custom log-format from them (user override). Otherwise,
-        # emit the structured JSON default.
-        custom_fields = [f for f in (logged_fields or []) if f.enabled]
-        if custom_fields:
-            log_format = " ".join(
-                f"%{{{_safe_token(f.field)}}}" if not f.field.startswith("%") else f.field
-                for f in custom_fields
-            )
-            lines.append(f"    log-format {log_format}")
-        else:
-            lines.append(f"    log-format {_default_json_log_format(ja4_enabled, page_protect_enabled=page_protect_enabled)}")
+        listener_fields = [
+            f for f in (logged_fields or [])
+            if f.enabled and (f.listener_id is None or f.listener_id == listener.id)
+        ]
+        lines.append(f"    log-format {_build_json_log_format(ja4_enabled, page_protect_enabled=page_protect_enabled, custom_fields=listener_fields)}")
 
     # Initialized here so it's always defined (TCP listeners skip the HTTP
     # block below but the content-switching section at the end references it).
