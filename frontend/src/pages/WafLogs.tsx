@@ -127,7 +127,7 @@ export default function WafLogs() {
   }, [events, search])
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col flex-1 min-h-0 space-y-4">
       <div className="flex items-center justify-end">
         <div className="flex items-center gap-2">
           <select
@@ -167,7 +167,7 @@ export default function WafLogs() {
         <span className="text-xs text-slate-500">{t('pages:wafLogs.eventsCount', { filtered: parsed.length, total: events.length })}</span>
       </div>
 
-      <div className="card overflow-x-auto max-h-[70vh] !p-0">
+      <div className="card overflow-auto flex-1 min-h-0 !p-0">
         <table className="w-full text-sm text-start">
           <thead className="text-slate-400 border-b border-slate-800 sticky top-0 bg-slate-900 z-10">
             <tr>
@@ -178,7 +178,6 @@ export default function WafLogs() {
               <th className="px-4 py-3">{t('pages:wafLogs.tableHeaders.ruleId')}</th>
               <th className="px-4 py-3">{t('pages:wafLogs.tableHeaders.severity')}</th>
               <th className="px-4 py-3">{t('pages:wafLogs.tableHeaders.client')}</th>
-              <th className="px-4 py-3">{t('pages:wafLogs.tableHeaders.uri')}</th>
               <th className="px-4 py-3">{t('pages:wafLogs.tableHeaders.message')}</th>
             </tr>
           </thead>
@@ -195,7 +194,7 @@ export default function WafLogs() {
                       <ChevronRight className={`w-4 h-4 text-slate-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap">{formatLogTimestamp(row.time || row.timestamp)}</td>
-                    <td className="px-4 py-2 max-w-xs truncate font-mono" title={row.unique_id}>
+                    <td className="px-4 py-2 max-w-xs truncate font-mono text-xs" title={row.unique_id}>
                       {row.unique_id ? (
                         <button onClick={(e) => handleUniqueIdClick(e, i, row.unique_id!)} className="text-primary hover:underline cursor-pointer">
                           {row.unique_id}
@@ -212,16 +211,13 @@ export default function WafLogs() {
                         </button>
                       ) : '-'}
                     </td>
-                    <td className="px-4 py-2 max-w-xs truncate" title={row.uri || row.path}>
-                      {row.uri || row.path || '-'}
-                    </td>
                     <td className="px-4 py-2 max-w-md truncate" title={row.msg || row.message || row.raw}>
                       {row.msg || row.message || row.raw || '-'}
                     </td>
                   </tr>
                   {isExpanded && (
                     <tr className="bg-slate-900/60">
-                      <td colSpan={9} className="px-6 py-4">
+                      <td colSpan={8} className="px-6 py-4">
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                           <div>
                             <span className="text-slate-400 text-xs">{t('pages:wafLogs.expandedFields.fullTime')}</span>
@@ -270,7 +266,7 @@ export default function WafLogs() {
             })}
             {parsed.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-4 py-6 text-slate-500">{events.length === 0 ? t('pages:wafLogs.noWafEvents') : t('pages:wafLogs.noEventsMatchFilter')}</td>
+                <td colSpan={8} className="px-4 py-6 text-slate-500">{events.length === 0 ? t('pages:wafLogs.noWafEvents') : t('pages:wafLogs.noEventsMatchFilter')}</td>
               </tr>
             )}
           </tbody>

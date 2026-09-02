@@ -295,7 +295,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </aside>
       <Toaster />
       <ProfileDrawer />
-      <main className="flex-1 overflow-y-auto p-6 lg:ms-0">
+      <main className="flex-1 overflow-y-auto p-6 pe-12 lg:ms-0">
         <div className="lg:hidden flex items-center gap-3 mb-4">
           <button onClick={() => setOpen(true)} className="p-2 rounded-lg bg-slate-900 border border-slate-800">
             <Menu className="w-5 h-5" />

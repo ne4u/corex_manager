@@ -627,15 +627,13 @@ def _default_json_log_format(ja4_enabled: bool, page_protect_enabled: bool = Fal
         '"ct":"%Tc"',
         '"tt":"%Tt"',
         '"termination":"%ts"',
-        '"sec_action":"%[var(txn.sec.action)]"',
+        '"action":"%[var(txn.action)]"',
         '"sec_rule":"%[var(txn.sec.rule)]"',
         '"risk_score":"%[var(txn.risk.score)]"',
         '"risk_rules_hit":"%[var(txn.risk.rules_hit)]"',
         '"risk_rules_hit_count":"%[var(txn.risk.rules_hit_count)]"',
         '"risk_hit_density":"%[var(txn.risk.hit_density)]"',
-        '"rl_action":"%[var(txn.ratelimit.action)]"',
         '"rl_name":"%[var(txn.ratelimit.name)]"',
-        '"waf_action":"%[var(txn.coraza.action)]"',
         '"waf_status":"%[var(txn.coraza.status)]"',
         '"waf_anomaly_score":"%[var(txn.coraza.anomaly_score)]"',
         '"waf_rules_hit":"%[var(txn.coraza.rules_hit)]"',
@@ -2367,6 +2365,7 @@ def generate_frontend(
                     lines.append(f"    http-request set-log-level silent if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}")
                 if rl_log:
                     lines.append(f"    http-request set-var(txn.ratelimit.action) str(blocked) if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}")
+                    lines.append(f"    http-request set-var(txn.action) str(blocked) if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }} !{{ var(txn.sec.action) -m found }}")
                     lines.append(f"    http-request set-var(txn.ratelimit.name) str({rname}) if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}")
                 lines.append(f"    http-request set-var(txn.rate_limit_window) str({rl_window})")
                 lines.append(f"    http-request set-var(txn.rate_limit_duration) str({rl_duration})")
@@ -2385,6 +2384,7 @@ def generate_frontend(
                     lines.append(f"    http-request set-log-level silent if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}")
                 if rl_log:
                     lines.append(f"    http-request set-var(txn.ratelimit.action) str(blocked) if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}")
+                    lines.append(f"    http-request set-var(txn.action) str(blocked) if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }} !{{ var(txn.sec.action) -m found }}")
                     lines.append(f"    http-request set-var(txn.ratelimit.name) str({rname}) if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}")
                 lines.append(f"    http-request set-var(txn.rate_limit_window) str({rl_window})")
                 lines.append(f"    http-request set-var(txn.rate_limit_duration) str({rl_duration})")
@@ -2410,6 +2410,7 @@ def generate_frontend(
                     lines.append(f"    http-request set-log-level silent if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}")
                 if rl_log:
                     lines.append(f"    http-request set-var(txn.ratelimit.action) str(blocked) if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}")
+                    lines.append(f"    http-request set-var(txn.action) str(blocked) if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }} !{{ var(txn.sec.action) -m found }}")
                     lines.append(f"    http-request set-var(txn.ratelimit.name) str({rname}) if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}")
                 lines.append(f"    http-request set-var(txn.rate_limit_window) str({rl_window})")
                 lines.append(f"    http-request set-var(txn.rate_limit_duration) str({rl_duration})")
@@ -2438,6 +2439,9 @@ def generate_frontend(
             # txn.coraza.action is set by the SPOE filter; txn.waf.action mirrors it
             # so the unified log-format can reference a stable var name.
             lines.append("    http-request set-var(txn.waf.action) var(txn.coraza.action) if !{ var(txn.sec.skip_waf) -m found }")
+            # Combined action var: WAF overwrites RL (WAF > RL priority) but only
+            # if a security rule didn't already set txn.action (Sec > WAF > RL).
+            lines.append("    http-request set-var(txn.action) var(txn.coraza.action) if { var(txn.coraza.action) -m found } !{ var(txn.sec.skip_waf) -m found } !{ var(txn.sec.action) -m found }")
 
             if action == "allow":
                 lines.append("    http-request allow if { var(txn.coraza.action) -m str allow }")

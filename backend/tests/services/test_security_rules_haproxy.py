@@ -70,6 +70,8 @@ def test_emit_security_rules_log(db):
     emit_security_rules(listener, db, lines)
     joined = "\n".join(lines)
     assert "txn.sec.action" in joined
+    assert "txn.action" in joined
+    assert 'set-var(txn.action) str(block)' in joined
     assert "txn.sec.rule" in joined
     assert "log-rule" in joined
     assert "X-Security-Log" not in joined
@@ -91,6 +93,7 @@ def test_emit_security_rules_log_false(db):
     emit_security_rules(listener, db, lines)
     joined = "\n".join(lines)
     assert "txn.sec.action" not in joined
+    assert "txn.action" not in joined
     assert "txn.sec.rule" not in joined
 
 
@@ -712,6 +715,17 @@ def test_default_json_log_format_includes_user_agent():
     """
     fmt = haproxy._default_json_log_format(ja4_enabled=False)
     assert '"user_agent":"%[capture.req.hdr(1),json]"' in fmt
+
+
+def test_default_json_log_format_combined_action_field():
+    """The default JSON log-format should use a single combined 'action' field
+    instead of separate sec_action/rl_action/waf_action fields.
+    """
+    fmt = haproxy._default_json_log_format(ja4_enabled=False)
+    assert '"action":"%[var(txn.action)]"' in fmt
+    assert "sec_action" not in fmt
+    assert "rl_action" not in fmt
+    assert "waf_action" not in fmt
 
 
 def test_global_options_change_detected_by_config_status(db, monkeypatch, tmp_path):

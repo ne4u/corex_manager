@@ -313,7 +313,7 @@ export default function Waf() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col h-full space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold flex items-center gap-2"><Shield className="h-5 w-5 text-primary" /> {t('waf.title')}</h2>
         <div className="flex items-center gap-2">

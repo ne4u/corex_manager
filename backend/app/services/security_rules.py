@@ -760,6 +760,7 @@ def _emit_request_rule(rule: Any, condition: str, lines: List[str], block_status
     if getattr(rule, "log", True):
         rule_name = _safe_log_value(rule.name)
         lines.append(f"    http-request set-var(txn.sec.action) str({rule.action}) if {guarded_cond}")
+        lines.append(f"    http-request set-var(txn.action) str({rule.action}) if {guarded_cond}")
         lines.append(f"    http-request set-var(txn.sec.rule) str({rule_name}) if {guarded_cond}")
 
     if rule.action == "block":
@@ -838,6 +839,7 @@ def _emit_response_rule(rule: Any, condition: str, lines: List[str], block_statu
     if getattr(rule, "log", True):
         rule_name = _safe_log_value(rule.name)
         lines.append(f"    http-response set-var(txn.sec.action) str({rule.action}) if {condition}")
+        lines.append(f"    http-response set-var(txn.action) str({rule.action}) if {condition}")
         lines.append(f"    http-response set-var(txn.sec.rule) str({rule_name}) if {condition}")
 
     if rule.action == "block":

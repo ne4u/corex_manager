@@ -62,13 +62,16 @@ export default function ProfileDrawer() {
 
   return (
     <>
-      {/* Floating Action Button — lower-right in LTR, lower-left in RTL */}
+      {/* Vertical folder-tab handle — centered on the end edge (right in LTR, left in RTL) */}
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 end-6 z-40 w-12 h-12 rounded-full bg-primary text-white shadow-lg hover:opacity-90 transition-opacity flex items-center justify-center"
+        className="fixed bottom-6 end-0 z-40 h-36 w-10 rounded-s-lg bg-primary text-white shadow-lg hover:opacity-90 transition-opacity flex flex-col items-center justify-center gap-2"
         aria-label={t('profile:tabs.profile')}
       >
-        <UserCircle className="w-6 h-6" />
+        <UserCircle className="w-5 h-5 shrink-0" />
+        <span className="text-xs font-medium tracking-wide [writing-mode:vertical-rl] rotate-180">
+          {t('profile:tabs.profile')}
+        </span>
       </button>
 
       {/* Backdrop */}

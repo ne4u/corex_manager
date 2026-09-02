@@ -250,7 +250,7 @@ export default function Logs() {
   }, [asnPopover, uidPopover, reqFpPopover, ja4Popover])
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col h-full space-y-6">
       {/* Tab switcher */}
       <Tabs
         tabs={[
@@ -354,7 +354,7 @@ export default function Logs() {
             </span>
           </div>
 
-          <div className="card overflow-x-auto max-h-[70vh] !p-0">
+          <div className="card overflow-auto flex-1 min-h-0 !p-0">
             <table className="w-full text-sm text-start">
               <thead className="text-slate-400 border-b border-slate-800 sticky top-0 bg-slate-900 z-10">
                 <tr>
@@ -500,8 +500,8 @@ export default function Logs() {
                                 </code>
                               </div>
                               <div>
-                                <span className="text-slate-400 text-xs">{t('pages:logs.expandedFields.secAction')}</span>
-                                <code className={`block text-xs mt-1 font-mono break-all ${actionColor(p.sec_action)}`}>{p.sec_action || '-'}</code>
+                                <span className="text-slate-400 text-xs">{t('pages:logs.expandedFields.action')}</span>
+                                <code className={`block text-xs mt-1 font-mono break-all ${actionColor(p.action || p.sec_action || p.waf_action || p.rl_action)}`}>{p.action || p.sec_action || p.waf_action || p.rl_action || '-'}</code>
                               </div>
                               <div>
                                 <span className="text-slate-400 text-xs">{t('pages:logs.expandedFields.secRule')}</span>
@@ -524,16 +524,8 @@ export default function Logs() {
                                 <code className="block text-xs mt-1 font-mono break-all">{p.risk_rules_hit && p.risk_rules_hit !== '-' ? p.risk_rules_hit : '-'}</code>
                               </div>
                               <div>
-                                <span className="text-slate-400 text-xs">{t('pages:logs.expandedFields.rlAction')}</span>
-                                <code className={`block text-xs mt-1 font-mono break-all ${actionColor(p.rl_action)}`}>{p.rl_action || '-'}</code>
-                              </div>
-                              <div>
                                 <span className="text-slate-400 text-xs">{t('pages:logs.expandedFields.rlName')}</span>
                                 <code className="block text-xs mt-1 font-mono break-all">{p.rl_name || '-'}</code>
-                              </div>
-                              <div>
-                                <span className="text-slate-400 text-xs">{t('pages:logs.expandedFields.wafAction')}</span>
-                                <code className={`block text-xs mt-1 font-mono break-all ${actionColor(p.waf_action)}`}>{p.waf_action || '-'}</code>
                               </div>
                               <div>
                                 <span className="text-slate-400 text-xs">{t('pages:logs.expandedFields.clientPort')}</span>

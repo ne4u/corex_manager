@@ -58,6 +58,17 @@ def test_generate_config_waf_action_block(db):
     assert 'http-response deny deny_status 403 default-errorfiles if { var(txn.coraza.action) -m str deny } !{ var(txn.sec.skip_waf) -m found }' in cfg
 
 
+def test_generate_config_waf_emits_combined_action_var(db):
+    """WAF config should set txn.action (combined) alongside txn.waf.action."""
+    backend = make_backend(db)
+    listener = make_listener(db, backend=backend)
+    make_server(db, backend.id)
+    make_waf_rule(db, name="waf", listener_id=listener.id, action="block", status_code=403)
+    cfg = haproxy.generate_config(db)
+    assert "set-var(txn.waf.action) var(txn.coraza.action)" in cfg
+    assert "set-var(txn.action) var(txn.coraza.action)" in cfg
+
+
 def test_generate_config_waf_drop_uses_deny_not_silent_drop(db):
     """Coraza 'drop' action should use deny (logged), not silent-drop (unlogged)."""
     backend = make_backend(db)
@@ -635,6 +646,18 @@ def test_rate_limit_basic_src_uses_sc0(db):
     assert "sc_http_req_rate(0) gt 100" in cfg
     assert "track-sc1" not in cfg
     assert "backend rl_rate_" not in cfg
+
+
+def test_rate_limit_emits_combined_action_var(db):
+    """Rate limit config should set txn.action (combined) alongside txn.ratelimit.action."""
+    backend = make_backend(db)
+    listener = make_listener(db, backend=backend)
+    make_server(db, backend.id)
+    make_rate_limit(db, listener_id=listener.id, limit_type="basic",
+                    events=100, window_seconds=60)
+    cfg = haproxy.generate_config(db)
+    assert "set-var(txn.ratelimit.action) str(blocked)" in cfg
+    assert "set-var(txn.action) str(blocked)" in cfg
 
 
 def test_rate_limit_advanced_non_src_header(db):
