@@ -1,0 +1,37 @@
+{{- if .Values.haproxyData.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: haproxy-data
+  namespace: {{ include "corex-manager.namespace" . }}
+  labels:
+    {{- include "corex-manager.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.haproxyData.persistence.accessMode }}
+  {{- if .Values.haproxyData.persistence.storageClass }}
+  storageClassName: {{ .Values.haproxyData.persistence.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.haproxyData.persistence.size }}
+{{- end }}
+---
+{{- if .Values.certs.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: certs
+  namespace: {{ include "corex-manager.namespace" . }}
+  labels:
+    {{- include "corex-manager.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.certs.persistence.accessMode }}
+  {{- if .Values.certs.persistence.storageClass }}
+  storageClassName: {{ .Values.certs.persistence.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.certs.persistence.size }}
+{{- end }}

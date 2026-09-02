@@ -1,0 +1,199 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Release.Name }}-corex
+  namespace: {{ include "corex-manager.namespace" . }}
+  labels:
+    {{- include "corex-manager.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ .Release.Name }}-corex
+  replicas: {{ .Values.corexPod.replicas }}
+  selector:
+    matchLabels:
+      {{- include "corex-manager.podSelectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "corex-manager.podSelectorLabels" . | nindent 8 }}
+    spec:
+      shareProcessNamespace: {{ .Values.corexPod.shareProcessNamespace }}
+      securityContext:
+        sysctls:
+          {{- range $sysctl := .Values.corexPod.corex.sysctls }}
+          - name: {{ $sysctl | splitList "=" | first }}
+            value: {{ $sysctl | splitList "=" | last | quote }}
+          {{- end }}
+
+      # Downward API — expose pod name and namespace to the api container
+      # so the KubernetesRuntime can target exec/logs at this pod.
+      volumes:
+        - name: haproxy-data
+          {{- if .Values.haproxyData.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: haproxy-data
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: certs
+          {{- if .Values.certs.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: certs
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: coraza-log
+          emptyDir: {}
+        {{- if .Values.diskCache.enabled }}
+        - name: varnish-data
+          emptyDir: {}
+        {{- end }}
+
+      containers:
+        # ── HAProxy (corex) ──────────────────────────────────────────
+        - name: corex
+          image: {{ include "corex-manager.image" .Values.image.corex }}
+          imagePullPolicy: {{ .Values.image.corex.pullPolicy }}
+          securityContext:
+            runAsUser: {{ .Values.corexPod.corex.runAsUser }}
+            capabilities:
+              add: {{ toYaml .Values.corexPod.corex.capabilities.add | nindent 16 }}
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+            - name: https
+              containerPort: 443
+              protocol: TCP
+            - name: dataplane
+              containerPort: 5555
+              protocol: TCP
+            - name: haproxy-stats
+              containerPort: 8404
+              protocol: TCP
+          volumeMounts:
+            - name: haproxy-data
+              mountPath: /app/data
+            - name: certs
+              mountPath: /app/certs
+          resources:
+            {{- toYaml .Values.corexPod.corex.resources | nindent 12 }}
+
+        # ── API (backend) ────────────────────────────────────────────
+        - name: api
+          image: {{ include "corex-manager.image" .Values.image.api }}
+          imagePullPolicy: {{ .Values.image.api.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: {{ .Release.Name }}-config
+            - secretRef:
+                name: {{ .Values.secrets.existingSecret | default (printf "%s-secrets" .Release.Name) }}
+          env:
+            - name: COREX_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: COREX_POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          ports:
+            - name: api-http
+              containerPort: 8000
+              protocol: TCP
+          volumeMounts:
+            - name: haproxy-data
+              mountPath: /app/data
+            - name: certs
+              mountPath: /app/certs
+            - name: coraza-log
+              mountPath: /app/data
+              subPath: coraza-spoa.log
+          resources:
+            {{- toYaml .Values.corexPod.api.resources | nindent 12 }}
+
+        # ── Coraza SPOA ──────────────────────────────────────────────
+        - name: coraza-spoa
+          image: {{ include "corex-manager.image" .Values.image.corex }}
+          imagePullPolicy: {{ .Values.image.corex.pullPolicy }}
+          command: ["/usr/local/bin/coraza-spoa"]
+          args: ["-config", "/app/data/coraza.cfg"]
+          env:
+            - name: CORAZA_SPOA_LOG_PATH
+              value: /app/data/coraza-spoa.log
+          volumeMounts:
+            - name: haproxy-data
+              mountPath: /app/data
+          resources:
+            {{- toYaml .Values.corexPod.coraza.resources | nindent 12 }}
+
+        {{- if .Values.diskCache.enabled }}
+        # ── Varnish (disk cache) ─────────────────────────────────────
+        - name: varnish
+          image: varnish:7.6-alpine
+          command:
+            - sh
+            - -c
+            - |
+              varnishd -F -a :6081 -T :6082 \
+                -f /app/data/varnish/default.vcl \
+                -s file,/varnish/varnish_storage.bin,{{ .Values.corexPod.varnish.storageSize }} \
+                -p feature=+http2 \
+                -p vcc_allow_inline_c=on \
+                -p vcc_unsafe_path=on
+          ports:
+            - name: varnish
+              containerPort: 6081
+              protocol: TCP
+            - name: varnish-admin
+              containerPort: 6082
+              protocol: TCP
+          volumeMounts:
+            - name: haproxy-data
+              mountPath: /app/data
+            - name: varnish-data
+              mountPath: /varnish
+          resources:
+            {{- toYaml .Values.corexPod.varnish.resources | nindent 12 }}
+        {{- end }}
+
+        {{- if .Values.mcpGateway.enabled }}
+        # ── MCP Gateway ──────────────────────────────────────────────
+        - name: mcp-gateway
+          image: {{ include "corex-manager.image" .Values.image.mcpGateway }}
+          imagePullPolicy: {{ .Values.image.mcpGateway.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: {{ .Release.Name }}-config
+            - secretRef:
+                name: {{ .Values.secrets.existingSecret | default (printf "%s-secrets" .Release.Name) }}
+          ports:
+            - name: mcp-gateway
+              containerPort: 8081
+              protocol: TCP
+          volumeMounts:
+            - name: haproxy-data
+              mountPath: /app/data
+          resources:
+            {{- toYaml .Values.mcpGateway.resources | nindent 12 }}
+        {{- end }}
+
+        {{- if .Values.mcpServer.enabled }}
+        # ── MCP Server ───────────────────────────────────────────────
+        - name: mcp-server
+          image: {{ include "corex-manager.image" .Values.image.mcpServer }}
+          imagePullPolicy: {{ .Values.image.mcpServer.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: {{ .Release.Name }}-config
+            - secretRef:
+                name: {{ .Values.secrets.existingSecret | default (printf "%s-secrets" .Release.Name) }}
+          ports:
+            - name: mcp-server
+              containerPort: 8082
+              protocol: TCP
+          volumeMounts:
+            - name: haproxy-data
+              mountPath: /app/data
+          resources:
+            {{- toYaml .Values.mcpServer.resources | nindent 12 }}
+        {{- end }}

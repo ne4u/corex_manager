@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+  namespace: {{ include "corex-manager.namespace" . }}
+  labels:
+    {{- include "corex-manager.labels" . | nindent 4 }}
+data:
+  {{- range $key, $val := .Values.env }}
+  {{ $key }}: {{ $val | quote }}
+  {{- end }}
+  COREX_RUNTIME: "kubernetes"
+  HAPROXY_CONTAINER_NAME: "corex"
+  VARNISH_CONTAINER_NAME: "varnish"
+  CORAZA_SPOA_HOST: "127.0.0.1"
+  VARNISH_PORT: "6081"
+  DATAPLANE_API_URL: "https://127.0.0.1:5555/v3"
+  ACME_CHALLENGE_BACKEND_HOST: "127.0.0.1"
+  ACME_CHALLENGE_BACKEND_PORT: "80"
+  MCP_GATEWAY_INTERNAL_HOST: "{{ if .Values.mcpGateway.enabled }}127.0.0.1{{ end }}"
+  MCP_SERVER_INTERNAL_HOST: "{{ if .Values.mcpServer.enabled }}127.0.0.1{{ end }}"

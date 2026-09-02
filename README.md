@@ -124,14 +124,21 @@ cd frontend && npm test        # frontend
 ├── mcp-gateway/        # multi-tenant MCP gateway
 ├── shared/             # code shared between backend and gateway
 ├── deploy.py           # selective-rebuild deploy script (see deploy.md)
-└── docker-compose.yml
+├── docker-compose.yml
+└── k8s/                # Helm chart for Kubernetes deployment (see k8s/README.md)
 ```
 
 ## Deployment
 
-See [deploy.md](deploy.md) for deploying to a remote Docker host with
-selective service rebuilds, and [SECURITY.md](SECURITY.md) for the production
-hardening checklist.
+**Docker Compose** (default): See [deploy.md](deploy.md) for deploying to a
+remote Docker host with selective service rebuilds, and
+[SECURITY.md](SECURITY.md) for the production hardening checklist.
+
+**Kubernetes**: See [k8s/README.md](k8s/README.md) for deploying via the Helm
+chart with in-cluster or external PostgreSQL/Valkey. The `deploy.py` script
+supports `--target k8s-cluster` (local cluster) and `--target k8s-remote`
+(remote cluster via SSH) with the same selective-rebuild change detection as
+the Docker Compose flow.
 
 ## License
 

@@ -1,0 +1,253 @@
+# coreX Manager Helm Chart Values
+# Default values for a self-contained in-cluster deployment.
+# Override with -f values.yaml or --set key=value.
+
+# -- Global namespace override (defaults to .Release.Namespace)
+namespaceOverride: ""
+
+# -- Image references. For local dev, build the Dockerfiles and load into
+# kind/minikube, then set pullPolicy: Never. For prod, push to a registry.
+image:
+  api:
+    repository: corex-api
+    tag: latest
+    pullPolicy: IfNotPresent
+  corex:
+    repository: corex-corex
+    tag: latest
+    pullPolicy: IfNotPresent
+  frontend:
+    repository: corex-frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+  mcpGateway:
+    repository: corex-mcp-gateway
+    tag: latest
+    pullPolicy: IfNotPresent
+  mcpServer:
+    repository: corex-mcp-server
+    tag: latest
+    pullPolicy: IfNotPresent
+
+# -- The sidecar Pod (api + haproxy + coraza + varnish)
+corexPod:
+  # -- replicas (HAProxy is stateful; keep 1 unless you have a multi-node plan)
+  replicas: 1
+  # -- shareProcessNamespace allows the api container to signal coraza/varnish PIDs
+  shareProcessNamespace: true
+  # -- HAProxy (corex) container config
+  corex:
+    # -- run as root (needed for haproxy master worker + socket + NET_ADMIN)
+    runAsUser: 0
+    capabilities:
+      add:
+        - NET_ADMIN
+        - NET_RAW
+    sysctls:
+      - net.core.somaxconn=65535
+      - net.ipv4.tcp_max_syn_backlog=65535
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 2000m
+        memory: 1Gi
+  # -- API (backend) container config
+  api:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+  # -- Coraza SPOA container config
+  coraza:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 1000m
+        memory: 512Mi
+  # -- Varnish disk cache sidecar (gated by diskCache.enabled)
+  varnish:
+    storageSize: 1G
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+
+# -- Disk cache (Varnish) — disabled by default
+diskCache:
+  enabled: false
+
+# -- Persistence for haproxy-data (shared volume)
+haproxyData:
+  persistence:
+    enabled: false
+    # -- Storage class (e.g. standard, gp2, local-path). If empty, uses cluster default.
+    storageClass: ""
+    size: 5Gi
+    accessMode: ReadWriteOnce
+
+# -- Persistence for certs
+certs:
+  persistence:
+    enabled: false
+    storageClass: ""
+    size: 1Gi
+    accessMode: ReadWriteOnce
+
+# -- PostgreSQL — in-cluster by default; set enabled: false for external
+postgres:
+  enabled: true
+  image: postgres:16-alpine
+  database: haproxy_manager
+  user: haproxy
+  password: ""  # -- set a strong password!
+  persistence:
+    storageClass: ""
+    size: 10Gi
+    accessMode: ReadWriteOnce
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  # -- External DB config (used when enabled: false)
+  external:
+    host: ""
+    port: 5432
+    database: haproxy_manager
+    user: haproxy
+    password: ""
+    # -- Use an existing Secret for the DB password
+    existingSecret: ""
+    secretKey: password
+
+# -- Valkey (Redis-compatible) — in-cluster by default; set enabled: false for external
+valkey:
+  enabled: true
+  image: valkey/valkey:9-alpine
+  password: ""  # -- set a strong password (optional)
+  persistence:
+    storageClass: ""
+    size: 5Gi
+    accessMode: ReadWriteOnce
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  # -- External Valkey config (used when enabled: false)
+  external:
+    host: ""
+    port: 6379
+    password: ""
+    existingSecret: ""
+    secretKey: password
+
+# -- CAPTCHA service (Cap)
+cap:
+  enabled: true
+  image: tiago2/cap:latest
+  adminKey: ""
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# -- Frontend (nginx + SPA)
+frontend:
+  service:
+    type: ClusterIP
+    ports:
+      http: 80
+      https: 443
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# -- corex (HAProxy) Service — how HAProxy is exposed
+corexService:
+  type: LoadBalancer
+  # -- For NodePort, set a specific port (optional)
+  nodePort: ""
+  # -- LoadBalancer annotations (e.g. for cloud provider config)
+  annotations: {}
+
+# -- MCP Gateway (optional)
+mcpGateway:
+  enabled: false
+  secretsKey: ""
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# -- MCP Server (optional)
+mcpServer:
+  enabled: false
+  corexMcpToken: ""
+  mcpServiceToken: ""
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# -- Ingress (optional)
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  # -- Target: "corex" (HAProxy) or "frontend" (nginx SPA)
+  target: corex
+  host: ""
+  tls:
+    enabled: false
+    secretName: ""
+
+# -- Environment variables (non-secret) applied to the api container
+env:
+  DATAPLANE_API_ENABLED: "true"
+  ACME_SH_ENABLED: "true"
+  CORAZA_SPOA_ENABLED: "true"
+  HAPROXY_RESOLVER_NAME: "kube-dns"
+  HAPROXY_RESOLVER_NAMESERVER: "169.254.25.10:53"
+  HAPROXY_MAXCONN: "100000"
+  METRICS_SAMPLE_INTERVAL_SECONDS: "30"
+  WAF_METRICS_SAMPLE_INTERVAL_SECONDS: "10"
+  TASK_QUEUE_ENABLED: "true"
+  AUTO_RENEW_ENABLED: "true"
+
+# -- Secret env vars — provide via --set or an existing Secret
+secrets:
+  # -- Generate with: python -c "import secrets; print(secrets.token_urlsafe(32))"
+  secretKey: ""
+  adminPassword: ""
+  dataplaneApiUser: "admin"
+  dataplaneApiPassword: ""
+  # -- Use an existing Secret for all secret env vars
+  existingSecret: ""

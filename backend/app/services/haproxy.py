@@ -12,13 +12,10 @@ from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy import DateTime, JSON, Table, text
 from ..core.database import Base
 
-try:
-    import docker
-except ImportError:  # pragma: no cover
-    docker = None  # type: ignore
 from sqlalchemy.orm import Session, joinedload
 from ..core.config import get_settings
 from . import coraza_config, dataplane
+from .runtime import get_runtime
 from ..models.models import (
     Listener, Backend, Server, Certificate, CipherSuite,
     WafRule, WafException, RateLimit, Redirect, Rewrite,
@@ -387,15 +384,8 @@ def _haproxy_supports_geoip2() -> bool:
     _geoip2_support_cache = False
     try:
         output = ""
-        if docker is not None:
-            try:
-                client = docker.from_env()
-                container_name = os.environ.get("HAPROXY_CONTAINER_NAME", "haproxy")
-                container = client.containers.get(container_name)
-                ec, out = container.exec_run("haproxy -vv")
-                output = (out or b"").decode("utf-8", errors="replace")
-            except Exception:
-                pass
+        runtime = get_runtime()
+        output = runtime.haproxy_version_verbose() or ""
         if not output:
             haproxy_bin = shutil.which("haproxy")
             if haproxy_bin:
@@ -963,11 +953,16 @@ def generate_global_section(
     # Docker embedded DNS resolver for SPOA/dynamic backend hostnames.
     # Referenced by backend server lines that use hostnames instead of IPs.
     # Emitted when WAF (SPOA) or disk cache (Varnish) is enabled, since both
-    # use hostnames that need runtime DNS resolution via Docker's embedded DNS.
+    # use hostnames that need runtime DNS resolution. The resolver name and
+    # nameserver are configurable via HAPROXY_RESOLVER_NAME /
+    # HAPROXY_RESOLVER_NAMESERVER (defaults: docker / 127.0.0.11:53 for
+    # Docker Compose; the Helm chart sets kube-dns / CoreDNS IP for K8s).
     if settings.CORAZA_SPOA_ENABLED or disk_cache_enabled:
+        resolver_name = getattr(settings, "HAPROXY_RESOLVER_NAME", "docker")
+        resolver_ns = getattr(settings, "HAPROXY_RESOLVER_NAMESERVER", "127.0.0.11:53")
         lines.append("")
-        lines.append("resolvers docker")
-        lines.append("    nameserver docker 127.0.0.11:53")
+        lines.append(f"resolvers {resolver_name}")
+        lines.append(f"    nameserver {resolver_name} {resolver_ns}")
         lines.append("    resolve_retries 3")
         lines.append("    timeout resolve 1s")
         lines.append("    timeout retry 1s")
@@ -3026,7 +3021,8 @@ def generate_backend(
     if disk_cache_active:
         varnish_host = _safe_token(settings.VARNISH_CONTAINER_NAME)
         varnish_port = int(settings.VARNISH_PORT)
-        lines.append(f"    server disk_cache {varnish_host}:{varnish_port} check resolvers docker init-addr none backup")
+        _resolver_name = getattr(settings, "HAPROXY_RESOLVER_NAME", "docker")
+        lines.append(f"    server disk_cache {varnish_host}:{varnish_port} check resolvers {_resolver_name} init-addr none backup")
 
     for s in servers:
         server_name = _safe_name(s.name)
@@ -3132,7 +3128,8 @@ def _coraza_spoa_servers() -> List[str]:
     lines = []
     resolver_options = ""
     if settings.CORAZA_SPOA_ENABLED:
-        resolver_options = " resolvers docker"
+        _resolver_name = getattr(settings, "HAPROXY_RESOLVER_NAME", "docker")
+        resolver_options = f" resolvers {_resolver_name}"
     for i, t in enumerate(targets, start=1):
         t = t.strip()
         if not t:
@@ -3963,50 +3960,17 @@ def write_config(
 
 
 def _haproxy_check_docker(config_path: str) -> Tuple[bool, str]:
-    """Run haproxy -c inside the running haproxy container via the Docker SDK.
+    """Run haproxy -c inside the running haproxy container via the runtime backend.
 
-    Wraps ``container.exec_run`` in a thread with a 30-second timeout because
-    the Docker SDK's exec_run has no native timeout parameter and can hang
-    indefinitely if the container or haproxy process is unresponsive.
+    Delegates to ``get_runtime().validate_haproxy_config()`` which dispatches
+    to the Docker SDK (DockerRuntime) or Kubernetes API (KubernetesRuntime)
+    depending on the ``COREX_RUNTIME`` setting.
 
-    Note: we deliberately avoid the ``with ThreadPoolExecutor`` context manager
-    because its ``__exit__`` calls ``shutdown(wait=True)``, which blocks until
-    the worker thread finishes — defeating the timeout. Instead we use
-    ``shutdown(wait=False)`` on timeout so the main thread can continue while
-    the orphaned daemon thread cleans up on process exit.
+    The original Docker SDK implementation (with a 30-second thread timeout)
+    is preserved in ``DockerRuntime.validate_haproxy_config``.
     """
-    if docker is None:
-        return False, "haproxy container check failed: docker SDK not installed"
-    container_name = os.environ.get("HAPROXY_CONTAINER_NAME", "haproxy")
-
-    def _run() -> Tuple[int, str]:
-        print(f"[DOCKER_CHECK] creating docker client", flush=True)
-        client = docker.from_env()
-        print(f"[DOCKER_CHECK] getting container: {container_name}", flush=True)
-        container = client.containers.get(container_name)
-        print(f"[DOCKER_CHECK] calling exec_run: haproxy -c -f {config_path}", flush=True)
-        ec, output = container.exec_run(f"haproxy -c -f {config_path}")
-        print(f"[DOCKER_CHECK] exec_run returned: ec={ec}", flush=True)
-        return ec, (output or b"").decode().strip()
-
-    import concurrent.futures
-    print("[DOCKER_CHECK] starting thread pool", flush=True)
-    executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-    future = executor.submit(_run)
-    try:
-        print("[DOCKER_CHECK] waiting for result (30s timeout)", flush=True)
-        ec, output = future.result(timeout=30)
-        executor.shutdown(wait=True)
-        print(f"[DOCKER_CHECK] result: ec={ec}", flush=True)
-        return ec == 0, output
-    except concurrent.futures.TimeoutExpired:
-        executor.shutdown(wait=False)
-        print("[DOCKER_CHECK] TIMED OUT after 30s", flush=True)
-        return False, "haproxy -c timed out after 30s in container"
-    except Exception as e:
-        executor.shutdown(wait=False)
-        print(f"[DOCKER_CHECK] exception: {e}", flush=True)
-        return False, f"haproxy container check failed: {e}"
+    runtime = get_runtime()
+    return runtime.validate_haproxy_config(config_path)
 
 
 def _haproxy_check_local(config_path: str) -> Tuple[bool, str]:

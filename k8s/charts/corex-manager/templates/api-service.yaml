@@ -1,0 +1,35 @@
+# Internal headless service for the StatefulSet (required for stable network identity)
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-corex-headless
+  namespace: {{ include "corex-manager.namespace" . }}
+  labels:
+    {{- include "corex-manager.labels" . | nindent 4 }}
+spec:
+  clusterIP: None
+  selector:
+    {{- include "corex-manager.podSelectorLabels" . | nindent 4 }}
+  ports:
+    - name: api-http
+      port: 8000
+      targetPort: api-http
+      protocol: TCP
+---
+# ClusterIP service for the API (used by the frontend to reach the backend)
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-api
+  namespace: {{ include "corex-manager.namespace" . }}
+  labels:
+    {{- include "corex-manager.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "corex-manager.podSelectorLabels" . | nindent 4 }}
+  ports:
+    - name: api-http
+      port: 8000
+      targetPort: api-http
+      protocol: TCP

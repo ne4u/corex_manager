@@ -21,11 +21,7 @@ from sqlalchemy.orm import Session
 from ..core.config import get_settings
 from ..models.models import Backend, CacheConfig, Listener, ResponseHeader, PageProtectPolicy
 from .cache_rules import emit_vcl_decision
-
-try:
-    import docker
-except ImportError:  # pragma: no cover
-    docker = None  # type: ignore
+from .runtime import get_runtime
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -390,16 +386,14 @@ def _container_vcl_path() -> str:
 
 
 def _get_container():
-    """Get the Varnish Docker container, or None if unavailable."""
-    if docker is None:
-        return None
-    try:
-        client = docker.from_env()
-        container_name = os.environ.get("VARNISH_CONTAINER_NAME", settings.VARNISH_CONTAINER_NAME)
-        return client.containers.get(container_name)
-    except Exception as e:
-        logger.debug("Varnish container not available: %s", e)
-        return None
+    """Check if the Varnish container is available via the runtime backend.
+
+    Returns True if available, False otherwise. The actual container/pod
+    management is handled by the runtime backend (DockerRuntime or
+    KubernetesRuntime).
+    """
+    runtime = get_runtime()
+    return runtime if runtime.is_available() else None
 
 
 def validate_vcl(vcl_text: str) -> Tuple[bool, str]:
@@ -407,25 +401,24 @@ def validate_vcl(vcl_text: str) -> Tuple[bool, str]:
 
     Falls back to local varnishd if available. Returns (is_valid, details).
     """
-    # Try container first
-    container = _get_container()
-    if container is not None:
+    runtime = get_runtime()
+    # Try container first via the runtime backend
+    if runtime.is_available():
         try:
             # Write VCL to a temp file inside the container's data volume
-            vcl_path = os.path.join(os.path.dirname(settings.VARNISH_VCL_PATH), "_validate.vcl")
             # Write locally first (the volume is shared with the API container)
             local_path = os.path.join(os.path.dirname(settings.HAPROXY_CONFIG_PATH), "_validate.vcl")
             with open(local_path, "w") as f:
                 f.write(vcl_text)
             # The Varnish container mounts haproxy-data at /app/data
             container_vcl_path = f"/app/data/_validate.vcl"
-            ec, output = container.exec_run(f"varnishd -C -f {container_vcl_path}")
+            ok, details = runtime.validate_vcl(container_vcl_path)
             try:
                 os.remove(local_path)
             except OSError:
                 pass
-            decoded = (output or b"").decode("utf-8", errors="replace").strip()
-            return ec == 0, decoded
+            if ok or not details.startswith("Varnish container not available"):
+                return ok, details
         except Exception as e:
             return False, f"VCL validation via container failed: {e}"
 
@@ -482,39 +475,13 @@ def write_vcl(db: Session) -> str:
 
 def reload_vcl() -> bool:
     """Reload the VCL in the running Varnish container."""
-    container = _get_container()
-    if container is None:
+    runtime = get_runtime()
+    if not runtime.is_available():
         logger.warning("Varnish container not available, VCL written but not reloaded")
         return False
 
     container_vcl_path = _container_vcl_path()
-
-    # Try varnishreload first (simpler, available in official images)
-    try:
-        ec, output = container.exec_run("varnishreload")
-        if ec == 0:
-            return True
-        logger.warning("varnishreload failed: %s", (output or b"").decode("utf-8", errors="replace"))
-    except Exception as e:
-        logger.warning("varnishreload failed: %s", e)
-
-    # Fallback: varnishadm vcl.load + vcl.use. The VCL label must be unique —
-    # Varnish rejects vcl.load for a name that is already loaded, so derive a
-    # fresh label from the current time for every reload.
-    try:
-        label = f"reload_{int(time.time() * 1000)}"
-        ec, output = container.exec_run(f"varnishadm vcl.load {label} {container_vcl_path}")
-        if ec != 0:
-            logger.error("varnishadm vcl.load failed: %s", (output or b"").decode("utf-8", errors="replace"))
-            return False
-        ec, output = container.exec_run(f"varnishadm vcl.use {label}")
-        if ec != 0:
-            logger.error("varnishadm vcl.use failed: %s", (output or b"").decode("utf-8", errors="replace"))
-            return False
-        return True
-    except Exception as e:
-        logger.error("varnishadm reload failed: %s", e)
-        return False
+    return runtime.reload_vcl(container_vcl_path)
 
 
 def purge_backend(x_cache_backend_value: str) -> bool:
@@ -526,39 +493,23 @@ def purge_backend(x_cache_backend_value: str) -> bool:
     raw backend name or a VCL-safe identifier — those may differ when the
     backend name contains dots/colons/dashes or was suffixed for uniqueness.
     """
-    container = _get_container()
-    if container is None:
+    runtime = get_runtime()
+    if not runtime.is_available():
         logger.warning("Varnish container not available, cannot purge backend")
         return False
 
     safe_value = _safe_vcl_string(x_cache_backend_value)
     ban_expr = f'obj.http.X-Cache-Backend == "{safe_value}"'
-    try:
-        ec, output = container.exec_run(f'varnishadm ban "{ban_expr}"')
-        if ec == 0:
-            return True
-        logger.warning("varnishadm ban failed: %s", (output or b"").decode("utf-8", errors="replace"))
-    except Exception as e:
-        logger.warning("varnishadm ban failed: %s", e)
-    return False
+    return runtime.purge_vcl(ban_expr)
 
 
 def purge_all() -> bool:
     """Purge (ban) all cached objects in the disk cache."""
-    container = _get_container()
-    if container is None:
+    runtime = get_runtime()
+    if not runtime.is_available():
         logger.warning("Varnish container not available, cannot purge all")
         return False
-
-    # Ban all objects
-    try:
-        ec, output = container.exec_run('varnishadm ban "obj.http.X-Cache-Backend ~ .*"')
-        if ec == 0:
-            return True
-        logger.warning("varnishadm ban all failed: %s", (output or b"").decode("utf-8", errors="replace"))
-    except Exception as e:
-        logger.warning("varnishadm ban all failed: %s", e)
-    return False
+    return runtime.purge_all()
 
 
 def get_stats() -> Dict[str, Any]:
@@ -567,56 +518,13 @@ def get_stats() -> Dict[str, Any]:
     Returns a dict with key counters: cache_hit, cache_miss, n_object,
     n_lru_nuked, etc. Returns empty dict if unavailable.
     """
-    container = _get_container()
-    if container is None:
+    runtime = get_runtime()
+    if not runtime.is_available():
         return {}
-
-    try:
-        ec, output = container.exec_run("varnishstat -j")
-        if ec != 0:
-            logger.warning("varnishstat failed: %s", (output or b"").decode("utf-8", errors="replace"))
-            return {}
-        data = json.loads((output or b"").decode("utf-8", errors="replace"))
-        counters = data.get("counters", {})
-        result: Dict[str, Any] = {}
-        # Extract the most useful counters
-        for key in (
-            "MAIN.cache_hit", "MAIN.cache_miss", "MAIN.cache_hit_grace",
-            # Hit-for-pass / hit-for-miss: Varnish caches the *decision* to
-            # pass or miss, so subsequent lookups hit that decision object
-            # instead of going to cache_miss. They must be included in the
-            # miss count for an accurate hit rate.
-            "MAIN.cache_hitpass", "MAIN.cache_hitmiss",
-            "MAIN.n_object", "MAIN.n_lru_nuked", "MAIN.n_expired",
-            "MAIN.threads", "MAIN.sess_conn", "MAIN.client_req",
-            "MAIN.backend_req", "MAIN.fetch_head", "MAIN.fetch_length",
-            "MAIN.fetch_chunked", "MAIN.bans", "MAIN.bans_completed",
-            # Body byte counters for bandwidth-saved calculation:
-            # s_resp_bodybytes = bytes sent to clients (from cache or backend)
-            # b_resp_bodybytes = bytes fetched from backend (origin)
-            # Bytes saved = s_resp_bodybytes - b_resp_bodybytes (served from
-            # cache without a backend fetch).
-            "MAIN.s_resp_bodybytes", "MAIN.b_resp_bodybytes",
-        ):
-            if key in counters:
-                val = counters[key].get("value", 0)
-                result[key] = val
-        # Also include storage info
-        for key in list(counters.keys()):
-            if key.startswith("MAIN.s0.") or key.startswith("SMF."):
-                result[key] = counters[key].get("value", 0)
-        return result
-    except Exception as e:
-        logger.warning("varnishstat failed: %s", e)
-        return {}
+    return runtime.varnish_stats()
 
 
 def is_running() -> bool:
     """Check if the Varnish container is running."""
-    container = _get_container()
-    if container is None:
-        return False
-    try:
-        return container.status == "running"
-    except Exception:
-        return False
+    runtime = get_runtime()
+    return runtime.is_available()

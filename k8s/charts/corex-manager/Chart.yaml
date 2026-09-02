@@ -1,0 +1,12 @@
+apiVersion: v2
+name: corex-manager
+description: coreX Manager — HAProxy + WAF control plane with Kubernetes support
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - haproxy
+  - waf
+  - coraza
+  - reverse-proxy
+  - load-balancer

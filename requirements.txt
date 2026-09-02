@@ -20,5 +20,6 @@ valkey==6.1.1
 maxminddb==2.6.0
 geoip2==4.8.0
 docker==7.1.0
+kubernetes==35.0.0
 pyotp==2.9.0
 qrcode==7.4.2

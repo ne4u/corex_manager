@@ -1,6 +1,16 @@
 # coreX Manager Deploy
 
-`deploy.py` deploys the project to a remote Linux Docker host using `rsync` and `docker compose`. It uses **selective rebuilds** — only rebuilding and redeploying services whose files changed since the last deploy.
+`deploy.py` deploys the project to a remote Linux Docker host or a Kubernetes cluster using `rsync`, `docker compose`, and `helm`. It uses **selective rebuilds** — only rebuilding and redeploying services whose files changed since the last deploy.
+
+## Deployment Targets
+
+| Target | Description |
+|--------|-------------|
+| `docker` (default) | rsync + `docker compose build/up` on a remote host |
+| `k8s-remote` | rsync + build images on remote + load into k8s + `helm upgrade` on remote |
+| `k8s-cluster` | build images locally + load into local cluster + `helm upgrade` locally |
+
+All targets share the same selective-rebuild change detection via the deploy manifest.
 
 ## What it does
 
@@ -103,6 +113,41 @@ python3 deploy.py --force-rebuild corex --force-rebuild frontend
 | `--yes`, `-y` | Skip confirmation prompts | `False` |
 | `--dry-run` | Show what would be rebuilt/restarted without making changes | `False` |
 | `--force-rebuild` | Force rebuild of a service (e.g., `--force-rebuild corex`). Use `all` for all buildable services. Can be specified multiple times. | — |
+
+## Kubernetes deployment
+
+The `--target k8s-cluster` and `--target k8s-remote` modes deploy via the Helm chart in `k8s/charts/corex-manager/`. See `k8s/README.md` for full architecture details.
+
+### k8s-cluster (local cluster — kind/minikube/docker-desktop)
+
+```bash
+# Build images, load into local cluster, helm upgrade
+python3 deploy.py --target k8s-cluster \
+  --release-name corex \
+  --namespace corex \
+  --values-file my-values.yaml
+```
+
+### k8s-remote (remote cluster via SSH)
+
+```bash
+# rsync to remote, build on remote, load into remote cluster, helm upgrade on remote
+python3 deploy.py --target k8s-remote \
+  --host 1.2.3.4 --user admin \
+  --release-name corex \
+  --namespace corex \
+  --values-file my-values.yaml
+```
+
+### Kubernetes-specific options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--target` | Deployment target: `docker`, `k8s-remote`, `k8s-cluster` | `docker` |
+| `--release-name` | Helm release name | `corex` |
+| `--namespace` | Kubernetes namespace | `corex` |
+| `--values-file` | Path to Helm values.yaml override | — |
+| `--image-tag` | Docker image tag for rebuilt images | `latest` |
 
 ## Access after deploy
 

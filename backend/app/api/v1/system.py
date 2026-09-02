@@ -20,6 +20,7 @@ from ...services.metrics import get_metrics
 from ...services.settings import get_maxmind_license_key, get_setting, list_settings, set_setting
 from ...services.stats import _send_command, get_stats
 from ...services.waf_metrics import get_waf_metrics
+from ...services.runtime import get_runtime
 
 router = APIRouter()
 settings = get_settings()
@@ -46,19 +47,9 @@ def system_health(
     # Valkey/Redis
     valkey = valkey_available()
 
-    # Docker reachability (reuse logic from logs/health)
-    docker = False
-    docker_error = None
-    try:
-        import docker as _docker
-        client = _docker.from_env()
-        container_name = getattr(settings, "HAPROXY_CONTAINER_NAME", "haproxy")
-        client.containers.get(container_name)
-        docker = True
-    except ImportError:
-        docker_error = "Docker SDK not installed"
-    except Exception as exc:
-        docker_error = str(exc)
+    # Runtime backend reachability (Docker SDK or Kubernetes API)
+    runtime = get_runtime()
+    rt_desc = runtime.describe()
 
     # GeoIP DB status
     geoip = {
@@ -73,7 +64,7 @@ def system_health(
     return {
         "haproxy_socket": {"available": haproxy_socket, "path": socket_path},
         "valkey": {"available": valkey},
-        "docker": {"available": docker, "error": docker_error},
+        "docker": {"available": rt_desc.get("available", False), "error": rt_desc.get("error")},
         "geoip": geoip,
         "coraza_spoa": {"enabled": coraza_enabled},
     }
@@ -159,18 +150,14 @@ def get_recent_logs(limit: int = Query(100, le=1000), user=Depends(get_current_u
     if not getattr(settings, "HAPROXY_LOG_VIEWER_ENABLED", True):
         return {"lines": [], "error": "log viewer disabled"}
 
-    try:
-        import docker
-    except ImportError:
-        return {"lines": [], "error": "Docker SDK not installed"}
+    runtime = get_runtime()
+    if not runtime.is_available():
+        return {"lines": [], "error": runtime.describe().get("error") or "runtime backend not available"}
 
     try:
-        client = docker.from_env()
-        container_name = getattr(settings, "HAPROXY_CONTAINER_NAME", "haproxy")
-        container = client.containers.get(container_name)
         # Fetch more lines than requested so we still have `limit` after filtering
         # out non-JSON system messages.
-        raw = container.logs(tail=limit * 5, timestamps=True)
+        raw = runtime.haproxy_logs(tail=limit * 5, timestamps=True)
     except Exception as exc:
         return {"lines": [], "error": f"could not fetch logs: {exc}"}
 
@@ -258,19 +245,11 @@ def get_logs_health(db: Session = Depends(get_db), user=Depends(get_current_user
     has_stdout = any(d.target in ("stdout", "stderr") for d in enabled_dests)
     default_stdout_active = len(enabled_dests) == 0 and getattr(settings, "HAPROXY_LOG_DEFAULT_STDOUT", True)
 
-    # Check Docker SDK reachability
-    docker_reachable = False
-    docker_error = None
-    try:
-        import docker as _docker
-        client = _docker.from_env()
-        container_name = getattr(settings, "HAPROXY_CONTAINER_NAME", "haproxy")
-        client.containers.get(container_name)
-        docker_reachable = True
-    except ImportError:
-        docker_error = "Docker SDK not installed"
-    except Exception as exc:
-        docker_error = str(exc)
+    # Check runtime backend reachability
+    runtime = get_runtime()
+    rt_desc = runtime.describe()
+    docker_reachable = rt_desc.get("available", False)
+    docker_error = rt_desc.get("error")
 
     # Determine current log-format mode
     log_format_mode = "json_default"

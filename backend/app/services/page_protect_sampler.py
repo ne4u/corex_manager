@@ -1,4 +1,4 @@
-"""Page Protect sampler — reads HAProxy logs via Docker SDK and stores CSP reports.
+"""Page Protect sampler — reads HAProxy logs via the runtime backend and stores CSP reports.
 
 Background thread that polls HAProxy container logs every
 PAGE_PROTECT_SAMPLER_INTERVAL_SECONDS, extracts lines with a non-empty
@@ -26,6 +26,7 @@ from .page_protect import (
     store_beacon_resources,
     store_csp_report,
 )
+from .runtime import get_runtime
 
 logger = logging.getLogger(__name__)
 
@@ -116,36 +117,31 @@ def sample_csp_reports(force_recent: bool = False) -> int:
     user can re-process logs that were previously skipped (e.g. due to a log
     format bug that has since been fixed).
     """
-    try:
-        import docker
-    except ImportError:
-        logger.debug("Docker SDK not installed; skipping CSP report sampling")
+    runtime = get_runtime()
+    if not runtime.is_available():
+        logger.debug("Runtime backend not available; skipping CSP report sampling")
         return 0
 
     db: Optional[Session] = None
     try:
-        client = docker.from_env()
-        container_name = getattr(settings, "HAPROXY_CONTAINER_NAME", "haproxy")
-        container = client.containers.get(container_name)
-
         if force_recent:
             # Manual trigger: grab last 10 minutes regardless of offset
             cutoff = int(time.time()) - 600
-            raw = container.logs(since=cutoff, timestamps=True)
+            raw = runtime.haproxy_logs(since=cutoff, timestamps=True)
         else:
             last_ts = _read_offset()
             # Fetch logs since the last timestamp (or last 5 minutes if first run).
-            # Docker's `since` parameter truncates to whole seconds, so we add 1
+            # The `since` parameter truncates to whole seconds, so we add 1
             # to skip past the last seen second entirely. This prevents
             # re-processing the same entry every cycle. Entries arriving in the
             # same second as the last processed one are rare with a 10s poll
             # interval and are recovered by the manual "Sample Reports" trigger.
             if last_ts is not None:
-                raw = container.logs(since=int(last_ts) + 1, timestamps=True)
+                raw = runtime.haproxy_logs(since=int(last_ts) + 1, timestamps=True)
             else:
                 # First run: grab last 5 minutes
                 cutoff = int(time.time()) - 300
-                raw = container.logs(since=cutoff, timestamps=True)
+                raw = runtime.haproxy_logs(since=cutoff, timestamps=True)
 
         if isinstance(raw, bytes):
             raw = raw.decode("utf-8", errors="replace")

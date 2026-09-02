@@ -284,6 +284,32 @@ class Settings(BaseSettings):
     HAPROXY_LOG_MAX_LEN: int = 65535  # max HAProxy log line length (HAProxy default 1024 truncates CSP report bodies)
     HAPROXY_CONTAINER_NAME: str = "corex"  # container name for Docker SDK log retrieval
 
+    # Runtime backend selection — controls how the backend interacts with
+    # sibling containers (HAProxy, Coraza, Varnish) for config validation,
+    # log retrieval, VCL management, and coraza restart.
+    #   auto       → detect at startup (K8s SA token → kubernetes, docker.sock → docker, else none)
+    #   docker     → use the Docker SDK (docker.from_env) — the traditional compose path
+    #   kubernetes → use the Kubernetes API (in-cluster config) — the Helm chart path
+    #   none       → graceful degradation (no exec/logs/restart; falls back to local haproxy -c)
+    COREX_RUNTIME: str = "auto"
+    # Kubernetes-only settings (read only when COREX_RUNTIME=kubernetes).
+    # Set via the downward API in the Helm chart Pod spec.
+    COREX_POD_NAME: str = ""
+    COREX_POD_NAMESPACE: str = ""
+    # Container names within the sidecar Pod (used for exec/log targeting).
+    K8S_HAPROXY_CONTAINER: str = "corex"
+    K8S_CORAZA_CONTAINER: str = "coraza-spoa"
+    K8S_VARNISH_CONTAINER: str = "varnish"
+
+    # HAProxy DNS resolver — emitted in generated haproxy.cfg as
+    #   resolvers <name>
+    #       nameserver <name> <nameserver>
+    # Defaults match Docker's embedded DNS (127.0.0.11:53) so Docker
+    # deployments generate byte-identical configs. The Helm chart sets
+    # these to the cluster's CoreDNS IP (e.g. kube-dns / 169.254.25.10:53).
+    HAPROXY_RESOLVER_NAME: str = "docker"
+    HAPROXY_RESOLVER_NAMESERVER: str = "127.0.0.11:53"
+
     # GUI session configuration
     SESSION_TIMEOUT_MINUTES: int = 30
     SESSION_WARNING_SECONDS: int = 60

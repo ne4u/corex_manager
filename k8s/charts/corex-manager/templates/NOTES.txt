@@ -1,0 +1,42 @@
+coreX Manager has been deployed!
+
+== Verification ==
+
+1. Check pod status:
+   kubectl get pods -n {{ include "corex-manager.namespace" . }} -l app.kubernetes.io/instance={{ .Release.Name }}
+
+2. Get the HAProxy LoadBalancer IP (if using LoadBalancer type):
+   kubectl get svc {{ .Release.Name }}-corex -n {{ include "corex-manager.namespace" . }}
+
+3. Access the frontend:
+   {{- if eq .Values.corexService.type "LoadBalancer" }}
+   # Wait for the LoadBalancer IP to be assigned, then:
+   curl http://<LB_IP>/
+   {{- else if eq .Values.corexService.type "NodePort" }}
+   # Port-forward for local access:
+   kubectl port-forward svc/{{ .Release.Name }}-corex -n {{ include "corex-manager.namespace" . }} 8080:80
+   curl http://localhost:8080/
+   {{- else }}
+   # Port-forward for local access:
+   kubectl port-forward svc/{{ .Release.Name }}-corex -n {{ include "corex-manager.namespace" . }} 8080:80
+   curl http://localhost:8080/
+   {{- end }}
+
+4. Access the management UI:
+   kubectl port-forward svc/{{ .Release.Name }}-frontend -n {{ include "corex-manager.namespace" . }} 3443:443
+   # Then open https://localhost:3443 in your browser
+
+== Configuration ==
+
+- Backend runtime: Kubernetes (in-cluster API)
+- HAProxy resolver: {{ .Values.env.HAPROXY_RESOLVER_NAME }} ({{ .Values.env.HAPROXY_RESOLVER_NAMESERVER }})
+- Database: {{ if .Values.postgres.enabled }}in-cluster PostgreSQL{{ else }}external ({{ .Values.postgres.external.host }}){{ end }}
+- Valkey: {{ if .Values.valkey.enabled }}in-cluster{{ else }}external ({{ .Values.valkey.external.host }}){{ end }}
+- Disk cache (Varnish): {{ if .Values.diskCache.enabled }}enabled{{ else }}disabled{{ end }}
+- MCP Gateway: {{ if .Values.mcpGateway.enabled }}enabled{{ else }}disabled{{ end }}
+
+== Next Steps ==
+
+1. Log in with the admin password you set in values.yaml
+2. Configure your backends and listeners via the management UI
+3. Apply the configuration to generate and validate the HAProxy config

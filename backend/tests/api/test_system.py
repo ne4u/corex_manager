@@ -1,5 +1,31 @@
-import sys
 from unittest.mock import MagicMock
+
+
+def _mock_runtime(monkeypatch, logs_return_value):
+    """Patch get_runtime() to return a fake runtime with the given logs.
+
+    The log viewer endpoint calls runtime.is_available() and
+    runtime.haproxy_logs(tail=..., timestamps=True). This helper creates a
+    fake runtime that returns True for is_available and returns the provided
+    logs_return_value from haproxy_logs.
+    """
+    from app.api.v1 import system as system_module
+    from app.services.runtime import get_runtime
+
+    # Clear the lru_cache so get_runtime() picks up our mock
+    get_runtime.cache_clear()
+
+    fake_runtime = MagicMock()
+    fake_runtime.is_available.return_value = True
+    fake_runtime.haproxy_logs.return_value = logs_return_value
+    fake_runtime.describe.return_value = {"available": True, "error": None, "type": "docker"}
+
+    monkeypatch.setattr(system_module, "get_runtime", lambda: fake_runtime)
+    # Also patch the source so any other module that imports get_runtime gets the mock
+    import app.services.runtime as runtime_mod
+    monkeypatch.setattr(runtime_mod, "get_runtime", lambda: fake_runtime)
+
+    return fake_runtime
 
 
 def test_logs_recent_parses_json_log_lines(client, monkeypatch):
@@ -13,22 +39,12 @@ def test_logs_recent_parses_json_log_lines(client, monkeypatch):
 
     settings = get_settings()
     monkeypatch.setattr(settings, "HAPROXY_LOG_VIEWER_ENABLED", True)
-    monkeypatch.setattr(settings, "HAPROXY_CONTAINER_NAME", "fake-haproxy")
     monkeypatch.setattr(system_module, "settings", settings)
 
-    fake_container = MagicMock()
-    fake_container.logs.return_value = (
+    _mock_runtime(monkeypatch, (
         b'2023-10-01T12:00:00.000000000Z {"foo":"bar"}\n'
         b'2023-10-01T12:00:00.000000000Z not json\n'
-    )
-
-    fake_client = MagicMock()
-    fake_client.containers.get.return_value = fake_container
-
-    fake_docker = MagicMock()
-    fake_docker.from_env.return_value = fake_client
-
-    monkeypatch.setitem(sys.modules, "docker", fake_docker)
+    ))
 
     res = client.get("/api/v1/logs/recent?limit=100")
     assert res.status_code == 200
@@ -53,25 +69,15 @@ def test_logs_recent_strips_control_chars_before_json(client, monkeypatch):
 
     settings = get_settings()
     monkeypatch.setattr(settings, "HAPROXY_LOG_VIEWER_ENABLED", True)
-    monkeypatch.setattr(settings, "HAPROXY_CONTAINER_NAME", "fake-haproxy")
     monkeypatch.setattr(system_module, "settings", settings)
 
-    fake_container = MagicMock()
     # NUL byte + a couple of other control chars prefix the JSON payload,
     # mirroring real-world HAProxy output on rate-limited requests.
-    fake_container.logs.return_value = (
+    _mock_runtime(monkeypatch, (
         b'2023-10-01T12:00:00.000000000Z \x00\x01\x02{"ts":"x","status":"429"}\n'
         b'2023-10-01T12:00:01.000000000Z {"ts":"y","status":"200"}\n'
         b'2023-10-01T12:00:02.000000000Z ALERT: some haproxy system message\n'
-    )
-
-    fake_client = MagicMock()
-    fake_client.containers.get.return_value = fake_container
-
-    fake_docker = MagicMock()
-    fake_docker.from_env.return_value = fake_client
-
-    monkeypatch.setitem(sys.modules, "docker", fake_docker)
+    ))
 
     res = client.get("/api/v1/logs/recent?limit=100")
     assert res.status_code == 200
@@ -103,24 +109,16 @@ def test_logs_recent_returns_newest_lines_when_over_limit(client, monkeypatch):
 
     settings = get_settings()
     monkeypatch.setattr(settings, "HAPROXY_LOG_VIEWER_ENABLED", True)
-    monkeypatch.setattr(settings, "HAPROXY_CONTAINER_NAME", "fake-haproxy")
     monkeypatch.setattr(system_module, "settings", settings)
 
     # 5 JSON log lines, oldest→newest as Docker returns them.
-    fake_container = MagicMock()
-    fake_container.logs.return_value = (
+    _mock_runtime(monkeypatch, (
         b'2023-10-01T12:00:00.000000000Z {"ts":"L1","status":"200"}\n'
         b'2023-10-01T12:00:01.000000000Z {"ts":"L2","status":"200"}\n'
         b'2023-10-01T12:00:02.000000000Z {"ts":"L3","status":"403"}\n'
         b'2023-10-01T12:00:03.000000000Z {"ts":"L4","status":"403"}\n'
         b'2023-10-01T12:00:04.000000000Z {"ts":"L5","status":"403"}\n'
-    )
-
-    fake_client = MagicMock()
-    fake_client.containers.get.return_value = fake_container
-    fake_docker = MagicMock()
-    fake_docker.from_env.return_value = fake_client
-    monkeypatch.setitem(sys.modules, "docker", fake_docker)
+    ))
 
     # limit=2 — only the 2 newest parsed lines should come back.
     res = client.get("/api/v1/logs/recent?limit=2")

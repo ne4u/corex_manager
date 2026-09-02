@@ -1,6 +1,5 @@
 """Tests for the Page Protect sampler (CSP report collection from HAProxy logs)."""
 import json
-import sys
 from unittest.mock import patch, MagicMock
 
 import pytest
@@ -11,14 +10,31 @@ from app.models.models import CspReport, PageProtectScript
 
 @pytest.fixture
 def mock_docker(monkeypatch):
-    """Inject a mock docker module into sys.modules so `import docker` succeeds."""
+    """Mock the runtime backend so haproxy_logs returns test data.
+
+    Returns (mock_runtime, mock_client) where mock_runtime.haproxy_logs
+    can be configured with the desired log output.
+    """
+    from app.services.runtime import get_runtime
+
+    # Clear the lru_cache so get_runtime() picks up our mock
+    get_runtime.cache_clear()
+
+    mock_runtime = MagicMock()
+    mock_runtime.is_available.return_value = True
+    mock_runtime.haproxy_logs.return_value = ""
+
+    # Patch get_runtime in both the sampler module and the runtime package
+    import app.services.runtime as runtime_mod
+    monkeypatch.setattr(runtime_mod, "get_runtime", lambda: mock_runtime)
+    monkeypatch.setattr("app.services.page_protect_sampler.get_runtime", lambda: mock_runtime)
+
+    # Return a mock_container-like object for backward compat with test code
+    # that sets mock_container.logs.return_value
     mock_container = MagicMock()
     mock_client = MagicMock()
-    mock_client.containers.get.return_value = mock_container
-    mock_docker_mod = MagicMock()
-    mock_docker_mod.from_env.return_value = mock_client
-
-    monkeypatch.setitem(sys.modules, "docker", mock_docker_mod)
+    # Wire mock_container.logs to mock_runtime.haproxy_logs
+    mock_runtime.haproxy_logs.side_effect = lambda **kwargs: mock_container.logs.return_value
     return mock_container, mock_client
 
 
@@ -146,17 +162,15 @@ def test_parse_log_line_rejects_unescaped_csp_report():
 
 
 def test_sample_csp_reports_no_docker_sdk(db, monkeypatch):
-    """When Docker SDK is not available, should return 0 gracefully."""
-    # Remove docker from sys.modules so the import fails
-    monkeypatch.delitem(sys.modules, "docker", raising=False)
-    import builtins
-    real_import = builtins.__import__
+    """When the runtime backend is not available, should return 0 gracefully."""
+    from app.services.runtime import get_runtime
 
-    def mock_import(name, *args, **kwargs):
-        if name == "docker":
-            raise ImportError("No module named 'docker'")
-        return real_import(name, *args, **kwargs)
+    get_runtime.cache_clear()
+    mock_runtime = MagicMock()
+    mock_runtime.is_available.return_value = False
+    import app.services.runtime as runtime_mod
+    monkeypatch.setattr(runtime_mod, "get_runtime", lambda: mock_runtime)
+    monkeypatch.setattr("app.services.page_protect_sampler.get_runtime", lambda: mock_runtime)
 
-    monkeypatch.setattr(builtins, "__import__", mock_import)
     result = sample_csp_reports()
     assert result == 0
