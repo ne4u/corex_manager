@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ScanEye, Plus, Trash2, RefreshCw, Download, AlertTriangle, CheckCircle2, Play, Square, Wand2, LayoutDashboard, Shield, FileCode, ClipboardList, Settings as SettingsIcon, History, Pencil, Activity, RotateCcw } from 'lucide-react'
+import { ScanEye, Plus, Trash2, RefreshCw, Download, AlertTriangle, CheckCircle2, Play, Square, Wand2, LayoutDashboard, Shield, FileCode, ClipboardList, Settings as SettingsIcon, History, Pencil, Activity, RotateCcw, ChevronUp, ChevronDown, ArrowUpDown } from 'lucide-react'
 import { pageProtect, backends, getErrorDetail, settings as settingsApi } from '../services/api'
 import useApiList from '../hooks/useApiList'
 import Modal from '../components/Modal'
@@ -807,6 +807,36 @@ function SourceInput({ onAdd }: { onAdd: (source: string) => void }) {
   )
 }
 
+type ScriptSortKey = 'url' | 'resource_type' | 'domain' | 'source' | 'occurrence_count' | 'last_seen' | 'last_hash_at' | 'hash_status'
+type SortDir = 'asc' | 'desc'
+
+function SortTh({ label, sortKey, activeKey, dir, onSort }: {
+  label: string
+  sortKey: ScriptSortKey
+  activeKey: ScriptSortKey | null
+  dir: SortDir
+  onSort: (key: ScriptSortKey) => void
+}) {
+  const isActive = activeKey === sortKey
+  return (
+    <th>
+      <button
+        onClick={() => onSort(sortKey)}
+        className="inline-flex items-center gap-1 hover:text-slate-200 cursor-pointer select-none"
+      >
+        {label}
+        {isActive ? (
+          dir === 'asc'
+            ? <ChevronUp className="w-3.5 h-3.5" />
+            : <ChevronDown className="w-3.5 h-3.5" />
+        ) : (
+          <ArrowUpDown className="w-3 h-3 opacity-40" />
+        )}
+      </button>
+    </th>
+  )
+}
+
 function ScriptsTab() {
   const { formatDateTime } = useDateTime()
   const { items: scripts, reload } = useApiList<PageProtectScript>(pageProtect.scripts.list)
@@ -817,6 +847,17 @@ function ScriptsTab() {
   const [newUrl, setNewUrl] = useState('')
   const [newType, setNewType] = useState('script')
   const [adding, setAdding] = useState(false)
+  const [sortKey, setSortKey] = useState<ScriptSortKey | null>(null)
+  const [sortDir, setSortDir] = useState<SortDir>('asc')
+
+  const toggleSort = (key: ScriptSortKey) => {
+    if (sortKey === key) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortKey(key)
+      setSortDir('asc')
+    }
+  }
 
   const filtered = scripts.filter(s => {
     if (filterType && s.resource_type !== filterType) return false
@@ -824,6 +865,35 @@ function ScriptsTab() {
     if (filterChanged === 'unchanged' && s.hash_changed) return false
     return true
   })
+
+  const sorted = (() => {
+    if (!sortKey) return filtered
+    const dir = sortDir === 'asc' ? 1 : -1
+    const getVal = (s: PageProtectScript): string | number => {
+      switch (sortKey) {
+        case 'url': return s.url || ''
+        case 'resource_type': return s.resource_type || ''
+        case 'domain': return s.domain || ''
+        case 'source': return s.source || ''
+        case 'occurrence_count': return s.occurrence_count || 0
+        case 'last_seen': return s.last_seen || ''
+        case 'last_hash_at': return s.last_hash_at || ''
+        case 'hash_status': {
+          // Derive a sortable rank: Error(0) < Changed(1) < Unchecked(2) < OK(3)
+          const checkFailed = s.hash_checked_at && (!s.last_hash_at || s.hash_checked_at > s.last_hash_at)
+          if (checkFailed) return 0
+          if (s.hash_changed) return 1
+          if (s.last_hash) return 3
+          return 2
+        }
+      }
+    }
+    return [...filtered].sort((a, b) => {
+      const va = getVal(a), vb = getVal(b)
+      if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir
+      return String(va).localeCompare(String(vb)) * dir
+    })
+  })()
 
   const checkAll = async () => {
     setChecking(true)
@@ -952,10 +1022,20 @@ function ScriptsTab() {
       <div className="card overflow-x-auto">
         <table className="w-full text-sm text-start">
           <thead className="text-slate-400 border-b border-slate-800">
-            <tr><th>URL</th><th>Type</th><th>Domain</th><th>Source</th><th>Occurrences</th><th>Last Seen</th><th>Last Checked</th><th>Hash Status</th><th></th></tr>
+            <tr>
+              <SortTh label="URL" sortKey="url" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />
+              <SortTh label="Type" sortKey="resource_type" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />
+              <SortTh label="Domain" sortKey="domain" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />
+              <SortTh label="Source" sortKey="source" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />
+              <SortTh label="Occurrences" sortKey="occurrence_count" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />
+              <SortTh label="Last Seen" sortKey="last_seen" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />
+              <SortTh label="Last Checked" sortKey="last_hash_at" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />
+              <SortTh label="Hash Status" sortKey="hash_status" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />
+              <th></th>
+            </tr>
           </thead>
           <tbody>
-            {filtered.map(s => (
+            {sorted.map(s => (
               <tr key={s.id} className="border-b border-slate-800 last:border-0">
                 <td className="py-2 font-mono text-xs truncate max-w-xs" title={s.url}>{s.url}</td>
                 <td className="text-slate-400">{s.resource_type}</td>
@@ -990,7 +1070,7 @@ function ScriptsTab() {
                 </td>
               </tr>
             ))}
-            {filtered.length === 0 && <tr><td colSpan={9} className="py-4 text-center text-slate-500">No scripts detected yet</td></tr>}
+            {sorted.length === 0 && <tr><td colSpan={9} className="py-4 text-center text-slate-500">No scripts detected yet</td></tr>}
           </tbody>
         </table>
       </div>

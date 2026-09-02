@@ -12,8 +12,23 @@
 (function () {
   'use strict';
 
-  var BEACON_URL = '/_asset-beacon';
-  var BEACON_SCRIPT_URL = '/_asset-beacon.js';
+  // Derive the POST endpoint and script URL from this script's own src tag
+  // so they stay in sync with whatever path is configured in Page Protect
+  // settings (HAProxy injects <script src="/_cx-assets.js?v=..."></script>).
+  // Falls back to defaults if detection fails.
+  var BEACON_SCRIPT_URL = '/_cx-assets.js';
+  var BEACON_URL = '/_cx-assets';
+  try {
+    var currentScript = document.currentScript || (function () {
+      var scripts = document.getElementsByTagName('script');
+      return scripts[scripts.length - 1];
+    })();
+    if (currentScript && currentScript.src) {
+      var srcUrl = new URL(currentScript.src, location.href);
+      BEACON_SCRIPT_URL = srcUrl.pathname;
+      BEACON_URL = BEACON_SCRIPT_URL.replace(/\.js$/, '');
+    }
+  } catch (_) {}
   var collected = {};
   var sent = false;
 
@@ -72,20 +87,23 @@
       resources: resources,
       ts: Date.now(),
     });
-    // Use sendBeacon for reliability (survives page unload)
+    // Use sendBeacon for reliability (survives page unload).
+    // Check the return value — sendBeacon returns false when the payload
+    // exceeds the browser's ~64KB limit, in which case fall back to fetch.
     if (navigator.sendBeacon) {
-      navigator.sendBeacon(BEACON_URL, payload);
-    } else {
-      // Fallback to fetch with keepalive
       try {
-        fetch(BEACON_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: payload,
-          keepalive: true,
-        }).catch(function () {});
+        if (navigator.sendBeacon(BEACON_URL, payload)) return;
       } catch (_) {}
     }
+    // Fallback to fetch with keepalive (also used when sendBeacon returns false)
+    try {
+      fetch(BEACON_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payload,
+        keepalive: true,
+      }).catch(function () {});
+    } catch (_) {}
   }
 
   // Collect existing resource entries
@@ -113,4 +131,7 @@
       if (document.visibilityState === 'hidden') sendBeacon();
     }, { once: true });
   }
+  // Also send after a delay in case the user stays on the page (pagehide
+  // may not fire for a while). The sent flag prevents duplicate sends.
+  setTimeout(sendBeacon, 5000);
 })();

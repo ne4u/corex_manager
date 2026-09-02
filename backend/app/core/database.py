@@ -137,4 +137,35 @@ def init_db():
         _log.info("init_db: upgrade complete")
 
     _ensure_admin_user()
+    _migrate_stale_beacon_paths()
     _log.info("init_db: done")
+
+
+def _migrate_stale_beacon_paths():
+    """One-time migration: update stale /_asset-beacon paths to /_cx-assets.
+
+    The default Page Protect beacon paths were renamed from /_asset-beacon
+    to /_cx-assets to avoid ad blocker filter lists. Existing deployments
+    have the old paths stored in the settings table; update them to the
+    new defaults so the UI and HAProxy config use the non-blocked paths.
+    """
+    from ..models.models import Setting
+    db = SessionLocal()
+    try:
+        renames = {
+            "page_protect_beacon_path": ("/_asset-beacon", "/_cx-assets"),
+            "page_protect_beacon_script_path": ("/_asset-beacon.js", "/_cx-assets.js"),
+        }
+        for key, (old_val, new_val) in renames.items():
+            row = db.query(Setting).filter(Setting.key == key).first()
+            if row and row.value == old_val:
+                row.value = new_val
+                db.commit()
+                import logging
+                logging.getLogger(__name__).info(
+                    "Migrated %s: %s → %s", key, old_val, new_val
+                )
+    except Exception:
+        db.rollback()
+    finally:
+        db.close()

@@ -9,7 +9,7 @@ import { NotificationProvider } from '../../contexts/NotificationContext'
 vi.mock('../../services/api', () => ({
   pageProtect: {
     settings: {
-      get: vi.fn(() => Promise.resolve({ data: { monitoring_enabled: false, change_detection_enabled: false, change_detection_interval_hours: 24, report_retention_days: 7, report_path: '/_csp-report', beacon_injection_enabled: false, beacon_path: '/_asset-beacon', beacon_script_path: '/_asset-beacon.js', beacon_content_types: 'text/html', beacon_path_patterns: '', beacon_backend_ids: [], auto_prune_stale_days: 7 } })),
+      get: vi.fn(() => Promise.resolve({ data: { monitoring_enabled: false, change_detection_enabled: false, change_detection_interval_hours: 24, report_retention_days: 7, report_path: '/_csp-report', beacon_injection_enabled: false, beacon_path: '/_cx-assets', beacon_script_path: '/_cx-assets.js', beacon_content_types: 'text/html', beacon_path_patterns: '', beacon_backend_ids: [], auto_prune_stale_days: 7 } })),
       update: vi.fn(() => Promise.resolve({ data: {} })),
     },
     sample: vi.fn(() => Promise.resolve({ data: { stored: 5 } })),

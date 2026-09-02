@@ -2180,12 +2180,12 @@ def generate_frontend(
         # and POSTs them to the beacon endpoint for inventory building.
         beacon = page_protect_beacon or {}
         if page_protect_enabled and beacon.get("enabled"):
-            beacon_path = _safe_token(beacon.get("beacon_path") or "/_asset-beacon")
-            beacon_script_path = _safe_token(beacon.get("beacon_script_path") or "/_asset-beacon.js")
+            beacon_path = _safe_token(beacon.get("beacon_path") or "/_cx-assets")
+            beacon_script_path = _safe_token(beacon.get("beacon_script_path") or "/_cx-assets.js")
             # Serve the static beacon JS file
             beacon_js_path = getattr(settings, 'PAGE_PROTECT_BEACON_JS_PATH', '/etc/haproxy/page-protect-beacon.js')
             lines.append(f"    acl is_beacon_script path -m str {beacon_script_path}")
-            lines.append(f"    http-request return status 200 content-type application/javascript lf-file {beacon_js_path} hdr Cache-Control public,max-age=86400 if is_beacon_script")
+            lines.append(f"    http-request return status 200 content-type application/javascript lf-file {beacon_js_path} hdr Cache-Control public,max-age=300,must-revalidate if is_beacon_script")
             # Capture beacon POSTs (resource lists from the browser)
             lines.append(f"    acl is_asset_beacon path -m str {beacon_path}")
             lines.append("    http-request wait-for-body time 5s if is_asset_beacon")
@@ -2820,7 +2820,7 @@ def generate_backend(
         beacon = page_protect_beacon or {}
         beacon_enabled = beacon.get("enabled", False)
         beacon_backend_ids = beacon.get("backend_ids") or []
-        beacon_script_path = beacon.get("beacon_script_path") or "/_asset-beacon.js"
+        beacon_script_path = beacon.get("beacon_script_path") or "/_cx-assets.js"
         # Check if beacon injection applies to this backend
         backend_has_beacon = beacon_enabled and (not beacon_backend_ids or backend.id in beacon_backend_ids)
         for policy in db.query(PageProtectPolicy).filter(PageProtectPolicy.enabled == True).all():  # noqa: E712
@@ -2830,6 +2830,8 @@ def generate_backend(
             directives = dict(policy.directives or {})
             # When beacon injection is enabled for this backend, add the beacon
             # script path to script-src so CSP doesn't block it in enforce mode.
+            # Also ensure connect-src allows the beacon POST (sendBeacon/fetch
+            # are governed by connect-src, which falls back to default-src).
             if backend_has_beacon:
                 script_src = directives.get("script-src")
                 if script_src is None:
@@ -2840,6 +2842,19 @@ def generate_backend(
                 else:
                     if "'self'" not in script_src and beacon_script_path not in script_src:
                         directives["script-src"] = list(script_src) + ["'self'"]
+                # Ensure the beacon POST endpoint is not blocked by CSP.
+                # sendBeacon() and fetch() are subject to connect-src.
+                connect_src = directives.get("connect-src")
+                if connect_src is not None:
+                    if "'self'" not in connect_src:
+                        directives["connect-src"] = list(connect_src) + ["'self'"]
+                else:
+                    # connect-src not set — falls back to default-src.
+                    # Ensure default-src has 'self' (may not have been added
+                    # above if script-src was explicitly set).
+                    default_src = directives.get("default-src")
+                    if default_src and "'self'" not in default_src:
+                        directives["default-src"] = list(default_src) + ["'self'"]
             csp_value = build_csp_header(directives, report_uri=report_uri)
             if not csp_value:
                 continue

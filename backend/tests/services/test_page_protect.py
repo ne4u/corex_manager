@@ -274,12 +274,13 @@ def test_build_beacon_rule(db):
         "beacon_content_types": "text/html",
         "beacon_path_patterns": "/app,/dashboard",
     }
-    rule = build_beacon_rule(pp_settings, "/_asset-beacon.js")
+    rule = build_beacon_rule(pp_settings, "/_cx-assets.js")
     assert rule["transform_type"] == "inject"
     assert rule["inject_position"] == "before"
     assert rule["content_types"] == ["text/html"]
     assert rule["path_patterns"] == ["/app", "/dashboard"]
-    assert "<script src=\"/_asset-beacon.js\"></script>" in rule["inject_string"]
+    assert "<script src=\"/_cx-assets.js?v=" in rule["inject_string"]
+    assert rule["inject_string"].endswith("\"></script>")
     assert rule["find_regex"] == "</head>|</body>"
 
 

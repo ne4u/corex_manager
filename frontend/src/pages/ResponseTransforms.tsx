@@ -48,7 +48,7 @@ export default function ResponseTransforms() {
     name: 'Page Protect Inventory Beacon',
     transform_type: 'inject',
     find_regex: '</head>|</body>',
-    inject_string: `<script src="${beaconSettings.beacon_script_path || '/_asset-beacon.js'}"></script>`,
+    inject_string: `<script src="${beaconSettings.beacon_script_path || '/_cx-assets.js'}"></script>`,
     inject_position: 'before',
     content_types: beaconSettings.beacon_content_types || 'text/html',
     enabled: true,

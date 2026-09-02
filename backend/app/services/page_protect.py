@@ -3,6 +3,7 @@
 Core service: CSP header builder, CSP report parser, script inventory upsert,
 settings helpers, and dashboard stats.
 """
+import hashlib
 import json
 import logging
 from datetime import datetime, timedelta, timezone
@@ -51,8 +52,8 @@ _DEFAULTS = {
     "baseline_end": "",    # ISO timestamp or empty
     "baseline_note": "",   # optional user label
     "beacon_injection_enabled": False,
-    "beacon_path": "/_asset-beacon",
-    "beacon_script_path": "/_asset-beacon.js",
+    "beacon_path": "/_cx-assets",
+    "beacon_script_path": "/_cx-assets.js",
     "beacon_content_types": "text/html",
     "beacon_path_patterns": "",
     "beacon_backend_ids": [],
@@ -449,8 +450,8 @@ def get_beacon_settings(db: Session) -> Dict[str, Any]:
     pp = get_page_protect_settings(db)
     return {
         "enabled": pp.get("beacon_injection_enabled", False),
-        "beacon_path": pp.get("beacon_path", "/_asset-beacon"),
-        "beacon_script_path": pp.get("beacon_script_path", "/_asset-beacon.js"),
+        "beacon_path": pp.get("beacon_path", "/_cx-assets"),
+        "beacon_script_path": pp.get("beacon_script_path", "/_cx-assets.js"),
         "content_types": pp.get("beacon_content_types", "text/html"),
         "path_patterns": pp.get("beacon_path_patterns", ""),
         "backend_ids": pp.get("beacon_backend_ids", []),
@@ -462,7 +463,16 @@ def build_beacon_rule(pp_settings: Dict[str, Any], beacon_script_url: str) -> Di
 
     This rule is merged into the per-backend resp-transform JSON config file
     alongside any user-defined transform rules.
+
+    A cache-busting version hash is appended to the script URL so browsers
+    fetch the new JS when its content changes (the file is served with a
+    long max-age). HAProxy's ``path`` fetch strips the query string, so the
+    ACL still matches the base path.
     """
+    from .page_protect_beacon_js import BEACON_JS
+    version = hashlib.sha256(BEACON_JS.encode()).hexdigest()[:8]
+    separator = "&" if "?" in beacon_script_url else "?"
+    versioned_url = f"{beacon_script_url}{separator}v={version}"
     content_types = [c.strip() for c in (pp_settings.get("beacon_content_types") or "text/html").split(",") if c.strip()]
     path_patterns = [p.strip() for p in (pp_settings.get("beacon_path_patterns") or "").split(",") if p.strip()]
     return {
@@ -473,7 +483,7 @@ def build_beacon_rule(pp_settings: Dict[str, Any], beacon_script_url: str) -> Di
         "content_types": content_types,
         "max_body_size": 1048576,
         "find_regex": "</head>|</body>",
-        "inject_string": f'<script src="{beacon_script_url}"></script>',
+        "inject_string": f'<script src="{versioned_url}"></script>',
         "inject_position": "before",
         "path_patterns": path_patterns,
     }
