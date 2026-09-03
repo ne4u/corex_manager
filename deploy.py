@@ -91,9 +91,9 @@ RSYNC_EXCLUDES = [
     "frontend/src/test-setup.ts",
     "frontend/src/vitest-globals.d.ts",
     # Runtime directories — never synced.
-    # `data/` is a named Docker volume (haproxy-data); the host dir is local-dev only.
-    # `certs/` is a bind mount but its contents are runtime-managed (acme.sh, backend);
-    # the deploy script only ensures the directory exists (see mkdir in main()).
+    # `data/` is the bind-mount base (DATA_DIR) for haproxy/postgres/valkey/varnish;
+    # its contents are runtime-managed and must not be overwritten by rsync.
+    # `certs/` is also bind-mounted under DATA_DIR; runtime-managed (acme.sh, backend).
     "data/",
     "certs/",
     # Git backup directories (from history rewrites)
@@ -785,12 +785,25 @@ def _deploy_docker(args: argparse.Namespace) -> int:
         print("Error: rsync failed.", file=sys.stderr)
         return 1
 
-    # `certs/` is a bind mount (./certs:/app/certs) but its contents are
-    # runtime-managed (acme.sh, backend cert issuance), so it is excluded from
-    # rsync. Ensure the directory exists on the remote so the bind mount works.
-    # `data/` is a named Docker volume (haproxy-data), so no host dir is needed.
-    print("\nEnsuring certs/ exists on remote...")
-    _ssh_cmd(host, user, f"mkdir -p {shlex.quote(remote_path)}/certs", ssh_password)
+    # `certs/` and `data/` are bind-mounted under DATA_DIR (set in the remote
+    # .env, defaults to ./data). Their contents are runtime-managed (acme.sh,
+    # backend cert issuance, postgres, valkey, etc.), so they are excluded from
+    # rsync. Ensure the directories exist on the remote so the bind mounts work.
+    # Creating them explicitly avoids root-owned dirs that can cause permission
+    # issues (especially postgres, which refuses to start if the data dir is
+    # owned by root). We source the remote .env so DATA_DIR matches what docker
+    # compose will actually use.
+    print("\nEnsuring data directories exist on remote...")
+    _ssh_cmd(
+        host,
+        user,
+        f"cd {shlex.quote(remote_path)} && "
+        f"set -a && . ./.env && set +a && "
+        f"DATA_DIR=${{DATA_DIR:-./data}} && "
+        f"mkdir -p \"$DATA_DIR/haproxy\" \"$DATA_DIR/postgres\" "
+        f"\"$DATA_DIR/valkey\" \"$DATA_DIR/varnish\" \"$DATA_DIR/certs\"",
+        ssh_password,
+    )
 
     print("\nEnsuring .env exists on remote...")
     _remote_docker(

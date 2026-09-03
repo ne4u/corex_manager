@@ -11,8 +11,8 @@ services:
     env_file:
       - .env
     volumes:
-      - haproxy-data:/app/data
-      - ./certs:/app/certs
+      - ${DATA_DIR:-./data}/haproxy:/app/data
+      - ${DATA_DIR:-./data}/certs:/app/certs
       - haproxy-run:/var/run
       - /var/run/docker.sock:/var/run/docker.sock
       - ./backend/app:/app/app
@@ -68,8 +68,8 @@ services:
       - "8404:8404"
       - "5555:5555"
     volumes:
-      - haproxy-data:/app/data
-      - ./certs:/app/certs
+      - ${DATA_DIR:-./data}/haproxy:/app/data
+      - ${DATA_DIR:-./data}/certs:/app/certs
       - haproxy-run:/var/run
     environment:
       - DATAPLANE_API_ENABLED=${DATAPLANE_API_ENABLED:-false}
@@ -98,7 +98,7 @@ services:
     image: busybox:1.37
     command: ["sh", "/init/init.sh"]
     volumes:
-      - haproxy-data:/app/data
+      - ${DATA_DIR:-./data}/haproxy:/app/data
       - ./coraza-spoa/init.sh:/init/init.sh:ro
       - ./coraza-spoa/coraza-spoa.yaml:/init/coraza-spoa.yaml:ro
     networks:
@@ -113,7 +113,7 @@ services:
       coraza-spoa-init:
         condition: service_completed_successfully
     volumes:
-      - haproxy-data:/app/data
+      - ${DATA_DIR:-./data}/haproxy:/app/data
     restart: unless-stopped
     networks:
       corex-net:
@@ -129,7 +129,7 @@ services:
       - POSTGRES_USER=${POSTGRES_USER:-haproxy}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-haproxy}
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - ${DATA_DIR:-./data}/postgres:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-haproxy} -d ${POSTGRES_DB:-haproxy_manager}"]
       interval: 5s
@@ -142,7 +142,7 @@ services:
   valkey:
     image: valkey/valkey:9-alpine
     volumes:
-      - valkey-data:/data
+      - ${DATA_DIR:-./data}/valkey:/data
     # Require authentication if VALKEY_PASSWORD is set in .env
     command: sh -c 'valkey-server --save 60 1 --loglevel warning --maxmemory-policy noeviction $${VALKEY_PASSWORD:+--requirepass $$VALKEY_PASSWORD}'
     environment:
@@ -180,8 +180,8 @@ services:
     # child/worker process to the varnish user internally.
     user: "0:0"
     volumes:
-      - haproxy-data:/app/data
-      - varnish-data:/var/lib/varnish
+      - ${DATA_DIR:-./data}/haproxy:/app/data
+      - ${DATA_DIR:-./data}/varnish:/var/lib/varnish
     # Create a minimal VCL file if it doesn't exist yet (the API writes the
     # real VCL during config apply). Without this, varnishd fails to start
     # on first boot before the API has had a chance to write the VCL.
@@ -219,7 +219,7 @@ services:
     env_file:
       - .env
     volumes:
-      - haproxy-data:/app/data
+      - ${DATA_DIR:-./data}/haproxy:/app/data
     environment:
       - MCP_GATEWAY_ENABLED=${MCP_GATEWAY_ENABLED:-false}
       - MCP_GATEWAY_LISTEN=0.0.0.0:8081
@@ -245,7 +245,7 @@ services:
     env_file:
       - .env
     volumes:
-      - haproxy-data:/app/data
+      - ${DATA_DIR:-./data}/haproxy:/app/data
       - ./backend/app:/app/app
     environment:
       - DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER:-haproxy}:${POSTGRES_PASSWORD:-haproxy}@postgres:5432/${POSTGRES_DB:-haproxy_manager}
@@ -272,8 +272,4 @@ networks:
     driver: bridge
 
 volumes:
-  haproxy-data:
   haproxy-run:
-  valkey-data:
-  varnish-data:
-  postgres-data:

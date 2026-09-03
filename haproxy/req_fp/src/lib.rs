@@ -641,21 +641,24 @@ fn build_fingerprint(txn: &Txn) -> LuaResult<String> {
     // 16. status
     parts.push(status.to_string());
 
-    // 17. body_bytes (response Content-Length, with res.body_len fallback)
+    // 17. body_bytes (response Content-Length only).
+    //
+    // We intentionally do NOT fall back to res.body_len here. Accessing
+    // res_body_len in an http-response Lua action forces HAProxy to buffer
+    // the entire response body before the action can complete. For large
+    // concurrent responses (e.g. 20 × 11MB OSD bundle files with chunked
+    // transfer-encoding), this causes massive memory buffering, client
+    // timeouts (termination: PH), and 500 errors.
+    //
+    // For chunked responses (no Content-Length), body_bytes will be "0" in
+    // the fingerprint. The actual response size is still captured in the
+    // HAProxy access log's bytes_out field, so no data is lost.
     let res_raw = txn.f.get_str("res_hdrs", ()).unwrap_or_default();
     let (_, _, res_hdrs) = parse_headers(&res_raw);
-    let mut bytes: u64 = 0;
-    if let Some(cl_val) = res_hdrs.get("content-length") {
-        bytes = cl_val.parse::<u64>().unwrap_or(0);
-    }
-    if bytes == 0 {
-        let body_len: Option<u64> = txn.f.get("res_body_len", ()).unwrap_or(None);
-        if let Some(bl) = body_len {
-            if bl > 0 {
-                bytes = bl;
-            }
-        }
-    }
+    let bytes: u64 = res_hdrs
+        .get("content-length")
+        .and_then(|cl| cl.parse::<u64>().ok())
+        .unwrap_or(0);
     parts.push(bytes.to_string());
 
     let fingerprint = parts.join("_");

@@ -379,26 +379,14 @@ local function build_fingerprint(txn)
     -- 16. status
     add(status)
 
-    -- 17. body_bytes (response Content-Length, with res.body_len fallback)
-    -- NOTE: res.hdrs captures the backend's response headers as received by
-    -- HAProxy, before HAProxy buffers the body and may inject Content-Length.
-    -- If the backend uses chunked encoding or sends no Content-Length, this
-    -- field will be 0 even though the client receives a Content-Length header
-    -- (added by HAProxy's response buffering). As a fallback, when the parsed
-    -- Content-Length is 0/absent we use res.body_len, which returns the length
-    -- of the response body HAProxy has buffered so far. This is reliable when
-    -- the body has already been buffered (e.g. small responses, or when other
-    -- http-response rules force buffering) but may still be 0 for streamed
-    -- responses; no wait-for-body directive is emitted to avoid changing the
-    -- proxy's buffering/streaming behavior.
+    -- 17. body_bytes (response Content-Length only).
+    -- See haproxy/lua/req_fp.lua for full rationale: we do NOT fall back to
+    -- res.body_len because it forces HAProxy to buffer the entire response
+    -- body, causing timeouts on large concurrent responses.
     local res_raw = txn.f:res_hdrs() or ''
     local _, _, res_hdrs = parse_headers(res_raw)
     local cl_val = res_hdrs['content-length']
     local bytes  = cl_val and (tonumber(cl_val) or 0) or 0
-    if bytes <= 0 then
-        local body_len = txn.f:res_body_len() or 0
-        if body_len > 0 then bytes = body_len end
-    end
     add(bytes > 0 and bytes or 0)
 
     return table.concat(parts, '_')
