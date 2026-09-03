@@ -302,6 +302,7 @@ export default function Listeners() {
           {form.quic && (
             <div><LabelWithTooltip tooltip={t('pages:listeners.tooltips.altSvcHeader')} className="label">{t('pages:listeners.modal.altSvcHeader')}</LabelWithTooltip><input className="input" placeholder={t('pages:listeners.modal.altSvcPlaceholder')} value={form.options?.alt_svc || ''} onChange={e => setForm({ ...form, options: { ...form.options, alt_svc: e.target.value } })} /></div>
           )}
+          <div><LabelWithTooltip tooltip={t('pages:listeners.tooltips.reqFpExcludePaths')} className="label">{t('pages:listeners.modal.reqFpExcludePaths')}</LabelWithTooltip><input className="input" placeholder="/bundles/,/static/" value={form.options?.req_fp_exclude_paths || ''} onChange={e => setForm({ ...form, options: { ...form.options, req_fp_exclude_paths: e.target.value } })} /></div>
           <HaproxyOptionsEditor
             scope="listener"
             value={form.haproxy_options || []}

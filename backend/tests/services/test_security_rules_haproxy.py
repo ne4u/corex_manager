@@ -361,6 +361,21 @@ def test_generate_frontend_req_fp_enabled(db):
     assert "http-response lua.req_fp" in cfg
 
 
+def test_generate_frontend_req_fp_exclude_paths(db):
+    """req_fp should be skipped for excluded path prefixes (configurable via
+    listener.options.req_fp_exclude_paths). Prevents 500s from Lua thread
+    blocking on large concurrent static file downloads."""
+    backend = make_backend(db)
+    listener = make_listener(db, backend=backend)
+    listener.options = {"req_fp_exclude_paths": "/bundles/,/static/"}
+    db.commit()
+    make_server(db, backend.id)
+    cfg = haproxy.generate_frontend(listener, db, req_fp_enabled=True)
+    assert "is_req_fp_excluded" in cfg
+    assert "path_beg /bundles/ /static/" in cfg
+    assert "unless { var(txn.req_fp_excluded) -m found }" in cfg
+
+
 def test_generate_frontend_req_fp_before_response_headers(db):
     """lua.req_fp must run before any http-response set-header so txn.req_fp is populated."""
     from app.models.models import ResponseHeader

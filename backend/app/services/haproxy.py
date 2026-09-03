@@ -2306,8 +2306,31 @@ def generate_frontend(
                 if os.path.exists(geo_db):
                     lines.append(f'    http-request set-var(txn.geo_country) src,geoip2({geo_db},country.iso_code)')
                     lines.append(f'    http-request set-var(txn.geoip_tz) src,geoip2({geo_db},location.time_zone)')
-            lines.append("    http-request lua.req_fp_capture")
-            lines.append("    http-response lua.req_fp")
+
+            # Optional: skip req_fp for specific path prefixes. The http-response
+            # lua.req_fp action runs in the HAProxy thread and accesses res_hdrs,
+            # which blocks the thread until response headers are available. For
+            # large concurrent responses (e.g. 20 × 11MB static bundles), this
+            # exhausts all HAProxy worker threads and causes 500 errors
+            # (termination: PH). Configurable via listener.options.req_fp_exclude_paths
+            # as a comma-separated list of path prefixes.
+            exclude_paths = str(
+                (listener.options or {}).get("req_fp_exclude_paths", "")
+            ).strip()
+            if exclude_paths:
+                paths = [_safe_token(p.strip()) for p in exclude_paths.split(",") if p.strip()]
+                if paths:
+                    path_list = " ".join(paths)
+                    lines.append(f'    acl is_req_fp_excluded path_beg {path_list}')
+                    lines.append('    http-request set-var(txn.req_fp_excluded) str(1) if is_req_fp_excluded')
+                    lines.append('    http-request lua.req_fp_capture unless { var(txn.req_fp_excluded) -m found }')
+                    lines.append('    http-response lua.req_fp unless { var(txn.req_fp_excluded) -m found }')
+                else:
+                    lines.append('    http-request lua.req_fp_capture')
+                    lines.append('    http-response lua.req_fp')
+            else:
+                lines.append('    http-request lua.req_fp_capture')
+                lines.append('    http-response lua.req_fp')
 
         # API Armor deeper analysis — runs AFTER req_fp_capture so req_fp
         # subfields are available for security rules.

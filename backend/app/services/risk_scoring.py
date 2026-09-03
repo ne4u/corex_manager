@@ -381,16 +381,24 @@ def emit_risk_scoring(listener: Any, db: Session, lines: List[str]) -> None:
     """
     rules = rules_for_listener(db, listener.id)
 
+    # When req_fp is excluded for this request (txn.req_fp_excluded), skip
+    # risk_capture and risk_compute. Risk scoring rules reference txn.req_fp.*
+    # vars (hdr_count, path_depth, param_types, etc.) which are empty when
+    # req_fp is skipped. Without this guard, rules like "hdr_count < 5"
+    # evaluate as true (empty = 0), inflating the risk score and triggering
+    # captcha challenges on legitimate static asset downloads.
+    skip_cond = "{ var(txn.req_fp_excluded) -m found }"
+
     # Phase 1: always emit risk_capture (even with 0 rules, so txn.risk_fp.*
     # vars are available to Security Rules that reference them).
     lines.append("    # Risk Scoring Phase 1: derive metadata fields (Lua)")
-    lines.append("    http-request lua.risk_capture")
+    lines.append(f"    http-request lua.risk_capture unless {skip_cond}")
 
     if not rules:
         # Still emit risk_compute with an empty rules table so txn.risk.score
         # is set to "0" and txn.risk.rules_hit is set to "" (safe defaults).
         lines.append("    # Risk Scoring Phase 3: compute score (no rules configured)")
-        lines.append("    http-request lua.risk_compute")
+        lines.append(f"    http-request lua.risk_compute unless {skip_cond}")
         return
 
     # Phase 2: per-rule match flags
@@ -411,13 +419,18 @@ def emit_risk_scoring(listener: Any, db: Session, lines: List[str]) -> None:
         # juxtaposed, OR groups joined by "or"). Do NOT add extra braces —
         # `{ { ... } }` is rejected by HAProxy ("missing fetch method in ACL
         # expression '{'"). Match the convention used by _emit_request_rule.
+        #
+        # Guard with !{ var(txn.req_fp_excluded) -m found } so rules that
+        # reference txn.req_fp.* vars don't match on empty values when req_fp
+        # is skipped (e.g. hdr_count < 5 would be true when req_fp vars are
+        # unset, inflating the risk score).
         lines.append(
-            f"    http-request set-var(txn.risk.match_{rule.id}) bool(1) if {condition}"
+            f"    http-request set-var(txn.risk.match_{rule.id}) bool(1) if {condition} !{skip_cond}"
         )
 
     # Phase 3: compute score
     lines.append("    # Risk Scoring Phase 3: compute score from match flags (Lua)")
-    lines.append("    http-request lua.risk_compute")
+    lines.append(f"    http-request lua.risk_compute unless {skip_cond}")
 
 
 # ---------------------------------------------------------------------------
