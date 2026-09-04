@@ -759,6 +759,76 @@ def _default_nbthread() -> int:
         return max(1, os.cpu_count() or 1)
 
 
+def _effective_tune_bufsize(
+    global_options: Optional[List[dict]],
+    compression_enabled: bool = False,
+    resp_transform_enabled: bool = False,
+    img_2_webp_enabled: bool = False,
+    req_fp_enabled: bool = False,
+    quic_enabled: bool = False,
+    disk_cache_enabled: bool = False,
+) -> int:
+    """Return the tune.bufsize HAProxy will actually run with.
+
+    Mirrors the emission rules in ``generate_global_section``: an explicit
+    user value in Global Options wins, then ``IMG_2_WEBP_BUFSIZE`` (when the
+    image filter is on), then the multi-filter / req_fp / large-response auto
+    floors, and finally HAProxy's built-in default. Anything that must stay
+    within the buffer (SPOE ``max-frame-size``, ``tune.vars.txn-max-size``)
+    derives from this so the config stays valid when the user changes
+    tune.bufsize.
+    """
+    for opt in (global_options or []):
+        if opt.get("enabled", True) and _safe_token(str(opt.get("directive", ""))).strip().lower() == "tune.bufsize":
+            try:
+                return int(_safe_token(str(opt.get("value", ""))).strip())
+            except (TypeError, ValueError):
+                break
+    if img_2_webp_enabled and settings.IMG_2_WEBP_BUFSIZE:
+        return settings.IMG_2_WEBP_BUFSIZE
+    auto_bufsize = 0
+    if not settings.IMG_2_WEBP_BUFSIZE:
+        if sum([bool(resp_transform_enabled), bool(compression_enabled), bool(img_2_webp_enabled)]) >= 3:
+            auto_bufsize = settings.HAPROXY_MULTI_FILTER_BUFSIZE
+        if req_fp_enabled and settings.HAPROXY_LUA_REQFP_BUFSIZE:
+            auto_bufsize = max(auto_bufsize, settings.HAPROXY_LUA_REQFP_BUFSIZE)
+        # H2 and H3 muxes can only allocate one buffer per stream. When a
+        # backend (e.g. Varnish cache hit) delivers the entire response
+        # instantly, responses larger than tune.bufsize overflow the single
+        # stream buffer → PH termination → 500. Apply the floor when QUIC
+        # (HTTP/3) is enabled OR disk cache (Varnish) is active, since both
+        # produce instant large responses over H2/H3.
+        if (quic_enabled or disk_cache_enabled) and settings.HAPROXY_QUIC_MIN_BUFSIZE:
+            auto_bufsize = max(auto_bufsize, settings.HAPROXY_QUIC_MIN_BUFSIZE)
+    return auto_bufsize or settings.HAPROXY_DEFAULT_BUFSIZE
+
+
+def _effective_tune_bufsize_from_db(db: Optional[Session]) -> int:
+    """Resolve the effective tune.bufsize from persisted settings (for callers
+    such as the SPOE config generator that don't receive the toggles)."""
+    if db is None:
+        return settings.HAPROXY_DEFAULT_BUFSIZE
+    from .settings import get_setting
+
+    def _flag(key: str, default: bool) -> bool:
+        return get_setting(db, key, str(default)).lower() in ("true", "1", "yes")
+
+    try:
+        raw = get_setting(db, "haproxy_global_options", "[]")
+        global_options = json.loads(raw or "[]") if isinstance(raw, str) else (raw or [])
+    except (json.JSONDecodeError, TypeError):
+        global_options = []
+    return _effective_tune_bufsize(
+        global_options,
+        compression_enabled=_flag("compression_enabled", settings.COMPRESSION_ENABLED),
+        resp_transform_enabled=_flag("resp_transform_enabled", settings.RESP_TRANSFORM_ENABLED),
+        img_2_webp_enabled=_flag("img_2_webp_enabled", settings.IMG_2_WEBP_ENABLED),
+        req_fp_enabled=_flag("req_fp_enabled", settings.REQ_FP_ENABLED),
+        quic_enabled=_any_listener_has_quic(db),
+        disk_cache_enabled=_any_backend_has_disk_cache(db),
+    )
+
+
 def generate_global_section(
     ciphers: Optional[List[CipherSuite]] = None,
     logs: Optional[List[LogDestination]] = None,
@@ -772,6 +842,7 @@ def generate_global_section(
     captcha_challenge_enabled: bool = False,
     api_armor_enabled: bool = False,
     req_fp_enabled: bool = False,
+    quic_enabled: bool = False,
 ) -> str:
     lines = ["global"]
     lines.append(f"    maxconn {settings.HAPROXY_MAXCONN}")
@@ -843,34 +914,151 @@ def generate_global_section(
         bool(compression_enabled),
         bool(img_2_webp_enabled),
     ])
+    user_set_bufsize = any(
+        opt.get("enabled", True)
+        and _safe_token(str(opt.get("directive", ""))).strip().lower() == "tune.bufsize"
+        for opt in (global_options or [])
+    )
+    auto_bufsize = 0
     if lua_response_filter_count >= 3:
-        user_set_bufsize = any(
-            opt.get("enabled", True)
-            and _safe_token(str(opt.get("directive", ""))).strip().lower() == "tune.bufsize"
-            for opt in (global_options or [])
-        )
         if not user_set_bufsize and not settings.IMG_2_WEBP_BUFSIZE:
-            lines.append(f"    tune.bufsize {settings.HAPROXY_MULTI_FILTER_BUFSIZE}")
+            auto_bufsize = settings.HAPROXY_MULTI_FILTER_BUFSIZE
+
+    # Optional bufsize floor for request-phase Lua actions (req_fp_capture,
+    # risk_capture, risk_compute). OFF by default (HAPROXY_LUA_REQFP_BUFSIZE=0):
+    # tune.bufsize is global and HAProxy sizes every stream/mux buffer from
+    # it, so a 512KB value with a large maxconn multiplies memory use by 32×.
+    # Operators who still observe PH terminations with Lua actions can set
+    # tune.bufsize explicitly in Global Options, or opt in via the env var.
+    if req_fp_enabled and settings.HAPROXY_LUA_REQFP_BUFSIZE and not user_set_bufsize and not settings.IMG_2_WEBP_BUFSIZE:
+        auto_bufsize = max(auto_bufsize, settings.HAPROXY_LUA_REQFP_BUFSIZE)
+
+    # Large-response bufsize floor (H2 + H3 mux limitation). HAProxy's H2 and
+    # H3 muxes can only allocate one buffer per stream. When a backend (e.g.
+    # Varnish cache hit) delivers the entire response instantly, responses
+    # larger than tune.bufsize overflow the single stream buffer and HAProxy
+    # aborts with PH (proxy header) termination → 500. This affects both HTTP/2
+    # and HTTP/3 — the H2 mux has the same one-buffer-per-stream limitation as
+    # H3, so disabling QUIC alone does not help. The floor is applied when QUIC
+    # (HTTP/3) is enabled OR disk cache (Varnish) is active, since both produce
+    # instant large responses. Only auto-emitted when the user has not set
+    # tune.bufsize explicitly. If the user set a smaller value, a warning
+    # comment is emitted instead. See HAPROXY_QUIC_MIN_BUFSIZE in config.py.
+    needs_large_buf = quic_enabled or disk_cache_enabled
+    if needs_large_buf and settings.HAPROXY_QUIC_MIN_BUFSIZE:
+        if not user_set_bufsize and not settings.IMG_2_WEBP_BUFSIZE:
+            auto_bufsize = max(auto_bufsize, settings.HAPROXY_QUIC_MIN_BUFSIZE)
+        elif user_set_bufsize:
+            user_bufsize_val = None
+            for opt in (global_options or []):
+                if opt.get("enabled", True) and _safe_token(str(opt.get("directive", ""))).strip().lower() == "tune.bufsize":
+                    try:
+                        user_bufsize_val = int(_safe_token(str(opt.get("value", ""))).strip())
+                    except (TypeError, ValueError):
+                        pass
+                    break
+            if user_bufsize_val is not None and user_bufsize_val < settings.HAPROXY_QUIC_MIN_BUFSIZE:
+                lines.append(
+                    f"    # WARNING: tune.bufsize {user_bufsize_val} is below the recommended minimum "
+                    f"of {settings.HAPROXY_QUIC_MIN_BUFSIZE} for large responses over HTTP/2/3 with "
+                    f"disk cache. Responses larger than tune.bufsize may abort with PH termination → 500. "
+                    f"Raise tune.bufsize or lower HAPROXY_MAXCONN to compensate for memory use."
+                )
+
+    if auto_bufsize > 0:
+        lines.append(f"    tune.bufsize {auto_bufsize}")
+
+    # Bound per-transaction variable memory. HAProxy's default is unlimited, so
+    # every txn var (req_fp_capture subfields, risk scores, security-rule flags,
+    # and a buffered request body via txn.req_fp_body / txn.api_body) can pin
+    # memory for the whole stream lifetime. `req.body` can never return more
+    # than one buffer, so the cap is derived from the effective tune.bufsize
+    # plus headroom for the small vars. A user-supplied tune.vars.txn-max-size
+    # in Global Options wins; HAPROXY_TXN_VARS_MAX_SIZE=0 disables the cap.
+    user_set_txn_vars = any(
+        opt.get("enabled", True)
+        and _safe_token(str(opt.get("directive", ""))).strip().lower() == "tune.vars.txn-max-size"
+        for opt in (global_options or [])
+    )
+    if not user_set_txn_vars and settings.HAPROXY_TXN_VARS_HEADROOM:
+        effective_bufsize = _effective_tune_bufsize(
+            global_options,
+            compression_enabled=compression_enabled,
+            resp_transform_enabled=resp_transform_enabled,
+            img_2_webp_enabled=img_2_webp_enabled,
+            req_fp_enabled=req_fp_enabled,
+            quic_enabled=quic_enabled,
+            disk_cache_enabled=disk_cache_enabled,
+        )
+        lines.append(f"    tune.vars.txn-max-size {effective_bufsize + settings.HAPROXY_TXN_VARS_HEADROOM}")
+
+    # Cap tune.h2.max-frame-size to the effective tune.bufsize. The H2/H3 mux
+    # uses this as the maximum DATA frame payload, but the actual data must fit
+    # in the HAProxy buffer (tune.bufsize). If max-frame-size > bufsize, the mux
+    # can attempt to coalesce more response data than the buffer holds, causing
+    # PH (proxy header) terminations → 500 on large responses. A user-supplied
+    # value <= bufsize is respected; a value > bufsize is capped with a warning
+    # comment so the config stays valid when the user lowers tune.bufsize.
+    user_h2_max_frame = None
+    for opt in (global_options or []):
+        if not opt.get("enabled", True):
+            continue
+        if _safe_token(str(opt.get("directive", ""))).strip().lower() != "tune.h2.max-frame-size":
+            continue
+        try:
+            user_h2_max_frame = int(_safe_token(str(opt.get("value", ""))).strip())
+        except (TypeError, ValueError):
+            pass
+        break
+    if user_h2_max_frame is not None:
+        effective_bufsize = _effective_tune_bufsize(
+            global_options,
+            compression_enabled=compression_enabled,
+            resp_transform_enabled=resp_transform_enabled,
+            img_2_webp_enabled=img_2_webp_enabled,
+            req_fp_enabled=req_fp_enabled,
+            quic_enabled=quic_enabled,
+            disk_cache_enabled=disk_cache_enabled,
+        )
+        if user_h2_max_frame > effective_bufsize:
+            lines.append(
+                f"    # WARNING: tune.h2.max-frame-size was {user_h2_max_frame} but exceeds "
+                f"tune.bufsize {effective_bufsize}; capped to prevent PH terminations"
+            )
+            lines.append(f"    tune.h2.max-frame-size {effective_bufsize}")
+        else:
+            lines.append(f"    tune.h2.max-frame-size {user_h2_max_frame}")
 
     # Log destinations (global).
-    # If no enabled LogDestination rows exist, emit a default stdout target so
-    # `docker compose logs haproxy` shows request logs out of the box.
+    # User-configured LogDestination rows are emitted first. A stdout target is
+    # always retained (when HAPROXY_LOG_DEFAULT_STDOUT is true) so the live log
+    # viewer — which tails the HAProxy container's stdout via the Docker SDK —
+    # keeps working even when the user adds non-stdout destinations (e.g. a
+    # remote syslog server). It is only skipped if the user already configured
+    # a stdout/stderr destination themselves, to avoid duplicate log lines.
     # For stdout/stderr targets, use `format raw` to emit the log-format string
     # as-is (no syslog framing) — ideal for JSON logging in containers.
     # `len` is raised above HAProxy's 1024 default so CSP report bodies are not
     # truncated in the log line before the sampler can parse them.
     log_max_len = getattr(settings, "HAPROXY_LOG_MAX_LEN", 65535)
     enabled_logs = [log for log in (logs or []) if log.enabled]
+    has_stdout_target = False
     if enabled_logs:
         for log in enabled_logs:
             target = _safe_token(log.target)
             facility = _safe_token(log.facility)
             level = _safe_token(log.level)
             if target in ("stdout", "stderr"):
+                has_stdout_target = True
                 lines.append(f"    log {target} len {log_max_len} format raw {facility}")
             else:
                 lines.append(f"    log {target} len {log_max_len} {facility} {level}")
-    elif getattr(settings, "HAPROXY_LOG_DEFAULT_STDOUT", True):
+    # Always keep a stdout target so the live log viewer (which tails the
+    # HAProxy container's stdout via the Docker SDK) keeps working even when
+    # the user adds non-stdout destinations (e.g. a remote syslog server).
+    # Skip if the user already configured a stdout/stderr destination to
+    # avoid emitting duplicate log lines.
+    if not has_stdout_target and getattr(settings, "HAPROXY_LOG_DEFAULT_STDOUT", True):
         lines.append(f"    log stdout len {log_max_len} format raw daemon")
 
     # TLS session cache
@@ -953,6 +1141,7 @@ def generate_global_section(
         line for line in extra_global
         if not line.strip().startswith("tune.lua.bool-sample-conversion")
         and not line.strip().startswith("tune.stick-counters")
+        and not line.strip().startswith("tune.h2.max-frame-size")
     ]
     lines.extend(extra_global)
 
@@ -1204,7 +1393,13 @@ def _build_ssl_bind_options(listener: Listener, certs: List[Certificate],
             opts.append("alpn h2")
         elif listener.http2:
             opts.append("alpn h2,http/1.1")
-        if listener.quic:
+        # 0-RTT (TLS 1.3 early data) is opt-in via listener.options.allow_0rtt
+        # because it enables replay attacks (RFC 9001 §9.2). When enabled, a
+        # replay mitigation rule is emitted in generate_frontend that rejects
+        # non-idempotent methods (POST/PUT/DELETE/PATCH) with HTTP 425 when
+        # early data is detected (ssl_fc_has_early).
+        listener_opts = listener.options or {}
+        if listener.quic and listener_opts.get("allow_0rtt"):
             opts.append("allow-0rtt")
         if cipher:
             ciphers_str = _safe_token(cipher.ciphers or CIPHER_BASELINES.get(cipher.baseline, ""))
@@ -1945,6 +2140,18 @@ def generate_frontend(
         # normal proxy chain. These headers sit before per-listener request
         # headers so user-defined rules can override them.
         lines.append("    option http-keep-alive")
+
+        # 0-RTT replay attack mitigation (RFC 9001 §9.2). When 0-RTT is
+        # enabled on this listener (allow-0rtt on the bind line), early data
+        # can be replayed by a network attacker. Reject non-idempotent
+        # methods with HTTP 425 (Too Early) so the client retries after the
+        # TLS handshake completes. GET and HEAD are safe to serve via 0-RTT
+        # because they are idempotent and have no side effects. This rule
+        # is emitted early (before any other http-request rules) so replayed
+        # state-changing requests are rejected before any processing.
+        if listener.quic and listener_options.get("allow_0rtt"):
+            lines.append("    acl is_early_data ssl_fc_has_early")
+            lines.append("    http-request deny status 425 if is_early_data !{ method GET HEAD }")
 
         # Stick-table + tcp-request connection tracking — MUST be emitted
         # before any http-request rules. HAProxy processes tcp-request
@@ -3410,6 +3617,29 @@ def _any_listener_has_challenge(db: Session) -> bool:
     return False
 
 
+def _any_listener_has_quic(db: Session) -> bool:
+    """Return True if any enabled listener has QUIC (HTTP/3) enabled."""
+    for listener in db.query(Listener).all():
+        if listener.enabled and getattr(listener, "quic", False) and listener.ssl_enabled:
+            return True
+    return False
+
+
+def _any_backend_has_disk_cache(db: Session) -> bool:
+    """Return True if any backend has disk cache (Varnish) enabled.
+
+    Varnish cache hits deliver entire responses instantly, which can overflow
+    the H2/H3 mux's single-buffer-per-stream limit when responses are larger
+    than tune.bufsize. Used to auto-raise tune.bufsize.
+    """
+    for cc in db.query(CacheConfig).all():
+        if cc.disk_cache_enabled:
+            backend = db.get(Backend, cc.backend_id)
+            if backend and backend.protocol != "tcp":
+                return True
+    return False
+
+
 def generate_cap_proxy_backends(db: Session = None) -> str:
     """Emit the CAPTCHA proxy backends.
 
@@ -3571,7 +3801,7 @@ def generate_config(
         frontend_names, backend_names, stats_name, coraza_name = _get_section_names(db)
 
     config = "# Generated by coreX Manager\n# Do not edit manually\n\n"
-    config += generate_global_section(ciphers, logs, logged_fields, global_options, ja4_enabled=ja4_enabled, compression_enabled=compression_enabled, disk_cache_enabled=disk_cache_enabled, resp_transform_enabled=resp_transform_enabled, img_2_webp_enabled=img_2_webp_enabled, captcha_challenge_enabled=_any_listener_has_challenge(db), api_armor_enabled=api_armor_enabled, req_fp_enabled=req_fp_enabled)
+    config += generate_global_section(ciphers, logs, logged_fields, global_options, ja4_enabled=ja4_enabled, compression_enabled=compression_enabled, disk_cache_enabled=disk_cache_enabled, resp_transform_enabled=resp_transform_enabled, img_2_webp_enabled=img_2_webp_enabled, captcha_challenge_enabled=_any_listener_has_challenge(db), api_armor_enabled=api_armor_enabled, req_fp_enabled=req_fp_enabled, quic_enabled=_any_listener_has_quic(db))
     config += generate_defaults_section(headers, error_pages)
     config += generate_dataplane_section()
     config += generate_stats_frontend(stats_name)

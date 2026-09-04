@@ -228,6 +228,37 @@ class Settings(BaseSettings):
     # user has not set tune.bufsize explicitly (via Global Options or
     # IMG_2_WEBP_BUFSIZE). See generate_global_section in haproxy.py.
     HAPROXY_MULTI_FILTER_BUFSIZE: int = 65_536
+    # Optional tune.bufsize floor emitted when request-phase Lua actions
+    # (req_fp_capture, risk_capture, risk_compute) are active. 0 = disabled
+    # (default). A previous default of 512KB was used to paper over PH
+    # terminations observed with many concurrent large HTTP/2 responses, but
+    # tune.bufsize is global: every stream and mux buffer is sized from it, so
+    # 512KB × HAPROXY_MAXCONN × 2 is a ~32× memory multiplier that exhausts
+    # RAM long before the buffer helps. The Lua-side causes (shared-state
+    # lua-load lock, per-request dofile, oversized txn vars) are addressed
+    # directly instead. Set this (or tune.bufsize in Global Options) only
+    # together with a suitably lowered HAPROXY_MAXCONN.
+    HAPROXY_LUA_REQFP_BUFSIZE: int = 0
+    # Minimum tune.bufsize emitted automatically when any listener has QUIC
+    # (HTTP/3) enabled OR disk cache (Varnish) is active. HAProxy's H2 and H3
+    # muxes can only allocate one buffer per stream. When a backend (e.g.
+    # Varnish cache hit) delivers the entire response instantly, responses
+    # larger than tune.bufsize overflow the single stream buffer and HAProxy
+    # aborts with PH (proxy header) termination → 500. This affects both HTTP/2
+    # and HTTP/3 — disabling QUIC does not help because the H2 mux has the same
+    # one-buffer-per-stream limitation. 1MB handles most large static assets
+    # (OSD bundle JS files up to ~1MB). Only emitted when the user has not set
+    # tune.bufsize explicitly. If the user sets a smaller value, a warning
+    # comment is emitted instead. Memory impact: bufsize × maxconn × 2 — with
+    # 1MB and maxconn 4096, worst-case buffer memory is ~8GB. Lower
+    # HAPROXY_MAXCONN accordingly. See generate_global_section.
+    HAPROXY_QUIC_MIN_BUFSIZE: int = 1_048_576  # 1 MB
+    # Headroom added to the effective tune.bufsize to derive the emitted
+    # tune.vars.txn-max-size (HAProxy default: unlimited). A buffered request
+    # body var (txn.req_fp_body / txn.api_body) is at most one buffer; the
+    # headroom covers the few dozen small fingerprint/risk/security-rule vars.
+    # 0 disables emitting the cap.
+    HAPROXY_TXN_VARS_HEADROOM: int = 65_536
     # Safety margin subtracted from the effective bufsize to account for
     # tune.maxrewrite (1024) and the response header block, which share the same
     # buffer. Capped at a quarter of the bufsize so small buffers stay sane.

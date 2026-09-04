@@ -21,7 +21,7 @@ export default function Listeners() {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<number | null>(null)
   const [mcpGatewayEnabled, setMcpGatewayEnabled] = useState(false)
-  const initialForm = { name: '', bind_address: '0.0.0.0', bind_port: 80, mode: 'http', protocol: 'http', ssl_enabled: false, http2: false, quic: false, proxy_protocol: false, force_https: false, default_backend_id: null as number | null, certificate_id: null as number | null, certificate_ids: [] as number[], alpn: '', options: { cipher_suite: '', mcp_route_enabled: false } as any, haproxy_options: [] as HaproxyOption[] }
+  const initialForm = { name: '', bind_address: '0.0.0.0', bind_port: 80, mode: 'http', protocol: 'http', ssl_enabled: false, http2: false, quic: false, proxy_protocol: false, force_https: false, default_backend_id: null as number | null, certificate_id: null as number | null, certificate_ids: [] as number[], alpn: '', options: { cipher_suite: '', mcp_route_enabled: false, allow_0rtt: false } as any, haproxy_options: [] as HaproxyOption[] }
   const [form, setForm] = useState<any>(initialForm)
 
   useEffect(() => {
@@ -300,9 +300,11 @@ export default function Listeners() {
             <div><LabelWithTooltip tooltip={t('pages:listeners.tooltips.alpn')} className="label">{t('pages:listeners.modal.alpn')}</LabelWithTooltip><input className="input" placeholder={t('pages:listeners.modal.alpnPlaceholder')} value={form.alpn || ''} onChange={e => setForm({ ...form, alpn: e.target.value })} /></div>
           )}
           {form.quic && (
-            <div><LabelWithTooltip tooltip={t('pages:listeners.tooltips.altSvcHeader')} className="label">{t('pages:listeners.modal.altSvcHeader')}</LabelWithTooltip><input className="input" placeholder={t('pages:listeners.modal.altSvcPlaceholder')} value={form.options?.alt_svc || ''} onChange={e => setForm({ ...form, options: { ...form.options, alt_svc: e.target.value } })} /></div>
+            <>
+              <div><LabelWithTooltip tooltip={t('pages:listeners.tooltips.altSvcHeader')} className="label">{t('pages:listeners.modal.altSvcHeader')}</LabelWithTooltip><input className="input" placeholder={t('pages:listeners.modal.altSvcPlaceholder')} value={form.options?.alt_svc || ''} onChange={e => setForm({ ...form, options: { ...form.options, alt_svc: e.target.value } })} /></div>
+              <label className="flex items-center gap-2"><input type="checkbox" checked={form.options?.allow_0rtt || false} onChange={e => setForm({ ...form, options: { ...form.options, allow_0rtt: e.target.checked } })} /><span>{t('pages:listeners.modal.allow0rtt')}</span><InfoTooltip content={t('pages:listeners.tooltips.allow0rtt')} /></label>
+            </>
           )}
-          <div><LabelWithTooltip tooltip={t('pages:listeners.tooltips.reqFpExcludePaths')} className="label">{t('pages:listeners.modal.reqFpExcludePaths')}</LabelWithTooltip><input className="input" placeholder="/bundles/,/static/" value={form.options?.req_fp_exclude_paths || ''} onChange={e => setForm({ ...form, options: { ...form.options, req_fp_exclude_paths: e.target.value } })} /></div>
           <HaproxyOptionsEditor
             scope="listener"
             value={form.haproxy_options || []}

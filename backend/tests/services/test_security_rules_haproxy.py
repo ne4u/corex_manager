@@ -275,6 +275,147 @@ def test_generate_global_section_multi_filter_bufsize_img2webp_wins():
         s.IMG_2_WEBP_BUFSIZE = orig
 
 
+def test_generate_global_section_req_fp_no_auto_bufsize():
+    """req_fp alone must not auto-emit a large tune.bufsize (memory multiplier)."""
+    cfg = haproxy.generate_global_section(req_fp_enabled=True)
+    assert "tune.bufsize" not in cfg
+
+
+def test_generate_global_section_req_fp_bufsize_opt_in():
+    """HAPROXY_LUA_REQFP_BUFSIZE > 0 opts back in to the bufsize floor."""
+    from app.core.config import get_settings
+    s = get_settings()
+    orig = s.HAPROXY_LUA_REQFP_BUFSIZE
+    try:
+        s.HAPROXY_LUA_REQFP_BUFSIZE = 131072
+        cfg = haproxy.generate_global_section(req_fp_enabled=True)
+        assert "tune.bufsize 131072" in cfg
+    finally:
+        s.HAPROXY_LUA_REQFP_BUFSIZE = orig
+
+
+def test_generate_global_section_txn_vars_cap_from_default_bufsize():
+    """tune.vars.txn-max-size = default bufsize + headroom when nothing else sets bufsize."""
+    from app.core.config import get_settings
+    s = get_settings()
+    cfg = haproxy.generate_global_section()
+    expected = s.HAPROXY_DEFAULT_BUFSIZE + s.HAPROXY_TXN_VARS_HEADROOM
+    assert f"tune.vars.txn-max-size {expected}" in cfg
+
+
+def test_generate_global_section_txn_vars_cap_tracks_user_bufsize():
+    """A user tune.bufsize raises the txn-vars cap so req.body vars still fit."""
+    from app.core.config import get_settings
+    s = get_settings()
+    cfg = haproxy.generate_global_section(
+        global_options=[{"enabled": True, "directive": "tune.bufsize", "value": "262144"}],
+    )
+    assert f"tune.vars.txn-max-size {262144 + s.HAPROXY_TXN_VARS_HEADROOM}" in cfg
+
+
+def test_generate_global_section_txn_vars_cap_user_override():
+    """A user-supplied tune.vars.txn-max-size is not duplicated."""
+    cfg = haproxy.generate_global_section(
+        global_options=[{"enabled": True, "directive": "tune.vars.txn-max-size", "value": "4194304"}],
+    )
+    assert "tune.vars.txn-max-size 4194304" in cfg
+    assert cfg.count("tune.vars.txn-max-size") == 1
+
+
+def test_generate_global_section_h2_max_frame_size_capped_to_bufsize():
+    """A user tune.h2.max-frame-size > tune.bufsize is capped to prevent PH terminations."""
+    cfg = haproxy.generate_global_section(
+        global_options=[
+            {"enabled": True, "directive": "tune.bufsize", "value": "65536"},
+            {"enabled": True, "directive": "tune.h2.max-frame-size", "value": "1048576"},
+        ],
+    )
+    assert "tune.h2.max-frame-size 65536" in cfg
+    assert "tune.h2.max-frame-size 1048576" not in cfg
+    assert "WARNING" in cfg
+    # The directive line should appear exactly once (not duplicated from extra_global).
+    # The WARNING comment also mentions the directive name, so count directive lines only.
+    directive_lines = [l for l in cfg.splitlines() if l.strip().startswith("tune.h2.max-frame-size")]
+    assert len(directive_lines) == 1
+
+
+def test_generate_global_section_h2_max_frame_size_within_bufsize_respected():
+    """A user tune.h2.max-frame-size <= tune.bufsize is emitted as-is."""
+    cfg = haproxy.generate_global_section(
+        global_options=[
+            {"enabled": True, "directive": "tune.bufsize", "value": "262144"},
+            {"enabled": True, "directive": "tune.h2.max-frame-size", "value": "16384"},
+        ],
+    )
+    assert "tune.h2.max-frame-size 16384" in cfg
+    assert "WARNING" not in cfg
+
+
+def test_generate_global_section_h2_max_frame_size_not_emitted_when_unset():
+    """When the user hasn't set tune.h2.max-frame-size, it's not emitted (HAProxy default)."""
+    cfg = haproxy.generate_global_section()
+    assert "tune.h2.max-frame-size" not in cfg
+
+
+def test_generate_global_section_quic_auto_bufsize():
+    """QUIC enabled auto-raises tune.bufsize to HAPROXY_QUIC_MIN_BUFSIZE when user hasn't set it."""
+    from app.core.config import get_settings
+    s = get_settings()
+    cfg = haproxy.generate_global_section(quic_enabled=True)
+    assert f"tune.bufsize {s.HAPROXY_QUIC_MIN_BUFSIZE}" in cfg
+
+
+def test_generate_global_section_disk_cache_auto_bufsize():
+    """Disk cache (Varnish) enabled auto-raises tune.bufsize (H2 mux has same one-buffer limit)."""
+    from app.core.config import get_settings
+    s = get_settings()
+    cfg = haproxy.generate_global_section(disk_cache_enabled=True)
+    assert f"tune.bufsize {s.HAPROXY_QUIC_MIN_BUFSIZE}" in cfg
+
+
+def test_generate_global_section_quic_warns_small_user_bufsize():
+    """QUIC enabled with a user tune.bufsize below the minimum emits a warning comment."""
+    from app.core.config import get_settings
+    s = get_settings()
+    cfg = haproxy.generate_global_section(
+        quic_enabled=True,
+        global_options=[{"enabled": True, "directive": "tune.bufsize", "value": "65536"}],
+    )
+    assert "WARNING" in cfg
+    assert f"{s.HAPROXY_QUIC_MIN_BUFSIZE}" in cfg
+    # The user's small value is still emitted (not overridden)
+    assert "tune.bufsize 65536" in cfg
+
+
+def test_generate_global_section_quic_no_warning_for_large_user_bufsize():
+    """QUIC enabled with a user tune.bufsize >= minimum does not emit a warning."""
+    from app.core.config import get_settings
+    s = get_settings()
+    cfg = haproxy.generate_global_section(
+        quic_enabled=True,
+        global_options=[{"enabled": True, "directive": "tune.bufsize", "value": str(s.HAPROXY_QUIC_MIN_BUFSIZE)}],
+    )
+    assert "WARNING" not in cfg
+    assert f"tune.bufsize {s.HAPROXY_QUIC_MIN_BUFSIZE}" in cfg
+
+
+def test_generate_global_section_no_auto_bufsize_when_disabled():
+    """Neither QUIC nor disk cache enabled does not auto-raise tune.bufsize."""
+    cfg = haproxy.generate_global_section(quic_enabled=False, disk_cache_enabled=False)
+    # No auto tune.bufsize emission (only emitted when filters/QUIC/cache require it)
+    assert "tune.bufsize" not in cfg
+
+
+def test_generate_global_section_stateless_lua_scripts_per_thread():
+    """Stateless Lua scripts use lua-load-per-thread (no shared-state Lua lock)."""
+    cfg = haproxy.generate_global_section(ja4_enabled=True, req_fp_enabled=True)
+    assert "lua-load-per-thread /etc/haproxy/ja4.lua" in cfg
+    assert "lua-load-per-thread /etc/haproxy/acme.lua" in cfg
+    assert "lua-load /etc/haproxy/ja4.lua" not in cfg
+    assert "lua-load /etc/haproxy/acme.lua" not in cfg
+    assert "lua-load-per-thread /etc/haproxy/risk_score.lua" in cfg
+
+
 def test_generate_config_with_security_rule(db):
     """Full config generation with a security rule should include the rule lines."""
     backend = make_backend(db)
@@ -416,6 +557,58 @@ def test_alt_svc_guarded_against_varnish_fetch(db):
     cfg = haproxy.generate_frontend(listener, db)
     assert "http-response set-header Alt-Svc" in cfg
     assert "!{ var(txn.is_varnish_fetch) -m found }" in cfg
+
+
+def test_quic_no_0rtt_by_default(db):
+    """0-RTT (allow-0rtt) must NOT be emitted by default when QUIC is enabled,
+    because 0-RTT enables replay attacks (RFC 9001 §9.2). It is opt-in via
+    listener.options.allow_0rtt."""
+    backend = make_backend(db)
+    listener = make_listener(db, backend=backend, name="quic_no_0rtt", bind_port=443, ssl_enabled=True)
+    listener.quic = True
+    db.commit()
+    make_server(db, backend.id)
+    cfg = haproxy.generate_frontend(listener, db)
+    assert "allow-0rtt" not in cfg
+    # Replay mitigation rule must also be absent when 0-RTT is off
+    assert "ssl_fc_has_early" not in cfg
+    assert "status 425" not in cfg
+
+
+def test_quic_0rtt_opt_in_emits_bind_and_mitigation(db):
+    """When listener.options.allow_0rtt is True, allow-0rtt is emitted on the
+    bind line AND the replay mitigation rule (HTTP 425 for non-idempotent
+    methods on early data) is emitted in the frontend."""
+    backend = make_backend(db)
+    listener = make_listener(db, backend=backend, name="quic_0rtt", bind_port=443, ssl_enabled=True)
+    listener.quic = True
+    listener.options = {"allow_0rtt": True}
+    db.commit()
+    make_server(db, backend.id)
+    cfg = haproxy.generate_frontend(listener, db)
+    # allow-0rtt on the QUIC bind line
+    assert "allow-0rtt" in cfg
+    # Replay mitigation: ACL + deny rule
+    assert "acl is_early_data ssl_fc_has_early" in cfg
+    assert "http-request deny status 425 if is_early_data !{ method GET HEAD }" in cfg
+
+
+def test_quic_0rtt_mitigation_before_other_request_rules(db):
+    """The 0-RTT replay mitigation rule must appear before other http-request
+    rules (e.g. X-Forwarded-For) so replayed state-changing requests are
+    rejected before any processing."""
+    backend = make_backend(db)
+    listener = make_listener(db, backend=backend, name="quic_0rtt_order", bind_port=443, ssl_enabled=True)
+    listener.quic = True
+    listener.options = {"allow_0rtt": True}
+    db.commit()
+    make_server(db, backend.id)
+    cfg = haproxy.generate_frontend(listener, db)
+    deny_pos = cfg.find("http-request deny status 425")
+    xff_pos = cfg.find("http-request add-header X-Forwarded-For")
+    assert deny_pos != -1, "0-RTT deny rule not found"
+    assert xff_pos != -1, "X-Forwarded-For rule not found"
+    assert deny_pos < xff_pos, "0-RTT deny rule must appear before X-Forwarded-For"
 
 
 def test_csp_guarded_against_varnish_fetch(db):
