@@ -915,10 +915,61 @@ def test_default_json_log_format_combined_action_field():
     instead of separate sec_action/rl_action/waf_action fields.
     """
     fmt = haproxy._default_json_log_format(ja4_enabled=False)
-    assert '"action":"%[var(txn.action)]"' in fmt
+    assert '"action":"%[var(txn.action),json]"' in fmt
     assert "sec_action" not in fmt
     assert "rl_action" not in fmt
     assert "waf_action" not in fmt
+
+
+def test_default_json_log_format_user_controlled_fields_use_json_converter():
+    """User-controlled fields (path, query, host) must use the ,json converter.
+
+    Without ,json, raw backslashes/quotes/control chars in URLs and Host
+    headers produce invalid JSON in the log line, causing downstream SIEM
+    parsers (Vector parse_json) to fail silently and lose ALL structured
+    fields — not just the offending one. This is particularly insidious
+    because it selectively breaks parsing for attack traffic (exploit
+    attempts with special chars in URLs).
+
+    The ,json converter escapes \\, ", and control characters for safe
+    JSON inclusion. path/query are stashed in txn vars during the request
+    phase (http-request set-var) because the path/query sample fetches
+    are not available at log-format evaluation time (HAProxy 3.4+).
+    """
+    fmt = haproxy._default_json_log_format(ja4_enabled=True)
+    assert '"path":"%[var(txn.path),json]"' in fmt
+    assert '"query":"%[var(txn.query),json]"' in fmt
+    assert '"host":"%[var(txn.host),json]"' in fmt
+    # The old raw log-format variables must NOT be present
+    assert '"path":"%HP"' not in fmt
+    assert '"query":"%HQ"' not in fmt
+    assert '"host":"%[var(txn.host)]"' not in fmt
+
+
+def test_default_json_log_format_all_string_vars_use_json_converter():
+    """All string-type var() fields must use the ,json converter for JSON safety.
+
+    Defense in depth: even system-set string vars (action labels, rule names,
+    WAF messages, rate-limit names) can contain quotes/commas/special chars
+    that break JSON. Numeric vars are excluded (they can't contain
+    JSON-breaking characters).
+    """
+    fmt = haproxy._default_json_log_format(ja4_enabled=True)
+    # String vars that need ,json
+    assert '"sec_rule":"%[var(txn.sec.rule),json]"' in fmt
+    assert '"risk_rules_hit":"%[var(txn.risk.rules_hit),json]"' in fmt
+    assert '"risk_hit_density":"%[var(txn.risk.hit_density),json]"' in fmt
+    assert '"rl_name":"%[var(txn.ratelimit.name),json]"' in fmt
+    assert '"waf_status":"%[var(txn.coraza.status),json]"' in fmt
+    assert '"waf_rules_hit":"%[var(txn.coraza.rules_hit),json]"' in fmt
+    assert '"waf_rule_ids":"%[var(txn.coraza.rule_ids),json]"' in fmt
+    assert '"status_source":"%[var(txn.status_source),json]"' in fmt
+    assert '"req_fp":"%[var(txn.req_fp),json]"' in fmt
+    assert '"ja4":"%[lua.ja4_fp,json]"' in fmt
+    # Numeric vars should NOT have ,json (they can't break JSON)
+    assert '"risk_score":"%[var(txn.risk.score)]"' in fmt
+    assert '"risk_rules_hit_count":"%[var(txn.risk.rules_hit_count)]"' in fmt
+    assert '"waf_anomaly_score":"%[var(txn.coraza.anomaly_score)]"' in fmt
 
 
 def test_global_options_change_detected_by_config_status(db, monkeypatch, tmp_path):

@@ -610,29 +610,37 @@ def _default_json_log_fields(ja4_enabled: bool, page_protect_enabled: bool = Fal
         "client_port": "%cp",
         "frontend": "%f",
         "backend": "%b",
-        "host": "%[var(txn.host)]",
+        # host/path/query are user-controlled (Host header, URL) and can
+        # contain backslashes, quotes, and control characters that break
+        # JSON. The ,json converter escapes them for safe JSON inclusion.
+        # path/query are stashed in txn vars during the request phase
+        # (http-request set-var) because the path/query sample fetches
+        # are not available at log-format evaluation time (HAProxy 3.4+).
+        "host": "%[var(txn.host),json]",
         "method": "%HM",
-        "path": "%HP",
-        "query": "%HQ",
+        "path": "%[var(txn.path),json]",
+        "query": "%[var(txn.query),json]",
         "user_agent": "%[capture.req.hdr(1),json]",
         "status": "%ST",
-        "status_source": "%[var(txn.status_source)]",
+        "status_source": "%[var(txn.status_source),json]",
         "bytes_out": "%B",
         "rt": "%Tr",
         "ct": "%Tc",
         "tt": "%Tt",
         "termination": "%ts",
-        "action": "%[var(txn.action)]",
-        "sec_rule": "%[var(txn.sec.rule)]",
+        # String vars (action labels, rule names, WAF messages) can contain
+        # quotes/commas/special chars — ,json escapes them for JSON safety.
+        "action": "%[var(txn.action),json]",
+        "sec_rule": "%[var(txn.sec.rule),json]",
         "risk_score": "%[var(txn.risk.score)]",
-        "risk_rules_hit": "%[var(txn.risk.rules_hit)]",
+        "risk_rules_hit": "%[var(txn.risk.rules_hit),json]",
         "risk_rules_hit_count": "%[var(txn.risk.rules_hit_count)]",
-        "risk_hit_density": "%[var(txn.risk.hit_density)]",
-        "rl_name": "%[var(txn.ratelimit.name)]",
-        "waf_status": "%[var(txn.coraza.status)]",
+        "risk_hit_density": "%[var(txn.risk.hit_density),json]",
+        "rl_name": "%[var(txn.ratelimit.name),json]",
+        "waf_status": "%[var(txn.coraza.status),json]",
         "waf_anomaly_score": "%[var(txn.coraza.anomaly_score)]",
-        "waf_rules_hit": "%[var(txn.coraza.rules_hit)]",
-        "waf_rule_ids": "%[var(txn.coraza.rule_ids)]",
+        "waf_rules_hit": "%[var(txn.coraza.rules_hit),json]",
+        "waf_rule_ids": "%[var(txn.coraza.rule_ids),json]",
         "server": "%s",
         "unique_id": "%ID",
     }
@@ -642,31 +650,32 @@ def _default_json_log_fields(ja4_enabled: bool, page_protect_enabled: bool = Fal
     #   2. Native geoip2 converter — when HAProxy is built with geoip2 support
     #   3. map_ip fallback files — legacy last resort
     if _geoip_lua_module_available():
-        fields["country"] = '%[src,lua.geoip2-lookup-city(\\"country\\",\\"iso_code\\")]'
-        fields["asn"] = '%[src,lua.geoip2-lookup-asn(\\"autonomous_system_number\\")]'
-        fields["asn_org"] = '%[src,lua.geoip2-lookup-asn(\\"autonomous_system_organization\\")]'
-        fields["asn_network"] = '%[src,lua.geoip2-lookup-asn(\\"network\\")]'
-        fields["city"] = '%[src,lua.geoip2-lookup-city(\\"city\\",\\"names\\",\\"en\\")]'
+        fields["country"] = '%[src,lua.geoip2-lookup-city(\\"country\\",\\"iso_code\\"),json]'
+        fields["asn"] = '%[src,lua.geoip2-lookup-asn(\\"autonomous_system_number\\"),json]'
+        fields["asn_org"] = '%[src,lua.geoip2-lookup-asn(\\"autonomous_system_organization\\"),json]'
+        fields["asn_network"] = '%[src,lua.geoip2-lookup-asn(\\"network\\"),json]'
+        fields["city"] = '%[src,lua.geoip2-lookup-city(\\"city\\",\\"names\\",\\"en\\"),json]'
     elif _haproxy_supports_geoip2() and os.path.exists(settings.GEOIP_DB_PATH):
         geo_db = os.path.abspath(settings.GEOIP_DB_PATH)
-        fields["country"] = f"%[src,geoip2({geo_db},country.iso_code)]"
+        fields["country"] = f"%[src,geoip2({geo_db},country.iso_code),json]"
         if os.path.exists(settings.ASN_DB_PATH):
             asn_db = os.path.abspath(settings.ASN_DB_PATH)
-            fields["asn"] = f"%[src,geoip2({asn_db},autonomous_system_number)]"
+            fields["asn"] = f"%[src,geoip2({asn_db},autonomous_system_number),json]"
     elif not _haproxy_supports_geoip2() and os.path.exists(settings.GEOIP_COUNTRY_MAP_PATH):
         country_map = os.path.abspath(settings.GEOIP_COUNTRY_MAP_PATH)
-        fields["country"] = f"%[src,map_ip({country_map})]"
+        fields["country"] = f"%[src,map_ip({country_map}),json]"
         if os.path.exists(settings.GEOIP_ASN_MAP_PATH):
             asn_map = os.path.abspath(settings.GEOIP_ASN_MAP_PATH)
-            fields["asn"] = f"%[src,map_ip({asn_map})]"
+            fields["asn"] = f"%[src,map_ip({asn_map}),json]"
 
     # JA4 — only if the JA4 Lua script is loaded (ja4_enabled)
     if ja4_enabled:
-        fields["ja4"] = "%[lua.ja4_fp]"
+        fields["ja4"] = "%[lua.ja4_fp,json]"
 
     # req_fp — always safe to reference. var(txn.req_fp) returns empty when
-    # the per-frontend req_fp_capture action isn't emitted.
-    fields["req_fp"] = "%[var(txn.req_fp)]"
+    # the per-frontend req_fp_capture action isn't emitted. The ,json
+    # converter escapes any special chars in header/param-derived sub-fields.
+    fields["req_fp"] = "%[var(txn.req_fp),json]"
 
     # Page Protect — CSP report body captured in txn.csp_report for report POSTs.
     # Empty for normal requests. The sampler filters for non-empty values.
@@ -2436,10 +2445,17 @@ def generate_frontend(
             lines.append(f"    http-request track-sc3 src table resp_code_table_{lname}")
 
         lines.append("    http-request capture req.hdr(Host) len 64")
-        # Stash the Host header in a txn var so the log-format (evaluated at
-        # log time, where req.hdr() is not reliably available) can reference
-        # it via %[var(txn.host)]. See _default_json_log_format.
+        # Stash the Host header, request path, and query string in txn vars
+        # so the log-format (evaluated at log time, where req.hdr()/path/query
+        # sample fetches are not reliably available — HAProxy 3.4+ rejects them
+        # in log-format) can reference them via %[var(txn.host),json] etc.
+        # The ,json converter in the log-format escapes backslashes, quotes,
+        # and control chars for safe JSON inclusion (attack traffic with
+        # special chars in URLs would otherwise produce invalid JSON).
+        # See _default_json_log_format.
         lines.append("    http-request set-var(txn.host) req.hdr(host)")
+        lines.append("    http-request set-var(txn.path) path")
+        lines.append("    http-request set-var(txn.query) query")
         # Default status_source to "haproxy" — overridden to "backend" by the
         # http-response set-var below when a real backend response is received.
         # http-response rules do NOT fire for HAProxy-generated responses (deny,
