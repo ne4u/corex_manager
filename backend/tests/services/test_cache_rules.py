@@ -578,8 +578,14 @@ def test_cache_store_guarded_when_disk_cache_active(db):
     assert "filter cache cache_dual_cache" in cfg
     # cache-use IS present, gated with !is_varnish_fetch
     assert "cache-use cache_dual_cache" in cfg
-    # cache-store IS present, gated with !is_varnish_fetch
-    assert "cache-store cache_dual_cache if !is_varnish_fetch" in cfg
+    # cache-store IS present, gated with cache-rule ACLs and !is_varnish_fetch
+    assert "cache-store cache_dual_cache" in cfg
+    assert "!is_varnish_fetch" in cfg
+    # cache-store should reference the txn var set during request phase
+    # (request-phase ACLs like path_end are not available in http-response)
+    store_lines = [l for l in cfg.split("\n") if "cache-store cache_dual_cache" in l]
+    assert len(store_lines) >= 1
+    assert any("var(txn.cache_match_" in l for l in store_lines)
 
 
 def test_cache_store_unguarded_when_disk_cache_inactive(db):

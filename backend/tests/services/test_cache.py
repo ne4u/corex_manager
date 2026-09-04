@@ -231,8 +231,14 @@ def test_both_tiers_simultaneous(db):
     # cache-use is gated with !is_varnish_fetch
     assert "cache-use cache_dual" in cfg
     assert "!is_varnish_fetch" in cfg
-    # cache-store is gated with !is_varnish_fetch
-    assert "cache-store cache_dual if !is_varnish_fetch" in cfg
+    # cache-store is gated with cache-rule ACLs and !is_varnish_fetch
+    assert "cache-store cache_dual" in cfg
+    assert "!is_varnish_fetch" in cfg
+    # cache-store should reference the txn var set during request phase
+    # (request-phase ACLs like path_end are not available in http-response)
+    store_lines = [l for l in cfg.split("\n") if "cache-store cache_dual" in l]
+    assert len(store_lines) >= 1
+    assert any("var(txn.cache_match_" in l for l in store_lines)
     # Disk cache routing — Varnish primary, origin as backup fallback
     assert "http-request set-header X-Cache-Backend dual" in cfg
     assert "server disk_cache varnish:6081" in cfg

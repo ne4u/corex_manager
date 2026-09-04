@@ -1270,7 +1270,11 @@ def generate_defaults_section(headers: Optional[List[ResponseHeader]] = None,
     lines.append("    timeout client 50s")
     lines.append("    timeout server 50s")
     lines.append("    timeout http-keep-alive 10s")
-    lines.append("    option http-server-close")
+    # No "option http-server-close" here: it forced closing the server-side
+    # connection after every response, which defeated per-backend http-reuse
+    # directives (safe/aggressive) and prevented connection pooling. HAProxy's
+    # built-in default (http-reuse safe since 1.9) now applies, and backends
+    # can override via the http_reuse field (e.g. "never" for streaming).
     # No "option forwardfor" here: every HTTP frontend explicitly emits
     # http-request add-header X-Forwarded-For "%[src]" (after the Restore
     # Client IP set-src rules). Having both caused the proxy IP to be
@@ -1681,19 +1685,23 @@ def _emit_cache_directives(
     backend_name: str,
     cache_section_names: Dict[int, str],
     disk_cache_globally_enabled: bool,
-) -> List[str]:
+) -> Tuple[List[str], List[str]]:
     """Emit cache directives for a backend section.
 
     - Memory cache: `http-request cache-use <name>` and `http-response cache-store <name>`.
     - Disk cache: `use-server` directives route cache-eligible requests to Varnish,
       bypass/no-match requests go directly to origin servers.
 
-    Returns a list of config lines. TCP-mode backends get no cache directives.
+    Returns (lines, use_server_lines). ``use_server_lines`` contains the
+    ``use-server`` directives that must be emitted AFTER all http-request rules
+    (HAProxy processes http-request before use-server at runtime, and emits a
+    warning if an http-request rule appears after use-server in the config).
+    TCP-mode backends get no cache directives.
     """
     if not cache_config:
-        return []
+        return ([], [])
     if backend.protocol == "tcp":
-        return []
+        return ([], [])
 
     lines: List[str] = []
     
@@ -1769,20 +1777,77 @@ def _emit_cache_directives(
                 lines.extend(rule_lines)
 
                 # Check for response-phase rules (content_type, status_code)
-                from .cache_rules import emit_response_phase_cache_store_condition
+                from .cache_rules import emit_response_phase_cache_store_condition, active_rules, REQUEST_PHASE_TYPES
                 response_store = emit_response_phase_cache_store_condition(cache_config, cache_name)
                 if response_store:
                     # Conditional cache-store based on response attributes.
                     # Add !is_varnish_fetch when disk cache is active to avoid
-                    # double-caching Varnish responses in memory.
+                    # double-caching Varnish responses in memory. Use the txn
+                    # var (set in frontend) because is_varnish_fetch is a
+                    # request-phase ACL incompatible with http-response rules.
                     if disk_cache_active:
-                        response_store = response_store.replace(" if ", " if !is_varnish_fetch ", 1)
+                        response_store = response_store.replace(" if ", " if !{ var(txn.is_varnish_fetch) -m found } ", 1)
                     lines.append(response_store)
                 else:
-                    # No response-phase rules - unconditional cache-store.
-                    # Add !is_varnish_fetch guard when disk cache is active.
-                    if disk_cache_active:
-                        lines.append(f"    http-response cache-store {cache_name} if !is_varnish_fetch")
+                    # No response-phase rules — gate cache-store on the same
+                    # request-phase ACLs used for cache-use. Without this, the
+                    # cache filter buffers EVERY response (up to max-object-size)
+                    # before deciding whether to store, which causes buffer
+                    # exhaustion and 500 errors under concurrency with large
+                    # non-cacheable responses (e.g. 10 × 11MB OSD bundle files
+                    # with no Content-Length header).
+                    #
+                    # By gating on the cache-rule ACLs, only cacheable file
+                    # types (e.g. .js, .css) are processed by cache-store.
+                    # Non-cacheable responses pass through without buffering.
+                    all_rules = active_rules(cache_config)
+                    cache_rules = [
+                        r for r in all_rules
+                        if r.tier == "memory"
+                        and r.match_type in REQUEST_PHASE_TYPES
+                        and r.action == "cache"
+                    ]
+                    if cache_rules:
+                        # Emit one cache-store line per cache rule, mirroring
+                        # the cache-use lines. HAProxy processes multiple
+                        # cache-store directives in order — the first matching
+                        # condition stores the response. If none match, the
+                        # response passes through without cache buffering.
+                        #
+                        # This avoids the cache filter buffering EVERY response
+                        # (up to max-object-size) when only specific file types
+                        # are cacheable. Without this, 10 concurrent 11MB
+                        # non-cacheable responses cause buffer exhaustion → 500.
+                        #
+                        # Request-phase ACLs (path_end, etc.) are NOT available
+                        # in backend http-response rules in HAProxy 3.4+ — they
+                        # trigger "will never match" warnings. Instead, set a
+                        # txn variable during the request phase for each cache
+                        # rule, then reference it in the response phase.
+                        preceding_bypass = []
+                        for r in all_rules:
+                            if r.tier != "memory" or r.match_type not in REQUEST_PHASE_TYPES:
+                                continue
+                            acl_name = f"{acl_prefix}_{r.id}"
+                            if r.action == "bypass":
+                                preceding_bypass.append(acl_name)
+                                continue
+                            var_name = f"txn.cache_match_{r.id}"
+                            # Request phase: capture whether this cache rule matched
+                            req_conds = [acl_name] + [f"!{n}" for n in preceding_bypass]
+                            if disk_cache_active:
+                                req_conds.append("!is_varnish_fetch")
+                            lines.append(f"    http-request set-var({var_name}) bool(1) if {' '.join(req_conds)}")
+                            # Response phase: use the txn var instead of the ACL.
+                            # is_varnish_fetch is also a request-phase ACL, so use
+                            # the txn var set in the frontend instead.
+                            resp_conds = [f"{{ var({var_name}) -m found }}"]
+                            if disk_cache_active:
+                                resp_conds.append("!{ var(txn.is_varnish_fetch) -m found }")
+                            lines.append(f"    http-response cache-store {cache_name} if {' '.join(resp_conds)}")
+                        # If no cache rules with action=cache, no cache-store emitted
+                    elif disk_cache_active:
+                        lines.append(f"    http-response cache-store {cache_name} if !{{ var(txn.is_varnish_fetch) -m found }}")
                     else:
                         lines.append(f"    http-response cache-store {cache_name}")
             else:
@@ -1830,15 +1895,23 @@ def _emit_cache_directives(
         # Content-Length removal, flushing failures → blank response).
         lines.append(f"    http-request set-var(txn.is_disk_cache_eligible) str(1) if {header_condition} !is_varnish_fetch")
 
+        # use-server directives are returned separately so the caller can emit
+        # them AFTER all http-request rules (including resp_transform's
+        # del-header Accept-Encoding). HAProxy processes http-request before
+        # use-server at runtime, but warns if an http-request rule appears
+        # after use-server in the config file.
+        use_server_output = []
         # PURGE/BAN always goes to Varnish (first, so it takes precedence)
-        lines.append(f"    use-server disk_cache if is_cache_purge !is_varnish_fetch")
+        use_server_output.append(f"    use-server disk_cache if is_cache_purge !is_varnish_fetch")
 
         # Cache rule use-server directives (with loop prevention)
         for line in use_server_lines:
             # Add !is_varnish_fetch negation to each use-server directive
-            lines.append(f"{line} !is_varnish_fetch")
+            use_server_output.append(f"{line} !is_varnish_fetch")
+    else:
+        use_server_output = []
 
-    return lines
+    return (lines, use_server_output)
 
 
 def _trusted_src_condition(db: Session) -> Optional[str]:
@@ -3178,10 +3251,15 @@ def generate_backend(
 
     # Cache directives (per backend) — memory cache (HAProxy native) and disk
     # cache routing header. Server-line replacement for disk cache happens below.
+    # use-server directives are returned separately so they can be emitted
+    # AFTER all http-request rules (HAProxy warns if http-request appears after
+    # use-server in the config, even though http-request is always processed
+    # first at runtime).
     cache_config = db.query(CacheConfig).filter(CacheConfig.backend_id == backend.id).first() if effective_mode == "http" else None
     disk_cache_active = bool(cache_config and cache_config.disk_cache_enabled and disk_cache_enabled and effective_mode == "http")
+    use_server_lines: List[str] = []
     if effective_mode == "http":
-        cache_lines = _emit_cache_directives(backend, cache_config, backend_name, cache_section_names or {}, disk_cache_enabled)
+        cache_lines, use_server_lines = _emit_cache_directives(backend, cache_config, backend_name, cache_section_names or {}, disk_cache_enabled)
         lines.extend(cache_lines)
         if cache_config and cache_config.disk_cache_enabled and not disk_cache_enabled:
             lines.append("    # disk cache requested but not enabled in Global Options")
@@ -3252,6 +3330,12 @@ def generate_backend(
         # image/webp by default (image/ is not in the default content_types).
         ic_lines = _emit_img_2_webp_filter(backend, img_2_webp_enabled, has_fcgi=bool(fcgi_app_name))
         lines.extend(ic_lines)
+
+    # Emit use-server directives AFTER all http-request rules and filters.
+    # HAProxy processes http-request before use-server at runtime, but warns
+    # if an http-request rule appears after use-server in the config file.
+    # This placement avoids the warning while preserving runtime behavior.
+    lines.extend(use_server_lines)
 
     _, extra_backend = _render_haproxy_options(backend.haproxy_options, "backend")
     lines.extend(extra_backend)
@@ -3548,7 +3632,17 @@ def _emit_challenge_redirect(
     result: ``txn.captcha_cookie_valid`` is set by the Lua action when the
     cookie's opaque token exists in Valkey (i.e. the user previously solved
     a challenge and the TTL has not expired).
+
+    Varnish internal fetches (X-Varnish-Fetch header) are always skipped:
+    they can't solve CAPTCHAs, and caching a 302 challenge redirect would
+    corrupt the cache (Varnish would serve the redirect to every client
+    instead of the real response).
     """
+    # Varnish fetch guard — appended to every condition so internal cache
+    # fetches bypass the challenge entirely.
+    varnish_guard = "!{ var(txn.is_varnish_fetch) -m found }"
+    condition = f"{condition} {varnish_guard}"
+
     # If the user already solved a challenge in this TTL window, allow the request
     lines.append(f"    http-request allow if {{ var(txn.captcha_cookie_valid) -m found }} {condition}")
     # Capture HAProxy's unique-id so challenge events can be correlated with logs
@@ -3874,6 +3968,7 @@ def generate_mcp_gateway_backend(db: Session) -> str:
     return f"""backend mcp_gateway
     mode http
     option http-keep-alive
+    http-reuse never
     timeout server 300s
     timeout tunnel 300s
     http-request set-header Cache-Control no-store

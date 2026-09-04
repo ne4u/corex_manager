@@ -157,6 +157,15 @@ def test_generate_config_waf_action_challenge(db):
     # The JA4 fingerprint is forwarded to backends so the captcha verify
     # endpoint can compute the same binding hash.
     assert 'set-header X-JA4-Fingerprint' in cfg
+    # Challenge redirects must skip Varnish internal fetches (X-Varnish-Fetch)
+    # so Varnish doesn't cache a 302 challenge redirect instead of the real
+    # response. The is_varnish_fetch guard is appended to every condition.
+    assert "txn.is_varnish_fetch" in cfg
+    assert "http-request redirect location" in cfg
+    # The redirect line must include the varnish fetch guard
+    redirect_lines = [l for l in cfg.splitlines() if "http-request redirect location" in l and "cid=" in l]
+    assert len(redirect_lines) > 0
+    assert "txn.is_varnish_fetch" in redirect_lines[0]
 
 
 def test_generate_config_waf_action_challenge_ja4_disabled(db):
