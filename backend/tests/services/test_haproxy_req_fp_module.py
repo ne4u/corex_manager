@@ -2,8 +2,9 @@
 
 The req_fp module is a Rust cdylib loaded via the combined modules.lua loader
 (single lua-load-per-thread) when req_fp_enabled is true and the module is
-available. The per-frontend http-request lua.req_fp_capture and http-response
-lua.req_fp actions are emitted only when both conditions are met.
+available. The per-frontend http-request lua.req_fp_capture action is emitted
+only when both conditions are met. The response-phase fingerprint is assembled
+by native HAProxy http-response set-var-fmt directives (no Lua action).
 
 The old standalone `lua-load /etc/haproxy/req_fp.lua` line is removed — req_fp
 is now Rust-only (Docker-only), matching the compression/resp_transform/
@@ -54,7 +55,7 @@ def test_req_fp_enabled_emits_combined_loader_and_actions(db):
     assert "req_fp.register" in loader_content
     # Per-frontend actions are emitted
     assert "http-request lua.req_fp_capture" in cfg
-    assert "http-response lua.req_fp" in cfg
+    assert "http-response lua.req_fp_response" in cfg
 
 
 def test_req_fp_standalone_lua_load_removed(db):
@@ -82,7 +83,7 @@ def test_req_fp_module_disabled_no_actions(db, monkeypatch):
     cfg = haproxy.generate_config(db)
     # Actions not emitted because module is unavailable
     assert "lua.req_fp_capture" not in cfg
-    assert "lua.req_fp" not in cfg
+    assert "lua.req_fp_response" not in cfg
 
 
 def test_req_fp_log_format_var_still_present(db):
@@ -94,5 +95,5 @@ def test_req_fp_log_format_var_still_present(db):
     db.commit()
     cfg = haproxy.generate_config(db)
     # The log-format still references var(txn.req_fp) — it returns empty
-    # when the http-response lua.req_fp action isn't emitted.
+    # when the req_fp_capture action isn't emitted.
     assert "var(txn.req_fp)" in cfg

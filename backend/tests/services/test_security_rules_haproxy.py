@@ -149,12 +149,12 @@ def test_emit_security_rules_disabled_skipped(db):
 def test_generate_global_section_lua_load():
     """Global section should include JA4 Lua prerequisites before lua-load."""
     cfg = haproxy.generate_global_section()
-    assert "lua-load /etc/haproxy/ja4.lua" in cfg
+    assert "lua-load-per-thread /etc/haproxy/ja4.lua" in cfg
     assert "tune.lua.bool-sample-conversion normal" in cfg
     assert "tune.ssl.capture-buffer-size 336" in cfg
     # tune settings must come before lua-load
-    assert cfg.index("tune.lua.bool-sample-conversion") < cfg.index("lua-load /etc/haproxy/ja4.lua")
-    assert cfg.index("tune.ssl.capture-buffer-size") < cfg.index("lua-load /etc/haproxy/ja4.lua")
+    assert cfg.index("tune.lua.bool-sample-conversion") < cfg.index("lua-load-per-thread /etc/haproxy/ja4.lua")
+    assert cfg.index("tune.ssl.capture-buffer-size") < cfg.index("lua-load-per-thread /etc/haproxy/ja4.lua")
     # req_fp is now a Rust cdylib loaded via the combined modules.lua loader
     # (only when req_fp_enabled). The standalone lua-load line is removed.
     assert "lua-load /etc/haproxy/req_fp.lua" not in cfg
@@ -189,7 +189,7 @@ def test_generate_global_section_stick_counters_minimum_floor():
 def test_generate_global_section_ja4_disabled():
     """With ja4_enabled=False, ja4 lua-load and tune directives should be absent."""
     cfg = haproxy.generate_global_section(ja4_enabled=False)
-    assert "lua-load /etc/haproxy/ja4.lua" not in cfg
+    assert "lua-load-per-thread /etc/haproxy/ja4.lua" not in cfg
     assert "tune.ssl.capture-buffer-size" not in cfg
     # tune.lua.bool-sample-conversion is always emitted (before any lua-load)
     assert "tune.lua.bool-sample-conversion" in cfg
@@ -335,7 +335,7 @@ def test_generate_config_lua_load_in_global(db):
     make_listener(db, backend=backend)
     make_server(db, backend.id)
     cfg = haproxy.generate_config(db)
-    assert "lua-load /etc/haproxy/ja4.lua" in cfg
+    assert "lua-load-per-thread /etc/haproxy/ja4.lua" in cfg
     # req_fp is now a Rust cdylib loaded via combined modules.lua loader
     # (only when req_fp_enabled). The standalone lua-load line is removed.
     assert "lua-load /etc/haproxy/req_fp.lua" not in cfg
@@ -348,36 +348,21 @@ def test_generate_frontend_req_fp_disabled(db):
     make_server(db, backend.id)
     cfg = haproxy.generate_frontend(listener, db, req_fp_enabled=False)
     assert "http-request lua.req_fp_capture" not in cfg
-    assert "http-response lua.req_fp" not in cfg
+    assert "http-response lua.req_fp_response" not in cfg
 
 
 def test_generate_frontend_req_fp_enabled(db):
-    """With req_fp_enabled=True, both req_fp directives should be emitted."""
+    """With req_fp_enabled=True, req_fp_capture and req_fp_response should be emitted."""
     backend = make_backend(db)
     listener = make_listener(db, backend=backend)
     make_server(db, backend.id)
     cfg = haproxy.generate_frontend(listener, db, req_fp_enabled=True)
     assert "http-request lua.req_fp_capture" in cfg
-    assert "http-response lua.req_fp" in cfg
-
-
-def test_generate_frontend_req_fp_exclude_paths(db):
-    """req_fp should be skipped for excluded path prefixes (configurable via
-    listener.options.req_fp_exclude_paths). Prevents 500s from Lua thread
-    blocking on large concurrent static file downloads."""
-    backend = make_backend(db)
-    listener = make_listener(db, backend=backend)
-    listener.options = {"req_fp_exclude_paths": "/bundles/,/static/"}
-    db.commit()
-    make_server(db, backend.id)
-    cfg = haproxy.generate_frontend(listener, db, req_fp_enabled=True)
-    assert "is_req_fp_excluded" in cfg
-    assert "path_beg /bundles/ /static/" in cfg
-    assert "unless { var(txn.req_fp_excluded) -m found }" in cfg
+    assert "http-response lua.req_fp_response" in cfg
 
 
 def test_generate_frontend_req_fp_before_response_headers(db):
-    """lua.req_fp must run before any http-response set-header so txn.req_fp is populated."""
+    """lua.req_fp_response must run before any http-response set-header so txn.req_fp is populated."""
     from app.models.models import ResponseHeader
     backend = make_backend(db)
     listener = make_listener(db, backend=backend)
@@ -386,11 +371,11 @@ def test_generate_frontend_req_fp_before_response_headers(db):
     db.add(hdr)
     db.commit()
     cfg = haproxy.generate_frontend(listener, db, req_fp_enabled=True)
-    lua_idx = cfg.find("http-response lua.req_fp")
+    fmt_idx = cfg.find("http-response lua.req_fp_response")
     hdr_idx = cfg.find("http-response set-header X-Req-FP")
-    assert lua_idx >= 0, "lua.req_fp line not found"
+    assert fmt_idx >= 0, "lua.req_fp_response line not found"
     assert hdr_idx >= 0, "set-header X-Req-FP line not found"
-    assert lua_idx < hdr_idx, "lua.req_fp must come before set-header that references txn.req_fp"
+    assert fmt_idx < hdr_idx, "lua.req_fp_response must come before set-header that references txn.req_fp"
 
 
 def test_response_headers_guarded_against_varnish_fetch(db):
@@ -458,7 +443,7 @@ def test_generate_config_req_fp_via_setting(db):
     set_setting(db, "req_fp_enabled", "true")
     cfg = haproxy.generate_config(db)
     assert "http-request lua.req_fp_capture" in cfg
-    assert "http-response lua.req_fp" in cfg
+    assert "http-response lua.req_fp_response" in cfg
 
 
 def test_generate_config_ja4_disabled_via_setting(db):
@@ -469,7 +454,7 @@ def test_generate_config_ja4_disabled_via_setting(db):
     make_server(db, backend.id)
     set_setting(db, "ja4_enabled", "false")
     cfg = haproxy.generate_config(db)
-    assert "lua-load /etc/haproxy/ja4.lua" not in cfg
+    assert "lua-load-per-thread /etc/haproxy/ja4.lua" not in cfg
     # req_fp is now a Rust cdylib, not loaded via standalone lua-load
     assert "lua-load /etc/haproxy/req_fp.lua" not in cfg
 

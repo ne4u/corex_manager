@@ -223,6 +223,32 @@ def test_generate_coraza_spoe_config_no_log_global(db):
     assert "log global" not in cfg
 
 
+def test_generate_coraza_spoe_config_max_frame_size_default_bufsize(db):
+    """HAProxy caps max-frame-size at tune.bufsize - 4; with the 16KB default that is 16380."""
+    cfg = haproxy.generate_coraza_spoe_config(db)
+    assert "max-frame-size 16380" in cfg
+
+
+def test_generate_coraza_spoe_config_max_frame_size_capped_at_coraza_limit(db):
+    """A large user tune.bufsize must not push max-frame-size above Coraza's 65535."""
+    import json
+    from app.services.settings import set_setting
+    set_setting(db, "haproxy_global_options", json.dumps([{"enabled": True, "directive": "tune.bufsize", "value": "1048576"}]))
+    db.commit()
+    cfg = haproxy.generate_coraza_spoe_config(db)
+    assert "max-frame-size 65535" in cfg
+
+
+def test_generate_coraza_spoe_config_max_frame_size_64k_bufsize(db):
+    """tune.bufsize 65536 → max-frame-size 65532 (65535 would be rejected by HAProxy)."""
+    import json
+    from app.services.settings import set_setting
+    set_setting(db, "haproxy_global_options", json.dumps([{"enabled": True, "directive": "tune.bufsize", "value": "65536"}]))
+    db.commit()
+    cfg = haproxy.generate_coraza_spoe_config(db)
+    assert "max-frame-size 65532" in cfg
+
+
 def test_generate_config_waf_rate_limit(db):
     backend = make_backend(db)
     listener = make_listener(db, backend=backend)

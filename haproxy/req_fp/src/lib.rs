@@ -2,13 +2,10 @@
 //!
 //! Registers two Lua actions:
 //!   - "req_fp_capture" (http-req phase) — captures request data into txn vars
-//!   - "req_fp"          (http-res phase) — builds the 17-field fingerprint
-//!                                              using captured request data +
-//!                                              response data, stores in txn.req_fp
-//!
-//! Two-phase design: HAProxy frees the request buffer before the http-res
-//! phase, so request headers/query/etc. are captured in http-req and stored
-//! in transaction variables for use in http-res.
+//!     and builds the 15-field partial fingerprint (txn.req_fp_partial)
+//!   - "req_fp_response" (http-res phase) — appends response status and
+//!     content-length to the partial fingerprint, producing the full 17-field
+//!     fingerprint (txn.req_fp)
 //!
 //! Fingerprint format (17 underscore-separated fields):
 //!   {path_b62}_{method2}_{http_ver}_{path_depth}_
@@ -16,6 +13,9 @@
 //!   {hdr_count}_{hdr_list}_{accept_lang}_{auth_type}_
 //!   {cookie}_{cookie_fields}_{referer}_
 //!   {status}_{body_bytes}
+//!
+//! Fields 1-15 are built by req_fp_capture (request phase).
+//! Fields 16-17 are appended by req_fp_response (response phase).
 //!
 //! See the Lua predecessor (haproxy/lua/req_fp.lua) for the full field
 //! documentation. This Rust port preserves byte-exact fingerprint
@@ -51,30 +51,44 @@ static RE_FLOAT: Lazy<Regex> = Lazy::new(|| Regex::new(r"^-?\d*\.\d+$").unwrap()
 
 /// Treats the bytes of `s` as a big-endian integer and encodes it in base62.
 /// Caps input at PATH_MAX bytes. Returns "0" for empty input.
+///
+/// The integer is held as big-endian base-2^32 limbs and divided by 62 in
+/// place: two allocations total (limbs + output) instead of one fresh Vec per
+/// output digit, and 4 bytes consumed per division step instead of 1. The
+/// output is identical to byte-at-a-time long division (same integer, same
+/// radix).
 fn base62_encode(s: &[u8]) -> String {
     let bytes = if s.len() > PATH_MAX { &s[..PATH_MAX] } else { s };
     if bytes.is_empty() {
         return "0".to_string();
     }
 
-    // n is a Vec of byte-width "digits" representing the big-endian integer.
-    // Long division by 62 is performed until the value reaches zero.
-    let mut n: Vec<u8> = bytes.to_vec();
-    let mut out: Vec<u8> = Vec::new();
+    // Pack into big-endian u32 limbs; the first limb may be short.
+    let head = bytes.len() % 4;
+    let mut limbs: Vec<u32> = Vec::with_capacity(bytes.len() / 4 + 1);
+    if head > 0 {
+        limbs.push(bytes[..head].iter().fold(0u32, |acc, &b| (acc << 8) | b as u32));
+    }
+    for chunk in bytes[head..].chunks_exact(4) {
+        limbs.push(u32::from_be_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]));
+    }
 
-    while !n.is_empty() {
-        let mut rem: u32 = 0;
-        let mut new_n: Vec<u8> = Vec::with_capacity(n.len());
-        for &digit in &n {
-            let val = rem * 256 + digit as u32;
-            let q = val / 62;
+    // Each 32-bit limb yields at most ~5.4 base62 digits.
+    let mut out: Vec<u8> = Vec::with_capacity(limbs.len() * 6);
+    // `start` tracks the first non-zero limb so leading zeros are skipped
+    // without shifting the vector.
+    let mut start = 0;
+    while start < limbs.len() {
+        let mut rem: u64 = 0;
+        for limb in &mut limbs[start..] {
+            let val = (rem << 32) | *limb as u64;
+            *limb = (val / 62) as u32;
             rem = val % 62;
-            if q > 0 || !new_n.is_empty() {
-                new_n.push(q as u8);
-            }
         }
         out.push(B62_CHARS[rem as usize]);
-        n = new_n;
+        while start < limbs.len() && limbs[start] == 0 {
+            start += 1;
+        }
     }
     out.reverse();
     // Safety: B62_CHARS is ASCII, so the output is valid UTF-8.
@@ -436,19 +450,21 @@ fn detect_body_ctype(hdrs: &HashMap<String, String>) -> Option<&'static str> {
 // ---- Phase 1: Capture request data (http-req) ------------------------------
 
 fn capture_request(txn: &Txn) -> LuaResult<()> {
-    // Fetch all request-phase data now; the request buffer will be freed
-    // before the http-res phase runs.
+    // Everything the fingerprint needs is derived here, in the request phase,
+    // and only the derived subfields are stored as txn vars. The raw header
+    // block, query string and HTTP version are NOT copied into txn vars: they
+    // would be pinned in the stream's variable list for the whole transaction
+    // (including while a large response streams), and the only other consumer
+    // (risk_score.lua risk_capture, also http-req) reads them via fetches.
     let raw_hdrs = txn.f.get_str("req_hdrs", ()).unwrap_or_default();
     let path = txn.f.get_str("path", ()).unwrap_or_else(|_| "/".to_string());
     let method = txn.f.get_str("method", ()).unwrap_or_else(|_| "ge".to_string());
     let query = txn.f.get_str("query", ()).unwrap_or_default();
     let ver = txn.f.get_str("req_ver", ()).unwrap_or_else(|_| "1.1".to_string());
 
-    txn.set_var("txn.req_fp.hdrs", raw_hdrs.clone())?;
+    // txn.req_fp.path is kept (small, bounded by PATH_MAX in practice) for
+    // API Armor profiling, which runs after this action.
     txn.set_var("txn.req_fp.path", path.clone())?;
-    txn.set_var("txn.req_fp.method", method.clone())?;
-    txn.set_var("txn.req_fp.query", query.clone())?;
-    txn.set_var("txn.req_fp.ver", ver.clone())?;
 
     // Parse headers now for request-phase subfield txn vars.
     let (hdr_count, hdr_list, hdrs) = parse_headers(&raw_hdrs);
@@ -520,10 +536,30 @@ fn capture_request(txn: &Txn) -> LuaResult<()> {
         (keys, types, lens)
     };
 
-    // Store merged params for build_fingerprint to use.
-    txn.set_var("txn.req_fp.params_keys", param_keys.clone())?;
-    txn.set_var("txn.req_fp.params_types", param_types.clone())?;
-    txn.set_var("txn.req_fp.params_lens", param_lens.clone())?;
+    // Build partial fingerprint (fields 1-15, all request-phase data).
+    // The final 2 fields (status, body_bytes) are appended by req_fp_response
+    // in the http-res phase.
+    let accept_lang = get_accept_lang(&hdrs);
+    let cookie_fields = get_cookie_fields(&hdrs);
+    let partial = format!(
+        "{}_{}_{}_{}_{}_{}_{}_{}_{:02}_{}_{}_{}_{}_{}_{}",
+        base62_encode(path.as_bytes()),
+        method.chars().take(2).map(|c| c.to_ascii_lowercase()).collect::<String>(),
+        http_ver_code(&ver),
+        format!("{:02}", pdepth),
+        param_keys,
+        param_types,
+        param_lens,
+        ctype,
+        hdr_count,
+        hdr_list,
+        accept_lang,
+        atype,
+        cflag,
+        cookie_fields,
+        referer,
+    );
+    txn.set_var("txn.req_fp_partial", partial)?;
 
     // Set request-phase subfield txn vars for Security Rules access.
     txn.set_var("txn.req_fp.ctype", ctype)?;
@@ -542,133 +578,46 @@ fn capture_request(txn: &Txn) -> LuaResult<()> {
     Ok(())
 }
 
-// ---- Phase 2: Build fingerprint (http-res) ---------------------------------
+// ---- Phase 2: Assemble full fingerprint (http-res) -------------------------
 
-fn build_fingerprint(txn: &Txn) -> LuaResult<String> {
-    // Retrieve request data captured in phase 1.
-    let path: String = txn
-        .get_var("txn.req_fp.path")
-        .unwrap_or_else(|_| "/".to_string());
-    let method: String = txn
-        .get_var("txn.req_fp.method")
-        .unwrap_or_else(|_| "ge".to_string());
-    let ver: String = txn
-        .get_var("txn.req_fp.ver")
-        .unwrap_or_else(|_| "1.1".to_string());
-    let raw_hdrs: String = txn.get_var("txn.req_fp.hdrs").unwrap_or_default();
-
-    // Retrieve pre-computed merged params from capture_request (v2).
-    let param_keys: String = txn.get_var("txn.req_fp.params_keys").unwrap_or_default();
-    let param_types: String = txn.get_var("txn.req_fp.params_types").unwrap_or_default();
-    let param_lens: String = txn.get_var("txn.req_fp.params_lens").unwrap_or_default();
-
-    // Response-phase data (available now).
-    let status: u16 = txn.f.get("status", ()).unwrap_or(0);
-
-    let mut parts: Vec<String> = Vec::with_capacity(17);
-
-    // 1. path_b62
-    parts.push(base62_encode(path.as_bytes()));
-
-    // 2. method2
-    parts.push(method.chars().take(2).map(|c| c.to_ascii_lowercase()).collect());
-
-    // 3. http_ver
-    parts.push(http_ver_code(&ver).to_string());
-
-    // 4. path_depth
-    parts.push(format!("{:02}", get_path_depth(&path)));
-
-    // 5-7. param_keys / param_types / param_lens (merged query + body)
-    if !param_keys.is_empty() {
-        parts.push(param_keys);
-        parts.push(if param_types.is_empty() { "nil".to_string() } else { param_types });
-        parts.push(if param_lens.is_empty() { "0".to_string() } else { param_lens });
-    } else {
-        // Fallback: re-parse query only (v1 behavior when capture didn't set vars)
-        let query: String = txn.get_var("txn.req_fp.query").unwrap_or_default();
-        let params = parse_params(&query);
-        if params.is_empty() {
-            parts.push("nil".to_string());
-            parts.push("nil".to_string());
-            parts.push("0".to_string());
-        } else {
-            let keys: String = params
-                .iter()
-                .map(|(name, _)| name.chars().next().unwrap_or(' '))
-                .collect();
-            let types: String = params
-                .iter()
-                .map(|(_, value)| detect_type(value))
-                .collect();
-            let lens: String = params
-                .iter()
-                .map(|(_, value)| value.chars().count().to_string())
-                .collect::<Vec<_>>()
-                .join("-");
-            parts.push(keys);
-            parts.push(types);
-            parts.push(lens);
-        }
+fn capture_response(txn: &Txn) -> LuaResult<()> {
+    // Read the partial fingerprint built by req_fp_capture in the request phase.
+    let partial: String = txn
+        .get_var("txn.req_fp_partial")
+        .unwrap_or_default();
+    if partial.is_empty() {
+        // req_fp_capture didn't run (e.g. disabled listener) — skip.
+        return Ok(());
     }
 
-    // Parse request headers from the captured raw block.
-    let (hdr_count, hdr_list, hdrs) = parse_headers(&raw_hdrs);
+    // Response status code. Use get_str and parse — the Fetches API only
+    // exposes get_str (always returns String) and generic get<R> (which
+    // returns Option for sample fetches that may be absent).
+    let status_str = txn.f.get_str("status", ()).unwrap_or_default();
+    let status: i64 = status_str.parse().unwrap_or(0);
 
-    // 8. req_ctype
-    parts.push(get_req_ctype(&hdrs));
-
-    // 9-10. hdr_count / hdr_list
-    parts.push(format!("{:02}", hdr_count));
-    parts.push(hdr_list);
-
-    // 11. accept_lang
-    parts.push(get_accept_lang(&hdrs));
-
-    // 12. auth_type
-    parts.push(get_auth_type(&hdrs).to_string());
-
-    // 13. cookie
-    let cookie_val = hdrs.get("cookie").map(|v| !v.is_empty()).unwrap_or(false);
-    parts.push(if cookie_val { "c".to_string() } else { "n".to_string() });
-
-    // 14. cookie_fields
-    parts.push(get_cookie_fields(&hdrs));
-
-    // 15. referer
-    parts.push(get_referer_flag(&hdrs).to_string());
-
-    // 16. status
-    parts.push(status.to_string());
-
-    // 17. body_bytes (response Content-Length only).
-    //
-    // We intentionally do NOT fall back to res.body_len here. Accessing
-    // res_body_len in an http-response Lua action forces HAProxy to buffer
-    // the entire response body before the action can complete. For large
-    // concurrent responses (e.g. 20 × 11MB OSD bundle files with chunked
-    // transfer-encoding), this causes massive memory buffering, client
-    // timeouts (termination: PH), and 500 errors.
-    //
-    // For chunked responses (no Content-Length), body_bytes will be "0" in
-    // the fingerprint. The actual response size is still captured in the
-    // HAProxy access log's bytes_out field, so no data is lost.
+    // Response Content-Length. We parse res_hdrs (the raw response header block)
+    // rather than using res.hdr(content-length) directly — the parse_headers
+    // function is already available and handles edge cases (missing header,
+    // multiple values, etc.). We intentionally do NOT fall back to res.body_len:
+    // accessing that fetch in an http-response action forces HAProxy to buffer
+    // the entire response body, causing timeouts on large concurrent responses.
     let res_raw = txn.f.get_str("res_hdrs", ()).unwrap_or_default();
     let (_, _, res_hdrs) = parse_headers(&res_raw);
-    let bytes: u64 = res_hdrs
+    let body_bytes: i64 = res_hdrs
         .get("content-length")
-        .and_then(|cl| cl.parse::<u64>().ok())
+        .and_then(|v| v.parse::<i64>().ok())
+        .filter(|&v| v > 0)
         .unwrap_or(0);
-    parts.push(bytes.to_string());
 
-    let fingerprint = parts.join("_");
-
-    // Set response-phase subfield txn vars for Security Rules access.
+    // Build the full 17-field fingerprint.
+    let full = format!("{}_{}_{}", partial, status, body_bytes);
+    txn.set_var("txn.req_fp", full.clone())?;
+    txn.set_var("txn.req_fp.full", full)?;
     txn.set_var("txn.req_fp.status", status.to_string())?;
-    txn.set_var("txn.req_fp.body_bytes", bytes.to_string())?;
-    txn.set_var("txn.req_fp.full", fingerprint.clone())?;
+    txn.set_var("txn.req_fp.body_bytes", body_bytes.to_string())?;
 
-    Ok(fingerprint)
+    Ok(())
 }
 
 // ---- Action wrappers (error handling) --------------------------------------
@@ -689,21 +638,17 @@ fn capture_action(lua: &Lua, txn: Txn) -> LuaResult<()> {
     }
 }
 
-fn build_action(lua: &Lua, txn: Txn) -> LuaResult<()> {
-    match build_fingerprint(&txn) {
-        Ok(fingerprint) => {
-            txn.set_var("txn.req_fp", fingerprint)?;
-            Ok(())
-        }
+fn response_action(lua: &Lua, txn: Txn) -> LuaResult<()> {
+    match capture_response(&txn) {
+        Ok(()) => Ok(()),
         Err(e) => {
             let core = Core::new(lua);
             if let Ok(c) = core {
                 let _ = c.log(
                     LogLevel::Warning,
-                    format!("req_fp: fingerprint failed: {}", e.to_string()),
+                    format!("req_fp: response failed: {}", e.to_string()),
                 );
             }
-            txn.set_var("txn.req_fp", "err")?;
             Ok(())
         }
     }
@@ -711,7 +656,14 @@ fn build_action(lua: &Lua, txn: Txn) -> LuaResult<()> {
 
 // ---- Registration ----------------------------------------------------------
 
-/// Registers the "req_fp_capture" and "req_fp" Lua actions with HAProxy.
+/// Registers the "req_fp_capture" and "req_fp_response" Lua actions.
+///
+///   http-request lua.req_fp_capture
+///   http-response lua.req_fp_response
+///
+/// req_fp_capture builds the 15-field partial fingerprint (txn.req_fp_partial)
+/// in the request phase. req_fp_response appends status and body_bytes to
+/// produce the full 17-field fingerprint (txn.req_fp) in the response phase.
 pub fn register(lua: &Lua) -> LuaResult<()> {
     let core = Core::new(lua)?;
     core.register_action(
@@ -720,7 +672,12 @@ pub fn register(lua: &Lua) -> LuaResult<()> {
         0,
         capture_action,
     )?;
-    core.register_action("req_fp", &[Action::HttpRes], 0, build_action)?;
+    core.register_action(
+        "req_fp_response",
+        &[Action::HttpRes],
+        0,
+        response_action,
+    )?;
     Ok(())
 }
 
@@ -755,6 +712,63 @@ mod tests {
         // Verify it's non-empty and not "0"
         assert!(!result.is_empty());
         assert_ne!(result, "0");
+    }
+
+    /// Reference implementation: byte-at-a-time long division, as shipped in
+    /// the original Lua/Rust versions. Used to prove the limb-based encoder is
+    /// byte-exact.
+    fn base62_reference(s: &[u8]) -> String {
+        let bytes = if s.len() > PATH_MAX { &s[..PATH_MAX] } else { s };
+        if bytes.is_empty() {
+            return "0".to_string();
+        }
+        let mut n: Vec<u8> = bytes.to_vec();
+        let mut out: Vec<u8> = Vec::new();
+        while !n.is_empty() {
+            let mut rem: u32 = 0;
+            let mut new_n: Vec<u8> = Vec::with_capacity(n.len());
+            for &digit in &n {
+                let val = rem * 256 + digit as u32;
+                let q = val / 62;
+                rem = val % 62;
+                if q > 0 || !new_n.is_empty() {
+                    new_n.push(q as u8);
+                }
+            }
+            out.push(B62_CHARS[rem as usize]);
+            n = new_n;
+        }
+        out.reverse();
+        String::from_utf8(out).unwrap()
+    }
+
+    #[test]
+    fn test_base62_matches_reference() {
+        let mut cases: Vec<Vec<u8>> = vec![
+            b"/".to_vec(),
+            b"/api".to_vec(),
+            b"/api/v1/users/12345/profile".to_vec(),
+            b"\x00".to_vec(),
+            b"\x00\x00\x01".to_vec(),
+            b"\x00/leading-zero".to_vec(),
+            b"\xff\xff\xff\xff".to_vec(),
+            b"\xff\xff\xff\xff\xff".to_vec(),
+            vec![b'a'; PATH_MAX + 100],
+        ];
+        // Every length 1..=64 with a simple LCG byte pattern, so all four
+        // limb-alignment cases (len % 4) are covered many times.
+        let mut x: u32 = 0x2545_F491;
+        for len in 1..=64 {
+            let mut v = Vec::with_capacity(len);
+            for _ in 0..len {
+                x = x.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+                v.push((x >> 24) as u8);
+            }
+            cases.push(v);
+        }
+        for case in cases {
+            assert_eq!(base62_encode(&case), base62_reference(&case), "input {:?}", case);
+        }
     }
 
     #[test]

@@ -71,7 +71,7 @@ def test_acme_lua_script_loaded(db):
     listener = make_listener(db, backend=backend)
     make_server(db, backend.id)
     cfg = haproxy.generate_config(db)
-    assert "lua-load /etc/haproxy/acme.lua" in cfg
+    assert "lua-load-per-thread /etc/haproxy/acme.lua" in cfg
 
 
 def test_acme_not_emitted_for_tcp_listener(db):

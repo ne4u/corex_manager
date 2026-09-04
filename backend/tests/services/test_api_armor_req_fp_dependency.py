@@ -90,7 +90,7 @@ def test_config_gen_forces_req_fp_when_api_armor_on(db):
     # req_fp actions are emitted despite req_fp_enabled=false in DB
     # because the defensive guard forces it on when api_armor is on
     assert "http-request lua.req_fp_capture" in cfg
-    assert "http-response lua.req_fp" in cfg
+    assert "http-response lua.req_fp_response" in cfg
 
 
 def test_config_gen_no_force_when_api_armor_off(db):
@@ -103,4 +103,4 @@ def test_config_gen_no_force_when_api_armor_off(db):
     db.commit()
     cfg = haproxy.generate_config(db)
     assert "lua.req_fp_capture" not in cfg
-    assert "lua.req_fp" not in cfg
+    assert "lua.req_fp_response" not in cfg

@@ -49,6 +49,20 @@ def test_req_fp_parse_body_enabled_emits_buffering(db):
     assert set_var_idx < capture_idx, "req_fp_body set-var must precede lua.req_fp_capture"
 
 
+def test_req_fp_parse_body_released_after_capture(db):
+    """The buffered body var is unset right after lua.req_fp_capture consumes it."""
+    backend = make_backend(db)
+    make_server(db, backend.id)
+    make_listener(db, backend=backend, name="http_in")
+    set_setting(db, "req_fp_enabled", "true")
+    set_setting(db, "req_fp_parse_body", "true")
+    db.commit()
+    cfg = haproxy.generate_config(db)
+    unset_line = "http-request unset-var(txn.req_fp_body) if is_req_fp_body"
+    assert unset_line in cfg
+    assert cfg.index("lua.req_fp_capture") < cfg.index(unset_line)
+
+
 def test_req_fp_parse_body_content_type_acl(db):
     """The is_req_fp_body ACL matches JSON and form content types (not GraphQL)."""
     backend = make_backend(db)

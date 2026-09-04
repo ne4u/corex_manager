@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     CORAZA_SPOA_TARGETS: Optional[str] = None  # comma-separated host:port pairs for HA
     CORAZA_SPOA_APP: str = "haproxy-waf"
     CORAZA_SPOE_CONFIG_PATH: str = "data/coraza.cfg"
+    # Coraza SPOA's maximum SPOE frame size. The emitted max-frame-size is
+    # min(this, tune.bufsize - 4) since HAProxy rejects larger values.
+    CORAZA_SPOE_MAX_FRAME_SIZE: int = 65535
 
     # Metrics
     # 100k is a sane default for a high-throughput LB (e.g. 80k RPS with
