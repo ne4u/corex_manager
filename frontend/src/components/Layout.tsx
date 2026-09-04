@@ -59,7 +59,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation(['nav', 'common', 'pages'])
   const [open, setOpen] = useState(false)
   const [unapplied, setUnapplied] = useState(false)
-  const [applying, setApplying] = useState(false)
+  // Tracks which action is currently in flight so each button can show its
+  // own progress label. `null` = idle, 'apply' = applying, 'revert' = reverting.
+  const [activeAction, setActiveAction] = useState<'apply' | 'revert' | null>(null)
+  const applying = activeAction !== null
   const [applyTaskId, setApplyTaskId] = useState<number | null>(null)
   const [applyComment, setApplyComment] = useState('')
   const [showDiff, setShowDiff] = useState(false)
@@ -146,7 +149,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         if (t.data.status !== 'pending' && t.data.status !== 'running') {
           clearInterval(iv)
           setApplyTaskId(null)
-          setApplying(false)
+          setActiveAction(null)
           try {
             const s = await getConfigStatus()
             setUnapplied(s.data.unapplied)
@@ -157,7 +160,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       } catch {
         clearInterval(iv)
         setApplyTaskId(null)
-        setApplying(false)
+        setActiveAction(null)
       }
     }, 1500)
     return () => clearInterval(iv)
@@ -184,7 +187,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     if (!window.confirm(t('pages:dashboard.revertConfirm'))) {
       return
     }
-    setApplying(true)
+    setActiveAction('revert')
     try {
       const r = await revertConfig()
       const id = addNotification({
@@ -205,13 +208,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         message: typeof detail === 'object' ? detail?.message : (detail || t('pages:dashboard.revertFailed')),
         detail: typeof detail === 'object' ? (detail?.error || JSON.stringify(detail, null, 2)) : (err.message),
       })
-      setApplying(false)
+      setActiveAction(null)
     }
   }
 
 
   const handleApply = async () => {
-    setApplying(true)
+    setActiveAction('apply')
     try {
       const r = await applyConfig(applyComment)
       const id = addNotification({
@@ -232,7 +235,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         message: typeof detail === 'object' ? detail?.message : (detail || t('pages:dashboard.applyFailed')),
         detail: typeof detail === 'object' ? (detail?.error || JSON.stringify(detail, null, 2)) : (err.message),
       })
-      setApplying(false)
+      setActiveAction(null)
     }
   }
 
@@ -326,8 +329,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </div>
             <div className="flex items-center gap-3">
               <button onClick={handleReview} disabled={diffLoading} className="text-sm hover:underline">{diffLoading ? t('nav:unapplied.loading') : t('nav:unapplied.review')}</button>
-              <button onClick={handleRevert} disabled={applying} className="text-sm text-amber-400 hover:underline">{applying ? t('nav:unapplied.reverting') : t('common:actions.revert')}</button>
-              <button onClick={handleApply} disabled={applying} className="text-sm btn-primary">{applying ? t('nav:unapplied.applying') : t('common:actions.apply')}</button>
+              <button onClick={handleRevert} disabled={applying} className="text-sm text-amber-400 hover:underline">{activeAction === 'revert' ? t('nav:unapplied.reverting') : t('common:actions.revert')}</button>
+              <button onClick={handleApply} disabled={applying} className="text-sm btn-primary">{activeAction === 'apply' ? t('nav:unapplied.applying') : t('common:actions.apply')}</button>
             </div>
           </div>
         )}

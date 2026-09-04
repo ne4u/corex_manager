@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNotifications, Notification } from '../contexts/NotificationContext'
 import { X, CheckCircle, AlertCircle, Info, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react'
+
+const SUCCESS_AUTO_DISMISS_MS = 15000
 
 const typeStyles: Record<Notification['type'], string> = {
   info: 'bg-slate-800 border-slate-700 text-slate-100',
@@ -22,6 +24,16 @@ function Toast({ n }: { n: Notification }) {
   const { removeNotification } = useNotifications()
   const [showDetail, setShowDetail] = useState(false)
   const Icon = icons[n.type]
+
+  // Auto-dismiss success notifications after 15 seconds unless the user
+  // closes them manually. The timer is keyed on the notification type so it
+  // only starts once the toast transitions to "success" (e.g. when a tracked
+  // task completes). Cleanup on unmount/manual close clears the timer.
+  useEffect(() => {
+    if (n.type !== 'success') return
+    const timer = setTimeout(() => removeNotification(n.id), SUCCESS_AUTO_DISMISS_MS)
+    return () => clearTimeout(timer)
+  }, [n.type, n.id, removeNotification])
 
   return (
     <div
@@ -66,7 +78,7 @@ export default function Toaster() {
   if (notifications.length === 0) return null
 
   return (
-    <div className="fixed bottom-4 end-4 z-[100] flex flex-col gap-3">
+    <div className="fixed bottom-6 end-12 z-[100] flex flex-col gap-3">
       {notifications.map((n) => (
         <Toast key={n.id} n={n} />
       ))}
