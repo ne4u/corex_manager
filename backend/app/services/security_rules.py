@@ -497,13 +497,26 @@ def _translate_leaf(node: Dict[str, Any], db: Session) -> str:
             raise ValueError(f"Boolean field {field!r} only supports = operator")
 
         # String comparisons
+        # Special case: the 'method' fetch has a default matching method called
+        # 'method' (case-sensitive exact string match). Using '-m str' overrides
+        # it and triggers a HAProxy warning ("original matching method 'method'
+        # was overwritten"). Use the bare form (method VALUE) for = and != to
+        # avoid the warning. Other operators (regex, contains, etc.) still need
+        # explicit -m flags and may warn, but are uncommon for method matching.
+        is_method_fetch = (fetch == "method")
         if isinstance(value, str):
             if op == "=":
-                cond = f"{{ {fetch} -m str {_haproxy_string_value(value)} }}"
+                if is_method_fetch:
+                    cond = f"{{ method {_haproxy_string_value(value)} }}"
+                else:
+                    cond = f"{{ {fetch} -m str {_haproxy_string_value(value)} }}"
             elif op == "!=":
                 # Negation must be OUTSIDE the braces: !{ fetch -m str value }
                 # HAProxy rejects { !{ ... } } with "missing fetch method".
-                cond = f"!{{ {fetch} -m str {_haproxy_string_value(value)} }}"
+                if is_method_fetch:
+                    cond = f"!{{ method {_haproxy_string_value(value)} }}"
+                else:
+                    cond = f"!{{ {fetch} -m str {_haproxy_string_value(value)} }}"
             elif op == "~":
                 cond = f'{{ {fetch} -m reg "{_escape_regex(value)}" }}'
             elif op == "!~":
