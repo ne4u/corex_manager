@@ -4342,20 +4342,20 @@ def _generate_beacon_trust_tables() -> str:
 
     - ``cxid_table``: string-keyed, stores cxids (UUIDs) inserted into the
       Server-Timing response header. Tracked on sc5. Expires after
-      BEACON_CXID_TTL_SECONDS (default 120s).
+      BEACON_CXID_TTL_SECONDS (default 120s). Sized at 1m slots to
+      accommodate per-request cardinality (one entry per HTML response).
 
     - ``beacon_trust_table``: ip-keyed, stores trusted source IPs. Tracked on
       sc4. Expires after BEACON_TRUST_TTL_SECONDS (default 900s) with a
-      sliding-window refresh on every request from a trusted IP. Sized at
-      1m slots to accommodate high unique-client cardinality.
+      sliding-window refresh on every request from a trusted IP.
     """
     trust_ttl = getattr(settings, "BEACON_TRUST_TTL_SECONDS", 900)
-    cxid_ttl = getattr(settings, "BEACON_CXID_TTL_SECONDS", 600)
+    cxid_ttl = getattr(settings, "BEACON_CXID_TTL_SECONDS", 120)
     return (
         f"\nbackend cxid_table\n"
-        f"    stick-table type string len 64 size 100k expire {cxid_ttl}s store http_req_cnt\n"
+        f"    stick-table type string len 64 size 1m expire {cxid_ttl}s store http_req_cnt\n"
         f"\nbackend beacon_trust_table\n"
-        f"    stick-table type ip size 1m expire {trust_ttl}s store http_req_cnt\n"
+        f"    stick-table type ip size 100k expire {trust_ttl}s store http_req_cnt\n"
     )
 
 
