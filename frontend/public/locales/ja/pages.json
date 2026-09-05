@@ -533,6 +533,15 @@
       "enabled": "画像変換モジュールが有効になりました。",
       "disabled": "画像変換モジュールが無効になりました。",
       "failedToSave": "画像変換設定の保存に失敗しました。"
+    },
+    "serverTimingMetrics": {
+      "title": "Server-Timing メトリクス",
+      "description": "すべてのレスポンスの Server-Timing レスポンスヘッダーに接続、応答、合計タイミングメトリクス（ミリ秒単位）を追加します。ブラウザの DevTools および Resource Timing API で確認できます。Page Protect ビーコントラストも有効な場合、cxid とタイミングメトリクスは HTML レスポンスで単一の Server-Timing ヘッダーに結合されます。",
+      "enable": "Server-Timing メトリクスを有効化",
+      "save": "保存",
+      "enabledMsg": "Server-Timing メトリクスが有効になりました。",
+      "disabledMsg": "Server-Timing メトリクスが無効になりました。",
+      "saveFailed": "Server-Timing メトリクス設定の保存に失敗しました。"
     }
   },
   "loadBalancing": {

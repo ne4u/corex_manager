@@ -533,6 +533,15 @@
       "enabled": "Bildkonvertierungsmodul aktiviert.",
       "disabled": "Bildkonvertierungsmodul deaktiviert.",
       "failedToSave": "Speichern der Bildkonvertierungseinstellung fehlgeschlagen."
+    },
+    "serverTimingMetrics": {
+      "title": "Server-Timing-Metriken",
+      "description": "Fügt Verbindungs-, Antwort- und Gesamt-Timing-Metriken (in Millisekunden) zum Server-Timing-Antwort-Header bei allen Antworten hinzu. In den Browser-Entwicklertools und über die Resource Timing API sichtbar. Wenn Page Protect Beacon Trust ebenfalls aktiviert ist, werden cxid und Timing-Metriken in einem einzigen Server-Timing-Header bei HTML-Antworten kombiniert.",
+      "enable": "Server-Timing-Metriken aktivieren",
+      "save": "Speichern",
+      "enabledMsg": "Server-Timing-Metriken aktiviert.",
+      "disabledMsg": "Server-Timing-Metriken deaktiviert.",
+      "saveFailed": "Speichern der Server-Timing-Metriken-Einstellung fehlgeschlagen."
     }
   },
   "loadBalancing": {

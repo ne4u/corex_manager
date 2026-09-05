@@ -2135,6 +2135,7 @@ def generate_frontend(
     api_armor_max_body_bytes: int = 1048576,
     ja4_enabled: bool = True,
     disk_cache_enabled: bool = False,
+    server_timing_metrics_enabled: bool = False,
     logged_fields: Optional[List[LoggedField]] = None,
 ) -> str:
     cert_ids = (listener.certificate_ids or []) if listener.certificate_ids else []
@@ -2768,15 +2769,31 @@ def generate_frontend(
             elif h.action == "del":
                 lines.append(f"    http-response del-header {header_name}{condition}")
 
-        # Beacon Trust — Server-Timing header with cxid on HTML responses.
-        # The cxid was generated and tracked in cxid_table during the request
-        # phase (see http-request block above). Here we only add the
-        # Server-Timing response header so the beacon JS can read it via the
-        # Resource Timing API's serverTiming property (the only response
-        # header readable by JS). Only on HTML responses.
-        if beacon_trust:
-            lines.append('    acl is_html_response res.hdr(content-type) -m beg text/html')
-            lines.append('    http-response set-header Server-Timing "cxid;desc=\\"%[var(txn.cxid)]\\"" if is_html_response')
+        # Server-Timing response header.
+        #
+        # Two features use this header:
+        #   1. Beacon Trust (cxid) — on HTML responses only, so the beacon JS
+        #      can read the cxid via the Resource Timing API's serverTiming
+        #      property (the only response header readable by JS).
+        #   2. Server-Timing Metrics — on ALL responses, adds connect/response/
+        #      total timing metrics (dur in ms, per the Server-Timing spec).
+        #
+        # When both are enabled, HTML responses get a combined header with both
+        # cxid and timing metrics. Non-HTML responses get timing-only.
+        # Server-Timing supports comma-separated metrics in one header value.
+        if beacon_trust or server_timing_metrics_enabled:
+            if beacon_trust:
+                lines.append('    acl is_html_response res.hdr(content-type) -m beg text/html')
+            if beacon_trust and server_timing_metrics_enabled:
+                # Combined: cxid + timing on HTML, timing-only on non-HTML
+                lines.append('    http-response set-header Server-Timing "cxid;desc=\\"%[var(txn.cxid)]\\", total;dur=%Tt, connect;dur=%Tc, response;dur=%Tr" if is_html_response')
+                lines.append('    http-response set-header Server-Timing "total;dur=%Tt, connect;dur=%Tc, response;dur=%Tr" if !is_html_response')
+            elif beacon_trust:
+                # cxid only, HTML only (existing behavior)
+                lines.append('    http-response set-header Server-Timing "cxid;desc=\\"%[var(txn.cxid)]\\"" if is_html_response')
+            else:
+                # Timing metrics only, all responses
+                lines.append('    http-response set-header Server-Timing "total;dur=%Tt, connect;dur=%Tc, response;dur=%Tr"')
 
         # Custom response pages (per listener)
         errorfiles_dir = os.path.join(os.path.dirname(settings.HAPROXY_CONFIG_PATH), "errorfiles", _safe_path_name(listener.name))
@@ -3980,6 +3997,9 @@ def generate_config(
     req_fp_max_body_bytes = int(get_setting(db, "req_fp_max_body_bytes", str(settings.REQ_FP_MAX_BODY_BYTES)))
     req_fp_enforce_max_body = get_setting(db, "req_fp_enforce_max_body", str(settings.REQ_FP_ENFORCE_MAX_BODY)).lower() in ("true", "1", "yes")
 
+    # Server-Timing metrics toggle (DB setting with env fallback)
+    server_timing_metrics_enabled = get_setting(db, "server_timing_metrics_enabled", str(settings.SERVER_TIMING_METRICS_ENABLED)).lower() in ("true", "1", "yes")
+
     # API Armor toggle (DB setting with env fallback) — loads the Rust Lua
     # module globally and gates conditional body buffering + API/GraphQL/auth
     # inspection per-listener. Also reads the max body size setting.
@@ -4068,7 +4088,7 @@ def generate_config(
 
     for listener in listeners:
         if listener.enabled:
-            config += generate_frontend(listener, db, frontend_names=frontend_names, backend_names=backend_names, req_fp_enabled=req_fp_enabled, req_fp_parse_body=req_fp_parse_body, req_fp_max_body_bytes=req_fp_max_body_bytes, req_fp_enforce_max_body=req_fp_enforce_max_body, page_protect_enabled=page_protect_enabled, page_protect_report_path=page_protect_report_path, page_protect_beacon=page_protect_beacon, api_armor_enabled=api_armor_enabled, api_armor_max_body_bytes=api_armor_max_body_bytes, ja4_enabled=ja4_enabled, disk_cache_enabled=disk_cache_enabled, logged_fields=logged_fields)
+            config += generate_frontend(listener, db, frontend_names=frontend_names, backend_names=backend_names, req_fp_enabled=req_fp_enabled, req_fp_parse_body=req_fp_parse_body, req_fp_max_body_bytes=req_fp_max_body_bytes, req_fp_enforce_max_body=req_fp_enforce_max_body, page_protect_enabled=page_protect_enabled, page_protect_report_path=page_protect_report_path, page_protect_beacon=page_protect_beacon, api_armor_enabled=api_armor_enabled, api_armor_max_body_bytes=api_armor_max_body_bytes, ja4_enabled=ja4_enabled, disk_cache_enabled=disk_cache_enabled, server_timing_metrics_enabled=server_timing_metrics_enabled, logged_fields=logged_fields)
 
     for app in fcgi_apps:
         config += generate_fcgi_app(app)

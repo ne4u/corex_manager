@@ -533,6 +533,15 @@
       "enabled": "图片转换模块已启用。",
       "disabled": "图片转换模块已禁用。",
       "failedToSave": "保存图片转换设置失败。"
+    },
+    "serverTimingMetrics": {
+      "title": "Server-Timing 指标",
+      "description": "在所有响应的 Server-Timing 响应头中添加连接、响应和总计时指标（毫秒）。可在浏览器开发者工具和 Resource Timing API 中查看。当 Page Protect 信标信任也启用时，cxid 和计时指标在 HTML 响应中合并为单个 Server-Timing 头。",
+      "enable": "启用 Server-Timing 指标",
+      "save": "保存",
+      "enabledMsg": "Server-Timing 指标已启用。",
+      "disabledMsg": "Server-Timing 指标已禁用。",
+      "saveFailed": "保存 Server-Timing 指标设置失败。"
     }
   },
   "loadBalancing": {

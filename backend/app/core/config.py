@@ -166,6 +166,12 @@ class Settings(BaseSettings):
     REQ_FP_ENFORCE_MAX_BODY: bool = False  # reject oversized bodies with 413 instead of skipping body parsing
     REQ_FP_MODULE_ENABLED: bool = True  # use Rust Lua module (true) vs no fingerprinting (false, dev escape hatch)
 
+    # Server-Timing metrics (toggled via Global Options GUI; stored in DB settings).
+    # When enabled, HAProxy adds connect/response/total timing metrics to the
+    # Server-Timing response header on all responses. Values are in milliseconds
+    # (matching the Server-Timing spec's dur parameter).
+    SERVER_TIMING_METRICS_ENABLED: bool = False
+
     # Response compression (toggled via Global Options GUI; stored in DB settings).
     # When enabled, the haproxy-compression Rust Lua module is loaded
     # (lua-load-per-thread compress.lua) and both brotli and zstd become

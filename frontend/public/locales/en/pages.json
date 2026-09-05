@@ -537,6 +537,15 @@
       "enabled": "API Armor enabled.",
       "disabled": "API Armor disabled.",
       "failedToSave": "Failed to save API Armor setting."
+    },
+    "serverTimingMetrics": {
+      "title": "Server-Timing Metrics",
+      "description": "Add connect, response, and total timing metrics (in milliseconds) to the Server-Timing response header on all responses. Visible in browser DevTools and via the Resource Timing API. When Page Protect beacon trust is also enabled, the cxid and timing metrics are combined in a single Server-Timing header on HTML responses.",
+      "enable": "Enable Server-Timing Metrics",
+      "save": "Save",
+      "enabledMsg": "Server-Timing metrics enabled.",
+      "disabledMsg": "Server-Timing metrics disabled.",
+      "saveFailed": "Failed to save Server-Timing metrics setting."
     }
   },
   "loadBalancing": {

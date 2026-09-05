@@ -533,6 +533,15 @@
       "enabled": "이미지 변환 모듈이 활성화되었습니다.",
       "disabled": "이미지 변환 모듈이 비활성화되었습니다.",
       "failedToSave": "이미지 변환 설정 저장에 실패했습니다."
+    },
+    "serverTimingMetrics": {
+      "title": "Server-Timing 메트릭스",
+      "description": "모든 응답의 Server-Timing 응답 헤더에 연결, 응답 및 총 타이밍 메트릭스(밀리초)를 추가합니다. 브라우저 DevTools 및 Resource Timing API를 통해 볼 수 있습니다. Page Protect 비콘 트러스트도 활성화된 경우, cxid와 타이밍 메트릭스가 HTML 응답에서 단일 Server-Timing 헤더로 결합됩니다.",
+      "enable": "Server-Timing 메트릭스 활성화",
+      "save": "저장",
+      "enabledMsg": "Server-Timing 메트릭스가 활성화되었습니다.",
+      "disabledMsg": "Server-Timing 메트릭스가 비활성화되었습니다.",
+      "saveFailed": "Server-Timing 메트릭스 설정 저장에 실패했습니다."
     }
   },
   "loadBalancing": {

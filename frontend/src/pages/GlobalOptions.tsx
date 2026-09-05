@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { SlidersHorizontal, Wrench, KeyRound, FileText } from 'lucide-react'
-import { haproxy, getConfigStatus, auth } from '../services/api'
+import { SlidersHorizontal, Wrench, KeyRound, FileText, Timer } from 'lucide-react'
+import { haproxy, getConfigStatus, auth, settings } from '../services/api'
 import HaproxyOptionsEditor, { HaproxyOption } from '../components/HaproxyOptionsEditor'
 import { Tabs } from '../components/ui'
 import Ciphers from './Ciphers'
@@ -16,6 +16,10 @@ export default function GlobalOptions() {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
+
+  const [serverTimingMetricsEnabled, setServerTimingMetricsEnabled] = useState(false)
+  const [serverTimingMetricsSaving, setServerTimingMetricsSaving] = useState(false)
+  const [serverTimingMetricsMessage, setServerTimingMetricsMessage] = useState('')
 
   const [tab, setTab] = useState<GlobalOptionsTab>('advanced')
 
@@ -37,6 +41,9 @@ export default function GlobalOptions() {
       .then((r) => setOptions(Array.isArray(r.data) ? r.data : []))
       .catch(() => setMessage(t('pages:globalOptions.couldNotLoad')))
       .finally(() => setLoading(false))
+    settings.get('server_timing_metrics_enabled')
+      .then((r) => setServerTimingMetricsEnabled((r.data.value || 'false').toLowerCase() === 'true'))
+      .catch(() => setServerTimingMetricsEnabled(false))
   }, [])
 
   const save = async () => {
@@ -64,6 +71,27 @@ export default function GlobalOptions() {
     }
   }
 
+  const saveServerTimingMetrics = async () => {
+    setServerTimingMetricsSaving(true)
+    setServerTimingMetricsMessage('')
+    try {
+      await settings.update('server_timing_metrics_enabled', { value: String(serverTimingMetricsEnabled) })
+      setServerTimingMetricsMessage(serverTimingMetricsEnabled ? t('pages:globalOptions.serverTimingMetrics.enabledMsg') : t('pages:globalOptions.serverTimingMetrics.disabledMsg'))
+      let unapplied = true
+      try {
+        const sr = await getConfigStatus()
+        unapplied = sr.data.unapplied
+      } catch {
+        unapplied = true
+      }
+      window.dispatchEvent(new CustomEvent('config-status-changed', { detail: { unapplied } }))
+    } catch (err: any) {
+      setServerTimingMetricsMessage(err?.response?.data?.detail || t('pages:globalOptions.serverTimingMetrics.saveFailed'))
+    } finally {
+      setServerTimingMetricsSaving(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold flex items-center gap-2"><SlidersHorizontal className="h-5 w-5 text-primary" /> {t('pages:globalOptions.title')}</h1>
@@ -79,6 +107,7 @@ export default function GlobalOptions() {
       />
 
       {tab === 'advanced' && (
+      <>
       <div className="card space-y-4 max-w-3xl">
         <HaproxyOptionsEditor
           scope="global"
@@ -98,6 +127,34 @@ export default function GlobalOptions() {
           </p>
         )}
       </div>
+
+      <div className="card space-y-4 max-w-3xl">
+        <h2 className="text-lg font-semibold flex items-center gap-2"><Timer className="h-5 w-5 text-primary" /> {t('pages:globalOptions.serverTimingMetrics.title')}</h2>
+        <p className="text-sm text-slate-400">
+          {t('pages:globalOptions.serverTimingMetrics.description')}
+        </p>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={serverTimingMetricsEnabled}
+            onChange={(e) => setServerTimingMetricsEnabled(e.target.checked)}
+          />
+          <span className="text-sm">{t('pages:globalOptions.serverTimingMetrics.enable')}</span>
+        </label>
+        <button
+          className="btn-primary"
+          onClick={saveServerTimingMetrics}
+          disabled={serverTimingMetricsSaving}
+        >
+          {serverTimingMetricsSaving ? t('common:actions.saving') : t('pages:globalOptions.serverTimingMetrics.save')}
+        </button>
+        {serverTimingMetricsMessage && (
+          <p className={`text-sm ${serverTimingMetricsMessage === t('pages:globalOptions.serverTimingMetrics.enabledMsg') || serverTimingMetricsMessage === t('pages:globalOptions.serverTimingMetrics.disabledMsg') ? 'text-green-400' : 'text-red-400'}`}>
+            {serverTimingMetricsMessage}
+          </p>
+        )}
+      </div>
+      </>
       )}
 
       {tab === 'ciphers' && <Ciphers />}

@@ -533,6 +533,15 @@
       "enabled": "छवि रूपांतरण मॉड्यूल सक्षम किया गया।",
       "disabled": "छवि रूपांतरण मॉड्यूल अक्षम किया गया।",
       "failedToSave": "छवि रूपांतरण सेटिंग सहेजने में विफल।"
+    },
+    "serverTimingMetrics": {
+      "title": "Server-Timing मेट्रिक्स",
+      "description": "सभी प्रतिक्रियाओं पर Server-Timing प्रतिक्रिया शीर्षलेख में कनेक्ट, प्रतिक्रिया और कुल समय मेट्रिक्स (मिलीसेकंड में) जोड़ता है। ब्राउज़र डेवटूल्स और Resource Timing API के माध्यम से दृश्यमान। जब Page Protect बीकन ट्रस्ट भी सक्षम हो, तो cxid और समय मेट्रिक्स HTML प्रतिक्रियाओं पर एक ही Server-Timing शीर्षलेख में संयोजित होते हैं।",
+      "enable": "Server-Timing मेट्रिक्स सक्षम करें",
+      "save": "सहेजें",
+      "enabledMsg": "Server-Timing मेट्रिक्स सक्षम।",
+      "disabledMsg": "Server-Timing मेट्रिक्स अक्षम।",
+      "saveFailed": "Server-Timing मेट्रिक्स सेटिंग सहेजने में विफल।"
     }
   },
   "loadBalancing": {

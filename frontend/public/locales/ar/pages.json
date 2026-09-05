@@ -533,6 +533,15 @@
       "enabled": "تم تفعيل وحدة تحويل الصور.",
       "disabled": "تم تعطيل وحدة تحويل الصور.",
       "failedToSave": "فشل حفظ إعداد تحويل الصور."
+    },
+    "serverTimingMetrics": {
+      "title": "مقاييس Server-Timing",
+      "description": "إضافة مقاييس توقيت الاتصال والاستجابة والوقت الإجمالي (بالمللي ثانية) إلى رأس استجابة Server-Timing على جميع الاستجابات. مرئية في أدوات المطور في المتصفح وعبر Resource Timing API. عند تمكين ثقة beacon في Page Protect أيضًا، يتم دمج cxid ومقاييس التوقيت في رأس Server-Timing واحد على استجابات HTML.",
+      "enable": "تمكين مقاييس Server-Timing",
+      "save": "حفظ",
+      "enabledMsg": "تم تمكين مقاييس Server-Timing.",
+      "disabledMsg": "تم تعطيل مقاييس Server-Timing.",
+      "saveFailed": "فشل حفظ إعداد مقاييس Server-Timing."
     }
   },
   "loadBalancing": {

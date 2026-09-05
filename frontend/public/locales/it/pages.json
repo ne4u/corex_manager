@@ -533,6 +533,15 @@
       "enabled": "Modulo conversione immagini abilitato.",
       "disabled": "Modulo conversione immagini disabilitato.",
       "failedToSave": "Salvataggio dell'impostazione di conversione immagini non riuscito."
+    },
+    "serverTimingMetrics": {
+      "title": "Metriche Server-Timing",
+      "description": "Aggiunge metriche di tempo di connessione, risposta e totale (in millisecondi) all'intestazione di risposta Server-Timing su tutte le risposte. Visibile negli strumenti di sviluppo del browser e tramite Resource Timing API. Quando anche la fiducia del beacon di Page Protect è abilitata, cxid e metriche di tempo vengono combinati in un'unica intestazione Server-Timing sulle risposte HTML.",
+      "enable": "Abilita metriche Server-Timing",
+      "save": "Salva",
+      "enabledMsg": "Metriche Server-Timing abilitate.",
+      "disabledMsg": "Metriche Server-Timing disabilitate.",
+      "saveFailed": "Impossibile salvare l'impostazione delle metriche Server-Timing."
     }
   },
   "loadBalancing": {
