@@ -3111,7 +3111,8 @@
       "users": "Users",
       "features": "Feature Flags",
       "snapshots": "Snapshots",
-      "tables": "Stick Tables"
+      "tables": "Stick Tables",
+      "valkey": "Valkey"
     }
   },
   "featureFlags": {
@@ -3231,5 +3232,43 @@
     "showing": "Showing {{from}}-{{to}} of {{total}}",
     "pageOf": "Page {{page}} of {{total}}",
     "expiresAt": "Expires at"
+  },
+  "systemValkey": {
+    "title": "Valkey Inspector",
+    "description": "Browse Valkey (Redis-compatible) keys grouped by namespace prefix. View key type, TTL, size, and value preview. Admins can delete a single key.",
+    "namespace": "Namespace",
+    "keys": "Keys",
+    "sample": "Sample",
+    "key": "Key",
+    "type": "Type",
+    "ttl": "TTL",
+    "expiresAt": "Expires at",
+    "persistent": "persistent",
+    "missing": "missing",
+    "size": "Size",
+    "preview": "Preview",
+    "searchPlaceholder": "Search by key...",
+    "clearSearch": "Clear search",
+    "page": "page",
+    "autoRefresh": "Auto-refresh",
+    "deleteKey": "Delete key",
+    "confirmDeleteKey": "Delete key \"{{key}}\"? This cannot be undone.",
+    "keyDeleted": "Key deleted.",
+    "deleteFailed": "Failed to delete key.",
+    "noKeys": "No keys in this namespace.",
+    "noNamespaces": "No namespaces found. Valkey may not be running or is unavailable.",
+    "showing": "Showing {{from}}-{{to}} of {{total}}",
+    "pageOf": "Page {{page}} of {{total}}",
+    "serverInfo": "Server Info",
+    "version": "Version",
+    "role": "Role",
+    "uptime": "Uptime",
+    "connectedClients": "Clients",
+    "usedMemory": "Used memory",
+    "peakMemory": "Peak memory",
+    "totalKeys": "Total keys",
+    "databases": "Databases",
+    "unavailable": "Valkey is not available.",
+    "actions": "Actions"
   }
 }

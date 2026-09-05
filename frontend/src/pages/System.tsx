@@ -1,14 +1,15 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Settings as SettingsIcon, Users as UsersIcon, Flag, History, Table as TableIcon } from 'lucide-react'
+import { Settings as SettingsIcon, Users as UsersIcon, Flag, History, Table as TableIcon, Database } from 'lucide-react'
 import { Tabs } from '../components/ui'
 import SystemSettings from './SystemSettings'
 import Users from './Users'
 import FeatureFlags from './FeatureFlags'
 import SystemSnapshots from './SystemSnapshots'
 import SystemTables from './SystemTables'
+import SystemValkey from './SystemValkey'
 
-type SystemTab = 'settings' | 'users' | 'features' | 'snapshots' | 'tables'
+type SystemTab = 'settings' | 'users' | 'features' | 'snapshots' | 'tables' | 'valkey'
 
 export default function System() {
   const { t } = useTranslation(['pages', 'common'])
@@ -24,6 +25,7 @@ export default function System() {
           { id: 'features', label: t('pages:system.tabs.features'), icon: Flag },
           { id: 'snapshots', label: t('pages:system.tabs.snapshots'), icon: History },
           { id: 'tables', label: t('pages:system.tabs.tables'), icon: TableIcon },
+          { id: 'valkey', label: t('pages:system.tabs.valkey'), icon: Database },
         ]}
         active={tab}
         onChange={(id) => setTab(id as SystemTab)}
@@ -34,6 +36,7 @@ export default function System() {
       {tab === 'features' && <FeatureFlags />}
       {tab === 'snapshots' && <SystemSnapshots />}
       {tab === 'tables' && <SystemTables />}
+      {tab === 'valkey' && <SystemValkey />}
     </div>
   )
 }

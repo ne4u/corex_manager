@@ -731,3 +731,12 @@ export const stickTables = {
   clearEntry: (name: string, key: string) =>
     api.delete(`/haproxy/tables/${encodeURIComponent(name)}/entries/${encodeURIComponent(key)}`),
 }
+
+export const valkey = {
+  info: () => api.get('/valkey/info'),
+  namespaces: () => api.get('/valkey/namespaces'),
+  namespace: (prefix: string, params?: { limit?: number; offset?: number; search?: string }) =>
+    api.get(`/valkey/namespaces/${encodeURIComponent(prefix)}`, { params }),
+  // `{key:path}` route — encode `/` so it survives the path segment.
+  deleteKey: (key: string) => api.delete(`/valkey/keys/${encodeURIComponent(key)}`),
+}

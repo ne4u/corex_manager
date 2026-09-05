@@ -2490,7 +2490,8 @@
       "users": "Пользователи",
       "features": "Функции",
       "snapshots": "Снимки",
-      "tables": "Stick-таблицы"
+      "tables": "Stick-таблицы",
+      "valkey": "Valkey"
     }
   },
   "mcpGateway": {
@@ -3062,5 +3063,43 @@
     "showing": "Показано {{from}}-{{to}} из {{total}}",
     "pageOf": "Страница {{page}} из {{total}}",
     "expiresAt": "Истекает в"
+  },
+  "systemValkey": {
+    "title": "Инспектор Valkey",
+    "description": "Просмотр ключей Valkey (совместимого с Redis), сгруппированных по префиксу пространства имён. Тип ключа, TTL, размер и предпросмотр значения. Администраторы могут удалить один ключ.",
+    "namespace": "Пространство",
+    "keys": "Ключи",
+    "sample": "Пример",
+    "key": "Ключ",
+    "type": "Тип",
+    "ttl": "TTL",
+    "expiresAt": "Истекает в",
+    "persistent": "постоянный",
+    "missing": "отсутствует",
+    "size": "Размер",
+    "preview": "Предпросмотр",
+    "searchPlaceholder": "Поиск по ключу...",
+    "clearSearch": "Очистить поиск",
+    "page": "страница",
+    "autoRefresh": "Авто-обновление",
+    "deleteKey": "Удалить ключ",
+    "confirmDeleteKey": "Удалить ключ \"{{key}}\"? Это действие нельзя отменить.",
+    "keyDeleted": "Ключ удалён.",
+    "deleteFailed": "Не удалось удалить ключ.",
+    "noKeys": "В этом пространстве имён нет ключей.",
+    "noNamespaces": "Пространства имён не найдены. Valkey может не работать или недоступен.",
+    "showing": "Показано {{from}}-{{to}} из {{total}}",
+    "pageOf": "Страница {{page}} из {{total}}",
+    "serverInfo": "Информация о сервере",
+    "version": "Версия",
+    "role": "Роль",
+    "uptime": "Время работы",
+    "connectedClients": "Клиенты",
+    "usedMemory": "Использовано памяти",
+    "peakMemory": "Пиковая память",
+    "totalKeys": "Всего ключей",
+    "databases": "Базы данных",
+    "unavailable": "Valkey недоступен.",
+    "actions": "Действия"
   }
 }

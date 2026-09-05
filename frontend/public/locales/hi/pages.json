@@ -2490,7 +2490,8 @@
       "users": "उपयोगकर्ता",
       "features": "सुविधाएँ",
       "snapshots": "स्नैपशॉट",
-      "tables": "स्टिक टेबल्स"
+      "tables": "स्टिक टेबल्स",
+      "valkey": "Valkey"
     }
   },
   "mcpGateway": {
@@ -3062,5 +3063,43 @@
     "showing": "{{total}} में से {{from}}-{{to}} दिखा रहा है",
     "pageOf": "पृष्ठ {{page}} / {{total}}",
     "expiresAt": "समाप्ति समय"
+  },
+  "systemValkey": {
+    "title": "Valkey निरीक्षक",
+    "description": "नामस्थान प्रीफ़िक्स द्वारा समूहीकृत Valkey (Redis-संगत) कुंजियाँ ब्राउज़ करें। कुंजी प्रकार, TTL, आकार और मान पूर्वावलोकन देखें। व्यवस्थापक एक कुंजी हटा सकते हैं।",
+    "namespace": "नामस्थान",
+    "keys": "कुंजियाँ",
+    "sample": "नमूना",
+    "key": "कुंजी",
+    "type": "प्रकार",
+    "ttl": "TTL",
+    "expiresAt": "समाप्ति समय",
+    "persistent": "स्थायी",
+    "missing": "अनुपस्थित",
+    "size": "आकार",
+    "preview": "पूर्वावलोकन",
+    "searchPlaceholder": "कुंजी द्वारा खोजें...",
+    "clearSearch": "खोज साफ़ करें",
+    "page": "पृष्ठ",
+    "autoRefresh": "ऑटो-रिफ्रेश",
+    "deleteKey": "कुंजी हटाएँ",
+    "confirmDeleteKey": "कुंजी \"{{key}}\" हटाएँ? यह पूर्ववत नहीं किया जा सकता।",
+    "keyDeleted": "कुंजी हटाई गई।",
+    "deleteFailed": "कुंजी हटाने में विफल।",
+    "noKeys": "इस नामस्थान में कोई कुंजी नहीं।",
+    "noNamespaces": "कोई नामस्थान नहीं मिला। Valkey चल नहीं रहा है या अनुपलब्ध है।",
+    "showing": "{{total}} में से {{from}}-{{to}} दिखा रहा है",
+    "pageOf": "पृष्ठ {{page}} / {{total}}",
+    "serverInfo": "सर्वर जानकारी",
+    "version": "संस्करण",
+    "role": "भूमिका",
+    "uptime": "अपटाइम",
+    "connectedClients": "क्लाइंट",
+    "usedMemory": "उपयोग की गई मेमोरी",
+    "peakMemory": "पीक मेमोरी",
+    "totalKeys": "कुल कुंजियाँ",
+    "databases": "डेटाबेस",
+    "unavailable": "Valkey उपलब्ध नहीं है।",
+    "actions": "क्रियाएँ"
   }
 }

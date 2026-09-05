@@ -2490,7 +2490,8 @@
       "users": "المستخدمون",
       "features": "ميزات",
       "snapshots": "اللقطات",
-      "tables": "جداول Stick"
+      "tables": "جداول Stick",
+      "valkey": "Valkey"
     }
   },
   "mcpGateway": {
@@ -3062,5 +3063,43 @@
     "showing": "عرض {{from}}-{{to}} من {{total}}",
     "pageOf": "صفحة {{page}} من {{total}}",
     "expiresAt": "ينتهي في"
+  },
+  "systemValkey": {
+    "title": "فاحص Valkey",
+    "description": "تصفح مفاتيح Valkey (متوافق مع Redis) مجمعة حسب بادئة المساحة. اعرض نوع المفتاح وTTL والحجم ومعاينة القيمة. يمكن للمسؤولين حذف مفتاح واحد.",
+    "namespace": "المساحة",
+    "keys": "المفاتيح",
+    "sample": "عينة",
+    "key": "المفتاح",
+    "type": "النوع",
+    "ttl": "TTL",
+    "expiresAt": "ينتهي في",
+    "persistent": "دائم",
+    "missing": "مفقود",
+    "size": "الحجم",
+    "preview": "معاينة",
+    "searchPlaceholder": "البحث بالمفتاح...",
+    "clearSearch": "مسح البحث",
+    "page": "صفحة",
+    "autoRefresh": "تحديث تلقائي",
+    "deleteKey": "حذف المفتاح",
+    "confirmDeleteKey": "حذف المفتاح \"{{key}}\"؟ لا يمكن التراجع عن هذا.",
+    "keyDeleted": "تم حذف المفتاح.",
+    "deleteFailed": "فشل في حذف المفتاح.",
+    "noKeys": "لا توجد مفاتيح في هذه المساحة.",
+    "noNamespaces": "لم يتم العثور على مساحات. قد لا يكون Valkey قيد التشغيل أو غير متاح.",
+    "showing": "عرض {{from}}-{{to}} من {{total}}",
+    "pageOf": "صفحة {{page}} من {{total}}",
+    "serverInfo": "معلومات الخادم",
+    "version": "الإصدار",
+    "role": "الدور",
+    "uptime": "وقت التشغيل",
+    "connectedClients": "العملاء",
+    "usedMemory": "الذاكرة المستخدمة",
+    "peakMemory": "ذروة الذاكرة",
+    "totalKeys": "إجمالي المفاتيح",
+    "databases": "قواعد البيانات",
+    "unavailable": "Valkey غير متاح.",
+    "actions": "إجراءات"
   }
 }

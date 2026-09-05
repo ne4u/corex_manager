@@ -2490,7 +2490,8 @@
       "users": "Usuarios",
       "features": "Características",
       "snapshots": "Instantáneas",
-      "tables": "Tablas Stick"
+      "tables": "Tablas Stick",
+      "valkey": "Valkey"
     }
   },
   "mcpGateway": {
@@ -3062,5 +3063,43 @@
     "showing": "Mostrando {{from}}-{{to}} de {{total}}",
     "pageOf": "Página {{page}} de {{total}}",
     "expiresAt": "Expira a las"
+  },
+  "systemValkey": {
+    "title": "Inspector de Valkey",
+    "description": "Explora las claves de Valkey (compatible con Redis) agrupadas por prefijo de espacio de nombres. Ver tipo de clave, TTL, tamaño y vista previa del valor. Los administradores pueden eliminar una sola clave.",
+    "namespace": "Espacio",
+    "keys": "Claves",
+    "sample": "Ejemplo",
+    "key": "Clave",
+    "type": "Tipo",
+    "ttl": "TTL",
+    "expiresAt": "Expira a las",
+    "persistent": "persistente",
+    "missing": "falta",
+    "size": "Tamaño",
+    "preview": "Vista previa",
+    "searchPlaceholder": "Buscar por clave...",
+    "clearSearch": "Borrar búsqueda",
+    "page": "página",
+    "autoRefresh": "Auto-actualizar",
+    "deleteKey": "Eliminar clave",
+    "confirmDeleteKey": "¿Eliminar la clave \"{{key}}\"? Esto no se puede deshacer.",
+    "keyDeleted": "Clave eliminada.",
+    "deleteFailed": "Error al eliminar la clave.",
+    "noKeys": "No hay claves en este espacio de nombres.",
+    "noNamespaces": "No se encontraron espacios de nombres. Valkey puede no estar en ejecución o no está disponible.",
+    "showing": "Mostrando {{from}}-{{to}} de {{total}}",
+    "pageOf": "Página {{page}} de {{total}}",
+    "serverInfo": "Info del servidor",
+    "version": "Versión",
+    "role": "Rol",
+    "uptime": "Tiempo activo",
+    "connectedClients": "Clientes",
+    "usedMemory": "Memoria usada",
+    "peakMemory": "Memoria pico",
+    "totalKeys": "Claves totales",
+    "databases": "Bases de datos",
+    "unavailable": "Valkey no está disponible.",
+    "actions": "Acciones"
   }
 }

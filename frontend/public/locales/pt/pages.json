@@ -2490,7 +2490,8 @@
       "users": "Usuários",
       "features": "Recursos",
       "snapshots": "Snapshots",
-      "tables": "Tabelas Stick"
+      "tables": "Tabelas Stick",
+      "valkey": "Valkey"
     }
   },
   "mcpGateway": {
@@ -3062,5 +3063,43 @@
     "showing": "Mostrando {{from}}-{{to}} de {{total}}",
     "pageOf": "Página {{page}} de {{total}}",
     "expiresAt": "Expira às"
+  },
+  "systemValkey": {
+    "title": "Inspetor Valkey",
+    "description": "Navegue pelas chaves Valkey (compatível com Redis) agrupadas por prefixo de namespace. Veja o tipo, TTL, tamanho e pré-visualização do valor. Administradores podem excluir uma única chave.",
+    "namespace": "Namespace",
+    "keys": "Chaves",
+    "sample": "Exemplo",
+    "key": "Chave",
+    "type": "Tipo",
+    "ttl": "TTL",
+    "expiresAt": "Expira às",
+    "persistent": "persistente",
+    "missing": "ausente",
+    "size": "Tamanho",
+    "preview": "Pré-visualização",
+    "searchPlaceholder": "Buscar por chave...",
+    "clearSearch": "Limpar busca",
+    "page": "página",
+    "autoRefresh": "Auto-atualizar",
+    "deleteKey": "Excluir chave",
+    "confirmDeleteKey": "Excluir a chave \"{{key}}\"? Isso não pode ser desfeito.",
+    "keyDeleted": "Chave excluída.",
+    "deleteFailed": "Falha ao excluir a chave.",
+    "noKeys": "Nenhuma chave neste namespace.",
+    "noNamespaces": "Nenhum namespace encontrado. Valkey pode não estar em execução ou indisponível.",
+    "showing": "Mostrando {{from}}-{{to}} de {{total}}",
+    "pageOf": "Página {{page}} de {{total}}",
+    "serverInfo": "Info do servidor",
+    "version": "Versão",
+    "role": "Papel",
+    "uptime": "Tempo ativo",
+    "connectedClients": "Clientes",
+    "usedMemory": "Memória usada",
+    "peakMemory": "Memória pico",
+    "totalKeys": "Chaves totais",
+    "databases": "Bancos de dados",
+    "unavailable": "Valkey não está disponível.",
+    "actions": "Ações"
   }
 }

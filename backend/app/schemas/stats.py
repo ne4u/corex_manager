@@ -61,6 +61,50 @@ class StickTableClearResponse(BaseModel):
     cleared: int
 
 
+# ---------------------------------------------------------------------------
+# Valkey inspector (System → Valkey tab)
+# ---------------------------------------------------------------------------
+
+class ValkeyServerInfo(BaseModel):
+    available: bool
+    version: Optional[str] = None
+    uptime_seconds: int = 0
+    connected_clients: int = 0
+    used_memory_human: str = ""
+    used_memory_peak_human: str = ""
+    total_keys: int = 0
+    db_count: int = 0
+    role: str = ""
+    error: Optional[str] = None
+
+
+class ValkeyNamespaceSummary(BaseModel):
+    prefix: str
+    count: int
+    sample_keys: List[str] = []
+
+
+class ValkeyKeyEntry(BaseModel):
+    key: str
+    type: str
+    ttl: int  # -1 = no expiry, -2 = missing
+    size: Optional[int] = None  # bytes from MEMORY USAGE
+    preview: str = ""
+
+
+class ValkeyNamespaceDetail(BaseModel):
+    prefix: str
+    total: int = 0
+    offset: int = 0
+    limit: int = 100
+    keys: List[ValkeyKeyEntry] = []
+
+
+class ValkeyDeleteResponse(BaseModel):
+    ok: bool
+    deleted: int
+
+
 __all__ = [
     'MetricsResponse',
     'StatsResponse',
@@ -69,4 +113,9 @@ __all__ = [
     'StickTableEntry',
     'StickTableDetail',
     'StickTableClearResponse',
+    'ValkeyServerInfo',
+    'ValkeyNamespaceSummary',
+    'ValkeyKeyEntry',
+    'ValkeyNamespaceDetail',
+    'ValkeyDeleteResponse',
 ]

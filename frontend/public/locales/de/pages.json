@@ -2490,7 +2490,8 @@
       "users": "Benutzer",
       "features": "Funktionen",
       "snapshots": "Schnappschüsse",
-      "tables": "Stick-Tabellen"
+      "tables": "Stick-Tabellen",
+      "valkey": "Valkey"
     }
   },
   "mcpGateway": {
@@ -3062,5 +3063,43 @@
     "showing": "Zeige {{from}}-{{to}} von {{total}}",
     "pageOf": "Seite {{page}} von {{total}}",
     "expiresAt": "Läuft ab um"
+  },
+  "systemValkey": {
+    "title": "Valkey-Inspektor",
+    "description": "Valkey-Schlüssel (Redis-kompatibel) nach Namensraum-Präfix gruppiert durchsuchen. Schlüsseltyp, TTL, Größe und Wertvorschau anzeigen. Administratoren können einen einzelnen Schlüssel löschen.",
+    "namespace": "Namensraum",
+    "keys": "Schlüssel",
+    "sample": "Beispiel",
+    "key": "Schlüssel",
+    "type": "Typ",
+    "ttl": "TTL",
+    "expiresAt": "Läuft ab um",
+    "persistent": "dauerhaft",
+    "missing": "fehlt",
+    "size": "Größe",
+    "preview": "Vorschau",
+    "searchPlaceholder": "Nach Schlüssel suchen...",
+    "clearSearch": "Suche löschen",
+    "page": "Seite",
+    "autoRefresh": "Auto-Aktualisierung",
+    "deleteKey": "Schlüssel löschen",
+    "confirmDeleteKey": "Schlüssel \"{{key}}\" löschen? Dies kann nicht rückgängig gemacht werden.",
+    "keyDeleted": "Schlüssel gelöscht.",
+    "deleteFailed": "Schlüssel konnte nicht gelöscht werden.",
+    "noKeys": "Keine Schlüssel in diesem Namensraum.",
+    "noNamespaces": "Keine Namensräume gefunden. Valkey läuft möglicherweise nicht oder ist nicht verfügbar.",
+    "showing": "Zeige {{from}}-{{to}} von {{total}}",
+    "pageOf": "Seite {{page}} von {{total}}",
+    "serverInfo": "Serverinfo",
+    "version": "Version",
+    "role": "Rolle",
+    "uptime": "Laufzeit",
+    "connectedClients": "Clients",
+    "usedMemory": "Benutzter Speicher",
+    "peakMemory": "Spitzenspeicher",
+    "totalKeys": "Schlüssel gesamt",
+    "databases": "Datenbanken",
+    "unavailable": "Valkey ist nicht verfügbar.",
+    "actions": "Aktionen"
   }
 }

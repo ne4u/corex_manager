@@ -2490,7 +2490,8 @@
       "users": "사용자",
       "features": "기능",
       "snapshots": "스냅샷",
-      "tables": "스틱 테이블"
+      "tables": "스틱 테이블",
+      "valkey": "Valkey"
     }
   },
   "mcpGateway": {
@@ -3062,5 +3063,43 @@
     "showing": "{{total}}개 중 {{from}}-{{to}} 표시",
     "pageOf": "{{total}}페이지 중 {{page}}페이지",
     "expiresAt": "만료 시각"
+  },
+  "systemValkey": {
+    "title": "Valkey 검사기",
+    "description": "네임스페이스 접두사로 그룹화된 Valkey(Redis 호환) 키를 탐색합니다. 키 타입, TTL, 크기, 값 미리보기를 봅니다. 관리자는 단일 키를 삭제할 수 있습니다.",
+    "namespace": "네임스페이스",
+    "keys": "키",
+    "sample": "샘플",
+    "key": "키",
+    "type": "유형",
+    "ttl": "TTL",
+    "expiresAt": "만료 시각",
+    "persistent": "영구",
+    "missing": "없음",
+    "size": "크기",
+    "preview": "미리보기",
+    "searchPlaceholder": "키로 검색...",
+    "clearSearch": "검색 지우기",
+    "page": "페이지",
+    "autoRefresh": "자동 새로고침",
+    "deleteKey": "키 삭제",
+    "confirmDeleteKey": "키 \"{{key}}\"를 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.",
+    "keyDeleted": "키가 삭제되었습니다.",
+    "deleteFailed": "키 삭제에 실패했습니다.",
+    "noKeys": "이 네임스페이스에 키가 없습니다.",
+    "noNamespaces": "네임스페이스를 찾을 수 없습니다. Valkey가 실행되지 않거나 사용할 수 없을 수 있습니다.",
+    "showing": "{{total}}개 중 {{from}}-{{to}} 표시",
+    "pageOf": "{{total}}페이지 중 {{page}}페이지",
+    "serverInfo": "서버 정보",
+    "version": "버전",
+    "role": "역할",
+    "uptime": "가동 시간",
+    "connectedClients": "클라이언트",
+    "usedMemory": "사용 메모리",
+    "peakMemory": "최대 메모리",
+    "totalKeys": "전체 키",
+    "databases": "데이터베이스",
+    "unavailable": "Valkey를 사용할 수 없습니다.",
+    "actions": "작업"
   }
 }

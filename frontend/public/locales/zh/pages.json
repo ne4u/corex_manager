@@ -2490,7 +2490,8 @@
       "users": "用户",
       "features": "功能标志",
       "snapshots": "快照",
-      "tables": "粘性表"
+      "tables": "粘性表",
+      "valkey": "Valkey"
     }
   },
   "mcpGateway": {
@@ -3062,5 +3063,43 @@
     "showing": "显示 {{from}}-{{to}}，共 {{total}}",
     "pageOf": "第 {{page}} 页，共 {{total}} 页",
     "expiresAt": "过期时间"
+  },
+  "systemValkey": {
+    "title": "Valkey 检查器",
+    "description": "按命名空间前缀分组浏览 Valkey（兼容 Redis）键。查看键类型、TTL、大小和值预览。管理员可删除单个键。",
+    "namespace": "命名空间",
+    "keys": "键",
+    "sample": "示例",
+    "key": "键",
+    "type": "类型",
+    "ttl": "TTL",
+    "expiresAt": "过期时间",
+    "persistent": "持久",
+    "missing": "缺失",
+    "size": "大小",
+    "preview": "预览",
+    "searchPlaceholder": "按键搜索...",
+    "clearSearch": "清除搜索",
+    "page": "页",
+    "autoRefresh": "自动刷新",
+    "deleteKey": "删除键",
+    "confirmDeleteKey": "删除键 \"{{key}}\"？此操作无法撤销。",
+    "keyDeleted": "键已删除。",
+    "deleteFailed": "删除键失败。",
+    "noKeys": "此命名空间中没有键。",
+    "noNamespaces": "未找到命名空间。Valkey 可能未运行或不可用。",
+    "showing": "显示 {{from}}-{{to}}，共 {{total}}",
+    "pageOf": "第 {{page}} 页，共 {{total}} 页",
+    "serverInfo": "服务器信息",
+    "version": "版本",
+    "role": "角色",
+    "uptime": "运行时间",
+    "connectedClients": "客户端",
+    "usedMemory": "已用内存",
+    "peakMemory": "峰值内存",
+    "totalKeys": "总键数",
+    "databases": "数据库",
+    "unavailable": "Valkey 不可用。",
+    "actions": "操作"
   }
 }

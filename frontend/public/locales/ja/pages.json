@@ -2490,7 +2490,8 @@
       "users": "ユーザー",
       "features": "機能フラグ",
       "snapshots": "スナップショット",
-      "tables": "スティックテーブル"
+      "tables": "スティックテーブル",
+      "valkey": "Valkey"
     }
   },
   "mcpGateway": {
@@ -3062,5 +3063,43 @@
     "showing": "{{total}} 件中 {{from}}-{{to}} を表示",
     "pageOf": "{{total}} ページ中 {{page}} ページ目",
     "expiresAt": "期限時刻"
+  },
+  "systemValkey": {
+    "title": "Valkey インスペクター",
+    "description": "名前空間プレフィックスでグループ化された Valkey（Redis 互換）キーを参照します。キーのタイプ、TTL、サイズ、値のプレビューを表示します。管理者は単一キーを削除できます。",
+    "namespace": "名前空間",
+    "keys": "キー",
+    "sample": "サンプル",
+    "key": "キー",
+    "type": "タイプ",
+    "ttl": "TTL",
+    "expiresAt": "期限時刻",
+    "persistent": "永続",
+    "missing": "不明",
+    "size": "サイズ",
+    "preview": "プレビュー",
+    "searchPlaceholder": "キーで検索...",
+    "clearSearch": "検索をクリア",
+    "page": "ページ",
+    "autoRefresh": "自動更新",
+    "deleteKey": "キーを削除",
+    "confirmDeleteKey": "キー \"{{key}}\" を削除しますか？この操作は元に戻せません。",
+    "keyDeleted": "キーを削除しました。",
+    "deleteFailed": "キーの削除に失敗しました。",
+    "noKeys": "この名前空間にキーがありません。",
+    "noNamespaces": "名前空間が見つかりません。Valkey が実行されていないか利用できない可能性があります。",
+    "showing": "{{total}} 件中 {{from}}-{{to}} を表示",
+    "pageOf": "{{total}} ページ中 {{page}} ページ目",
+    "serverInfo": "サーバー情報",
+    "version": "バージョン",
+    "role": "ロール",
+    "uptime": "稼働時間",
+    "connectedClients": "クライアント",
+    "usedMemory": "使用メモリ",
+    "peakMemory": "ピークメモリ",
+    "totalKeys": "キー総数",
+    "databases": "データベース",
+    "unavailable": "Valkey は利用できません。",
+    "actions": "アクション"
   }
 }

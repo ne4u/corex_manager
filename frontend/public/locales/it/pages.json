@@ -2490,7 +2490,8 @@
       "users": "Utenti",
       "features": "Funzionalità",
       "snapshots": "Snapshot",
-      "tables": "Tabelle Stick"
+      "tables": "Tabelle Stick",
+      "valkey": "Valkey"
     }
   },
   "mcpGateway": {
@@ -3062,5 +3063,43 @@
     "showing": "Mostra {{from}}-{{to}} di {{total}}",
     "pageOf": "Pagina {{page}} di {{total}}",
     "expiresAt": "Scade alle"
+  },
+  "systemValkey": {
+    "title": "Ispettore Valkey",
+    "description": "Sfoglia le chiavi Valkey (compatibile con Redis) raggruppate per prefisso dello spazio dei nomi. Visualizza tipo, TTL, dimensione e anteprima del valore. Gli amministratori possono eliminare una singola chiave.",
+    "namespace": "Spazio",
+    "keys": "Chiavi",
+    "sample": "Esempio",
+    "key": "Chiave",
+    "type": "Tipo",
+    "ttl": "TTL",
+    "expiresAt": "Scade alle",
+    "persistent": "persistente",
+    "missing": "mancante",
+    "size": "Dimensione",
+    "preview": "Anteprima",
+    "searchPlaceholder": "Cerca per chiave...",
+    "clearSearch": "Cancella ricerca",
+    "page": "pagina",
+    "autoRefresh": "Auto-aggiorna",
+    "deleteKey": "Elimina chiave",
+    "confirmDeleteKey": "Eliminare la chiave \"{{key}}\"? Questa azione non può essere annullata.",
+    "keyDeleted": "Chiave eliminata.",
+    "deleteFailed": "Impossibile eliminare la chiave.",
+    "noKeys": "Nessuna chiave in questo spazio dei nomi.",
+    "noNamespaces": "Nessuno spazio dei nomi trovato. Valkey potrebbe non essere in esecuzione o non disponibile.",
+    "showing": "Mostra {{from}}-{{to}} di {{total}}",
+    "pageOf": "Pagina {{page}} di {{total}}",
+    "serverInfo": "Info server",
+    "version": "Versione",
+    "role": "Ruolo",
+    "uptime": "Tempo attivo",
+    "connectedClients": "Client",
+    "usedMemory": "Memoria usata",
+    "peakMemory": "Memoria picco",
+    "totalKeys": "Chiavi totali",
+    "databases": "Database",
+    "unavailable": "Valkey non è disponibile.",
+    "actions": "Azioni"
   }
 }

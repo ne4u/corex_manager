@@ -120,6 +120,14 @@ class Settings(BaseSettings):
     VALKEY_PORT: int = 6379
     VALKEY_DB: int = 0
     VALKEY_PASSWORD: Optional[str] = None
+    # Valkey inspector (System → Valkey tab). The scanned key list per namespace
+    # is cached for VALKEY_INSPECT_CACHE_TTL_SECONDS so repeated pagination clicks
+    # don't rescan. SCAN is bounded by VALKEY_INSPECT_MAX_SCAN_BATCHES batches of
+    # ~200 keys each (default 1000 → ~200k keys max) to avoid unbounded scans on
+    # large keyspaces.
+    VALKEY_INSPECT_CACHE_TTL_SECONDS: int = 5
+    VALKEY_INSPECT_MAX_PAGE_SIZE: int = 500
+    VALKEY_INSPECT_MAX_SCAN_BATCHES: int = 1000
     GEOIP_DB_PATH: str = "data/GeoLite2-Country.mmdb"
     ASN_DB_PATH: str = "data/GeoLite2-ASN.mmdb"
     GEOIP_CITY_DB_PATH: str = "data/GeoLite2-City.mmdb"
@@ -286,7 +294,7 @@ class Settings(BaseSettings):
     PAGE_PROTECT_BEACON_JS_PATH: str = "/app/data/page-protect-beacon.js"
     # Beacon Trust — IP trust via Page Protect beacon + Server-Timing cxid
     BEACON_TRUST_TTL_SECONDS: int = 900  # 15 min sliding window, refreshed on every request
-    BEACON_CXID_TTL_SECONDS: int = 600   # 10 min cxid validity window (page load → beacon POST)
+    BEACON_CXID_TTL_SECONDS: int = 120   # 2 min cxid validity window (page load → beacon POST)
     BEACON_TRUST_PERSIST_INTERVAL_SECONDS: int = 60  # export trust table to Valkey
 
     # Stick-table viewer (System → Tables tab). The full parsed entry list for a

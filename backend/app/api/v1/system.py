@@ -21,6 +21,11 @@ from ...schemas.stats import (
     StickTableSummary,
     StickTableDetail,
     StickTableClearResponse,
+    ValkeyServerInfo,
+    ValkeyNamespaceSummary,
+    ValkeyKeyEntry,
+    ValkeyNamespaceDetail,
+    ValkeyDeleteResponse,
 )
 from ...services.geoip import download_maxmind_dbs
 from ...services.metrics import get_metrics
@@ -29,6 +34,7 @@ from ...services.stats import _send_command, get_stats
 from ...services.waf_metrics import get_waf_metrics
 from ...services.runtime import get_runtime
 from ...services import stick_tables
+from ...services import valkey_inspect
 
 router = APIRouter()
 settings = get_settings()
@@ -496,6 +502,64 @@ def clear_stick_table_entry(
 ):
     """Remove a single entry from a stick-table by key (admin only)."""
     return stick_tables.clear_entry(name, key)
+
+
+# ---------------------------------------------------------------------------
+# Valkey inspector (System → Valkey tab)
+#
+# Keys are grouped by namespace prefix (the substring before the first `:`).
+# Keys without a `:` are grouped under the sentinel `__none__` (exposed as
+# `valkey_inspect.NO_NAMESPACE`). The DELETE route uses `{key:path}` so keys
+# containing `/` are accepted; the frontend encodes `/` as `%2F` which FastAPI
+# decodes back to a literal `/`.
+# ---------------------------------------------------------------------------
+
+@router.get("/valkey/info", response_model=ValkeyServerInfo)
+def valkey_info(
+    user=Depends(get_current_user),
+    _=Depends(rate_limit),
+):
+    """Return a summary of the Valkey server state (version, memory, key count)."""
+    return valkey_inspect.server_info()
+
+
+@router.get("/valkey/namespaces", response_model=List[ValkeyNamespaceSummary])
+def valkey_namespaces(
+    user=Depends(get_current_user),
+    _=Depends(rate_limit),
+):
+    """List all Valkey key namespaces (grouped by prefix before the first `:`)."""
+    return valkey_inspect.list_namespaces()
+
+
+@router.get("/valkey/namespaces/{prefix}", response_model=ValkeyNamespaceDetail)
+def valkey_namespace(
+    prefix: str,
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    search: Optional[str] = Query(None),
+    user=Depends(get_current_user),
+    _=Depends(rate_limit),
+):
+    """Fetch a paginated, optionally key-substring-filtered slice of a namespace.
+
+    Use the sentinel `__none__` to browse keys without a `:` namespace separator.
+    """
+    return valkey_inspect.get_namespace(prefix, limit=limit, offset=offset, search=search)
+
+
+@router.delete("/valkey/keys/{key:path}", response_model=ValkeyDeleteResponse)
+def valkey_delete_key(
+    key: str,
+    user=Depends(require_admin),
+    _=Depends(rate_limit),
+):
+    """Delete a single Valkey key (admin only).
+
+    Refuses to delete keys under the `valkey_inspect:` prefix (the inspector's
+    own cache) to avoid self-interference mid-scan.
+    """
+    return valkey_inspect.delete_key(key)
 
 
 # ---------------------------------------------------------------------------

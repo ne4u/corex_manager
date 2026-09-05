@@ -2490,7 +2490,8 @@
       "users": "Utilisateurs",
       "features": "Fonctionnalités",
       "snapshots": "Instantanés",
-      "tables": "Tables Stick"
+      "tables": "Tables Stick",
+      "valkey": "Valkey"
     }
   },
   "mcpGateway": {
@@ -3062,5 +3063,43 @@
     "showing": "Affichage de {{from}}-{{to}} sur {{total}}",
     "pageOf": "Page {{page}} sur {{total}}",
     "expiresAt": "Expire à"
+  },
+  "systemValkey": {
+    "title": "Inspecteur Valkey",
+    "description": "Parcourir les clés Valkey (compatible Redis) groupées par préfixe d'espace de noms. Voir le type, le TTL, la taille et l'aperçu de la valeur. Les administrateurs peuvent supprimer une seule clé.",
+    "namespace": "Espace",
+    "keys": "Clés",
+    "sample": "Exemple",
+    "key": "Clé",
+    "type": "Type",
+    "ttl": "TTL",
+    "expiresAt": "Expire à",
+    "persistent": "persistant",
+    "missing": "manquant",
+    "size": "Taille",
+    "preview": "Aperçu",
+    "searchPlaceholder": "Rechercher par clé...",
+    "clearSearch": "Effacer la recherche",
+    "page": "page",
+    "autoRefresh": "Auto-rafraîchir",
+    "deleteKey": "Supprimer la clé",
+    "confirmDeleteKey": "Supprimer la clé \"{{key}}\" ? Cette action est irréversible.",
+    "keyDeleted": "Clé supprimée.",
+    "deleteFailed": "Échec de la suppression de la clé.",
+    "noKeys": "Aucune clé dans cet espace de noms.",
+    "noNamespaces": "Aucun espace de noms trouvé. Valkey n'est peut-être pas en cours d'exécution ou n'est pas disponible.",
+    "showing": "Affichage de {{from}}-{{to}} sur {{total}}",
+    "pageOf": "Page {{page}} sur {{total}}",
+    "serverInfo": "Info serveur",
+    "version": "Version",
+    "role": "Rôle",
+    "uptime": "Disponibilité",
+    "connectedClients": "Clients",
+    "usedMemory": "Mémoire utilisée",
+    "peakMemory": "Mémoire pic",
+    "totalKeys": "Clés totales",
+    "databases": "Bases de données",
+    "unavailable": "Valkey n'est pas disponible.",
+    "actions": "Actions"
   }
 }
