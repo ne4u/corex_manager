@@ -52,6 +52,7 @@ _DEFAULTS = {
     "baseline_end": "",    # ISO timestamp or empty
     "baseline_note": "",   # optional user label
     "beacon_injection_enabled": False,
+    "beacon_trust_enabled": False,
     "beacon_path": "/_cx-assets",
     "beacon_script_path": "/_cx-assets.js",
     "beacon_content_types": "text/html",
@@ -450,6 +451,7 @@ def get_beacon_settings(db: Session) -> Dict[str, Any]:
     pp = get_page_protect_settings(db)
     return {
         "enabled": pp.get("beacon_injection_enabled", False),
+        "trust_enabled": pp.get("beacon_trust_enabled", False),
         "beacon_path": pp.get("beacon_path", "/_cx-assets"),
         "beacon_script_path": pp.get("beacon_script_path", "/_cx-assets.js"),
         "content_types": pp.get("beacon_content_types", "text/html"),

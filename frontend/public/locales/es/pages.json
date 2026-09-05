@@ -245,7 +245,10 @@
       "totals": "Totales",
       "events": "Eventos",
       "countryMap": "Mapa de países"
-    }
+    },
+    "systemMetrics": "Métricas del sistema",
+    "stickTableMetrics": "Métricas de tablas stick",
+    "stickTableEntries": "Conteo de entradas de tablas stick"
   },
   "auditLogs": {
     "title": "Logs de auditoría",
@@ -2391,7 +2394,21 @@
       "manualReportCollectionHelp": "Activa una muestra inmediata de informes CSP desde los registros de coreX.",
       "sampleReportsNow": "Muestrear informes ahora",
       "sampling": "Muestreando...",
-      "sampleComplete": "Muestra de informes CSP completada. {{count}} informes nuevos almacenados."
+      "sampleComplete": "Muestra de informes CSP completada. {{count}} informes nuevos almacenados.",
+      "beaconSectionTitle": "Beacon de Inventario y Confianza de Beacon",
+      "beaconRequiresRespTransform": "Las Transformaciones de Respuesta deben estar habilitadas en Opciones Globales para usar el Beacon de Inventario y la Confianza de Beacon.",
+      "inventoryBeacon": "Beacon de Inventario",
+      "inventoryBeaconHelp": "Inyecta un beacon JS en las respuestas HTML que recopila todos los recursos cargados a través de la API de Resource Timing. Proporciona un inventario completo de recursos independientemente del modo CSP.",
+      "beaconTrust": "Confianza de Beacon",
+      "beaconTrustHelp": "Inserta un ID único en el encabezado de respuesta Server-Timing. El beacon JS lo lee y lo envía con el POST del beacon. HAProxy valida el ID para demostrar que la IP recibió una respuesta real, luego marca la IP como confiable para la puntuación de riesgo. Se puede habilitar independientemente del seguimiento de recursos.",
+      "beaconEndpointPath": "Ruta del Endpoint del Beacon",
+      "beaconEndpointPathHelp": "Ruta URL a la que el beacon JS envía las listas de recursos.",
+      "beaconScriptPath": "Ruta del Script del Beacon",
+      "beaconScriptPathHelp": "Ruta URL desde donde HAProxy sirve el archivo JS del beacon.",
+      "beaconContentTypes": "Tipos de Contenido (separados por comas)",
+      "beaconContentTypesHelp": "Solo inyectar en respuestas con estos prefijos de content-type. Predeterminado: text/html",
+      "beaconPathPatterns": "Patrones de Ruta (separados por comas)",
+      "beaconPathPatternsHelp": "Solo inyectar en páginas cuya ruta URL comience con uno de estos prefijos. Vacío = todas las rutas."
     }
   },
   "toaster": {
@@ -2472,7 +2489,8 @@
       "settings": "Configuración",
       "users": "Usuarios",
       "features": "Características",
-      "snapshots": "Instantáneas"
+      "snapshots": "Instantáneas",
+      "tables": "Tablas Stick"
     }
   },
   "mcpGateway": {
@@ -3016,5 +3034,33 @@
       "settingsFailed": "Failed to update settings.",
       "serviceBusy": "SSL Labs service is temporarily busy. Try again in a few moments."
     }
+  },
+  "systemTables": {
+    "title": "Tablas Stick de HAProxy",
+    "description": "Ver y administrar las tablas stick de HAProxy (contadores de límite de tasa, confianza de beacon, afinidad de sesión). Las tablas grandes se paginan y almacenan en caché en el servidor.",
+    "tableName": "Tabla",
+    "type": "Tipo",
+    "size": "Tamaño",
+    "used": "Entradas",
+    "key": "Clave",
+    "use": "Uso",
+    "exp": "Expira",
+    "actions": "Acciones",
+    "searchPlaceholder": "Buscar por clave...",
+    "clearSearch": "Borrar búsqueda",
+    "page": "página",
+    "autoRefresh": "Auto-actualizar",
+    "clearAll": "Borrar todo",
+    "clearEntry": "Borrar entrada",
+    "confirmClearEntry": "¿Borrar la entrada \"{{key}}\" de la tabla {{name}}?",
+    "confirmClearAll": "¿Eliminar todas las entradas de la tabla \"{{name}}\"? Esto no se puede deshacer.",
+    "entryCleared": "Entrada borrada.",
+    "tableCleared": "Tabla borrada.",
+    "clearFailed": "Error al borrar la entrada.",
+    "noEntries": "No hay entradas en esta tabla.",
+    "noTables": "No se encontraron tablas stick. HAProxy puede no estar en ejecución o el socket de estadísticas no está disponible.",
+    "showing": "Mostrando {{from}}-{{to}} de {{total}}",
+    "pageOf": "Página {{page}} de {{total}}",
+    "expiresAt": "Expira a las"
   }
 }

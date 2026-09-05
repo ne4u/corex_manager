@@ -284,6 +284,16 @@ class Settings(BaseSettings):
     PAGE_PROTECT_HASH_USER_AGENT: str = "HAProxy-Manager-PageProtect/1.0"
     PAGE_PROTECT_DEFAULT_REPORT_PATH: str = "/_csp-report"
     PAGE_PROTECT_BEACON_JS_PATH: str = "/app/data/page-protect-beacon.js"
+    # Beacon Trust — IP trust via Page Protect beacon + Server-Timing cxid
+    BEACON_TRUST_TTL_SECONDS: int = 900  # 15 min sliding window, refreshed on every request
+    BEACON_CXID_TTL_SECONDS: int = 600   # 10 min cxid validity window (page load → beacon POST)
+    BEACON_TRUST_PERSIST_INTERVAL_SECONDS: int = 60  # export trust table to Valkey
+
+    # Stick-table viewer (System → Tables tab). The full parsed entry list for a
+    # table is cached in Valkey for this many seconds so repeated pagination
+    # clicks on a 100k+ entry table don't re-dump the whole table over the socket.
+    STICK_TABLE_CACHE_TTL_SECONDS: int = 5
+    STICK_TABLE_MAX_PAGE_SIZE: int = 500
 
     # API Armor (Cloudflare API Shield-parity: GraphQL, schema validation, auth,
     # behavioral profiling). Toggled via Global Options GUI; stored in DB settings.

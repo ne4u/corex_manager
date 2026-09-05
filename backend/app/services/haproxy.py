@@ -862,10 +862,11 @@ def generate_global_section(
     lines.append("    group haproxy")
 
     # Stick counters: HAProxy defaults to 3 (sc0–sc2). Response-code rate
-    # limiting uses sc3 (a dedicated stick-table backend), so require at least
-    # 4. A user-supplied tune.stick-counters value is respected when valid and
-    # >= 4, then deduped below.
-    tune_stick_counters_value = 4
+    # limiting uses sc3 (a dedicated stick-table backend), and beacon trust
+    # uses sc4 (beacon_trust_table) + sc5 (cxid_table), so require at least
+    # 6. A user-supplied tune.stick-counters value is respected when valid and
+    # >= 6, then deduped below.
+    tune_stick_counters_value = 6
     for opt in (global_options or []):
         if not opt.get("enabled", True):
             continue
@@ -875,8 +876,8 @@ def generate_global_section(
         try:
             user_value = int(raw_value)
         except (TypeError, ValueError):
-            user_value = 4
-        tune_stick_counters_value = max(4, user_value)
+            user_value = 6
+        tune_stick_counters_value = max(6, user_value)
         break
     lines.append(f"    tune.stick-counters {tune_stick_counters_value}")
 
@@ -2551,23 +2552,61 @@ def generate_frontend(
             lines.append("    http-request return status 204 if is_csp_report")
 
         # Page Protect — beacon injection capture + static JS serving.
-        # When beacon injection is enabled, HAProxy serves the beacon JS file
-        # and captures beacon POSTs (resource lists from the browser). The
-        # beacon JS uses the Resource Timing API to collect all loaded resources
-        # and POSTs them to the beacon endpoint for inventory building.
+        # The beacon JS is injected into HTML responses via the resp_transform
+        # filter. It collects resource timing entries (asset inventory) and
+        # reads the Server-Timing cxid (beacon trust), then POSTs both to the
+        # beacon endpoint. Asset tracking and beacon trust can be enabled
+        # independently — the JS + endpoint are active if either is enabled.
         beacon = page_protect_beacon or {}
-        if page_protect_enabled and beacon.get("enabled"):
+        beacon_assets = page_protect_enabled and beacon.get("enabled")
+        beacon_trust = page_protect_enabled and beacon.get("trust_enabled")
+        if beacon_assets or beacon_trust:
             beacon_path = _safe_token(beacon.get("beacon_path") or "/_cx-assets")
             beacon_script_path = _safe_token(beacon.get("beacon_script_path") or "/_cx-assets.js")
+            # Generate a unique cxid (UUID v4) for this request. The cxid is
+            # inserted into the Server-Timing response header on HTML responses
+            # (see http-response block below) and tracked in cxid_table. The
+            # beacon JS reads it via the Resource Timing API's serverTiming
+            # property and submits it with the beacon POST. HAProxy validates
+            # the cxid against cxid_table to prove the IP received a real
+            # response (anti-spoofing). Only emitted when beacon trust is on.
+            # Tracking happens in the request phase (not response) so that
+            # http_req_cnt is auto-incremented by track-sc, making the entry
+            # discoverable via table_http_req_cnt().
+            if beacon_trust:
+                lines.append("    http-request set-var(txn.cxid) uuid")
+                lines.append("    http-request track-sc5 var(txn.cxid) table cxid_table")
             # Serve the static beacon JS file
             beacon_js_path = getattr(settings, 'PAGE_PROTECT_BEACON_JS_PATH', '/etc/haproxy/page-protect-beacon.js')
             lines.append(f"    acl is_beacon_script path -m str {beacon_script_path}")
             lines.append(f"    http-request return status 200 content-type application/javascript lf-file {beacon_js_path} hdr Cache-Control public,max-age=300,must-revalidate if is_beacon_script")
-            # Capture beacon POSTs (resource lists from the browser)
+            # Capture beacon POSTs (resource lists + cxid from the browser)
             lines.append(f"    acl is_asset_beacon path -m str {beacon_path}")
             lines.append("    http-request wait-for-body time 5s if is_asset_beacon")
             lines.append(f"    http-request set-var(txn.asset_beacon) req.body if is_asset_beacon")
+            # Beacon Trust — validate the cxid submitted in the beacon POST body.
+            # Only emitted when beacon trust is enabled. json_query extracts
+            # $.cxid from the JSON body, table_http_req_cnt looks it up in
+            # cxid_table and returns the request count (>=1 if tracked, 0 if
+            # not found). If valid, track the source IP in beacon_trust_table
+            # (sc4) — the IP is now trusted for BEACON_TRUST_TTL_SECONDS
+            # (sliding window, refreshed on every subsequent request via the
+            # track-sc4 rule below).
+            if beacon_trust:
+                lines.append("    http-request set-var(txn.cxid_from_beacon) var(txn.asset_beacon),json_query('$.cxid') if is_asset_beacon")
+                lines.append("    http-request set-var(txn.cxid_valid) var(txn.cxid_from_beacon),table_http_req_cnt(cxid_table) if is_asset_beacon")
+                lines.append("    http-request track-sc4 src table beacon_trust_table if is_asset_beacon { var(txn.cxid_valid) -m int gt 0 }")
             lines.append("    http-request return status 204 if is_asset_beacon")
+            # Beacon Trust — sliding-window TTL refresh: if the IP is already
+            # in beacon_trust_table, re-track it to refresh the expiry timer.
+            # Only emitted when beacon trust is enabled. table_cnt() does NOT
+            # refresh expiry (only track-sc does), so this is side-effect-free
+            # for non-trusted IPs. Guarded with !is_asset_beacon so it never
+            # fires on beacon POSTs (the return above already short-circuits
+            # beacon POSTs, but the guard prevents two track-sc4 lines from
+            # matching the same request — see haproxy/haproxy#1170).
+            if beacon_trust:
+                lines.append("    http-request track-sc4 src table beacon_trust_table if !is_asset_beacon { src,table_http_req_cnt(beacon_trust_table) -m int gt 0 }")
 
         # Body buffering for request fingerprint param extraction.
         # When req_fp_parse_body is enabled (and API Armor is not already
@@ -2697,6 +2736,16 @@ def generate_frontend(
                 lines.append(f"    http-response add-header {header_name} {header_value}{condition}")
             elif h.action == "del":
                 lines.append(f"    http-response del-header {header_name}{condition}")
+
+        # Beacon Trust — Server-Timing header with cxid on HTML responses.
+        # The cxid was generated and tracked in cxid_table during the request
+        # phase (see http-request block above). Here we only add the
+        # Server-Timing response header so the beacon JS can read it via the
+        # Resource Timing API's serverTiming property (the only response
+        # header readable by JS). Only on HTML responses.
+        if beacon_trust:
+            lines.append('    acl is_html_response res.hdr(content-type) -m beg text/html')
+            lines.append('    http-response set-header Server-Timing "cxid;desc=\\"%[var(txn.cxid)]\\"" if is_html_response')
 
         # Custom response pages (per listener)
         errorfiles_dir = os.path.join(os.path.dirname(settings.HAPROXY_CONFIG_PATH), "errorfiles", _safe_path_name(listener.name))
@@ -3150,11 +3199,12 @@ def generate_backend(
     # we skip the resp_transform filter and emit a warning comment. The FCGI
     # backend works normally; response transforms are simply not applied.
     from . import resp_transform as _rt_svc
-    # Check for user-defined transform rules OR beacon injection rules
+    # Check for user-defined transform rules OR beacon injection rules.
+    # The beacon JS is injected if either asset tracking or beacon trust is on.
     _beacon = page_protect_beacon or {}
-    _beacon_enabled = _beacon.get("enabled", False)
+    _beacon_active = _beacon.get("enabled", False) or _beacon.get("trust_enabled", False)
     _beacon_backend_ids = _beacon.get("backend_ids") or []
-    _backend_has_beacon = _beacon_enabled and (not _beacon_backend_ids or backend.id in _beacon_backend_ids)
+    _backend_has_beacon = _beacon_active and (not _beacon_backend_ids or backend.id in _beacon_backend_ids)
     rt_has_rules = (
         effective_mode == "http"
         and (_rt_svc._matches_backend_any(db, backend) or _backend_has_beacon)
@@ -3214,11 +3264,11 @@ def generate_backend(
     if effective_mode == "http" and page_protect_enabled:
         from .page_protect import build_csp_header
         beacon = page_protect_beacon or {}
-        beacon_enabled = beacon.get("enabled", False)
+        beacon_active = beacon.get("enabled", False) or beacon.get("trust_enabled", False)
         beacon_backend_ids = beacon.get("backend_ids") or []
         beacon_script_path = beacon.get("beacon_script_path") or "/_cx-assets.js"
-        # Check if beacon injection applies to this backend
-        backend_has_beacon = beacon_enabled and (not beacon_backend_ids or backend.id in beacon_backend_ids)
+        # Check if beacon injection applies to this backend (either feature)
+        backend_has_beacon = beacon_active and (not beacon_backend_ids or backend.id in beacon_backend_ids)
         for policy in db.query(PageProtectPolicy).filter(PageProtectPolicy.enabled == True).all():  # noqa: E712
             if not _matches_backend(policy, backend):
                 continue
@@ -3901,10 +3951,11 @@ def generate_config(
     page_protect_report_path = get_report_path(db)
     page_protect_beacon = get_beacon_settings(db) if page_protect_enabled else None
 
-    # When Page Protect beacon injection is enabled, force resp_transform on
-    # so the Rust Lua module is loaded (the beacon rule is injected via the
-    # resp_transform filter). This overrides the global resp_transform setting.
-    if page_protect_beacon and page_protect_beacon.get("enabled"):
+    # When Page Protect beacon injection or beacon trust is enabled, force
+    # resp_transform on so the Rust Lua module is loaded (the beacon JS is
+    # injected via the resp_transform filter). This overrides the global
+    # resp_transform setting.
+    if page_protect_beacon and (page_protect_beacon.get("enabled") or page_protect_beacon.get("trust_enabled")):
         resp_transform_enabled = True
 
     if frontend_names is None or backend_names is None or stats_name is None or coraza_name is None:
@@ -3951,6 +4002,10 @@ def generate_config(
 
     # Response-code rate-limit stick-table backends (sc3 tracking)
     config += _generate_resp_code_tables(db)
+
+    # Beacon trust stick-table backends (sc4 + sc5 tracking)
+    # Always emitted so risk rules referencing ip.beacon_trusted don't break.
+    config += _generate_beacon_trust_tables()
 
     if _waf_enabled(db):
         config += generate_coraza_backend(coraza_name)
@@ -4278,6 +4333,31 @@ def _generate_resp_code_tables(db: Session) -> str:
     return "".join(sections)
 
 
+def _generate_beacon_trust_tables() -> str:
+    """Emit stick-table backends for beacon trust (IP trust via Page Protect beacon).
+
+    Two tables are always emitted (even when Page Protect beacon is disabled) so
+    that risk rules referencing ``ip.beacon_trusted`` never break the config —
+    the tables are simply empty when the beacon is disabled.
+
+    - ``cxid_table``: string-keyed, stores cxids (UUIDs) inserted into the
+      Server-Timing response header. Tracked on sc5. Expires after
+      BEACON_CXID_TTL_SECONDS (default 600s).
+
+    - ``beacon_trust_table``: ip-keyed, stores trusted source IPs. Tracked on
+      sc4. Expires after BEACON_TRUST_TTL_SECONDS (default 900s) with a
+      sliding-window refresh on every request from a trusted IP.
+    """
+    trust_ttl = getattr(settings, "BEACON_TRUST_TTL_SECONDS", 900)
+    cxid_ttl = getattr(settings, "BEACON_CXID_TTL_SECONDS", 600)
+    return (
+        f"\nbackend cxid_table\n"
+        f"    stick-table type string len 64 size 100k expire {cxid_ttl}s store http_req_cnt\n"
+        f"\nbackend beacon_trust_table\n"
+        f"    stick-table type ip size 100k expire {trust_ttl}s store http_req_cnt\n"
+    )
+
+
 def write_config(
     db: Session,
     created_by: Optional[str] = None,
@@ -4544,26 +4624,44 @@ def reload_haproxy() -> dict:
         logger.error("reload_haproxy: validation failed: %s", details)
         return {"status": "error", "message": f"HAProxy configuration validation failed: {details}"}
 
+    result: dict
     if settings.DATAPLANE_API_ENABLED:
         print("[RELOAD] step 2 — dataplane.reload_haproxy", flush=True)
         logger.info("reload_haproxy: step 2 — dataplane.reload_haproxy")
         dp_result = dataplane.reload_haproxy()
         if dp_result.get("status") == "ok":
             logger.info("reload_haproxy: dataplane reload ok")
-            return dp_result
-        logger.warning("reload_haproxy: dataplane reload failed (%s), falling back to socket", dp_result.get("message"))
-        logger.info("reload_haproxy: step 3 — _socket_reload (fallback)")
-        socket_result = _socket_reload()
-        if socket_result.get("status") == "ok":
-            logger.info("reload_haproxy: socket reload ok")
-            return {**socket_result, "message": f"{socket_result['message']} (Data Plane API fallback: {dp_result.get('message')})"}
-        logger.error("reload_haproxy: both dataplane and socket reload failed")
-        return {"status": "error", "message": f"{dp_result.get('message')}; socket fallback: {socket_result.get('message')}"}
+            result = dp_result
+        else:
+            logger.warning("reload_haproxy: dataplane reload failed (%s), falling back to socket", dp_result.get("message"))
+            logger.info("reload_haproxy: step 3 — _socket_reload (fallback)")
+            socket_result = _socket_reload()
+            if socket_result.get("status") == "ok":
+                logger.info("reload_haproxy: socket reload ok")
+                result = {**socket_result, "message": f"{socket_result['message']} (Data Plane API fallback: {dp_result.get('message')})"}
+            else:
+                logger.error("reload_haproxy: both dataplane and socket reload failed")
+                return {"status": "error", "message": f"{dp_result.get('message')}; socket fallback: {socket_result.get('message')}"}
+    else:
+        print("[RELOAD] step 2 — _socket_reload", flush=True)
+        logger.info("reload_haproxy: step 2 — _socket_reload")
+        result = _socket_reload()
+        logger.info("reload_haproxy: socket reload result: %s", result.get("status"))
 
-    print("[RELOAD] step 2 — _socket_reload", flush=True)
-    logger.info("reload_haproxy: step 2 — _socket_reload")
-    result = _socket_reload()
-    logger.info("reload_haproxy: socket reload result: %s", result.get("status"))
+    # Beacon Trust — re-seed the stick table from Valkey after a successful
+    # reload. HAProxy stick tables are wiped on reload; this restores trusted
+    # IPs so they don't lose trust on every config apply. Wrapped in
+    # try/except so a re-seed failure never breaks the reload flow. The short
+    # delay gives HAProxy time to initialize the stick table after reload.
+    if result.get("status") == "ok":
+        try:
+            import time as _time
+            _time.sleep(2)
+            from .beacon_trust_persist import seed_beacon_trust_table
+            seed_beacon_trust_table()
+        except Exception as exc:
+            logger.warning("beacon_trust re-seed after reload failed: %s", exc)
+
     return result
 
 

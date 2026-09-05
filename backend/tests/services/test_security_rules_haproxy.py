@@ -161,28 +161,28 @@ def test_generate_global_section_lua_load():
 
 
 def test_generate_global_section_stick_counters():
-    """Global section should set tune.stick-counters 4 for sc3 support."""
+    """Global section should set tune.stick-counters 6 for sc4/sc5 (beacon trust) support."""
     cfg = haproxy.generate_global_section()
-    assert "tune.stick-counters 4" in cfg
+    assert "tune.stick-counters 6" in cfg
 
 
 def test_generate_global_section_stick_counters_user_override():
-    """User-supplied tune.stick-counters should override the default when >= 4."""
+    """User-supplied tune.stick-counters should override the default when >= 6."""
     cfg = haproxy.generate_global_section(
         global_options=[{"enabled": True, "directive": "tune.stick-counters", "value": "8"}]
     )
     assert "tune.stick-counters 8" in cfg
-    assert "tune.stick-counters 4" not in cfg
+    assert "tune.stick-counters 6" not in cfg
     # req_fp is now a Rust cdylib, not loaded via standalone lua-load
     assert "lua-load /etc/haproxy/req_fp.lua" not in cfg
 
 
 def test_generate_global_section_stick_counters_minimum_floor():
-    """Values below 4 are clamped so sc3 support is never broken."""
+    """Values below 6 are clamped so sc4/sc5 (beacon trust) support is never broken."""
     cfg = haproxy.generate_global_section(
         global_options=[{"enabled": True, "directive": "tune.stick-counters", "value": "2"}]
     )
-    assert "tune.stick-counters 4" in cfg
+    assert "tune.stick-counters 6" in cfg
     assert "tune.stick-counters 2" not in cfg
 
 

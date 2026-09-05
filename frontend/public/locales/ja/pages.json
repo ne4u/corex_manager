@@ -245,7 +245,10 @@
       "totals": "合計",
       "events": "イベント",
       "countryMap": "国マップ"
-    }
+    },
+    "systemMetrics": "システムメトリクス",
+    "stickTableMetrics": "スティックテーブルメトリクス",
+    "stickTableEntries": "スティックテーブルエントリ数"
   },
   "auditLogs": {
     "title": "監査ログ",
@@ -2391,7 +2394,21 @@
       "manualReportCollectionHelp": "coreXログから即座にCSPレポートサンプルを取得します。",
       "sampleReportsNow": "今すぐレポートをサンプリング",
       "sampling": "サンプリング中...",
-      "sampleComplete": "CSPレポートサンプルが完了しました。{{count}}件の新しいレポートが保存されました。"
+      "sampleComplete": "CSPレポートサンプルが完了しました。{{count}}件の新しいレポートが保存されました。",
+      "beaconSectionTitle": "インベントリビーコンとビーコン信頼",
+      "beaconRequiresRespTransform": "インベントリビーコンとビーコン信頼を使用するには、グローバルオプションでレスポンス変換を有効にする必要があります。",
+      "inventoryBeacon": "インベントリビーコン",
+      "inventoryBeaconHelp": "HTMLレスポンスにJSビーコンを注入し、Resource Timing APIを介して読み込まれたすべてのリソースを収集します。CSPモードに関係なく完全なリソースインベントリを提供します。",
+      "beaconTrust": "ビーコン信頼",
+      "beaconTrustHelp": "Server-Timingレスポンスヘッダーに一意のIDを挿入します。ビーコンJSがそれを読み取り、ビーコンPOSTと共に送信します。HAProxyはIDを検証してIPが実際のレスポンスを受信したことを証明し、リスクスコアリングのためにIPを信頼済みとしてマークします。リソース追跡とは独立して有効にできます。",
+      "beaconEndpointPath": "ビーコンエンドポイントパス",
+      "beaconEndpointPathHelp": "ビーコンJSがリソースリストをPOSTするURLパス。",
+      "beaconScriptPath": "ビーコンスクリプトパス",
+      "beaconScriptPathHelp": "HAProxyがビーコンJSファイルを提供するURLパス。",
+      "beaconContentTypes": "コンテンツタイプ（カンマ区切り）",
+      "beaconContentTypesHelp": "これらのcontent-typeプレフィックスを持つレスポンスにのみ注入します。デフォルト：text/html",
+      "beaconPathPatterns": "パスパターン（カンマ区切り）",
+      "beaconPathPatternsHelp": "URLパスがこれらのプレフィックスのいずれかで始まるページにのみ注入します。空 = すべてのパス。"
     }
   },
   "toaster": {
@@ -2472,7 +2489,8 @@
       "settings": "設定",
       "users": "ユーザー",
       "features": "機能フラグ",
-      "snapshots": "スナップショット"
+      "snapshots": "スナップショット",
+      "tables": "スティックテーブル"
     }
   },
   "mcpGateway": {
@@ -3016,5 +3034,33 @@
       "settingsFailed": "Failed to update settings.",
       "serviceBusy": "SSL Labs service is temporarily busy. Try again in a few moments."
     }
+  },
+  "systemTables": {
+    "title": "HAProxy スティックテーブル",
+    "description": "HAProxy スティックテーブル（レート制限カウンター、ビーコン信頼、セッションアフィニティ）を表示・管理します。大きなテーブルはサーバー側でページ分割・キャッシュされます。",
+    "tableName": "テーブル",
+    "type": "タイプ",
+    "size": "サイズ",
+    "used": "エントリ数",
+    "key": "キー",
+    "use": "使用",
+    "exp": "期限",
+    "actions": "アクション",
+    "searchPlaceholder": "キーで検索...",
+    "clearSearch": "検索をクリア",
+    "page": "ページ",
+    "autoRefresh": "自動更新",
+    "clearAll": "すべて消去",
+    "clearEntry": "エントリを消去",
+    "confirmClearEntry": "テーブル {{name}} からエントリ \"{{key}}\" を消去しますか？",
+    "confirmClearAll": "テーブル \"{{name}}\" からすべてのエントリを削除しますか？この操作は元に戻せません。",
+    "entryCleared": "エントリを消去しました。",
+    "tableCleared": "テーブルを消去しました。",
+    "clearFailed": "エントリの消去に失敗しました。",
+    "noEntries": "このテーブルにエントリがありません。",
+    "noTables": "スティックテーブルが見つかりません。HAProxy が実行されていないか、統計ソケットが利用できない可能性があります。",
+    "showing": "{{total}} 件中 {{from}}-{{to}} を表示",
+    "pageOf": "{{total}} ページ中 {{page}} ページ目",
+    "expiresAt": "期限時刻"
   }
 }

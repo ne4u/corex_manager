@@ -35,14 +35,15 @@ def update_page_protect_settings_route(
 ):
     from ...services.page_protect import update_page_protect_settings
     from ...services.settings import get_setting
-    # Gate beacon injection behind Response Transformations — the beacon is
-    # injected via the resp_transform filter, so it cannot work without it.
-    if s_in.beacon_injection_enabled:
+    # Gate beacon injection and beacon trust behind Response Transformations —
+    # the beacon JS is injected via the resp_transform filter, so neither
+    # feature can work without it.
+    if s_in.beacon_injection_enabled or s_in.beacon_trust_enabled:
         rt_enabled = get_setting(db, "resp_transform_enabled", str(settings.RESP_TRANSFORM_ENABLED))
         if not rt_enabled or rt_enabled.lower() not in ("true", "1", "yes"):
             raise HTTPException(
                 status_code=403,
-                detail="Inventory Beacon requires Response Transformations to be enabled in Global Options.",
+                detail="Inventory Beacon and Beacon Trust both require Response Transformations to be enabled in Global Options.",
             )
     result = update_page_protect_settings(db, s_in.model_dump())
     return PageProtectSettings(**result)

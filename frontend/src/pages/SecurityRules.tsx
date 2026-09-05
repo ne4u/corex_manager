@@ -77,6 +77,7 @@ const FIELD_GROUPS = [
       'ip.src', 'ip.geoip.country', 'ip.geoip.asnum', 'ip.geoip.continent',
       'ip.geoip.city', 'ip.geoip.region', 'ip.geoip.postal_code',
       'ip.geoip.timezone', 'ip.geoip.latitude', 'ip.geoip.longitude',
+      'ip.beacon_trusted',
       'http.request.geo_lang_mismatch', 'http.request.geoip.timezone_mismatch',
     ],
   },
@@ -149,6 +150,7 @@ const BOOL_FIELDS = new Set([
 
 const NUMERIC_FIELDS = new Set([
   'ip.geoip.latitude', 'ip.geoip.longitude',
+  'ip.beacon_trusted',
   'http.response.status_code',
   'http.request.fingerprint.path_depth', 'http.request.fingerprint.header_count',
   'http.request.fingerprint.body_depth',

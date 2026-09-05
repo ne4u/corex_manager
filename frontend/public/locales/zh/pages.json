@@ -245,7 +245,10 @@
       "totals": "总计",
       "events": "事件",
       "countryMap": "国家/地区地图"
-    }
+    },
+    "systemMetrics": "系统指标",
+    "stickTableMetrics": "粘性表指标",
+    "stickTableEntries": "粘性表条目数"
   },
   "auditLogs": {
     "title": "审计日志",
@@ -2391,7 +2394,21 @@
       "manualReportCollectionHelp": "从coreX日志触发即时CSP报告采样。",
       "sampleReportsNow": "立即采样报告",
       "sampling": "采样中...",
-      "sampleComplete": "CSP报告采样完成。已存储{{count}}个新报告。"
+      "sampleComplete": "CSP报告采样完成。已存储{{count}}个新报告。",
+      "beaconSectionTitle": "清单信标与信标信任",
+      "beaconRequiresRespTransform": "必须在全局选项中启用响应转换才能使用清单信标和信标信任。",
+      "inventoryBeacon": "清单信标",
+      "inventoryBeaconHelp": "将 JS 信标注入 HTML 响应中，通过 Resource Timing API 收集所有已加载的资源。无论 CSP 模式如何，都提供完整的资源清单。",
+      "beaconTrust": "信标信任",
+      "beaconTrustHelp": "在 Server-Timing 响应头中插入唯一 ID。信标 JS 读取它并与信标 POST 一起提交。HAProxy 验证该 ID 以证明 IP 收到了真实响应，然后将 IP 标记为风险评分的可信 IP。可以独立于资源跟踪启用。",
+      "beaconEndpointPath": "信标端点路径",
+      "beaconEndpointPathHelp": "信标 JS POST 资源列表的 URL 路径。",
+      "beaconScriptPath": "信标脚本路径",
+      "beaconScriptPathHelp": "HAProxy 提供信标 JS 文件的 URL 路径。",
+      "beaconContentTypes": "内容类型（逗号分隔）",
+      "beaconContentTypesHelp": "仅注入具有这些 content-type 前缀的响应。默认值：text/html",
+      "beaconPathPatterns": "路径模式（逗号分隔）",
+      "beaconPathPatternsHelp": "仅注入 URL 路径以这些前缀之一开头的页面。空 = 所有路径。"
     }
   },
   "toaster": {
@@ -2472,7 +2489,8 @@
       "settings": "设置",
       "users": "用户",
       "features": "功能标志",
-      "snapshots": "快照"
+      "snapshots": "快照",
+      "tables": "粘性表"
     }
   },
   "mcpGateway": {
@@ -3016,5 +3034,33 @@
       "settingsFailed": "Failed to update settings.",
       "serviceBusy": "SSL Labs service is temporarily busy. Try again in a few moments."
     }
+  },
+  "systemTables": {
+    "title": "HAProxy 粘性表",
+    "description": "查看和管理 HAProxy 粘性表（速率限制计数器、信标信任、会话亲和性）。大表在服务器端分页并缓存。",
+    "tableName": "表",
+    "type": "类型",
+    "size": "容量",
+    "used": "条目数",
+    "key": "键",
+    "use": "使用",
+    "exp": "过期",
+    "actions": "操作",
+    "searchPlaceholder": "按键搜索...",
+    "clearSearch": "清除搜索",
+    "page": "页",
+    "autoRefresh": "自动刷新",
+    "clearAll": "全部清除",
+    "clearEntry": "清除条目",
+    "confirmClearEntry": "从表 {{name}} 中清除条目 \"{{key}}\"？",
+    "confirmClearAll": "从表 \"{{name}}\" 中删除所有条目？此操作无法撤销。",
+    "entryCleared": "条目已清除。",
+    "tableCleared": "表已清除。",
+    "clearFailed": "清除条目失败。",
+    "noEntries": "此表中没有条目。",
+    "noTables": "未找到粘性表。HAProxy 可能未运行或统计套接字不可用。",
+    "showing": "显示 {{from}}-{{to}}，共 {{total}}",
+    "pageOf": "第 {{page}} 页，共 {{total}} 页",
+    "expiresAt": "过期时间"
   }
 }

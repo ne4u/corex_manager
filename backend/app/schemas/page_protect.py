@@ -103,6 +103,7 @@ class PageProtectSettings(BaseModel):
     report_retention_days: int = 7
     report_path: str = "/_csp-report"
     beacon_injection_enabled: bool = False
+    beacon_trust_enabled: bool = False
     beacon_path: str = "/_cx-assets"
     beacon_script_path: str = "/_cx-assets.js"
     beacon_content_types: str = "text/html"

@@ -76,6 +76,7 @@ interface PageProtectSettings {
   report_retention_days: number
   report_path: string
   beacon_injection_enabled: boolean
+  beacon_trust_enabled: boolean
   beacon_path: string
   beacon_script_path: string
   beacon_content_types: string
@@ -1185,6 +1186,7 @@ function ReportsTab() {
 }
 
 function SettingsTab({ reloadStats }: { reloadStats: () => void }) {
+  const { t } = useTranslation(['pages', 'common'])
   const [settings, setSettings] = useState<PageProtectSettings | null>(null)
   const [saving, setSaving] = useState(false)
   const [sampling, setSampling] = useState(false)
@@ -1278,38 +1280,45 @@ function SettingsTab({ reloadStats }: { reloadStats: () => void }) {
         <div className="border-t border-slate-800 pt-4">
           {!respTransformEnabled && (
             <div className="mb-3 p-3 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs">
-              Response Transformations must be enabled in Global Options to use the Inventory Beacon.
+              {t('pageProtect.settings.beaconRequiresRespTransform')}
             </div>
           )}
           <div className={`flex items-center gap-2 mb-3 ${!respTransformEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
             <input type="checkbox" id="pp-beacon" className="rounded border-slate-600 bg-slate-800 text-primary" checked={settings.beacon_injection_enabled} onChange={e => setSettings({ ...settings, beacon_injection_enabled: e.target.checked })} disabled={!respTransformEnabled} />
             <label htmlFor="pp-beacon" className="text-sm">
-              <span className="font-medium">Inventory Beacon</span>
-              <p className="text-xs text-slate-500">Injects a JS beacon into HTML responses that collects all loaded resources via the Resource Timing API. Provides a complete asset inventory regardless of CSP mode.</p>
+              <span className="font-medium">{t('pageProtect.settings.inventoryBeacon')}</span>
+              <p className="text-xs text-slate-500">{t('pageProtect.settings.inventoryBeaconHelp')}</p>
+            </label>
+          </div>
+          <div className={`flex items-center gap-2 mb-3 ${!respTransformEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
+            <input type="checkbox" id="pp-beacon-trust" className="rounded border-slate-600 bg-slate-800 text-primary" checked={settings.beacon_trust_enabled} onChange={e => setSettings({ ...settings, beacon_trust_enabled: e.target.checked })} disabled={!respTransformEnabled} />
+            <label htmlFor="pp-beacon-trust" className="text-sm">
+              <span className="font-medium">{t('pageProtect.settings.beaconTrust')}</span>
+              <p className="text-xs text-slate-500">{t('pageProtect.settings.beaconTrustHelp')}</p>
             </label>
           </div>
           <div className={`grid grid-cols-2 gap-4 ${!respTransformEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
             <div>
-              <label className="label">Beacon Endpoint Path</label>
+              <label className="label">{t('pageProtect.settings.beaconEndpointPath')}</label>
               <input className="input" value={settings.beacon_path} onChange={e => setSettings({ ...settings, beacon_path: e.target.value })} disabled={!respTransformEnabled} />
-              <p className="text-xs text-slate-500 mt-1">URL path the beacon JS POSTs resource lists to.</p>
+              <p className="text-xs text-slate-500 mt-1">{t('pageProtect.settings.beaconEndpointPathHelp')}</p>
             </div>
             <div>
-              <label className="label">Beacon Script Path</label>
+              <label className="label">{t('pageProtect.settings.beaconScriptPath')}</label>
               <input className="input" value={settings.beacon_script_path} onChange={e => setSettings({ ...settings, beacon_script_path: e.target.value })} disabled={!respTransformEnabled} />
-              <p className="text-xs text-slate-500 mt-1">URL path HAProxy serves the beacon JS file from.</p>
+              <p className="text-xs text-slate-500 mt-1">{t('pageProtect.settings.beaconScriptPathHelp')}</p>
             </div>
           </div>
           <div className={`grid grid-cols-2 gap-4 mt-3 ${!respTransformEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
             <div>
-              <label className="label">Content Types (comma-sep)</label>
+              <label className="label">{t('pageProtect.settings.beaconContentTypes')}</label>
               <input className="input" value={settings.beacon_content_types} onChange={e => setSettings({ ...settings, beacon_content_types: e.target.value })} disabled={!respTransformEnabled} />
-              <p className="text-xs text-slate-500 mt-1">Only inject into responses with these content-type prefixes. Default: text/html</p>
+              <p className="text-xs text-slate-500 mt-1">{t('pageProtect.settings.beaconContentTypesHelp')}</p>
             </div>
             <div>
-              <label className="label">Path Patterns (comma-sep)</label>
+              <label className="label">{t('pageProtect.settings.beaconPathPatterns')}</label>
               <input className="input" value={settings.beacon_path_patterns} onChange={e => setSettings({ ...settings, beacon_path_patterns: e.target.value })} disabled={!respTransformEnabled} />
-              <p className="text-xs text-slate-500 mt-1">Only inject into pages whose URL path starts with one of these prefixes. Empty = all paths.</p>
+              <p className="text-xs text-slate-500 mt-1">{t('pageProtect.settings.beaconPathPatternsHelp')}</p>
             </div>
           </div>
         </div>

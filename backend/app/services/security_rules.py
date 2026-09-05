@@ -74,6 +74,8 @@ _FIELD_MAP: Dict[str, Tuple[str, str, str]] = {
     "ip.geoip.timezone": ("src,geoip2({geo_db},location.time_zone)", "request", "geoip"),
     "ip.geoip.latitude": ("src,geoip2({geo_db},location.latitude)", "request", "int"),
     "ip.geoip.longitude": ("src,geoip2({geo_db},location.longitude)", "request", "int"),
+    # Beacon Trust (Page Protect beacon — IP trusted via stick table lookup)
+    "ip.beacon_trusted": ("src,table_http_req_cnt(beacon_trust_table)", "request", "int"),
     # JA4 (via vendored Lua script)
     "http.request.ja4": ("lua.ja4_fp", "request", "ja4"),
     # Response fields

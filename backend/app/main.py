@@ -29,6 +29,7 @@ from .services.page_protect_sampler import start_page_protect_sampler
 from .services.page_protect_hasher import start_page_protect_hasher
 from .services.cache_metrics import start_sampler as start_cache_metrics_sampler
 from .services.mcp_metrics import start_mcp_sampler
+from .services.beacon_trust_persist import start_beacon_trust_persist, seed_beacon_trust_table
 from .services import coraza_config
 
 _geoip_downloader = GeoIpDownloader(interval_hours=_settings.GEOIP_DOWNLOAD_INTERVAL_HOURS)
@@ -127,6 +128,13 @@ async def lifespan(app: FastAPI):
             start_page_protect_hasher()
     finally:
         pp_db.close()
+    # Beacon Trust — re-seed stick table from Valkey (survives HAProxy reload)
+    # and start the periodic export thread.
+    try:
+        seed_beacon_trust_table()
+    except Exception as _exc:
+        logging.getLogger(__name__).warning("beacon_trust re-seed on startup failed: %s", _exc)
+    start_beacon_trust_persist()
     # API Armor — start profiler if enabled + profiling learning is on
     from .services.api_armor_profiler import start_profiler as start_api_armor_profiler, stop_profiler as stop_api_armor_profiler
     start_api_armor_profiler()

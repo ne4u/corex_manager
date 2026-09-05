@@ -245,7 +245,10 @@
       "totals": "Totaux",
       "events": "Événements",
       "countryMap": "Carte des pays"
-    }
+    },
+    "systemMetrics": "Métriques système",
+    "stickTableMetrics": "Métriques des tables stick",
+    "stickTableEntries": "Nombre d'entrées des tables stick"
   },
   "auditLogs": {
     "title": "Logs d'audit",
@@ -2391,7 +2394,21 @@
       "manualReportCollectionHelp": "Déclenche un échantillon immédiat de rapports CSP depuis les journaux coreX.",
       "sampleReportsNow": "Échantillonner les rapports maintenant",
       "sampling": "Échantillonnage...",
-      "sampleComplete": "Échantillon de rapports CSP terminé. {{count}} nouveaux rapports stockés."
+      "sampleComplete": "Échantillon de rapports CSP terminé. {{count}} nouveaux rapports stockés.",
+      "beaconSectionTitle": "Beacon d'Inventaire et Confiance du Beacon",
+      "beaconRequiresRespTransform": "Les Transformations de Réponse doivent être activées dans les Options Globales pour utiliser le Beacon d'Inventaire et la Confiance du Beacon.",
+      "inventoryBeacon": "Beacon d'Inventaire",
+      "inventoryBeaconHelp": "Injecte un beacon JS dans les réponses HTML qui collecte toutes les ressources chargées via l'API Resource Timing. Fournit un inventaire complet des ressources quel que soit le mode CSP.",
+      "beaconTrust": "Confiance du Beacon",
+      "beaconTrustHelp": "Insère un ID unique dans l'en-tête de réponse Server-Timing. Le beacon JS le lit et le soumet avec le POST du beacon. HAProxy valide l'ID pour prouver que l'IP a reçu une réponse réelle, puis marque l'IP comme fiable pour la notation des risques. Peut être activé indépendamment du suivi des ressources.",
+      "beaconEndpointPath": "Chemin du Endpoint du Beacon",
+      "beaconEndpointPathHelp": "Chemin URL vers lequel le beacon JS envoie les listes de ressources.",
+      "beaconScriptPath": "Chemin du Script du Beacon",
+      "beaconScriptPathHelp": "Chemin URL depuis lequel HAProxy sert le fichier JS du beacon.",
+      "beaconContentTypes": "Types de Contenu (séparés par virgules)",
+      "beaconContentTypesHelp": "Injecter uniquement dans les réponses avec ces préfixes de content-type. Par défaut : text/html",
+      "beaconPathPatterns": "Modèles de Chemin (séparés par virgules)",
+      "beaconPathPatternsHelp": "Injecter uniquement dans les pages dont le chemin URL commence par l'un de ces préfixes. Vide = tous les chemins."
     }
   },
   "toaster": {
@@ -2472,7 +2489,8 @@
       "settings": "Paramètres",
       "users": "Utilisateurs",
       "features": "Fonctionnalités",
-      "snapshots": "Instantanés"
+      "snapshots": "Instantanés",
+      "tables": "Tables Stick"
     }
   },
   "mcpGateway": {
@@ -3016,5 +3034,33 @@
       "settingsFailed": "Failed to update settings.",
       "serviceBusy": "SSL Labs service is temporarily busy. Try again in a few moments."
     }
+  },
+  "systemTables": {
+    "title": "Tables Stick HAProxy",
+    "description": "Afficher et gérer les tables stick HAProxy (compteurs de limite de débit, confiance beacon, affinité de session). Les grandes tables sont paginées et mises en cache côté serveur.",
+    "tableName": "Table",
+    "type": "Type",
+    "size": "Taille",
+    "used": "Entrées",
+    "key": "Clé",
+    "use": "Utilisation",
+    "exp": "Expiration",
+    "actions": "Actions",
+    "searchPlaceholder": "Rechercher par clé...",
+    "clearSearch": "Effacer la recherche",
+    "page": "page",
+    "autoRefresh": "Auto-rafraîchir",
+    "clearAll": "Tout effacer",
+    "clearEntry": "Effacer l'entrée",
+    "confirmClearEntry": "Effacer l'entrée \"{{key}}\" de la table {{name}} ?",
+    "confirmClearAll": "Supprimer toutes les entrées de la table \"{{name}}\" ? Cette action est irréversible.",
+    "entryCleared": "Entrée effacée.",
+    "tableCleared": "Table effacée.",
+    "clearFailed": "Échec de l'effacement de l'entrée.",
+    "noEntries": "Aucune entrée dans cette table.",
+    "noTables": "Aucune table stick trouvée. HAProxy n'est peut-être pas en cours d'exécution ou le socket de statistiques n'est pas disponible.",
+    "showing": "Affichage de {{from}}-{{to}} sur {{total}}",
+    "pageOf": "Page {{page}} sur {{total}}",
+    "expiresAt": "Expire à"
   }
 }

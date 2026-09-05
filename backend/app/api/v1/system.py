@@ -14,13 +14,21 @@ from ...core.config import get_settings
 from ...models.models import LogDestination, LoggedField, MetricSnapshot, Setting
 from ...schemas.haproxy_options import HaproxyOption
 from ...schemas.settings import AsnLookupResponse, GeoIpDownloadResponse, GeoIpStatusResponse, SettingCreate, SettingResponse
-from ...schemas.stats import MetricsResponse, StatsResponse, WafMetricsResponse
+from ...schemas.stats import (
+    MetricsResponse,
+    StatsResponse,
+    WafMetricsResponse,
+    StickTableSummary,
+    StickTableDetail,
+    StickTableClearResponse,
+)
 from ...services.geoip import download_maxmind_dbs
 from ...services.metrics import get_metrics
 from ...services.settings import get_maxmind_license_key, get_setting, list_settings, set_setting
 from ...services.stats import _send_command, get_stats
 from ...services.waf_metrics import get_waf_metrics
 from ...services.runtime import get_runtime
+from ...services import stick_tables
 
 router = APIRouter()
 settings = get_settings()
@@ -438,6 +446,56 @@ async def system_restore(
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Restore failed: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# HAProxy stick-table viewer (System → Tables tab)
+# ---------------------------------------------------------------------------
+
+@router.get("/haproxy/tables", response_model=List[StickTableSummary])
+def list_stick_tables(
+    user=Depends(get_current_user),
+    _=Depends(rate_limit),
+):
+    """List all HAProxy stick-tables with their type, size, and used count."""
+    return stick_tables.list_tables()
+
+
+@router.get("/haproxy/tables/{name}", response_model=StickTableDetail)
+def get_stick_table(
+    name: str,
+    limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    search: Optional[str] = Query(None),
+    user=Depends(get_current_user),
+    _=Depends(rate_limit),
+):
+    """Fetch a paginated, optionally key-substring-filtered slice of a stick-table."""
+    return stick_tables.get_table(name, limit=limit, offset=offset, search=search)
+
+
+@router.delete("/haproxy/tables/{name}", response_model=StickTableClearResponse)
+def clear_stick_table(
+    name: str,
+    user=Depends(require_admin),
+    _=Depends(rate_limit),
+):
+    """Remove all entries from a stick-table (admin only)."""
+    return stick_tables.clear_table(name)
+
+
+@router.delete(
+    "/haproxy/tables/{name}/entries/{key}",
+    response_model=StickTableClearResponse,
+)
+def clear_stick_table_entry(
+    name: str,
+    key: str,
+    user=Depends(require_admin),
+    _=Depends(rate_limit),
+):
+    """Remove a single entry from a stick-table by key (admin only)."""
+    return stick_tables.clear_entry(name, key)
 
 
 # ---------------------------------------------------------------------------

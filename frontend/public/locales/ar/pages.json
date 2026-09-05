@@ -245,7 +245,10 @@
       "totals": "الإجماليات",
       "events": "الأحداث",
       "countryMap": "خريطة الدول"
-    }
+    },
+    "systemMetrics": "مقاييس النظام",
+    "stickTableMetrics": "مقاييس الجداول stick",
+    "stickTableEntries": "عدد إدخالات الجداول stick"
   },
   "auditLogs": {
     "title": "سجلات التدقيق",
@@ -2391,7 +2394,21 @@
       "manualReportCollectionHelp": "تشغيل عينة فورية من تقارير CSP من سجلات coreX.",
       "sampleReportsNow": "أخذ عينة من التقارير الآن",
       "sampling": "جارٍ أخذ العينات...",
-      "sampleComplete": "اكتملت عينة تقرير CSP. تم تخزين {{count}} تقرير جديد."
+      "sampleComplete": "اكتملت عينة تقرير CSP. تم تخزين {{count}} تقرير جديد.",
+      "beaconSectionTitle": "منارة المخزون وثقة المنارة",
+      "beaconRequiresRespTransform": "يجب تمكين تحويلات الاستجابة في الخيارات العامة لاستخدام منارة المخزون وثقة المنارة.",
+      "inventoryBeacon": "منارة المخزون",
+      "inventoryBeaconHelp": "يحقن منارة JS في استجابات HTML تجمع جميع الموارد المحملة عبر واجهة Resource Timing API. توفر مخزوناً كاملاً للموارد بغض النظر عن وضع CSP.",
+      "beaconTrust": "ثقة المنارة",
+      "beaconTrustHelp": "يُدرج معرفاً فريداً في رأس استجابة Server-Timing. تقرأه منارة JS وتُرسله مع POST المنارة. يتحقق HAProxy من المعرف لإثبات أن IP تلقى استجابة حقيقية، ثم يُعلّم IP كموثوق لتقييم المخاطر. يمكن تمكينه بشكل مستقل عن تتبع الموارد.",
+      "beaconEndpointPath": "مسار نقطة نهاية المنارة",
+      "beaconEndpointPathHelp": "مسار URL الذي ترسل إليه منارة JS قوائم الموارد.",
+      "beaconScriptPath": "مسار نص المنارة البرمجي",
+      "beaconScriptPathHelp": "مسار URL الذي يقدم منه HAProxy ملف JS للمنارة.",
+      "beaconContentTypes": "أنواع المحتوى (مفصولة بفواصل)",
+      "beaconContentTypesHelp": "الحقن فقط في الاستجابات التي تحتوي على بادئات content-type هذه. الافتراضي: text/html",
+      "beaconPathPatterns": "أنماط المسار (مفصولة بفواصل)",
+      "beaconPathPatternsHelp": "الحقن فقط في الصفحات التي يبدأ مسار URL بأحد هذه البادئات. فارغ = جميع المسارات."
     }
   },
   "toaster": {
@@ -2472,7 +2489,8 @@
       "settings": "الإعدادات",
       "users": "المستخدمون",
       "features": "ميزات",
-      "snapshots": "اللقطات"
+      "snapshots": "اللقطات",
+      "tables": "جداول Stick"
     }
   },
   "mcpGateway": {
@@ -3016,5 +3034,33 @@
       "settingsFailed": "Failed to update settings.",
       "serviceBusy": "SSL Labs service is temporarily busy. Try again in a few moments."
     }
+  },
+  "systemTables": {
+    "title": "جداول Stick لـ HAProxy",
+    "description": "عرض وإدارة جداول stick لـ HAProxy (عدادات تحديد المعدل، ثقة beacon، تقارب الجلسة). الجداول الكبيرة مقسمة إلى صففات ومخزنة مؤقتاً على الخادم.",
+    "tableName": "جدول",
+    "type": "النوع",
+    "size": "الحجم",
+    "used": "الإدخالات",
+    "key": "المفتاح",
+    "use": "استخدام",
+    "exp": "انتهاء",
+    "actions": "إجراءات",
+    "searchPlaceholder": "البحث بالمفتاح...",
+    "clearSearch": "مسح البحث",
+    "page": "صفحة",
+    "autoRefresh": "تحديث تلقائي",
+    "clearAll": "مسح الكل",
+    "clearEntry": "مسح إدخال",
+    "confirmClearEntry": "مسح الإدخال \"{{key}}\" من الجدول {{name}}؟",
+    "confirmClearAll": "إزالة جميع الإدخالات من الجدول \"{{name}}\"؟ لا يمكن التراجع عن هذا.",
+    "entryCleared": "تم مسح الإدخال.",
+    "tableCleared": "تم مسح الجدول.",
+    "clearFailed": "فشل في مسح الإدخال.",
+    "noEntries": "لا توجد إدخالات في هذا الجدول.",
+    "noTables": "لم يتم العثور على جداول stick. قد لا يكون HAProxy قيد التشغيل أو مقبس الإحصائيات غير متاح.",
+    "showing": "عرض {{from}}-{{to}} من {{total}}",
+    "pageOf": "صفحة {{page}} من {{total}}",
+    "expiresAt": "ينتهي في"
   }
 }

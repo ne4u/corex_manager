@@ -44,6 +44,16 @@ def sample_metrics() -> None:
         rows = stats.get_backend_stats()
         logger.debug("HAProxy socket returned info keys=%s, stat rows=%d",
                      list(info.keys()) if info else [], len(rows or []))
+        # Capture stick-table entry counts for the Metrics dashboard chart.
+        # Stored inside process_info (a freeform JSON dict) under "stick_tables"
+        # as {table_name: used_count} to avoid a schema migration.
+        try:
+            from . import stick_tables
+            tables = stick_tables.list_tables()
+            if tables:
+                info["stick_tables"] = {t["name"]: t["used"] for t in tables}
+        except Exception as exc:
+            logger.debug("Could not sample stick-table counts: %s", exc)
         snapshot = MetricSnapshot(
             captured_at=datetime.now(timezone.utc).replace(tzinfo=None),
             process_info=info,
@@ -328,6 +338,8 @@ def get_metrics(db: Session, start: datetime, end: Optional[datetime] = None, st
             "bytes_in": _int(info.get("CumInBytes")),
             "bytes_out": _int(info.get("TotalBytesOut")),
         }
+        # Stick-table entry counts: {table_name: used_count} sampled at capture time.
+        agg["stick_tables"] = info.get("stick_tables", {})
         agg["time"] = ts.isoformat()
         points.append(agg)
         prev_snapshot = last

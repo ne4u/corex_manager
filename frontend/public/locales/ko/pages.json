@@ -245,7 +245,10 @@
       "totals": "합계",
       "events": "이벤트",
       "countryMap": "국가 맵"
-    }
+    },
+    "systemMetrics": "시스템 메트릭",
+    "stickTableMetrics": "스틱 테이블 메트릭",
+    "stickTableEntries": "스틱 테이블 항목 수"
   },
   "auditLogs": {
     "title": "감사 로그",
@@ -2391,7 +2394,21 @@
       "manualReportCollectionHelp": "coreX 로그에서 즉시 CSP 보고서 샘플을 트리거합니다.",
       "sampleReportsNow": "지금 보고서 샘플링",
       "sampling": "샘플링 중...",
-      "sampleComplete": "CSP 보고서 샘플이 완료되었습니다. {{count}}개의 새 보고서가 저장되었습니다."
+      "sampleComplete": "CSP 보고서 샘플이 완료되었습니다. {{count}}개의 새 보고서가 저장되었습니다.",
+      "beaconSectionTitle": "인벤토리 비콘 및 비콘 신뢰",
+      "beaconRequiresRespTransform": "인벤토리 비콘 및 비콘 신뢰를 사용하려면 전역 옵션에서 응답 변환이 활성화되어야 합니다.",
+      "inventoryBeacon": "인벤토리 비콘",
+      "inventoryBeaconHelp": "HTML 응답에 JS 비콘을 주입하여 Resource Timing API를 통해 로드된 모든 리소스를 수집합니다. CSP 모드에 관계없이 완전한 리소스 인벤토리를 제공합니다.",
+      "beaconTrust": "비콘 신뢰",
+      "beaconTrustHelp": "Server-Timing 응답 헤더에 고유 ID를 삽입합니다. 비콘 JS가 이를 읽고 비콘 POST와 함께 제출합니다. HAProxy는 ID를 검증하여 IP가 실제 응답을 받았음을 증명한 다음 위험 점수를 위해 IP를 신뢰할 수 있는 것으로 표시합니다. 리소스 추적과 독립적으로 활성화할 수 있습니다.",
+      "beaconEndpointPath": "비콘 엔드포인트 경로",
+      "beaconEndpointPathHelp": "비콘 JS가 리소스 목록을 POST하는 URL 경로입니다.",
+      "beaconScriptPath": "비콘 스크립트 경로",
+      "beaconScriptPathHelp": "HAProxy가 비콘 JS 파일을 제공하는 URL 경로입니다.",
+      "beaconContentTypes": "콘텐츠 유형 (쉼표로 구분)",
+      "beaconContentTypesHelp": "이러한 content-type 접두사가 있는 응답에만 주입합니다. 기본값: text/html",
+      "beaconPathPatterns": "경로 패턴 (쉼표로 구분)",
+      "beaconPathPatternsHelp": "URL 경로가 이러한 접두사 중 하나로 시작하는 페이지에만 주입합니다. 비어 있음 = 모든 경로."
     }
   },
   "toaster": {
@@ -2472,7 +2489,8 @@
       "settings": "설정",
       "users": "사용자",
       "features": "기능",
-      "snapshots": "스냅샷"
+      "snapshots": "스냅샷",
+      "tables": "스틱 테이블"
     }
   },
   "mcpGateway": {
@@ -3016,5 +3034,33 @@
       "settingsFailed": "Failed to update settings.",
       "serviceBusy": "SSL Labs service is temporarily busy. Try again in a few moments."
     }
+  },
+  "systemTables": {
+    "title": "HAProxy 스틱 테이블",
+    "description": "HAProxy 스틱 테이블(속도 제한 카운터, 비콘 신뢰, 세션 선호도)을 보고 관리합니다. 큰 테이블은 서버 측에서 페이지 매김 및 캐시됩니다.",
+    "tableName": "테이블",
+    "type": "유형",
+    "size": "크기",
+    "used": "항목 수",
+    "key": "키",
+    "use": "사용",
+    "exp": "만료",
+    "actions": "작업",
+    "searchPlaceholder": "키로 검색...",
+    "clearSearch": "검색 지우기",
+    "page": "페이지",
+    "autoRefresh": "자동 새로고침",
+    "clearAll": "모두 지우기",
+    "clearEntry": "항목 지우기",
+    "confirmClearEntry": "테이블 {{name}}에서 항목 \"{{key}}\"을(를) 지우시겠습니까?",
+    "confirmClearAll": "테이블 \"{{name}}\"에서 모든 항목을 제거하시겠습니까? 이 작업은 취소할 수 없습니다.",
+    "entryCleared": "항목이 지워졌습니다.",
+    "tableCleared": "테이블이 지워졌습니다.",
+    "clearFailed": "항목 지우기에 실패했습니다.",
+    "noEntries": "이 테이블에 항목이 없습니다.",
+    "noTables": "스틱 테이블을 찾을 수 없습니다. HAProxy가 실행되지 않거나 통계 소켓을 사용할 수 없을 수 있습니다.",
+    "showing": "{{total}}개 중 {{from}}-{{to}} 표시",
+    "pageOf": "{{total}}페이지 중 {{page}}페이지",
+    "expiresAt": "만료 시각"
   }
 }

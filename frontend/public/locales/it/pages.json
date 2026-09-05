@@ -245,7 +245,10 @@
       "totals": "Totali",
       "events": "Eventi",
       "countryMap": "Mappa Paesi"
-    }
+    },
+    "systemMetrics": "Metriche di sistema",
+    "stickTableMetrics": "Metriche delle tabelle stick",
+    "stickTableEntries": "Conteggio voci delle tabelle stick"
   },
   "auditLogs": {
     "title": "Log di Audit",
@@ -2391,7 +2394,21 @@
       "manualReportCollectionHelp": "Attiva un campionamento immediato dei rapporti CSP dai log di coreX.",
       "sampleReportsNow": "Campiona rapporti ora",
       "sampling": "Campionamento...",
-      "sampleComplete": "Campionamento rapporti CSP completato. {{count}} nuovi rapporti memorizzati."
+      "sampleComplete": "Campionamento rapporti CSP completato. {{count}} nuovi rapporti memorizzati.",
+      "beaconSectionTitle": "Beacon di Inventario e Fiducia del Beacon",
+      "beaconRequiresRespTransform": "Le Trasformazioni di Risposta devono essere abilitate nelle Opzioni Globali per utilizzare il Beacon di Inventario e la Fiducia del Beacon.",
+      "inventoryBeacon": "Beacon di Inventario",
+      "inventoryBeaconHelp": "Inietta un beacon JS nelle risposte HTML che raccoglie tutte le risorse caricate tramite la Resource Timing API. Fornisce un inventario completo delle risorse indipendentemente dalla modalità CSP.",
+      "beaconTrust": "Fiducia del Beacon",
+      "beaconTrustHelp": "Inserisce un ID univoco nell'intestazione di risposta Server-Timing. Il beacon JS lo legge e lo invia con il POST del beacon. HAProxy valida l'ID per provare che l'IP ha ricevuto una risposta reale, quindi marca l'IP come affidabile per il punteggio di rischio. Può essere abilitato indipendentemente dal tracciamento delle risorse.",
+      "beaconEndpointPath": "Percorso dell'Endpoint del Beacon",
+      "beaconEndpointPathHelp": "Percorso URL a cui il beacon JS invia gli elenchi di risorse.",
+      "beaconScriptPath": "Percorso dello Script del Beacon",
+      "beaconScriptPathHelp": "Percorso URL da cui HAProxy serve il file JS del beacon.",
+      "beaconContentTypes": "Tipi di Contenuto (separati da virgola)",
+      "beaconContentTypesHelp": "Iniettare solo in risposte con questi prefissi di content-type. Predefinito: text/html",
+      "beaconPathPatterns": "Modelli di Percorso (separati da virgola)",
+      "beaconPathPatternsHelp": "Iniettare solo in pagine il cui percorso URL inizia con uno di questi prefissi. Vuoto = tutti i percorsi."
     }
   },
   "toaster": {
@@ -2472,7 +2489,8 @@
       "settings": "Impostazioni",
       "users": "Utenti",
       "features": "Funzionalità",
-      "snapshots": "Snapshot"
+      "snapshots": "Snapshot",
+      "tables": "Tabelle Stick"
     }
   },
   "mcpGateway": {
@@ -3016,5 +3034,33 @@
       "settingsFailed": "Failed to update settings.",
       "serviceBusy": "SSL Labs service is temporarily busy. Try again in a few moments."
     }
+  },
+  "systemTables": {
+    "title": "Tabelle Stick HAProxy",
+    "description": "Visualizza e gestisci le tabelle stick di HAProxy (contatori rate-limit, beacon trust, affinità di sessione). Le tabelle grandi sono impaginate e memorizzate nella cache lato server.",
+    "tableName": "Tabella",
+    "type": "Tipo",
+    "size": "Dimensione",
+    "used": "Voci",
+    "key": "Chiave",
+    "use": "Uso",
+    "exp": "Scadenza",
+    "actions": "Azioni",
+    "searchPlaceholder": "Cerca per chiave...",
+    "clearSearch": "Cancella ricerca",
+    "page": "pagina",
+    "autoRefresh": "Auto-aggiorna",
+    "clearAll": "Cancella tutto",
+    "clearEntry": "Cancella voce",
+    "confirmClearEntry": "Cancellare la voce \"{{key}}\" dalla tabella {{name}}?",
+    "confirmClearAll": "Rimuovere tutte le voci dalla tabella \"{{name}}\"? Questa azione non può essere annullata.",
+    "entryCleared": "Voce cancellata.",
+    "tableCleared": "Tabella cancellata.",
+    "clearFailed": "Impossibile cancellare la voce.",
+    "noEntries": "Nessuna voce in questa tabella.",
+    "noTables": "Nessuna tabella stick trovata. HAProxy potrebbe non essere in esecuzione o il socket delle statistiche non è disponibile.",
+    "showing": "Mostra {{from}}-{{to}} di {{total}}",
+    "pageOf": "Pagina {{page}} di {{total}}",
+    "expiresAt": "Scade alle"
   }
 }

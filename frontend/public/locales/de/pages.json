@@ -245,7 +245,10 @@
       "totals": "Summen",
       "events": "Ereignisse",
       "countryMap": "Länderkarte"
-    }
+    },
+    "systemMetrics": "System-Metriken",
+    "stickTableMetrics": "Stick-Tabellen-Metriken",
+    "stickTableEntries": "Stick-Tabellen-Eintragsanzahl"
   },
   "auditLogs": {
     "title": "Audit-Logs",
@@ -2391,7 +2394,21 @@
       "manualReportCollectionHelp": "Löst eine sofortige CSP-Berichtsstichprobe aus coreX-Protokollen aus.",
       "sampleReportsNow": "Berichte jetzt testen",
       "sampling": "Wird getestet...",
-      "sampleComplete": "CSP-Berichtsstichprobe abgeschlossen. {{count}} neue Berichte gespeichert."
+      "sampleComplete": "CSP-Berichtsstichprobe abgeschlossen. {{count}} neue Berichte gespeichert.",
+      "beaconSectionTitle": "Inventar-Beacon und Beacon-Vertrauen",
+      "beaconRequiresRespTransform": "Antwort-Transformationen müssen in den globalen Optionen aktiviert sein, um den Inventar-Beacon und das Beacon-Vertrauen zu verwenden.",
+      "inventoryBeacon": "Inventar-Beacon",
+      "inventoryBeaconHelp": "Injiziert einen JS-Beacon in HTML-Antworten, der alle geladenen Ressourcen über die Resource Timing API sammelt. Bietet ein vollständiges Ressourceninventar unabhängig vom CSP-Modus.",
+      "beaconTrust": "Beacon-Vertrauen",
+      "beaconTrustHelp": "Fügt eine eindeutige ID im Server-Timing-Antwort-Header ein. Der Beacon-JS liest sie und sendet sie mit dem Beacon-POST. HAProxy validiert die ID, um zu beweisen, dass die IP eine echte Antwort erhalten hat, und markiert die IP dann als vertrauenswürdig für die Risikobewertung. Kann unabhängig vom Ressourcen-Tracking aktiviert werden.",
+      "beaconEndpointPath": "Beacon-Endpunkt-Pfad",
+      "beaconEndpointPathHelp": "URL-Pfad, an den der Beacon-JS die Ressourcenlisten sendet.",
+      "beaconScriptPath": "Beacon-Skript-Pfad",
+      "beaconScriptPathHelp": "URL-Pfad, von dem HAProxy die Beacon-JS-Datei bereitstellt.",
+      "beaconContentTypes": "Inhaltstypen (kommagetrennt)",
+      "beaconContentTypesHelp": "Nur in Antworten mit diesen Content-Type-Präfixen injizieren. Standard: text/html",
+      "beaconPathPatterns": "Pfadmuster (kommagetrennt)",
+      "beaconPathPatternsHelp": "Nur in Seiten injizieren, deren URL-Pfad mit einem dieser Präfixe beginnt. Leer = alle Pfade."
     }
   },
   "toaster": {
@@ -2472,7 +2489,8 @@
       "settings": "Einstellungen",
       "users": "Benutzer",
       "features": "Funktionen",
-      "snapshots": "Schnappschüsse"
+      "snapshots": "Schnappschüsse",
+      "tables": "Stick-Tabellen"
     }
   },
   "mcpGateway": {
@@ -3016,5 +3034,33 @@
       "settingsFailed": "Failed to update settings.",
       "serviceBusy": "SSL Labs service is temporarily busy. Try again in a few moments."
     }
+  },
+  "systemTables": {
+    "title": "HAProxy Stick-Tabellen",
+    "description": "HAProxy Stick-Tabellen anzeigen und verwalten (Rate-Limit-Zähler, Beacon-Trust, Sitzungsaffinität). Große Tabellen werden serverseitig paginiert und zwischengespeichert.",
+    "tableName": "Tabelle",
+    "type": "Typ",
+    "size": "Größe",
+    "used": "Einträge",
+    "key": "Schlüssel",
+    "use": "Nutzung",
+    "exp": "Ablauf",
+    "actions": "Aktionen",
+    "searchPlaceholder": "Nach Schlüssel suchen...",
+    "clearSearch": "Suche löschen",
+    "page": "Seite",
+    "autoRefresh": "Auto-Aktualisierung",
+    "clearAll": "Alle löschen",
+    "clearEntry": "Eintrag löschen",
+    "confirmClearEntry": "Eintrag \"{{key}}\" aus Tabelle {{name}} löschen?",
+    "confirmClearAll": "Alle Einträge aus Tabelle \"{{name}}\" entfernen? Dies kann nicht rückgängig gemacht werden.",
+    "entryCleared": "Eintrag gelöscht.",
+    "tableCleared": "Tabelle gelöscht.",
+    "clearFailed": "Eintrag konnte nicht gelöscht werden.",
+    "noEntries": "Keine Einträge in dieser Tabelle.",
+    "noTables": "Keine Stick-Tabellen gefunden. HAProxy läuft möglicherweise nicht oder der Stats-Socket ist nicht verfügbar.",
+    "showing": "Zeige {{from}}-{{to}} von {{total}}",
+    "pageOf": "Seite {{page}} von {{total}}",
+    "expiresAt": "Läuft ab um"
   }
 }

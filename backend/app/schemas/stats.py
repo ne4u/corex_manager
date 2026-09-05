@@ -27,4 +27,46 @@ class WafMetricsResponse(BaseModel):
     totals: Dict[str, int]
 
 
-__all__ = ['MetricsResponse', 'StatsResponse', 'WafMetricsResponse']
+# ---------------------------------------------------------------------------
+# HAProxy stick-table viewer (System → Tables tab)
+# ---------------------------------------------------------------------------
+
+class StickTableSummary(BaseModel):
+    name: str
+    type: str
+    size: int
+    used: int
+
+
+class StickTableEntry(BaseModel):
+    key: str = ""
+    use: Any = 0
+    exp: Any = 0
+    stores: Dict[str, str] = {}
+
+
+class StickTableDetail(BaseModel):
+    name: str
+    type: str = ""
+    size: int = 0
+    used: int = 0
+    total: int = 0
+    offset: int = 0
+    limit: int = 100
+    entries: List[StickTableEntry] = []
+
+
+class StickTableClearResponse(BaseModel):
+    ok: bool
+    cleared: int
+
+
+__all__ = [
+    'MetricsResponse',
+    'StatsResponse',
+    'WafMetricsResponse',
+    'StickTableSummary',
+    'StickTableEntry',
+    'StickTableDetail',
+    'StickTableClearResponse',
+]

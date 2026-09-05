@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Settings as SettingsIcon, Users as UsersIcon, Flag, History } from 'lucide-react'
+import { Settings as SettingsIcon, Users as UsersIcon, Flag, History, Table as TableIcon } from 'lucide-react'
 import { Tabs } from '../components/ui'
 import SystemSettings from './SystemSettings'
 import Users from './Users'
 import FeatureFlags from './FeatureFlags'
 import SystemSnapshots from './SystemSnapshots'
+import SystemTables from './SystemTables'
 
-type SystemTab = 'settings' | 'users' | 'features' | 'snapshots'
+type SystemTab = 'settings' | 'users' | 'features' | 'snapshots' | 'tables'
 
 export default function System() {
   const { t } = useTranslation(['pages', 'common'])
@@ -22,6 +23,7 @@ export default function System() {
           { id: 'users', label: t('pages:system.tabs.users'), icon: UsersIcon },
           { id: 'features', label: t('pages:system.tabs.features'), icon: Flag },
           { id: 'snapshots', label: t('pages:system.tabs.snapshots'), icon: History },
+          { id: 'tables', label: t('pages:system.tabs.tables'), icon: TableIcon },
         ]}
         active={tab}
         onChange={(id) => setTab(id as SystemTab)}
@@ -31,6 +33,7 @@ export default function System() {
       {tab === 'users' && <Users />}
       {tab === 'features' && <FeatureFlags />}
       {tab === 'snapshots' && <SystemSnapshots />}
+      {tab === 'tables' && <SystemTables />}
     </div>
   )
 }

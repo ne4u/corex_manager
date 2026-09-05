@@ -245,7 +245,10 @@
       "totals": "Итоги",
       "events": "События",
       "countryMap": "Карта стран"
-    }
+    },
+    "systemMetrics": "Системные метрики",
+    "stickTableMetrics": "Метрики stick-таблиц",
+    "stickTableEntries": "Количество записей в stick-таблицах"
   },
   "auditLogs": {
     "title": "Журнал аудита",
@@ -2391,7 +2394,21 @@
       "manualReportCollectionHelp": "Запускает немедленный сбор образца отчётов CSP из логов coreX.",
       "sampleReportsNow": "Собрать отчёты сейчас",
       "sampling": "Сбор...",
-      "sampleComplete": "Сбор образца отчётов CSP завершён. Сохранено {{count}} новых отчётов."
+      "sampleComplete": "Сбор образца отчётов CSP завершён. Сохранено {{count}} новых отчётов.",
+      "beaconSectionTitle": "Beacon инвентаризации и доверие Beacon",
+      "beaconRequiresRespTransform": "Преобразования ответов должны быть включены в глобальных параметрах для использования Beacon инвентаризации и доверия Beacon.",
+      "inventoryBeacon": "Beacon инвентаризации",
+      "inventoryBeaconHelp": "Внедряет JS-маяк в HTML-ответы, который собирает все загруженные ресурсы через Resource Timing API. Обеспечивает полную инвентаризацию ресурсов независимо от режима CSP.",
+      "beaconTrust": "Доверие Beacon",
+      "beaconTrustHelp": "Вставляет уникальный ID в заголовок ответа Server-Timing. JS-маяк читает его и отправляет с POST-запросом маяка. HAProxy проверяет ID, чтобы доказать, что IP получил реальный ответ, затем помечает IP как доверенный для оценки рисков. Может быть включён независимо от отслеживания ресурсов.",
+      "beaconEndpointPath": "Путь конечной точки Beacon",
+      "beaconEndpointPathHelp": "URL-путь, на который JS-маяк отправляет списки ресурсов.",
+      "beaconScriptPath": "Путь скрипта Beacon",
+      "beaconScriptPathHelp": "URL-путь, откуда HAProxy обслуживает файл JS маяка.",
+      "beaconContentTypes": "Типы содержимого (через запятую)",
+      "beaconContentTypesHelp": "Внедрять только в ответы с этими префиксами content-type. По умолчанию: text/html",
+      "beaconPathPatterns": "Шаблоны путей (через запятую)",
+      "beaconPathPatternsHelp": "Внедрять только на страницы, URL-путь которых начинается с одного из этих префиксов. Пусто = все пути."
     }
   },
   "toaster": {
@@ -2472,7 +2489,8 @@
       "settings": "Настройки",
       "users": "Пользователи",
       "features": "Функции",
-      "snapshots": "Снимки"
+      "snapshots": "Снимки",
+      "tables": "Stick-таблицы"
     }
   },
   "mcpGateway": {
@@ -3016,5 +3034,33 @@
       "settingsFailed": "Failed to update settings.",
       "serviceBusy": "SSL Labs service is temporarily busy. Try again in a few moments."
     }
+  },
+  "systemTables": {
+    "title": "Stick-таблицы HAProxy",
+    "description": "Просмотр и управление stick-таблицами HAProxy (счётчики ограничения скорости, доверие beacon, привязка сессий). Большие таблицы paginated и кэшируются на стороне сервера.",
+    "tableName": "Таблица",
+    "type": "Тип",
+    "size": "Размер",
+    "used": "Записи",
+    "key": "Ключ",
+    "use": "Использ.",
+    "exp": "Истекает",
+    "actions": "Действия",
+    "searchPlaceholder": "Поиск по ключу...",
+    "clearSearch": "Очистить поиск",
+    "page": "страница",
+    "autoRefresh": "Авто-обновление",
+    "clearAll": "Очистить всё",
+    "clearEntry": "Очистить запись",
+    "confirmClearEntry": "Очистить запись \"{{key}}\" из таблицы {{name}}?",
+    "confirmClearAll": "Удалить все записи из таблицы \"{{name}}\"? Это действие нельзя отменить.",
+    "entryCleared": "Запись очищена.",
+    "tableCleared": "Таблица очищена.",
+    "clearFailed": "Не удалось очистить запись.",
+    "noEntries": "В этой таблице нет записей.",
+    "noTables": "Stick-таблицы не найдены. HAProxy может не работать или статистический сокет недоступен.",
+    "showing": "Показано {{from}}-{{to}} из {{total}}",
+    "pageOf": "Страница {{page}} из {{total}}",
+    "expiresAt": "Истекает в"
   }
 }

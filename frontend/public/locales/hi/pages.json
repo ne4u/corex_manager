@@ -245,7 +245,10 @@
       "totals": "कुल",
       "events": "इवेंट",
       "countryMap": "देश मानचित्र"
-    }
+    },
+    "systemMetrics": "सिस्टम मेट्रिक्स",
+    "stickTableMetrics": "स्टिक टेबल मेट्रिक्स",
+    "stickTableEntries": "स्टिक टेबल प्रविष्टि संख्या"
   },
   "auditLogs": {
     "title": "ऑडिट लॉग",
@@ -2391,7 +2394,21 @@
       "manualReportCollectionHelp": "coreX लॉग से तत्काल CSP रिपोर्ट नमूना ट्रिगर करता है।",
       "sampleReportsNow": "अभी रिपोर्ट्स नमूना लें",
       "sampling": "नमूना लिया जा रहा है...",
-      "sampleComplete": "CSP रिपोर्ट नमूना पूर्ण। {{count}} नई रिपोर्ट्स संग्रहीत की गईं।"
+      "sampleComplete": "CSP रिपोर्ट नमूना पूर्ण। {{count}} नई रिपोर्ट्स संग्रहीत की गईं।",
+      "beaconSectionTitle": "इन्वेंटरी बीकन और बीकन ट्रस्ट",
+      "beaconRequiresRespTransform": "इन्वेंटरी बीकन और बीकन ट्रस्ट का उपयोग करने के लिए ग्लोबल विकल्पों में रिस्पॉन्स ट्रांसफ़ॉर्मेशन सक्षम होने चाहिए।",
+      "inventoryBeacon": "इन्वेंटरी बीकन",
+      "inventoryBeaconHelp": "HTML प्रतिक्रियाओं में एक JS बीकन इंजेक्ट करता है जो Resource Timing API के माध्यम से सभी लोड किए गए संसाधनों को एकत्र करता है। CSP मोड की परवाह किए बिना संसाधनों की पूरी इन्वेंटरी प्रदान करता है।",
+      "beaconTrust": "बीकन ट्रस्ट",
+      "beaconTrustHelp": "Server-Timing प्रतिक्रिया शीर्षलेख में एक अद्वितीय ID सम्मिलित करता है। बीकन JS इसे पढ़ता है और बीकन POST के साथ सबमिट करता है। HAProxy ID को मान्य करता है ताकि यह सिद्ध हो सके कि IP को वास्तविक प्रतिक्रिया प्राप्त हुई, फिर जोखिम स्कोरिंग के लिए IP को विश्वसनीय के रूप में चिह्नित करता है। इसे संसाधन ट्रैकिंग से स्वतंत्र रूप से सक्षम किया जा सकता है।",
+      "beaconEndpointPath": "बीकन एंडपॉइंट पथ",
+      "beaconEndpointPathHelp": "URL पथ जिस पर बीकन JS संसाधन सूचियां POST करता है।",
+      "beaconScriptPath": "बीकन स्क्रिप्ट पथ",
+      "beaconScriptPathHelp": "URL पथ जहाँ से HAProxy बीकन JS फ़ाइल परोसता है।",
+      "beaconContentTypes": "सामग्री प्रकार (अल्पविराम से अलग)",
+      "beaconContentTypesHelp": "केवल इन content-type प्रीफ़िक्स वाली प्रतिक्रियाओं में इंजेक्ट करें। डिफ़ॉल्ट: text/html",
+      "beaconPathPatterns": "पथ पैटर्न (अल्पविराम से अलग)",
+      "beaconPathPatternsHelp": "केवल उन पृष्ठों में इंजेक्ट करें जिनका URL पथ इनमें से किसी एक प्रीफ़िक्स से शुरू होता है। खाली = सभी पथ।"
     }
   },
   "toaster": {
@@ -2472,7 +2489,8 @@
       "settings": "सेटिंग्स",
       "users": "उपयोगकर्ता",
       "features": "सुविधाएँ",
-      "snapshots": "स्नैपशॉट"
+      "snapshots": "स्नैपशॉट",
+      "tables": "स्टिक टेबल्स"
     }
   },
   "mcpGateway": {
@@ -3016,5 +3034,33 @@
       "settingsFailed": "Failed to update settings.",
       "serviceBusy": "SSL Labs service is temporarily busy. Try again in a few moments."
     }
+  },
+  "systemTables": {
+    "title": "HAProxy स्टिक टेबल्स",
+    "description": "HAProxy स्टिक टेबल्स देखें और प्रबंधित करें (रेट-लिमिट काउंटर, बीकन ट्रस्ट, सत्र एफिनिटी)। बड़ी टेबल्स सर्वर-साइड पर पेजिनेटेड और कैश्ड होती हैं।",
+    "tableName": "टेबल",
+    "type": "प्रकार",
+    "size": "आकार",
+    "used": "प्रविष्टियाँ",
+    "key": "कुंजी",
+    "use": "उपयोग",
+    "exp": "समाप्ति",
+    "actions": "क्रियाएँ",
+    "searchPlaceholder": "कुंजी द्वारा खोजें...",
+    "clearSearch": "खोज साफ़ करें",
+    "page": "पृष्ठ",
+    "autoRefresh": "ऑटो-रिफ्रेश",
+    "clearAll": "सभी साफ़ करें",
+    "clearEntry": "प्रविष्टि साफ़ करें",
+    "confirmClearEntry": "टेबल {{name}} से प्रविष्टि \"{{key}}\" साफ़ करें?",
+    "confirmClearAll": "टेबल \"{{name}}\" से सभी प्रविष्टियाँ हटाएँ? यह पूर्ववत नहीं किया जा सकता।",
+    "entryCleared": "प्रविष्टि साफ़ कर दी गई।",
+    "tableCleared": "टेबल साफ़ कर दी गई।",
+    "clearFailed": "प्रविष्टि साफ़ करने में विफल।",
+    "noEntries": "इस टेबल में कोई प्रविष्टि नहीं।",
+    "noTables": "कोई स्टिक टेबल नहीं मिली। HAProxy चल नहीं रहा है या सांख्यिकी सॉकेट अनुपलब्ध है।",
+    "showing": "{{total}} में से {{from}}-{{to}} दिखा रहा है",
+    "pageOf": "पृष्ठ {{page}} / {{total}}",
+    "expiresAt": "समाप्ति समय"
   }
 }

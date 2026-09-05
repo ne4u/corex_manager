@@ -40,6 +40,45 @@ def _send_command(cmd: str) -> str:
         return f"error: {e}"
 
 
+def _send_command_batch(commands: List[str]) -> str:
+    """Send multiple commands to the HAProxy stats socket in a single connection.
+
+    Pipelines all commands (newline-separated) in one socket connection to avoid
+    the overhead of opening a new connection per command. Used by the beacon
+    trust re-seed to bulk-insert IPs into the stick table after a reload.
+    """
+    path = settings.HAPROXY_SOCKET_PATH
+    if not os.path.exists(path):
+        logger.warning("HAProxy socket not found at %s", path)
+        return ""
+    if not commands:
+        return ""
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+            s.settimeout(10)
+            s.connect(path)
+            # Send all commands at once (newline-separated)
+            payload = "\n".join(commands) + "\n"
+            s.sendall(payload.encode())
+            try:
+                s.shutdown(socket.SHUT_WR)
+            except OSError:
+                pass
+            data = b""
+            while True:
+                try:
+                    chunk = s.recv(16384)
+                except socket.timeout:
+                    break
+                if not chunk:
+                    break
+                data += chunk
+            return data.decode()
+    except Exception as e:
+        logger.warning("HAProxy socket batch error: %s", e)
+        return f"error: {e}"
+
+
 def parse_csv(csv_text: str) -> List[Dict[str, Any]]:
     lines = csv_text.strip().splitlines()
     if not lines:

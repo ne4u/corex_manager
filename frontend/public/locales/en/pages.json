@@ -249,7 +249,10 @@
       "totals": "Totals",
       "events": "Events",
       "countryMap": "Country Map"
-    }
+    },
+    "systemMetrics": "System metrics",
+    "stickTableMetrics": "Stick-table metrics",
+    "stickTableEntries": "Stick-table entry count"
   },
   "auditLogs": {
     "title": "Audit Logs",
@@ -2577,7 +2580,21 @@
       "manualReportCollectionHelp": "Trigger an immediate CSP report sample from coreX logs.",
       "sampleReportsNow": "Sample Reports Now",
       "sampling": "Sampling...",
-      "sampleComplete": "CSP report sample complete. {{count}} new reports stored."
+      "sampleComplete": "CSP report sample complete. {{count}} new reports stored.",
+      "beaconSectionTitle": "Inventory Beacon & Beacon Trust",
+      "beaconRequiresRespTransform": "Response Transformations must be enabled in Global Options to use the Inventory Beacon and Beacon Trust.",
+      "inventoryBeacon": "Inventory Beacon",
+      "inventoryBeaconHelp": "Injects a JS beacon into HTML responses that collects all loaded resources via the Resource Timing API. Provides a complete asset inventory regardless of CSP mode.",
+      "beaconTrust": "Beacon Trust",
+      "beaconTrustHelp": "Inserts a unique ID in the Server-Timing response header. The beacon JS reads it and submits it with the beacon POST. HAProxy validates the ID to prove the IP received a real response, then marks the IP as trusted for risk scoring. Can be enabled independently from asset tracking.",
+      "beaconEndpointPath": "Beacon Endpoint Path",
+      "beaconEndpointPathHelp": "URL path the beacon JS POSTs resource lists to.",
+      "beaconScriptPath": "Beacon Script Path",
+      "beaconScriptPathHelp": "URL path HAProxy serves the beacon JS file from.",
+      "beaconContentTypes": "Content Types (comma-sep)",
+      "beaconContentTypesHelp": "Only inject into responses with these content-type prefixes. Default: text/html",
+      "beaconPathPatterns": "Path Patterns (comma-sep)",
+      "beaconPathPatternsHelp": "Only inject into pages whose URL path starts with one of these prefixes. Empty = all paths."
     }
   },
   "toaster": {
@@ -3093,7 +3110,8 @@
       "settings": "Settings",
       "users": "Users",
       "features": "Feature Flags",
-      "snapshots": "Snapshots"
+      "snapshots": "Snapshots",
+      "tables": "Stick Tables"
     }
   },
   "featureFlags": {
@@ -3185,5 +3203,33 @@
       "settingsFailed": "Failed to update settings.",
       "serviceBusy": "SSL Labs service is temporarily busy. Try again in a few moments."
     }
+  },
+  "systemTables": {
+    "title": "HAProxy Stick Tables",
+    "description": "View and manage HAProxy stick-tables (rate-limit counters, beacon trust, session affinity). Large tables are paginated and cached server-side.",
+    "tableName": "Table",
+    "type": "Type",
+    "size": "Size",
+    "used": "Entries",
+    "key": "Key",
+    "use": "Use",
+    "exp": "Expire",
+    "actions": "Actions",
+    "searchPlaceholder": "Search by key...",
+    "clearSearch": "Clear search",
+    "page": "page",
+    "autoRefresh": "Auto-refresh",
+    "clearAll": "Clear all",
+    "clearEntry": "Clear entry",
+    "confirmClearEntry": "Clear entry \"{{key}}\" from table {{name}}?",
+    "confirmClearAll": "Remove all entries from table \"{{name}}\"? This cannot be undone.",
+    "entryCleared": "Entry cleared.",
+    "tableCleared": "Table cleared.",
+    "clearFailed": "Failed to clear entry.",
+    "noEntries": "No entries in this table.",
+    "noTables": "No stick-tables found. HAProxy may not be running or the stats socket is unavailable.",
+    "showing": "Showing {{from}}-{{to}} of {{total}}",
+    "pageOf": "Page {{page}} of {{total}}",
+    "expiresAt": "Expires at"
   }
 }

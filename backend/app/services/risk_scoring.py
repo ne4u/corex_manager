@@ -92,6 +92,8 @@ _FIELD_CATEGORIES: Dict[str, str] = {
     "ip.src": "list",
     "ip.geoip.asnum": "list",
     "http.request.ja4": "list",
+    # Beacon Trust (Page Protect beacon — trusted IP via stick table)
+    "ip.beacon_trusted": "trust",
 }
 
 # Valid category values (for validation on create/update).
@@ -630,6 +632,7 @@ _BASELINE_RULES_BY_RULESET: List[Tuple[str, str, str, int, str, bool]] = [
     # Trust signals (negative points subtract from score)
     ("default", "Valid auth", 'auth.valid', -15, "trust", True),
     ("default", "HTTP/2+", 'http.request.version_numeric >= 20', -5, "trust", True),
+    ("default", "Beacon-trusted IP", 'ip.beacon_trusted > 0', -15, "trust", True),
 ]
 
 # Seed security lists: (name, type, description, entries)

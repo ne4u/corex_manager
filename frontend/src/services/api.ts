@@ -722,3 +722,12 @@ export const mcp = {
     get: (serverId: number) => api.get(`/mcp/servers/${serverId}/catalog`),
   },
 }
+
+export const stickTables = {
+  list: () => api.get('/haproxy/tables'),
+  get: (name: string, params?: { limit?: number; offset?: number; search?: string }) =>
+    api.get(`/haproxy/tables/${encodeURIComponent(name)}`, { params }),
+  clearAll: (name: string) => api.delete(`/haproxy/tables/${encodeURIComponent(name)}`),
+  clearEntry: (name: string, key: string) =>
+    api.delete(`/haproxy/tables/${encodeURIComponent(name)}/entries/${encodeURIComponent(key)}`),
+}

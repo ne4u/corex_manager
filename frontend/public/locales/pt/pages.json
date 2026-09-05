@@ -245,7 +245,10 @@
       "totals": "Totais",
       "events": "Eventos",
       "countryMap": "Mapa de Países"
-    }
+    },
+    "systemMetrics": "Métricas do sistema",
+    "stickTableMetrics": "Métricas das tabelas stick",
+    "stickTableEntries": "Contagem de entradas das tabelas stick"
   },
   "auditLogs": {
     "title": "Logs de Auditoria",
@@ -2391,7 +2394,21 @@
       "manualReportCollectionHelp": "Dispara uma amostra imediata de relatório CSP dos logs do coreX.",
       "sampleReportsNow": "Amostrar Relatórios Agora",
       "sampling": "Amostrando...",
-      "sampleComplete": "Amostra de relatório CSP concluída. {{count}} novos relatórios armazenados."
+      "sampleComplete": "Amostra de relatório CSP concluída. {{count}} novos relatórios armazenados.",
+      "beaconSectionTitle": "Beacon de Inventário e Confiança do Beacon",
+      "beaconRequiresRespTransform": "As Transformações de Resposta devem estar ativadas nas Opções Globais para usar o Beacon de Inventário e a Confiança do Beacon.",
+      "inventoryBeacon": "Beacon de Inventário",
+      "inventoryBeaconHelp": "Injeta um beacon JS nas respostas HTML que coleta todos os recursos carregados via a API de Resource Timing. Fornece um inventário completo de recursos independentemente do modo CSP.",
+      "beaconTrust": "Confiança do Beacon",
+      "beaconTrustHelp": "Insere um ID exclusivo no cabeçalho de resposta Server-Timing. O beacon JS o lê e o envia com o POST do beacon. O HAProxy valida o ID para provar que o IP recebeu uma resposta real e marca o IP como confiável para a pontuação de risco. Pode ser ativado independentemente do rastreamento de recursos.",
+      "beaconEndpointPath": "Caminho do Endpoint do Beacon",
+      "beaconEndpointPathHelp": "Caminho URL para o qual o beacon JS envia as listas de recursos.",
+      "beaconScriptPath": "Caminho do Script do Beacon",
+      "beaconScriptPathHelp": "Caminho URL de onde o HAProxy serve o arquivo JS do beacon.",
+      "beaconContentTypes": "Tipos de Conteúdo (separados por vírgula)",
+      "beaconContentTypesHelp": "Injetar apenas em respostas com esses prefixos de content-type. Padrão: text/html",
+      "beaconPathPatterns": "Padrões de Caminho (separados por vírgula)",
+      "beaconPathPatternsHelp": "Injetar apenas em páginas cujo caminho URL começa com um desses prefixos. Vazio = todos os caminhos."
     }
   },
   "toaster": {
@@ -2472,7 +2489,8 @@
       "settings": "Configurações",
       "users": "Usuários",
       "features": "Recursos",
-      "snapshots": "Snapshots"
+      "snapshots": "Snapshots",
+      "tables": "Tabelas Stick"
     }
   },
   "mcpGateway": {
@@ -3016,5 +3034,33 @@
       "settingsFailed": "Failed to update settings.",
       "serviceBusy": "SSL Labs service is temporarily busy. Try again in a few moments."
     }
+  },
+  "systemTables": {
+    "title": "Tabelas Stick do HAProxy",
+    "description": "Ver e gerenciar as tabelas stick do HAProxy (contadores de limite de taxa, confiança de beacon, afinidade de sessão). Tabelas grandes são paginadas e armazenadas em cache no servidor.",
+    "tableName": "Tabela",
+    "type": "Tipo",
+    "size": "Tamanho",
+    "used": "Entradas",
+    "key": "Chave",
+    "use": "Uso",
+    "exp": "Expira",
+    "actions": "Ações",
+    "searchPlaceholder": "Buscar por chave...",
+    "clearSearch": "Limpar busca",
+    "page": "página",
+    "autoRefresh": "Auto-atualizar",
+    "clearAll": "Limpar tudo",
+    "clearEntry": "Limpar entrada",
+    "confirmClearEntry": "Limpar a entrada \"{{key}}\" da tabela {{name}}?",
+    "confirmClearAll": "Remover todas as entradas da tabela \"{{name}}\"? Isso não pode ser desfeito.",
+    "entryCleared": "Entrada limpa.",
+    "tableCleared": "Tabela limpa.",
+    "clearFailed": "Falha ao limpar a entrada.",
+    "noEntries": "Nenhuma entrada nesta tabela.",
+    "noTables": "Nenhuma tabela stick encontrada. O HAProxy pode não estar em execução ou o socket de estatísticas não está disponível.",
+    "showing": "Mostrando {{from}}-{{to}} de {{total}}",
+    "pageOf": "Página {{page}} de {{total}}",
+    "expiresAt": "Expira às"
   }
 }

@@ -74,6 +74,28 @@
     }
   }
 
+  // Read the cxid from the Server-Timing response header via the Resource
+  // Timing API's serverTiming property (the only response header readable by
+  // JS). HAProxy inserts "Server-Timing: total;dur=<ms>,cxid;desc="<uuid>""
+  // on HTML responses. The cxid proves the IP received a real response and
+  // is validated by HAProxy on the beacon POST to prevent spoofing.
+  function getCxid() {
+    try {
+      var entries = performance.getEntries ? performance.getEntries() : [];
+      for (var i = 0; i < entries.length; i++) {
+        var e = entries[i];
+        if (e.serverTiming) {
+          for (var j = 0; j < e.serverTiming.length; j++) {
+            if (e.serverTiming[j].name === 'cxid' && e.serverTiming[j].description) {
+              return e.serverTiming[j].description;
+            }
+          }
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
   function sendBeacon() {
     if (sent) return;
     sent = true;
@@ -81,11 +103,16 @@
     for (var key in collected) {
       if (collected.hasOwnProperty(key)) resources.push(collected[key]);
     }
-    if (resources.length === 0) return;
+    var cxid = getCxid();
+    // Skip only if there's nothing to send at all — no resources AND no cxid.
+    // The cxid must be submitted even when the resource list is empty so the
+    // IP can be beacon-trusted regardless of whether the page loaded assets.
+    if (resources.length === 0 && !cxid) return;
     var payload = JSON.stringify({
       page: location.href,
       resources: resources,
       ts: Date.now(),
+      cxid: cxid,
     });
     // Use sendBeacon for reliability (survives page unload).
     // Check the return value — sendBeacon returns false when the payload

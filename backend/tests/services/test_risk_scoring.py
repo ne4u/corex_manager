@@ -57,6 +57,11 @@ class TestCategoryDerivation:
     def test_none_ast(self):
         assert risk_scoring.derive_category(None, 0) == "custom"
 
+    def test_beacon_trusted_field(self):
+        """ip.beacon_trusted is categorized as 'trust'."""
+        ast = risk_scoring.parse_expression("ip.beacon_trusted > 0")
+        assert risk_scoring.derive_category(ast, -15) == "trust"
+
 
 class TestExpressionValidation:
     def test_valid_expression(self, db):
@@ -207,6 +212,16 @@ class TestBaselineSeeding:
         assert len(trust_rules) > 0
         for rule in trust_rules:
             assert rule.points < 0
+
+    def test_seed_beacon_trust_rule(self, db):
+        """The baseline seeding creates a 'Beacon-trusted IP' rule with -15 points."""
+        risk_scoring.seed_baseline_rules(db)
+        rule = db.query(RiskRule).filter(RiskRule.name == "Beacon-trusted IP").first()
+        assert rule is not None
+        assert rule.points == -15
+        assert rule.category == "trust"
+        assert "ip.beacon_trusted" in rule.expression
+        assert "> 0" in rule.expression
 
     def test_seed_rules_have_ruleset_id(self, db):
         risk_scoring.seed_baseline_rules(db)

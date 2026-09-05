@@ -260,6 +260,14 @@ class TestTranslator:
         assert '-m int gt 400' in cond
         assert phase == "response"
 
+    def test_beacon_trusted_gt_zero(self):
+        """ip.beacon_trusted translates to a table_http_req_cnt stick table lookup."""
+        ast = parse_expression('ip.beacon_trusted > 0')
+        cond, phase = translate(ast, self.db)
+        assert 'table_http_req_cnt(beacon_trust_table)' in cond
+        assert '-m int gt 0' in cond
+        assert phase == "request"
+
     def test_in_literals_string(self):
         ast = parse_expression('http.request.method in ["GET", "POST"]')
         cond, phase = translate(ast, self.db)

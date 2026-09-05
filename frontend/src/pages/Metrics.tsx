@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   LineChart,
@@ -29,6 +29,7 @@ interface MetricPoint {
   backends: Record<string, Record<string, number>>
   servers: Record<string, Record<string, { status: string; scur: number; rtime_ms: number; requests_rate: number; bytes_in_rate: number; bytes_out_rate: number }>>
   process: Record<string, number>
+  stick_tables?: Record<string, number>
 }
 
 const GEO_URL = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json'
@@ -72,6 +73,17 @@ function buildSeries(data: MetricPoint[], defs: { key: string; path: string }[],
     for (const { key, path } of defs) row[key] = getNum(d, path)
     return row
   })
+}
+
+const LEGEND_LINE_HEIGHT = 18
+const LEGEND_BUFFER = 4
+
+function estimateLegendHeight(labels: string[], containerWidth: number): number {
+  if (labels.length === 0 || containerWidth <= 0) return LEGEND_LINE_HEIGHT + LEGEND_BUFFER
+  const itemWidth = (label: string) => label.length * 6.5 + 8 + 4 + 12
+  const totalWidth = labels.reduce((sum, l) => sum + itemWidth(l), 0)
+  const rows = Math.max(1, Math.ceil(totalWidth / containerWidth))
+  return rows * LEGEND_LINE_HEIGHT + LEGEND_BUFFER
 }
 
 interface ChartDef {
@@ -191,6 +203,7 @@ export default function Metrics() {
   const [wafLoading, setWafLoading] = useState(false)
   const [countryData, setCountryData] = useState<WafMetricData | null>(null)
   const [visibleCodes, setVisibleCodes] = useState<Record<string, Record<string, boolean>>>({})
+  const [cardWidths, setCardWidths] = useState<Record<string, number>>({})
   const [bandwidthData, setBandwidthData] = useState<BandwidthMetricData | null>(null)
   const [bandwidthLoading, setBandwidthLoading] = useState(false)
 
@@ -288,18 +301,52 @@ export default function Metrics() {
     return { frontends: collect('frontends'), backends: collect('backends') }
   }, [data])
 
+  const stickTableNames = useMemo(() => {
+    const names = new Set<string>()
+    for (const pt of data) {
+      const tables = pt.stick_tables || {}
+      for (const name of Object.keys(tables)) names.add(name)
+    }
+    return Array.from(names).sort()
+  }, [data])
+
+  useLayoutEffect(() => {
+    if (tab !== 'haproxy') return
+    const measure = () => {
+      const els = document.querySelectorAll<HTMLElement>('[data-chart-title]')
+      const widths: Record<string, number> = {}
+      els.forEach((el) => {
+        const title = el.dataset.chartTitle
+        if (title) widths[title] = el.clientWidth
+      })
+      setCardWidths((prev) => {
+        const same =
+          Object.keys(widths).length === Object.keys(prev).length &&
+          Object.keys(widths).every((k) => widths[k] === prev[k])
+        return same ? prev : widths
+      })
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [tab, data, proxyNames, stickTableNames])
+
   function renderChart(m: ChartDef) {
-    const activeDefs = m.defs.filter((d) => !['1xx', '2xx', '3xx', '4xx', '5xx', 'other'].includes(d.key) || (visibleCodes[m.title]?.[d.key] ?? true))
+    const selection = visibleCodes[m.title] || {}
+    const hasSelection = Object.keys(selection).length > 0
+    const activeDefs = hasSelection ? m.defs.filter((d) => selection[d.key] === true) : m.defs
     const series = buildSeries(data, activeDefs, formatTimeCompact)
     const isArea = m.type === 'area'
     const isBytes = m.format === 'bytes'
     const yAxisUnit = isBytes ? undefined : m.unit
     const tickFmt = isBytes ? (v: number) => fmtBytesRate(v) : undefined
     const tooltipFmt = isBytes ? (v: number) => fmtBytesRate(v) : undefined
+    const legendH = estimateLegendHeight(m.defs.map((d) => d.key), cardWidths[m.title] || 600)
+    const chartHeight = 180 + legendH
     return (
-      <div key={m.title} className="card p-4 space-y-2">
+      <div key={m.title} className="card p-4 space-y-2" data-chart-title={m.title}>
         <h3 className="text-sm font-semibold text-slate-200">{t(m.title)}</h3>
-        <ResponsiveContainer width="100%" height={180}>
+        <ResponsiveContainer width="100%" height={chartHeight}>
           {isArea ? (
             <AreaChart data={series}>
               <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
@@ -307,20 +354,29 @@ export default function Metrics() {
               <YAxis tick={{ fontSize: 10 }} stroke="#94a3b8" unit={yAxisUnit} tickFormatter={tickFmt} domain={m.yDomain || ['auto', 'auto']} />
               <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155' }} formatter={tooltipFmt} />
               <Legend
+                height={legendH}
                 content={() => (
                   <div className="flex flex-wrap justify-center gap-3 mt-1">
                     {m.defs.map((d) => (
                       <span
                         key={d.key}
                         className={`cursor-pointer text-[11px] flex items-center gap-1 ${
-                          visibleCodes[m.title]?.[d.key] === false ? 'text-slate-600 line-through' : 'text-slate-300'
+                          hasSelection && selection[d.key] !== true ? 'text-slate-600 line-through' : 'text-slate-300'
                         }`}
                         onClick={() => {
                           if (!['1xx', '2xx', '3xx', '4xx', '5xx', 'other'].includes(d.key)) return
-                          setVisibleCodes((prev: Record<string, Record<string, boolean>>) => ({
-                            ...prev,
-                            [m.title]: { ...prev[m.title], [d.key]: !((prev[m.title]?.[d.key]) ?? true) },
-                          }))
+                          setVisibleCodes((prev: Record<string, Record<string, boolean>>) => {
+                            const cur = prev[m.title] || {}
+                            if (cur[d.key] === true) {
+                              const next = { ...cur }
+                              delete next[d.key]
+                              const out = { ...prev }
+                              if (Object.keys(next).length) out[m.title] = next
+                              else delete out[m.title]
+                              return out
+                            }
+                            return { ...prev, [m.title]: { ...cur, [d.key]: true } }
+                          })
                         }}
                       >
                         <span className="inline-block w-2 h-2 rounded-full" style={{ background: d.color }} />
@@ -349,20 +405,29 @@ export default function Metrics() {
               <YAxis tick={{ fontSize: 10 }} stroke="#94a3b8" unit={yAxisUnit} tickFormatter={tickFmt} domain={m.yDomain || ['auto', 'auto']} />
               <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155' }} formatter={tooltipFmt} />
               <Legend
+                height={legendH}
                 content={() => (
                   <div className="flex flex-wrap justify-center gap-3 mt-1">
                     {m.defs.map((d) => (
                       <span
                         key={d.key}
                         className={`cursor-pointer text-[11px] flex items-center gap-1 ${
-                          visibleCodes[m.title]?.[d.key] === false ? 'text-slate-600 line-through' : 'text-slate-300'
+                          hasSelection && selection[d.key] !== true ? 'text-slate-600 line-through' : 'text-slate-300'
                         }`}
                         onClick={() => {
                           if (!['1xx', '2xx', '3xx', '4xx', '5xx', 'other'].includes(d.key)) return
-                          setVisibleCodes((prev: Record<string, Record<string, boolean>>) => ({
-                            ...prev,
-                            [m.title]: { ...prev[m.title], [d.key]: !((prev[m.title]?.[d.key]) ?? true) },
-                          }))
+                          setVisibleCodes((prev: Record<string, Record<string, boolean>>) => {
+                            const cur = prev[m.title] || {}
+                            if (cur[d.key] === true) {
+                              const next = { ...cur }
+                              delete next[d.key]
+                              const out = { ...prev }
+                              if (Object.keys(next).length) out[m.title] = next
+                              else delete out[m.title]
+                              return out
+                            }
+                            return { ...prev, [m.title]: { ...cur, [d.key]: true } }
+                          })
                         }}
                       >
                         <span className="inline-block w-2 h-2 rounded-full" style={{ background: d.color }} />
@@ -392,7 +457,9 @@ export default function Metrics() {
 
   function renderMultiSeriesChart(title: string, kind: 'frontends' | 'backends', metric: string, format?: 'bytes') {
     const allNames = proxyNames[kind]
-    const activeNames = allNames.filter((name) => visibleCodes[title]?.[name] !== false)
+    const selection = visibleCodes[title] || {}
+    const hasSelection = Object.keys(selection).length > 0
+    const activeNames = hasSelection ? allNames.filter((name) => selection[name] === true) : allNames
     const isBytes = format === 'bytes'
     const tickFmt = isBytes ? (v: number) => fmtBytesRate(v) : undefined
     const tooltipFmt = isBytes ? (v: number) => fmtBytesRate(v) : undefined
@@ -404,29 +471,118 @@ export default function Metrics() {
       }
       return row
     })
+    const legendH = estimateLegendHeight(allNames, cardWidths[title] || 600)
+    const chartHeight = 180 + legendH
     return (
-      <div key={title} className="card p-4 space-y-2">
+      <div key={title} className="card p-4 space-y-2" data-chart-title={title}>
         <h3 className="text-sm font-semibold text-slate-200">{title}</h3>
-        <ResponsiveContainer width="100%" height={180}>
+        <ResponsiveContainer width="100%" height={chartHeight}>
           <LineChart data={series}>
             <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
             <XAxis dataKey="time" tick={{ fontSize: 10 }} stroke="#94a3b8" />
             <YAxis tick={{ fontSize: 10 }} stroke="#94a3b8" unit={isBytes ? undefined : '/s'} tickFormatter={tickFmt} domain={['auto', 'auto']} />
             <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155' }} formatter={tooltipFmt} />
             <Legend
+              height={legendH}
               content={() => (
                 <div className="flex flex-wrap justify-center gap-3 mt-1">
                   {allNames.map((name, i) => (
                     <span
                       key={name}
                       className={`cursor-pointer text-[11px] flex items-center gap-1 ${
-                        visibleCodes[title]?.[name] === false ? 'text-slate-600 line-through' : 'text-slate-300'
+                        hasSelection && selection[name] !== true ? 'text-slate-600 line-through' : 'text-slate-300'
                       }`}
                       onClick={() => {
-                        setVisibleCodes((prev: Record<string, Record<string, boolean>>) => ({
-                          ...prev,
-                          [title]: { ...prev[title], [name]: !((prev[title]?.[name]) ?? true) },
-                        }))
+                        setVisibleCodes((prev: Record<string, Record<string, boolean>>) => {
+                          const cur = prev[title] || {}
+                          if (cur[name] === true) {
+                            const next = { ...cur }
+                            delete next[name]
+                            const out = { ...prev }
+                            if (Object.keys(next).length) out[title] = next
+                            else delete out[title]
+                            return out
+                          }
+                          return { ...prev, [title]: { ...cur, [name]: true } }
+                        })
+                      }}
+                    >
+                      <span className="inline-block w-2 h-2 rounded-full" style={{ background: PROXY_PALETTE[i % PROXY_PALETTE.length] }} />
+                      {name}
+                    </span>
+                  ))}
+                </div>
+              )}
+            />
+            {activeNames.map((name) => {
+              const i = allNames.indexOf(name)
+              return (
+                <Line
+                  key={name}
+                  type="monotone"
+                  dataKey={name}
+                  stroke={PROXY_PALETTE[i % PROXY_PALETTE.length]}
+                  dot={false}
+                  isAnimationActive={false}
+                  strokeWidth={2}
+                />
+              )
+            })}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    )
+  }
+
+  function renderStickTableChart() {
+    const title = t('pages:metrics.stickTableEntries')
+    const allNames = stickTableNames
+    const selection = visibleCodes[title] || {}
+    const hasSelection = Object.keys(selection).length > 0
+    const activeNames = hasSelection ? allNames.filter((name) => selection[name] === true) : allNames
+    const series = data.map((pt) => {
+      const row: Record<string, number | string> = { time: formatTimeCompact(pt.time) }
+      const tables = pt.stick_tables || {}
+      for (const name of activeNames) {
+        row[name] = tables[name] ?? 0
+      }
+      return row
+    })
+    if (allNames.length === 0) return null
+    const legendH = estimateLegendHeight(allNames, cardWidths[title] || 600)
+    const chartHeight = 180 + legendH
+    return (
+      <div key={title} className="card p-4 space-y-2" data-chart-title={title}>
+        <h3 className="text-sm font-semibold text-slate-200">{title}</h3>
+        <ResponsiveContainer width="100%" height={chartHeight}>
+          <LineChart data={series}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+            <XAxis dataKey="time" tick={{ fontSize: 10 }} stroke="#94a3b8" />
+            <YAxis tick={{ fontSize: 10 }} stroke="#94a3b8" allowDecimals={false} domain={[0, 'auto']} />
+            <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155' }} />
+            <Legend
+              height={legendH}
+              content={() => (
+                <div className="flex flex-wrap justify-center gap-3 mt-1">
+                  {allNames.map((name, i) => (
+                    <span
+                      key={name}
+                      className={`cursor-pointer text-[11px] flex items-center gap-1 ${
+                        hasSelection && selection[name] !== true ? 'text-slate-600 line-through' : 'text-slate-300'
+                      }`}
+                      onClick={() => {
+                        setVisibleCodes((prev: Record<string, Record<string, boolean>>) => {
+                          const cur = prev[title] || {}
+                          if (cur[name] === true) {
+                            const next = { ...cur }
+                            delete next[name]
+                            const out = { ...prev }
+                            if (Object.keys(next).length) out[title] = next
+                            else delete out[title]
+                            return out
+                          }
+                          return { ...prev, [title]: { ...cur, [name]: true } }
+                        })
                       }}
                     >
                       <span className="inline-block w-2 h-2 rounded-full" style={{ background: PROXY_PALETTE[i % PROXY_PALETTE.length] }} />
@@ -519,8 +675,11 @@ export default function Metrics() {
             </div>
           )}
 
-          <h3 className="text-lg font-semibold text-slate-200">Process metrics</h3>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">{PROCESS_METRICS.map(renderChart)}</div>
+          <h3 className="text-lg font-semibold text-slate-200">{t('pages:metrics.systemMetrics')}</h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {PROCESS_METRICS.map(renderChart)}
+            {renderStickTableChart()}
+          </div>
 
           <h3 className="text-lg font-semibold text-slate-200">Per-proxy metrics</h3>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
