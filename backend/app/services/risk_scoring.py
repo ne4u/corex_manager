@@ -370,7 +370,7 @@ def _safe_log_value(value: str) -> str:
     return '"' + _LOG_VALUE_RE.sub("", str(value)) + '"'
 
 
-def emit_risk_scoring(listener: Any, db: Session, lines: List[str]) -> None:
+def emit_risk_scoring(listener: Any, db: Session, lines: List[str], guard: str = "") -> None:
     """Emit http-request lines for risk scoring on a listener.
 
     Three phases:
@@ -380,19 +380,32 @@ def emit_risk_scoring(listener: Any, db: Session, lines: List[str]) -> None:
 
     Called from generate_frontend after lua.req_fp_capture + geo set-vars,
     before security_rules.emit_security_rules.
+
+    ``guard`` is an optional HAProxy condition (e.g. ``"!is_pp_hasher"``)
+    appended to every emitted line so risk scoring can be skipped for
+    specific requests (e.g. internal Page Protect hasher requests that
+    bypass all security processing). When empty (default), behavior is
+    unchanged.
     """
     rules = rules_for_listener(db, listener.id)
+    guard_suffix = f" {guard}" if guard else ""
 
     # Phase 1: always emit risk_capture (even with 0 rules, so txn.risk_fp.*
     # vars are available to Security Rules that reference them).
     lines.append("    # Risk Scoring Phase 1: derive metadata fields (Lua)")
-    lines.append("    http-request lua.risk_capture")
+    if guard:
+        lines.append(f"    http-request lua.risk_capture if {guard}")
+    else:
+        lines.append("    http-request lua.risk_capture")
 
     if not rules:
         # Still emit risk_compute with an empty rules table so txn.risk.score
         # is set to "0" and txn.risk.rules_hit is set to "" (safe defaults).
         lines.append("    # Risk Scoring Phase 3: compute score (no rules configured)")
-        lines.append("    http-request lua.risk_compute")
+        if guard:
+            lines.append(f"    http-request lua.risk_compute if {guard}")
+        else:
+            lines.append("    http-request lua.risk_compute")
         return
 
     # Phase 2: per-rule match flags
@@ -414,12 +427,15 @@ def emit_risk_scoring(listener: Any, db: Session, lines: List[str]) -> None:
         # `{ { ... } }` is rejected by HAProxy ("missing fetch method in ACL
         # expression '{'"). Match the convention used by _emit_request_rule.
         lines.append(
-            f"    http-request set-var(txn.risk.match_{rule.id}) bool(1) if {condition}"
+            f"    http-request set-var(txn.risk.match_{rule.id}) bool(1) if {condition}{guard_suffix}"
         )
 
     # Phase 3: compute score
     lines.append("    # Risk Scoring Phase 3: compute score from match flags (Lua)")
-    lines.append("    http-request lua.risk_compute")
+    if guard:
+        lines.append(f"    http-request lua.risk_compute if {guard}")
+    else:
+        lines.append("    http-request lua.risk_compute")
 
 
 # ---------------------------------------------------------------------------

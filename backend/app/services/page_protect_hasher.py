@@ -23,6 +23,32 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
+def _hasher_headers() -> dict:
+    """Build browser-like request headers for the hasher.
+
+    The User-Agent stays as the non-browser coreX-Manager-PageProtect/2.0
+    string (so HAProxy can identify hasher requests), but every other header
+    mimics a modern browser to avoid being flagged by origin-side bot
+    detection. A secret internal bypass header is included so HAProxy can
+    skip logging, risk scoring, security rules, rate limiting, and WAF for
+    the hasher's local requests.
+    """
+    return {
+        "User-Agent": settings.PAGE_PROTECT_HASH_USER_AGENT,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Ch-Ua": '"Chromium";v="124", "Not:A-Brand";v="99"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"macOS"',
+        "Upgrade-Insecure-Requests": "1",
+        settings.PAGE_PROTECT_HASHER_BYPASS_HEADER: settings.PAGE_PROTECT_HASHER_BYPASS_TOKEN,
+    }
+
+
 def hash_script(script: PageProtectScript) -> Optional[str]:
     """Fetch a script URL and return the SHA-256 hash of its content, or None on error."""
     url = script.url
@@ -37,8 +63,9 @@ def hash_script(script: PageProtectScript) -> Optional[str]:
         resp = httpx.get(
             url,
             timeout=settings.PAGE_PROTECT_HASH_TIMEOUT_SECONDS,
-            headers={"User-Agent": settings.PAGE_PROTECT_HASH_USER_AGENT},
+            headers=_hasher_headers(),
             follow_redirects=True,
+            http2=True,
         )
         resp.raise_for_status()
         return hashlib.sha256(resp.content).hexdigest()

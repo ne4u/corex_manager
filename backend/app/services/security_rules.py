@@ -736,12 +736,18 @@ def emit_security_rules(listener: Any, db: Session, lines: List[str]) -> None:
 
     Lines are appended to the ``lines`` list. Called from ``generate_frontend``
     before rate-limit and WAF emission.
+
+    Challenge-action rules are skipped on force_https (non-SSL) listeners:
+    those listeners redirect all traffic to HTTPS, and serving the captcha
+    challenge over plaintext HTTP would set the _cv cookie without the Secure
+    flag. The challenge fires on the HTTPS listener after the redirect.
     """
     rules = rules_for_listener(db, listener.id)
     if not rules:
         return
 
     block_status = settings.SECURITY_RULES_BLOCK_STATUS if hasattr(settings, 'SECURITY_RULES_BLOCK_STATUS') else 403
+    force_https_redirect = getattr(listener, "force_https", False) and not getattr(listener, "ssl_enabled", False)
 
     for rule in rules:
         try:
@@ -754,6 +760,11 @@ def emit_security_rules(listener: Any, db: Session, lines: List[str]) -> None:
 
         # Skip actions are only valid for request-phase rules
         if phase == "response" and rule.action in _SKIP_ACTIONS:
+            continue
+
+        # Challenge actions are skipped on force_https listeners — the request
+        # is redirected to HTTPS where the challenge fires with a Secure cookie.
+        if force_https_redirect and rule.action == "challenge":
             continue
 
         if phase == "response":

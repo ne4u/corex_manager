@@ -1,3 +1,4 @@
+import secrets
 from typing import Optional
 
 from pydantic import field_validator
@@ -289,7 +290,13 @@ class Settings(BaseSettings):
     PAGE_PROTECT_SAMPLER_INTERVAL_SECONDS: int = 10
     PAGE_PROTECT_REPORT_BODY_MAX_BYTES: int = 16384
     PAGE_PROTECT_HASH_TIMEOUT_SECONDS: int = 10
-    PAGE_PROTECT_HASH_USER_AGENT: str = "HAProxy-Manager-PageProtect/1.0"
+    PAGE_PROTECT_HASH_USER_AGENT: str = "coreX-Manager-PageProtect/2.0"
+    # Internal bypass token sent by the Page Protect hasher in the
+    # PAGE_PROTECT_HASHER_BYPASS_HEADER so HAProxy can identify its local
+    # requests and skip logging, risk scoring, security rules, rate limiting,
+    # and WAF. When unset, a random token is generated once per process.
+    PAGE_PROTECT_HASHER_BYPASS_TOKEN: str = ""
+    PAGE_PROTECT_HASHER_BYPASS_HEADER: str = "X-CoreX-Internal"
     PAGE_PROTECT_DEFAULT_REPORT_PATH: str = "/_csp-report"
     PAGE_PROTECT_BEACON_JS_PATH: str = "/app/data/page-protect-beacon.js"
     # Beacon Trust — IP trust via Page Protect beacon + Server-Timing cxid
@@ -408,6 +415,16 @@ class Settings(BaseSettings):
                 "SECRET_KEY must be at least 32 bytes (UTF-8) for HS256 JWT security. "
                 'Generate one with: python -c "import secrets; print(secrets.token_urlsafe(32))"'
             )
+        return v
+
+    @field_validator("PAGE_PROTECT_HASHER_BYPASS_TOKEN")
+    @classmethod
+    def _validate_pp_hasher_bypass_token(cls, v: str) -> str:
+        # Generate a random token when unset so the hasher and HAProxy config
+        # generator (both read the same settings singleton) share a token
+        # within a process. Pin via env for stability across restarts.
+        if not v:
+            return secrets.token_hex(16)
         return v
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

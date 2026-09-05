@@ -2216,6 +2216,14 @@ def generate_frontend(
     rule_combined_acls: list = []  # list of (BackendRule, Backend, combined_acl_name)
 
     if effective_mode == "http":
+        # force_https (non-SSL) listeners exist solely to redirect HTTP traffic
+        # to HTTPS. Browser-facing features (Page Protect CSP reports, beacon
+        # JS/trust, captcha challenges) are skipped because this listener never
+        # serves HTML content to browsers — only 301 redirects (regular traffic)
+        # or Varnish fetch responses (internal cache fills). Those features fire
+        # on the HTTPS listener after the redirect.
+        force_https_redirect = listener.force_https and not listener.ssl_enabled
+
         # Standard reverse-proxy headers. X-Forwarded-Proto and Port are only
         # set when absent, so an internal Varnish re-fetch preserves the
         # original client scheme/port instead of overwriting it with the
@@ -2544,7 +2552,9 @@ def generate_frontend(
         # sampler reads HAProxy logs and extracts the csp_report field.
         # This runs early (before security rules/WAF) so report POSTs are never
         # blocked by security rules or rate limiting.
-        if page_protect_enabled:
+        # Skipped on force_https listeners — no HTML is served from a
+        # redirect-only listener, so no CSP violations originate here.
+        if page_protect_enabled and not force_https_redirect:
             report_path = _safe_token(page_protect_report_path) or "/_csp-report"
             lines.append(f"    acl is_csp_report path -m str {report_path}")
             lines.append("    http-request wait-for-body time 5s if is_csp_report")
@@ -2557,9 +2567,11 @@ def generate_frontend(
         # reads the Server-Timing cxid (beacon trust), then POSTs both to the
         # beacon endpoint. Asset tracking and beacon trust can be enabled
         # independently — the JS + endpoint are active if either is enabled.
+        # Skipped on force_https listeners — no HTML is served from a
+        # redirect-only listener, so no beacon JS is ever loaded by browsers.
         beacon = page_protect_beacon or {}
-        beacon_assets = page_protect_enabled and beacon.get("enabled")
-        beacon_trust = page_protect_enabled and beacon.get("trust_enabled")
+        beacon_assets = page_protect_enabled and beacon.get("enabled") and not force_https_redirect
+        beacon_trust = page_protect_enabled and beacon.get("trust_enabled") and not force_https_redirect
         if beacon_assets or beacon_trust:
             beacon_path = _safe_token(beacon.get("beacon_path") or "/_cx-assets")
             beacon_script_path = _safe_token(beacon.get("beacon_script_path") or "/_cx-assets.js")
@@ -2621,7 +2633,10 @@ def generate_frontend(
         # become nil: param_keys/param_types='nil', param_lens='0' when no
         # query params).
         api_armor_on_listener = api_armor_enabled and listener_options.get("api_armor", False)
-        if req_fp_enabled and req_fp_parse_body and not api_armor_on_listener:
+        # req_fp body buffering is skipped on force_https listeners —
+        # lua.req_fp_capture is also skipped (see below), so the buffered
+        # body would never be consumed.
+        if req_fp_enabled and req_fp_parse_body and not api_armor_on_listener and not force_https_redirect:
             lines.append('    acl is_req_fp_body req.hdr(content-type) -m beg application/json application/x-www-form-urlencoded')
             lines.append(f"    acl is_req_fp_body_oversize req.body_len gt {req_fp_max_body_bytes}")
             if req_fp_enforce_max_body:
@@ -2635,11 +2650,31 @@ def generate_frontend(
         # (lua.api_body_parse) runs AFTER req_fp_capture because it needs req_fp
         # subfields. Both run BEFORE security rules (so rules can reference
         # graphql.*/api.*/auth.*).
-        if api_armor_on_listener:
+        # Skipped on force_https listeners — req_fp_capture is skipped (see
+        # below), so api_body_parse would have no req_fp subfields to work
+        # with. API Armor fires on the HTTPS listener after the redirect.
+        if api_armor_on_listener and not force_https_redirect:
             lines.append('    acl is_api_armor req.hdr(content-type) -m beg application/json application/graphql application/x-www-form-urlencoded')
             lines.append(f"    http-request deny deny_status 413 if is_api_armor {{ req.body_len gt {api_armor_max_body_bytes} }}")
             lines.append("    http-request wait-for-body time 10s if is_api_armor")
             lines.append("    http-request set-var(txn.api_body) req.body if is_api_armor")
+
+        # GeoIP set-vars — txn.geo_country and txn.geoip_tz are consumed by
+        # lua.risk_capture (risk scoring) and may be referenced by future
+        # features. Emitted unconditionally (not gated by req_fp or
+        # force_https) so GeoIP-based security rules and logging work on all
+        # listeners. Security rules that reference ip.geoip.* use inline
+        # src,geoip2(...) fetches directly in their ACLs, so they don't depend
+        # on these vars — but the vars are here for risk scoring and any future
+        # consumers.
+        if _geoip_lua_module_available():
+            lines.append('    http-request set-var(txn.geo_country) src,lua.geoip2-lookup-city("country","iso_code")')
+            lines.append('    http-request set-var(txn.geoip_tz) src,lua.geoip2-lookup-city("location","time_zone")')
+        elif _haproxy_supports_geoip2():
+            geo_db = os.path.abspath(settings.GEOIP_DB_PATH)
+            if os.path.exists(geo_db):
+                lines.append(f'    http-request set-var(txn.geo_country) src,geoip2({geo_db},country.iso_code)')
+                lines.append(f'    http-request set-var(txn.geoip_tz) src,geoip2({geo_db},location.time_zone)')
 
         # HTTP request fingerprint (haproxy-req-fp Rust module) — single-phase
         # design: req_fp_capture builds the 15-field partial fingerprint in
@@ -2648,19 +2683,12 @@ def generate_frontend(
         # the Rust module being available (loaded via the combined modules.lua
         # loader). Body buffering (txn.api_body / txn.req_fp_body) must be
         # emitted ABOVE this line so the vars are populated when capture runs.
-        if req_fp_enabled and _req_fp_module_available():
-            # GeoIP set-vars for risk scoring (geo_lang_mismatch + timezone_mismatch).
-            # These must run BEFORE lua.req_fp_capture so txn.geo_country is
-            # available to lua.risk_capture (which runs after req_fp_capture).
-            if _geoip_lua_module_available():
-                lines.append('    http-request set-var(txn.geo_country) src,lua.geoip2-lookup-city("country","iso_code")')
-                lines.append('    http-request set-var(txn.geoip_tz) src,lua.geoip2-lookup-city("location","time_zone")')
-            elif _haproxy_supports_geoip2():
-                geo_db = os.path.abspath(settings.GEOIP_DB_PATH)
-                if os.path.exists(geo_db):
-                    lines.append(f'    http-request set-var(txn.geo_country) src,geoip2({geo_db},country.iso_code)')
-                    lines.append(f'    http-request set-var(txn.geoip_tz) src,geoip2({geo_db},location.time_zone)')
-
+        # Skipped on force_https listeners — the request is redirected to HTTPS
+        # where req_fp is captured properly. req_fp stays blank (empty txn var)
+        # and risk.score stays 0 (unset). Risk scoring, API Armor deeper
+        # analysis, and security rules referencing risk.*/req_fp.*/api.* fields
+        # fire on the HTTPS listener after the redirect.
+        if req_fp_enabled and _req_fp_module_available() and not force_https_redirect:
             # Request fingerprint (haproxy-req-fp Rust module) — two-phase
             # design: req_fp_capture builds the 15-field partial fingerprint
             # (txn.req_fp_partial) in the request phase. req_fp_response
@@ -2685,7 +2713,10 @@ def generate_frontend(
 
         # API Armor deeper analysis — runs AFTER req_fp_capture so req_fp
         # subfields are available for security rules.
-        if api_armor_on_listener:
+        # Skipped on force_https listeners — req_fp_capture is skipped above,
+        # so req_fp subfields are not available. API Armor fires on the HTTPS
+        # listener after the redirect.
+        if api_armor_on_listener and not force_https_redirect:
             lines.append("    http-request lua.api_body_parse if is_api_armor")
             lines.append("    http-request unset-var(txn.api_body) if is_api_armor")
 
@@ -2769,14 +2800,45 @@ def generate_frontend(
         if has_block_duration:
             lines.append("    http-request deny deny_status 429 default-errorfiles if { sc_get_gpc0(2) gt 0 } !{ var(txn.sec.skip_ratelimit) -m found }")
 
+        # Page Protect hasher bypass — internal agent requests (the hasher
+        # fetching scripts to detect code changes) skip logging, risk scoring,
+        # security rules, rate limiting, and WAF. Identified by BOTH the
+        # coreX-Manager-PageProtect/2.0 user-agent AND a secret token in a
+        # configurable header (default X-CoreX-Internal). The token is shared
+        # between the hasher (settings) and this ACL (same settings singleton),
+        # so they always match within a process. Pin via env for cross-restart
+        # stability. Always-on for every listener (matches the ACME/cap-proxy
+        # bypass precedent).
+        _pp_ua = _safe_token(settings.PAGE_PROTECT_HASH_USER_AGENT)
+        _pp_token = _safe_token(settings.PAGE_PROTECT_HASHER_BYPASS_TOKEN)
+        _pp_hdr = re.sub(r'[^A-Za-z0-9_-]', '', settings.PAGE_PROTECT_HASHER_BYPASS_HEADER or "X-CoreX-Internal") or "X-CoreX-Internal"
+        if _pp_ua and _pp_token:
+            lines.append(
+                f'    acl is_pp_hasher req.fhdr(user-agent) -m str "{_pp_ua}" req.hdr({_pp_hdr}) -m str "{_pp_token}"'
+            )
+            # Suppress the request log line for hasher requests.
+            lines.append("    http-request set-log-level silent if is_pp_hasher")
+            # Skip rate limiting and WAF (the rate-limit/WAF sections check
+            # these vars). Setting sec.done short-circuits further security
+            # rules (first-match-wins guard).
+            lines.append("    http-request set-var(txn.sec.skip_ratelimit) bool(1) if is_pp_hasher")
+            lines.append("    http-request set-var(txn.sec.skip_waf) bool(1) if is_pp_hasher")
+            lines.append("    http-request set-var(txn.sec.done) bool(1) if is_pp_hasher")
+
         # Risk Scoring — runs BEFORE Security Rules so risk.score /
         # risk.rules_hit / risk.rules_hit_count and per-ruleset vars
         # (risk.<slug>.score etc.) are available to Security Rule expressions.
         # Only emitted when req_fp is enabled (risk_capture reads txn.req_fp.*
-        # vars set by the Rust module).
-        if req_fp_enabled and _req_fp_module_available():
+        # vars set by the Rust module). Guarded with !is_pp_hasher so the
+        # hasher's local requests skip risk scoring entirely.
+        # Skipped on force_https listeners — req_fp_capture is skipped (no
+        # txn.req_fp.* vars), so risk_capture would have nothing to read.
+        # risk.score stays 0 (unset). Risk scoring fires on the HTTPS listener
+        # after the redirect.
+        if req_fp_enabled and _req_fp_module_available() and not force_https_redirect:
             from . import risk_scoring
-            risk_scoring.emit_risk_scoring(listener, db, lines)
+            _risk_guard = "!is_pp_hasher" if _pp_ua and _pp_token else ""
+            risk_scoring.emit_risk_scoring(listener, db, lines, guard=_risk_guard)
 
         # Security Rules — run BEFORE rate-limiting and WAF so skip flags take effect.
         # First-match-wins via txn.sec.done; sets txn.sec.skip_ratelimit / skip_waf.
@@ -2815,8 +2877,13 @@ def generate_frontend(
                 lines.append(f"    http-request set-var(txn.rate_limit_window) str({rl_window})")
                 lines.append(f"    http-request set-var(txn.rate_limit_duration) str({rl_duration})")
                 if rl_action == "challenge":
-                    from ..services.settings import get_setting as _gs
-                    _emit_challenge_redirect(lines, f"{rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}", settings.CAPTCHA_CHALLENGE_URL, rl.id, "rate_limit", rl.name)
+                    # Skip challenge on force_https listeners — redirect to
+                    # HTTPS where the challenge fires with a Secure cookie.
+                    if listener.force_https and not listener.ssl_enabled:
+                        pass
+                    else:
+                        from ..services.settings import get_setting as _gs
+                        _emit_challenge_redirect(lines, f"{rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}", settings.CAPTCHA_CHALLENGE_URL, rl.id, "rate_limit", rl.name)
                 else:
                     lines.append(f"    http-request deny deny_status {rl_status} default-errorfiles if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}")
                 if rl_duration > 0:
@@ -2834,7 +2901,12 @@ def generate_frontend(
                 lines.append(f"    http-request set-var(txn.rate_limit_window) str({rl_window})")
                 lines.append(f"    http-request set-var(txn.rate_limit_duration) str({rl_duration})")
                 if rl_action == "challenge":
-                    _emit_challenge_redirect(lines, f"{rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}", settings.CAPTCHA_CHALLENGE_URL, rl.id, "rate_limit", rl.name)
+                    # Skip challenge on force_https listeners — redirect to
+                    # HTTPS where the challenge fires with a Secure cookie.
+                    if listener.force_https and not listener.ssl_enabled:
+                        pass
+                    else:
+                        _emit_challenge_redirect(lines, f"{rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}", settings.CAPTCHA_CHALLENGE_URL, rl.id, "rate_limit", rl.name)
                 else:
                     lines.append(f"    http-request deny deny_status {rl_status} default-errorfiles if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}")
                 if rl_duration > 0:
@@ -2950,9 +3022,16 @@ def generate_frontend(
                         lines.append(f"    http-response set-var(txn.status_source) str(haproxy) if {{ var(txn.coraza.action) -m str deny }} !{{ var(txn.sec.skip_waf) -m found }}")
                         lines.append(f"    http-response deny deny_status {status} default-errorfiles if {{ var(txn.coraza.action) -m str deny }} !{{ var(txn.sec.skip_waf) -m found }}")
                 elif action == "challenge":
-                    challenge_url = _safe_token(redirect_url or settings.CAPTCHA_CHALLENGE_URL)
-                    waf_cond = "{ var(txn.coraza.action) -m str deny } !{ var(txn.sec.skip_waf) -m found }"
-                    _emit_challenge_redirect(lines, waf_cond, challenge_url, primary.id, "waf", primary.name)
+                    # Skip challenge on force_https listeners — the request is
+                    # redirected to HTTPS where the challenge fires with a
+                    # Secure cookie. Serving the captcha over plaintext HTTP
+                    # would set the _cv cookie without the Secure flag.
+                    if listener.force_https and not listener.ssl_enabled:
+                        pass
+                    else:
+                        challenge_url = _safe_token(redirect_url or settings.CAPTCHA_CHALLENGE_URL)
+                        waf_cond = "{ var(txn.coraza.action) -m str deny } !{ var(txn.sec.skip_waf) -m found }"
+                        _emit_challenge_redirect(lines, waf_cond, challenge_url, primary.id, "waf", primary.name)
                 else:  # block
                     lines.append(f"    http-request deny deny_status {status} default-errorfiles if {{ var(txn.coraza.action) -m str deny }} !{{ var(txn.sec.skip_waf) -m found }}")
                     lines.append(f"    http-response set-var(txn.status_source) str(haproxy) if {{ var(txn.coraza.action) -m str deny }} !{{ var(txn.sec.skip_waf) -m found }}")
@@ -3744,9 +3823,16 @@ def _listener_has_challenge_action(db: Session, listener_id: int) -> bool:
     """Return True if any enabled rule on this listener uses action=challenge.
 
     Checks WAF rules, security rules, and rate limits.
+
+    force_https (non-SSL) listeners redirect all traffic to HTTPS — challenge
+    actions would serve the captcha over plaintext HTTP with an insecure cookie,
+    so they are never emitted on these listeners. The challenge fires on the
+    HTTPS listener after the redirect.
     """
     from . import coraza_config, security_rules
     listener = db.query(Listener).filter(Listener.id == listener_id).first()
+    if listener and listener.force_https and not listener.ssl_enabled:
+        return False
     # WAF rules
     for rule in coraza_config.rules_for_listener(db, listener_id):
         if rule.enabled and _safe_token(getattr(rule, "action", "")) == "challenge":
