@@ -116,6 +116,43 @@ def is_page_protect_enabled(db: Session) -> bool:
     return str(val).lower() in ("true", "1", "yes")
 
 
+def resolve_pp_hasher_token(db: Session) -> str:
+    """Resolve the Page Protect hasher bypass token so it's stable across restarts.
+
+    Precedence:
+    1. ``PAGE_PROTECT_HASHER_BYPASS_TOKEN`` env var (explicit operator config).
+    2. ``pp_hasher_bypass_token`` DB setting (auto-generated on first boot).
+    3. Generate a random token and persist it to the DB.
+
+    The resolved value is written back to the ``settings`` singleton so that
+    ``haproxy.generate_config`` and ``page_protect_hasher._hasher_headers``
+    (both read the same singleton) use the same token within the process.
+
+    Without this, a new random token was generated on every restart (via the
+    Pydantic validator), causing the HAProxy config to differ from the
+    ``.applied`` snapshot and triggering a spurious "pending changes" banner.
+    """
+    import secrets as _secrets
+
+    # 1. Env var takes precedence
+    token = settings.PAGE_PROTECT_HASHER_BYPASS_TOKEN
+    if token:
+        return token
+
+    # 2. Check DB
+    token = get_setting(db, "pp_hasher_bypass_token", "")
+    if token:
+        settings.PAGE_PROTECT_HASHER_BYPASS_TOKEN = token
+        return token
+
+    # 3. Generate and persist
+    token = _secrets.token_hex(16)
+    set_setting(db, "pp_hasher_bypass_token", token)
+    settings.PAGE_PROTECT_HASHER_BYPASS_TOKEN = token
+    logger.info("Generated and persisted pp_hasher_bypass_token (stable across restarts)")
+    return token
+
+
 def is_page_protect_hashing_enabled(db: Session) -> bool:
     """Check the page_protect_change_detection_enabled setting."""
     val = get_setting(db, "page_protect_change_detection_enabled", str(_DEFAULTS["change_detection_enabled"]))

@@ -46,6 +46,12 @@ async def lifespan(app: FastAPI):
     from .services.certificates import migrate_cert_bundles
     db = SessionLocal()
     try:
+        # Resolve the Page Protect hasher bypass token early — before any
+        # config generation or hasher startup. This ensures the token is
+        # stable across restarts (persisted to DB) so the HAProxy config
+        # doesn't differ from the .applied snapshot on every restart.
+        from .services.page_protect import resolve_pp_hasher_token
+        resolve_pp_hasher_token(db)
         coraza_config.write_coraza_spoa_config(db)
         migrate_cert_bundles(db)
         # Regenerate the Varnish VCL on every startup. The VCL lives on the

@@ -492,11 +492,9 @@ class Settings(BaseSettings):
     @field_validator("PAGE_PROTECT_HASHER_BYPASS_TOKEN")
     @classmethod
     def _validate_pp_hasher_bypass_token(cls, v: str) -> str:
-        # Generate a random token when unset so the hasher and HAProxy config
-        # generator (both read the same settings singleton) share a token
-        # within a process. Pin via env for stability across restarts.
-        if not v:
-            return secrets.token_hex(16)
+        # The token is resolved at startup: env var takes precedence, then
+        # the DB-persisted value, then a random value is generated and
+        # persisted. See resolve_pp_hasher_token() in main.py.
         return v
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
