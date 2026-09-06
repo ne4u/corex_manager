@@ -2500,7 +2500,8 @@
       "features": "機能フラグ",
       "snapshots": "スナップショット",
       "tables": "スティックテーブル",
-      "valkey": "Valkey"
+      "valkey": "Valkey",
+      "ha": "高可用性"
     }
   },
   "mcpGateway": {
@@ -3110,5 +3111,45 @@
     "databases": "データベース",
     "unavailable": "Valkey は利用できません。",
     "actions": "アクション"
+  },
+  "systemHa": {
+    "title": "高可用性",
+    "disabled": "HAは有効ではありません。",
+    "disabledHint": ".envでHA_ENABLED=trueを設定し、HAオーバーライドで再デプロイしてください。",
+    "autoRefresh": "自動更新",
+    "apply": "設定を適用",
+    "applySuccess": "すべてのインスタンスに設定を適用しました。",
+    "applyFailed": "1つ以上のインスタンスで設定の適用に失敗しました。",
+    "configSaved": "HA設定を保存しました。",
+    "haproxyInstances": "HAProxyインスタンス",
+    "valkeyNodes": "Valkeyノード",
+    "corazaInstances": "Coraza SPOAインスタンス",
+    "noInstances": "HAProxyインスタンスが設定されていません。",
+    "noValkeyNodes": "Valkeyノードが見つかりません。",
+    "noCorazaInstances": "Corazaインスタンスが見つかりません。",
+    "connections": "接続",
+    "configEditor": "設定",
+    "topology": "トポロジー",
+    "peerPort": "ピアポート",
+    "haproxyReplicas": "HAProxyレプリカ",
+    "valkeyReplicas": "Valkeyレプリカ",
+    "corazaReplicas": "Corazaレプリカ",
+    "sentinelEnabled": "Valkey Sentinelを有効化",
+    "sentinelService": "Sentinelサービス名",
+    "sentinelHosts": "Sentinelホスト",
+    "instanceEditor": "HAProxyインスタンス",
+    "keepalived": "Keepalived",
+    "vip": "仮想IP (VIP)",
+    "interface": "インターフェース",
+    "vrid": "仮想ルーターID",
+    "priority": "優先度",
+    "advertInt": "広告間隔 (秒)",
+    "authPassword": "認証パスワード",
+    "peerAddresses": "ピアアドレス",
+    "trackScript": "トラックスクリプト",
+    "preempt": "プリエンプト",
+    "swarmMode": "Swarmモード",
+    "swarmVip": "Swarm VIP",
+    "swarmModeHint": "Swarmモードではkeepalivedは使用されません — Swarm ingressメッシュがVIPとフェイルオーバーを提供します。"
   }
 }

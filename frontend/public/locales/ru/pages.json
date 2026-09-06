@@ -2500,7 +2500,8 @@
       "features": "Функции",
       "snapshots": "Снимки",
       "tables": "Stick-таблицы",
-      "valkey": "Valkey"
+      "valkey": "Valkey",
+      "ha": "Высокая доступность"
     }
   },
   "mcpGateway": {
@@ -3110,5 +3111,45 @@
     "databases": "Базы данных",
     "unavailable": "Valkey недоступен.",
     "actions": "Действия"
+  },
+  "systemHa": {
+    "title": "Высокая доступность",
+    "disabled": "HA не включён.",
+    "disabledHint": "Установите HA_ENABLED=true в .env и передеплойте с HA override.",
+    "autoRefresh": "Авто-обновление",
+    "apply": "Применить конфиг",
+    "applySuccess": "Конфигурация применена ко всем экземплярам.",
+    "applyFailed": "Ошибка применения конфигурации на одном или нескольких экземплярах.",
+    "configSaved": "HA конфигурация сохранена.",
+    "haproxyInstances": "Экземпляры HAProxy",
+    "valkeyNodes": "Узлы Valkey",
+    "corazaInstances": "Экземпляры Coraza SPOA",
+    "noInstances": "Экземпляры HAProxy не настроены.",
+    "noValkeyNodes": "Узлы Valkey не найдены.",
+    "noCorazaInstances": "Экземпляры Coraza не найдены.",
+    "connections": "Соединения",
+    "configEditor": "Конфигурация",
+    "topology": "Топология",
+    "peerPort": "Порт Peer",
+    "haproxyReplicas": "Реплики HAProxy",
+    "valkeyReplicas": "Реплики Valkey",
+    "corazaReplicas": "Реплики Coraza",
+    "sentinelEnabled": "Включить Valkey Sentinel",
+    "sentinelService": "Имя службы Sentinel",
+    "sentinelHosts": "Хосты Sentinel",
+    "instanceEditor": "Экземпляры HAProxy",
+    "keepalived": "Keepalived",
+    "vip": "Виртуальный IP (VIP)",
+    "interface": "Интерфейс",
+    "vrid": "ID виртуального маршрутизатора",
+    "priority": "Приоритет",
+    "advertInt": "Интервал рекламы (с)",
+    "authPassword": "Пароль аутентификации",
+    "peerAddresses": "Адреса Peer",
+    "trackScript": "Скрипт отслеживания",
+    "preempt": "Preempt",
+    "swarmMode": "Режим Swarm",
+    "swarmVip": "Swarm VIP",
+    "swarmModeHint": "Keepalived не используется в режиме Swarm — mesh-сеть ingress Swarm обеспечивает VIP и отказоустойчивость."
   }
 }

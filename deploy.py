@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Deploy coreX Manager to a remote Docker host or Kubernetes cluster.
+"""Deploy coreX Manager to a remote Docker host, Docker Swarm, or Kubernetes cluster.
 
-Supports three deployment targets:
+Supports four deployment targets:
 
   docker      (default): rsync + docker compose build/up on a remote host
+  swarm:                rsync + build images + docker stack deploy on a Swarm cluster
   k8s-remote: rsync + build images on remote + load into k8s + helm upgrade
   k8s-cluster: build images locally + load into local cluster + helm upgrade
 
@@ -14,6 +15,8 @@ changed are rebuilt/restarted.
 Usage:
     python3 deploy.py
     python3 deploy.py --host 1.2.3.4 --user admin --remote-path /opt/corex_manager
+    python3 deploy.py --target swarm --host 1.2.3.4 --user admin --stack-name corex
+    python3 deploy.py --target swarm --host 1.2.3.4 --registry registry.example.com
     python3 deploy.py --target k8s-remote --host 1.2.3.4 --user admin
     python3 deploy.py --target k8s-cluster --release-name corex --namespace corex
     python3 deploy.py --dry-run
@@ -26,6 +29,12 @@ Requirements (local):
 Remote requirements (docker target):
     docker with compose plugin, user able to run `docker` either directly or
     via passwordless/sudo access.
+
+Remote requirements (swarm target):
+    docker with Swarm mode initialized (`docker swarm init`), user able to
+    run `docker` either directly or via passwordless/sudo access. For multi-
+    node Swarm, images must be in a registry (use --registry) or loaded on
+    every node.
 
 Remote requirements (k8s-remote target):
     docker (for building images), helm, kubectl, and a running k8s cluster
@@ -167,7 +176,7 @@ BUILDABLE_SERVICES = {"api", "corex", "frontend"}
 # and could never appear in the change set) and the remote copy is seeded once
 # from .env.example and then owned by the host. Edit the remote .env by hand and
 # use --force-rebuild to pick it up.
-FULL_REDEPLOY_PATHS = {"docker-compose.yml", ".env.example"}
+FULL_REDEPLOY_PATHS = {"docker-compose.yml", "docker-compose.ha.yml", ".env.example"}
 
 
 # ---------------------------------------------------------------------------
@@ -190,6 +199,31 @@ K8S_IMAGE_NAMES = {
     "corex": "corex-corex",
     "frontend": "corex-frontend",
 }
+
+
+# ---------------------------------------------------------------------------
+# Docker Swarm deployment constants
+# ---------------------------------------------------------------------------
+
+SWARM_STACK_FILE = "docker-swarm.yml"
+
+# Maps Docker Compose service names to Swarm image names (used for docker build).
+# These match the defaults in docker-swarm.yml (${SWARM_*_IMAGE}).
+SWARM_IMAGE_NAMES = {
+    "api": "corex-api",
+    "corex": "corex-haproxy",
+    "frontend": "corex-frontend",
+}
+
+# Additional Swarm services that have Dockerfiles but aren't in BUILDABLE_SERVICES
+# (mcp-gateway, mcp-server are optional and built on demand).
+SWARM_OPTIONAL_IMAGE_NAMES = {
+    "mcp-gateway": "corex-mcp-gateway",
+    "mcp-server": "corex-mcp-server",
+}
+
+# Files that trigger a full redeploy in Swarm mode.
+SWARM_FULL_REDEPLOY_PATHS = {"docker-swarm.yml", ".env.example"}
 
 
 # ---------------------------------------------------------------------------
@@ -359,6 +393,77 @@ def _compute_file_hashes(root: Path, excludes: list[str]) -> dict[str, str]:
             # Skip files we can't read (socket, broken symlink, etc.)
             continue
     return hashes
+
+
+# ---------------------------------------------------------------------------
+# HA (High Availability) detection helpers
+# ---------------------------------------------------------------------------
+
+def _detect_ha_enabled(
+    host: str, user: str, ssh_password: str, remote_path: str
+) -> bool:
+    """Check if HA is enabled on the remote host by sourcing .env.
+
+    Returns True only if HA_ENABLED=true (case-insensitive) is set in the
+    remote .env file. Returns False if the file doesn't exist, the variable
+    is unset, or it's set to anything other than true.
+    """
+    rc, out = _ssh_capture(
+        host, user,
+        f"cd {shlex.quote(remote_path)} && "
+        f"set -a && . ./.env 2>/dev/null && set +a && "
+        f'echo "${{HA_ENABLED:-false}}"',
+        ssh_password,
+    )
+    if rc != 0:
+        return False
+    val = out.strip().lower()
+    return val in ("true", "1", "yes")
+
+
+def _compose_cmd(ha_enabled: bool, *args: str) -> str:
+    """Build a docker compose command, including the HA override when enabled.
+
+    When HA is disabled, returns a plain ``docker compose ...`` command
+    (preserving the original behavior). When HA is enabled, returns
+    ``docker compose -f docker-compose.yml -f docker-compose.ha.yml ...``.
+    """
+    if ha_enabled:
+        return "docker compose -f docker-compose.yml -f docker-compose.ha.yml " + " ".join(args)
+    return "docker compose " + " ".join(args)
+
+
+def _detect_ha_state_change(
+    ha_enabled: bool, remote_manifest: dict | None
+) -> str:
+    """Detect HA state transitions.
+
+    Returns one of:
+    - "enabling": HA was off, now on (first enable — migration needed)
+    - "disabling": HA was on, now off (disable — cleanup needed)
+    - "steady": HA state unchanged
+    - "unknown": no manifest to compare against
+    """
+    if remote_manifest is None:
+        return "unknown"
+    prev_ha = remote_manifest.get("ha_enabled", False)
+    if ha_enabled and not prev_ha:
+        return "enabling"
+    if not ha_enabled and prev_ha:
+        return "disabling"
+    return "steady"
+
+
+# HA counterpart services — when HA is enabled and a base service is rebuilt,
+# the corresponding HA service should also be rebuilt.
+_HA_COUNTERPARTS: dict[str, list[str]] = {
+    "corex": ["corex2"],
+    "coraza-spoa": ["coraza-spoa2"],
+    "coraza-spoa-init": [],  # shared init, no counterpart
+}
+
+# HA-specific data directories to create when HA is enabled
+_HA_DATA_DIRS = ["haproxy2", "valkey-replica", "valkey-sentinel"]
 
 
 def _detect_changed_files(
@@ -705,6 +810,16 @@ def _deploy_docker(args: argparse.Namespace) -> int:
             print("Docker uses sudo (passwordless).")
 
     # ------------------------------------------------------------------
+    # HA (High Availability) detection
+    # ------------------------------------------------------------------
+    ha_enabled = _detect_ha_enabled(host, user, ssh_password, remote_path)
+    if ha_enabled:
+        print("\nHA mode: ENABLED (using docker-compose.ha.yml override)")
+        print(f"  Compose command: {_compose_cmd(True, '<action>')}")
+    else:
+        print("\nHA mode: disabled (single-instance)")
+
+    # ------------------------------------------------------------------
     # Change detection
     # ------------------------------------------------------------------
     print("\nComputing local file hashes...")
@@ -713,6 +828,15 @@ def _deploy_docker(args: argparse.Namespace) -> int:
 
     print("Downloading remote manifest...")
     remote_manifest = _download_manifest(host, user, ssh_password, sudo_prefix, remote_path)
+
+    # Now that we have the manifest, detect HA state transitions
+    ha_state = _detect_ha_state_change(ha_enabled, remote_manifest) if remote_manifest else "unknown"
+    if ha_state == "enabling":
+        print("  ⚠ Migration: enabling HA for the first time — HA services will start.")
+        print("    Ensure KEEPALIVED_VIP, KEEPALIVED_AUTH_PASSWORD, and HAPROXY_INSTANCES are set in .env.")
+    elif ha_state == "disabling":
+        print("  ⚠ Migration: disabling HA — HA services will be stopped/removed.")
+        print("    HA-specific data directories will remain on disk for manual cleanup.")
 
     if remote_manifest is None:
         print("  No manifest found — will do full deploy.")
@@ -763,6 +887,17 @@ def _deploy_docker(args: argparse.Namespace) -> int:
             # Force-rebuild supersedes restart for the same service
             services_to_restart -= services_to_rebuild
 
+    # When HA is enabled, expand rebuild sets to include HA counterpart services.
+    # E.g., rebuilding "corex" should also rebuild "corex2".
+    if ha_enabled:
+        ha_additions: set[str] = set()
+        for svc in services_to_rebuild:
+            for counterpart in _HA_COUNTERPARTS.get(svc, []):
+                ha_additions.add(counterpart)
+        if ha_additions:
+            services_to_rebuild |= ha_additions
+            print(f"\n  HA counterparts added to rebuild: {', '.join(sorted(ha_additions))}")
+
     # Print deploy plan
     _print_deploy_plan(
         services_to_rebuild, services_to_restart, full_redeploy, all_changes, args.force_rebuild
@@ -794,6 +929,9 @@ def _deploy_docker(args: argparse.Namespace) -> int:
     # owned by root). We source the remote .env so DATA_DIR matches what docker
     # compose will actually use.
     print("\nEnsuring data directories exist on remote...")
+    ha_dirs_cmd = ""
+    if ha_enabled:
+        ha_dirs_cmd = " ".join(f'"$DATA_DIR/{d}"' for d in _HA_DATA_DIRS)
     _ssh_cmd(
         host,
         user,
@@ -801,7 +939,8 @@ def _deploy_docker(args: argparse.Namespace) -> int:
         f"set -a && . ./.env && set +a && "
         f"DATA_DIR=${{DATA_DIR:-./data}} && "
         f"mkdir -p \"$DATA_DIR/haproxy\" \"$DATA_DIR/postgres\" "
-        f"\"$DATA_DIR/valkey\" \"$DATA_DIR/varnish\" \"$DATA_DIR/certs\"",
+        f"\"$DATA_DIR/valkey\" \"$DATA_DIR/varnish\" \"$DATA_DIR/certs\""
+        + (f" {ha_dirs_cmd}" if ha_dirs_cmd else ""),
         ssh_password,
     )
 
@@ -819,15 +958,15 @@ def _deploy_docker(args: argparse.Namespace) -> int:
         print("\nFull redeploy — building and starting all services...")
         rc = _remote_docker(
             host, user, ssh_password, sudo_prefix, remote_path,
-            "docker compose build",
-            "docker compose up -d",
+            _compose_cmd(ha_enabled, "build"),
+            _compose_cmd(ha_enabled, "up -d"),
         )
     elif not services_to_rebuild and not services_to_restart:
         # No changes — ensure all containers are running (no build)
         print("\nNo changes — ensuring all services are running...")
         rc = _remote_docker(
             host, user, ssh_password, sudo_prefix, remote_path,
-            "docker compose up -d",
+            _compose_cmd(ha_enabled, "up -d"),
         )
     elif services_to_rebuild:
         # Rebuild changed services (with layer cache, no --no-cache)
@@ -835,8 +974,8 @@ def _deploy_docker(args: argparse.Namespace) -> int:
         print(f"\nBuilding services: {build_targets}...")
         rc = _remote_docker(
             host, user, ssh_password, sudo_prefix, remote_path,
-            f"docker compose build {build_targets}",
-            f"docker compose up -d --no-deps {build_targets}",
+            _compose_cmd(ha_enabled, f"build {build_targets}"),
+            _compose_cmd(ha_enabled, f"up -d --no-deps {build_targets}"),
         )
         # Restart services that only need a restart (e.g., backend/app/ changes)
         if rc == 0 and services_to_restart:
@@ -844,7 +983,7 @@ def _deploy_docker(args: argparse.Namespace) -> int:
             print(f"\nRestarting services: {restart_targets}...")
             rc = _remote_docker(
                 host, user, ssh_password, sudo_prefix, remote_path,
-                f"docker compose restart {restart_targets}",
+                _compose_cmd(ha_enabled, f"restart {restart_targets}"),
             )
     else:
         # Only restarts needed (e.g., backend/app/ changes or coraza-spoa config)
@@ -852,7 +991,7 @@ def _deploy_docker(args: argparse.Namespace) -> int:
         print(f"\nRestarting services: {restart_targets}...")
         rc = _remote_docker(
             host, user, ssh_password, sudo_prefix, remote_path,
-            f"docker compose restart {restart_targets}",
+            _compose_cmd(ha_enabled, f"restart {restart_targets}"),
         )
 
     # Handle coraza-spoa special case: force-recreate init, then restart spoa
@@ -860,8 +999,8 @@ def _deploy_docker(args: argparse.Namespace) -> int:
         print("\nRecreating coraza-spoa-init and restarting coraza-spoa...")
         rc = _remote_docker(
             host, user, ssh_password, sudo_prefix, remote_path,
-            "docker compose up -d --force-recreate coraza-spoa-init",
-            "docker compose restart coraza-spoa",
+            _compose_cmd(ha_enabled, "up -d --force-recreate coraza-spoa-init"),
+            _compose_cmd(ha_enabled, "restart coraza-spoa"),
         )
 
     if rc != 0:
@@ -875,6 +1014,7 @@ def _deploy_docker(args: argparse.Namespace) -> int:
     manifest = {
         "deployed_at": datetime.now(timezone.utc).isoformat(),
         "files": local_hashes,
+        "ha_enabled": ha_enabled,
     }
     _upload_manifest(host, user, ssh_password, sudo_prefix, remote_path, manifest)
 
@@ -885,9 +1025,338 @@ def _deploy_docker(args: argparse.Namespace) -> int:
     print(f"  HAProxy:          http://{host}:80 / https://{host}:443")
     print(f"  Stats:            http://{host}:8404")
     print(f"  Captcha:          http://{host}:3001")
+    if ha_enabled:
+        print(f"  HAProxy (corex2): http://{host}:8081 / https://{host}:8444")
+        print(f"  HA VIP:           configured via KEEPALIVED_VIP in .env")
+        print(f"  HA Health API:    https://{host}:8000/api/v1/ha/health")
     print(f"\n  Note: The backend API now serves over HTTPS with a self-signed")
     print(f"  certificate. Direct API access requires -k (insecure) with curl.")
     print(f"  The frontend nginx proxies API requests over HTTPS internally.")
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# Docker Swarm deploy flow
+# ---------------------------------------------------------------------------
+
+def _detect_swarm_active(host: str, user: str, ssh_password: str) -> bool:
+    """Check if Docker Swarm is active on the remote host."""
+    rc, out = _ssh_capture(
+        host, user,
+        "docker info --format '{{.Swarm.LocalNodeState}}' 2>/dev/null",
+        ssh_password,
+    )
+    if rc != 0:
+        return False
+    return out.strip().lower() == "active"
+
+
+def _stack_cmd(stack_name: str, *args: str) -> str:
+    """Build a docker stack deploy command."""
+    return f"docker stack deploy -c {SWARM_STACK_FILE} {stack_name} " + " ".join(args)
+
+
+def _deploy_swarm(args: argparse.Namespace) -> int:
+    """Docker Swarm deploy flow — rsync + build images + docker stack deploy.
+
+    Requires Docker Swarm to be initialized on the remote host
+    (``docker swarm init`` or ``docker swarm join``).
+    """
+    _require("sshpass")
+    _require("rsync")
+    _require("ssh")
+
+    host, user, ssh_password, sudo_password, remote_path = _prompt(args)
+
+    stack_name = args.stack_name
+
+    if not args.yes:
+        print(f"\nWill deploy {PROJECT_ROOT} -> {user}@{host}:{remote_path}")
+        print(f"  Swarm stack: {stack_name}")
+        if args.dry_run:
+            print("(dry-run mode — no changes will be made)")
+        answer = input("Continue? [y/N]: ").strip().lower()
+        if answer not in ("y", "yes"):
+            print("Aborted.")
+            return 0
+
+    print("\nChecking remote host...")
+    rc = _ssh_cmd(host, user, f"mkdir -p {shlex.quote(remote_path)}", ssh_password)
+    if rc != 0:
+        print("Error: could not connect or create remote path.", file=sys.stderr)
+        return 1
+
+    print("Checking docker access on remote host...")
+    sudo_prefix = _detect_sudo(host, user, ssh_password, sudo_password)
+    if sudo_prefix is None:
+        return 1
+    if sudo_prefix:
+        if "SUDO_PW" in sudo_prefix:
+            print("Docker requires sudo; password will be sent to remote sudo.")
+        else:
+            print("Docker uses sudo (passwordless).")
+
+    print("Checking Docker Swarm status...")
+    if not _detect_swarm_active(host, user, ssh_password):
+        print("Error: Docker Swarm is not active on the remote host.", file=sys.stderr)
+        print("  Run 'docker swarm init' on the remote host first.", file=sys.stderr)
+        print("  For multi-node, join additional nodes with 'docker swarm join'.", file=sys.stderr)
+        return 1
+    print("  Swarm is active.")
+
+    # ------------------------------------------------------------------
+    # HA detection
+    # ------------------------------------------------------------------
+    ha_enabled = _detect_ha_enabled(host, user, ssh_password, remote_path)
+    if ha_enabled:
+        print(f"\nHA mode: ENABLED (Swarm replicas + ingress mesh VIP)")
+        print(f"  HAProxy replicas: 2 (Swarm ingress mesh provides VIP)")
+        print(f"  Coraza replicas: 2 (load-balanced by HAProxy)")
+        print(f"  Valkey: primary + replica + 3 Sentinels")
+        print(f"  No keepalived (Swarm mesh handles failover)")
+    else:
+        print("\nHA mode: disabled (single-instance)")
+
+    # ------------------------------------------------------------------
+    # Change detection (reuse the same hash/manifest logic)
+    # ------------------------------------------------------------------
+    print("\nComputing local file hashes...")
+    local_hashes = _compute_file_hashes(PROJECT_ROOT, RSYNC_EXCLUDES)
+    print(f"  {len(local_hashes)} files hashed.")
+
+    print("Downloading remote manifest...")
+    remote_manifest = _download_manifest(host, user, ssh_password, sudo_prefix, remote_path)
+
+    if remote_manifest is None:
+        print("  No manifest found — will do full deploy.")
+        services_to_rebuild = set(BUILDABLE_SERVICES)
+        services_to_restart: set[str] = set()
+        full_redeploy = True
+        all_changes: set[str] = set()
+    else:
+        deployed_at = remote_manifest.get("deployed_at", "unknown")
+        print(f"  Last deploy: {deployed_at}")
+
+        changed, added, deleted = _detect_changed_files(local_hashes, remote_manifest)
+        all_changes = changed | added | deleted
+
+        if added:
+            print(f"  Added: {len(added)} files")
+        if changed:
+            print(f"  Changed: {len(changed)} files")
+        if deleted:
+            print(f"  Deleted: {len(deleted)} files")
+
+        # Check for full-redeploy triggers (Swarm-specific)
+        full_redeploy = any(p in all_changes for p in SWARM_FULL_REDEPLOY_PATHS)
+
+        if full_redeploy:
+            print("  Swarm stack/env file changed — full redeploy.")
+            services_to_rebuild = set(BUILDABLE_SERVICES)
+            services_to_restart = set()
+        elif not all_changes:
+            print("  No changes detected.")
+            services_to_rebuild = set()
+            services_to_restart = set()
+        else:
+            services_to_rebuild, services_to_restart = _map_files_to_services(all_changes)
+
+    # Apply --force-rebuild overrides
+    if args.force_rebuild:
+        if "all" in args.force_rebuild:
+            services_to_rebuild = set(BUILDABLE_SERVICES)
+            print("\n  --force-rebuild all: forcing rebuild of all buildable services.")
+        else:
+            for svc in args.force_rebuild:
+                if svc in BUILDABLE_SERVICES:
+                    services_to_rebuild.add(svc)
+                    print(f"\n  --force-rebuild {svc}: forcing rebuild.")
+                else:
+                    print(f"\n  Warning: '{svc}' is not a buildable service (ignored).", file=sys.stderr)
+            services_to_restart -= services_to_rebuild
+
+    # Print deploy plan
+    _print_deploy_plan(
+        services_to_rebuild, services_to_restart, full_redeploy, all_changes, args.force_rebuild
+    )
+
+    if args.dry_run:
+        print("\n--dry-run: no changes made.")
+        return 0
+
+    if not args.yes:
+        answer = input("\nProceed with deploy? [y/N]: ").strip().lower()
+        if answer not in ("y", "yes"):
+            print("Aborted.")
+            return 0
+
+    # ------------------------------------------------------------------
+    # Rsync
+    # ------------------------------------------------------------------
+    if _rsync(host, user, remote_path, ssh_password) != 0:
+        print("Error: rsync failed.", file=sys.stderr)
+        return 1
+
+    # Ensure data directories exist on remote
+    print("\nEnsuring data directories exist on remote...")
+    ha_dirs_cmd = ""
+    if ha_enabled:
+        ha_dirs_cmd = " ".join(f'"$DATA_DIR/{d}"' for d in _HA_DATA_DIRS)
+    _ssh_cmd(
+        host,
+        user,
+        f"cd {shlex.quote(remote_path)} && "
+        f"set -a && . ./.env && set +a && "
+        f"DATA_DIR=${{DATA_DIR:-./data}} && "
+        f"mkdir -p \"$DATA_DIR/haproxy\" \"$DATA_DIR/postgres\" "
+        f"\"$DATA_DIR/valkey\" \"$DATA_DIR/varnish\" \"$DATA_DIR/certs\""
+        + (f" {ha_dirs_cmd}" if ha_dirs_cmd else ""),
+        ssh_password,
+    )
+
+    print("\nEnsuring .env exists on remote...")
+    _remote_docker(
+        host, user, ssh_password, sudo_prefix, remote_path,
+        "test -f .env || cp .env.example .env",
+    )
+
+    # ------------------------------------------------------------------
+    # Build images on remote
+    # ------------------------------------------------------------------
+    image_tag = args.image_tag
+    registry = args.registry
+
+    if services_to_rebuild or full_redeploy:
+        print(f"\nBuilding images on remote (tag: {image_tag})...")
+        for service in sorted(services_to_rebuild if services_to_rebuild else BUILDABLE_SERVICES):
+            image_name = SWARM_IMAGE_NAMES.get(service, f"corex-{service}")
+            full_name = f"{image_name}:{image_tag}"
+            if registry:
+                full_name = f"{registry}/{full_name}"
+
+            if service == "api":
+                ctx = str(remote_path)
+                df = "backend/Dockerfile"
+            elif service == "corex":
+                ctx = str(remote_path)
+                df = "haproxy/Dockerfile"
+            elif service == "frontend":
+                ctx = f"{remote_path}/frontend"
+                df = "Dockerfile"
+            else:
+                continue
+
+            print(f"\n  Building {full_name}...")
+            build_cmd = f"docker build -t {shlex.quote(full_name)} -f {shlex.quote(df)} {shlex.quote(ctx)}"
+            rc = _ssh_cmd(host, user, build_cmd, ssh_password)
+            if rc != 0:
+                print(f"Error: remote build of {service} failed.", file=sys.stderr)
+                return 1
+
+            # Push to registry if configured
+            if registry:
+                print(f"  Pushing {full_name} to registry...")
+                rc = _ssh_cmd(host, user, f"docker push {shlex.quote(full_name)}", ssh_password)
+                if rc != 0:
+                    print(f"Error: push of {service} failed.", file=sys.stderr)
+                    return 1
+
+    # ------------------------------------------------------------------
+    # Deploy the stack
+    # ------------------------------------------------------------------
+    print(f"\nDeploying Swarm stack '{stack_name}'...")
+
+    # Set HA-related env vars for the stack deploy command
+    stack_env_parts = []
+    if ha_enabled:
+        stack_env_parts.append("HA_ENABLED=true")
+        stack_env_parts.append("SWARM_MODE=true")
+        stack_env_parts.append(f"SWARM_HAPROXY_REPLICAS=2")
+        stack_env_parts.append(f"SWARM_CORAZA_REPLICAS=2")
+        stack_env_parts.append(f"SWARM_VALKEY_REPLICA_REPLICAS=1")
+        stack_env_parts.append(f"SWARM_SENTINEL_REPLICAS=3")
+    else:
+        stack_env_parts.append("HA_ENABLED=false")
+        stack_env_parts.append("SWARM_MODE=true")
+        stack_env_parts.append("SWARM_HAPROXY_REPLICAS=1")
+        stack_env_parts.append("SWARM_CORAZA_REPLICAS=1")
+        stack_env_parts.append("SWARM_VALKEY_REPLICA_REPLICAS=0")
+        stack_env_parts.append("SWARM_SENTINEL_REPLICAS=0")
+
+    stack_env_prefix = " ".join(stack_env_parts) + " "
+
+    deploy_cmd = (
+        f"cd {shlex.quote(remote_path)} && "
+        f"set -a && . ./.env && set +a && "
+        f"{stack_env_prefix}"
+        f"{_stack_cmd(stack_name)}"
+    )
+    if registry:
+        deploy_cmd += " --with-registry-auth"
+
+    rc = _remote_docker(
+        host, user, ssh_password, sudo_prefix, remote_path,
+        deploy_cmd,
+    )
+    if rc != 0:
+        print("Error: docker stack deploy failed.", file=sys.stderr)
+        return 1
+
+    # ------------------------------------------------------------------
+    # Wait for services to converge
+    # ------------------------------------------------------------------
+    print("\nWaiting for services to converge...")
+    import time
+    for attempt in range(30):
+        rc, out = _ssh_capture(
+            host, user,
+            f"docker stack services {stack_name} --format '{{{{.Name}}}} {{{{.Replicas}}}}' 2>/dev/null",
+            ssh_password,
+        )
+        if rc == 0 and out:
+            lines = out.strip().split("\n")
+            all_ready = True
+            for line in lines:
+                parts = line.rsplit(None, 1)
+                if len(parts) == 2:
+                    svc_name, replicas = parts
+                    if "/" in replicas:
+                        current, desired = replicas.split("/")
+                        if current != desired:
+                            all_ready = False
+            if all_ready:
+                print(f"  All services converged ({len(lines)} services).")
+                break
+        time.sleep(2)
+    else:
+        print("  Warning: not all services converged within 60s. Check with 'docker stack services'.", file=sys.stderr)
+
+    # ------------------------------------------------------------------
+    # Upload manifest
+    # ------------------------------------------------------------------
+    print("\nUploading deploy manifest...")
+    manifest = {
+        "deployed_at": datetime.now(timezone.utc).isoformat(),
+        "files": local_hashes,
+        "ha_enabled": ha_enabled,
+        "target": "swarm",
+        "stack_name": stack_name,
+    }
+    _upload_manifest(host, user, ssh_password, sudo_prefix, remote_path, manifest)
+
+    print("\nSwarm deployment complete.")
+    print(f"  Stack:            {stack_name}")
+    print(f"  Frontend (HTTP):  http://{host}:3000")
+    print(f"  Frontend (HTTPS): https://{host}:3443  (self-signed cert)")
+    print(f"  API:              https://{host}:8000  (self-signed cert)")
+    print(f"  HAProxy:          http://{host}:80 / https://{host}:443")
+    print(f"  Stats:            http://{host}:8404")
+    if ha_enabled:
+        print(f"  HA Mode:          Swarm ingress mesh VIP (no keepalived)")
+        print(f"  HA Health API:    https://{host}:8000/api/v1/ha/health")
+    print(f"\n  Manage with:  docker stack services {stack_name}")
+    print(f"                docker stack ps {stack_name}")
+    print(f"  Remove with:  docker stack rm {stack_name}")
     return 0
 
 
@@ -1149,8 +1618,8 @@ def _deploy_k8s(args: argparse.Namespace, target: str) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Deploy coreX Manager to Docker or Kubernetes.")
-    parser.add_argument("--target", choices=["docker", "k8s-remote", "k8s-cluster"],
+    parser = argparse.ArgumentParser(description="Deploy coreX Manager to Docker, Docker Swarm, or Kubernetes.")
+    parser.add_argument("--target", choices=["docker", "swarm", "k8s-remote", "k8s-cluster"],
                         default="docker", help="Deployment target (default: docker)")
     parser.add_argument("--host", help="Remote host IP or hostname")
     parser.add_argument("--user", help="Remote SSH user")
@@ -1175,11 +1644,16 @@ def main() -> int:
     parser.add_argument("--release-name", default="corex", help="Helm release name (k8s targets)")
     parser.add_argument("--namespace", default="corex", help="Kubernetes namespace (k8s targets)")
     parser.add_argument("--values-file", help="Path to Helm values.yaml override file (k8s targets)")
-    parser.add_argument("--image-tag", default="latest", help="Docker image tag for rebuilt images (k8s targets)")
+    parser.add_argument("--image-tag", default="latest", help="Docker image tag for rebuilt images (k8s + swarm targets)")
+    # Swarm-specific options
+    parser.add_argument("--stack-name", default="corex", help="Docker Swarm stack name (swarm target)")
+    parser.add_argument("--registry", help="Container registry URL for multi-node Swarm image distribution (swarm target)")
     args = parser.parse_args()
 
     if args.target == "docker":
         return _deploy_docker(args)
+    elif args.target == "swarm":
+        return _deploy_swarm(args)
     else:
         return _deploy_k8s(args, args.target)
 

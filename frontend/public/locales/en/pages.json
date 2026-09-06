@@ -3121,7 +3121,8 @@
       "features": "Feature Flags",
       "snapshots": "Snapshots",
       "tables": "Stick Tables",
-      "valkey": "Valkey"
+      "valkey": "Valkey",
+      "ha": "High Availability"
     }
   },
   "featureFlags": {
@@ -3279,5 +3280,45 @@
     "databases": "Databases",
     "unavailable": "Valkey is not available.",
     "actions": "Actions"
+  },
+  "systemHa": {
+    "title": "High Availability",
+    "disabled": "HA is not enabled.",
+    "disabledHint": "Set HA_ENABLED=true in your .env and redeploy with the HA override to enable high availability.",
+    "autoRefresh": "Auto-refresh",
+    "apply": "Apply Config",
+    "applySuccess": "Configuration applied to all instances.",
+    "applyFailed": "Config apply failed on one or more instances.",
+    "configSaved": "HA configuration saved.",
+    "haproxyInstances": "HAProxy Instances",
+    "valkeyNodes": "Valkey Nodes",
+    "corazaInstances": "Coraza SPOA Instances",
+    "noInstances": "No HAProxy instances configured.",
+    "noValkeyNodes": "No Valkey nodes found.",
+    "noCorazaInstances": "No Coraza instances found.",
+    "connections": "Connections",
+    "configEditor": "Configuration",
+    "topology": "Topology",
+    "peerPort": "Peer Port",
+    "haproxyReplicas": "HAProxy Replicas",
+    "valkeyReplicas": "Valkey Replicas",
+    "corazaReplicas": "Coraza Replicas",
+    "sentinelEnabled": "Enable Valkey Sentinel",
+    "sentinelService": "Sentinel Service Name",
+    "sentinelHosts": "Sentinel Hosts",
+    "instanceEditor": "HAProxy Instances",
+    "keepalived": "Keepalived",
+    "vip": "Virtual IP (VIP)",
+    "interface": "Interface",
+    "vrid": "Virtual Router ID",
+    "priority": "Priority",
+    "advertInt": "Advert Interval (s)",
+    "authPassword": "Auth Password",
+    "peerAddresses": "Peer Addresses",
+    "trackScript": "Track Script",
+    "preempt": "Preempt",
+    "swarmMode": "Swarm Mode",
+    "swarmVip": "Swarm VIP",
+    "swarmModeHint": "Keepalived is not used in Swarm mode — the Swarm ingress mesh provides VIP and failover."
   }
 }

@@ -70,11 +70,45 @@ spec:
             - name: haproxy-stats
               containerPort: 8404
               protocol: TCP
+            {{- if .Values.ha.enabled }}
+            - name: haproxy-peer
+              containerPort: {{ .Values.ha.haproxyPeerPort }}
+              protocol: TCP
+            {{- end }}
           volumeMounts:
             - name: haproxy-data
               mountPath: /app/data
             - name: certs
               mountPath: /app/certs
+          {{- if .Values.ha.enabled }}
+          env:
+            - name: HA_ENABLED
+              value: "true"
+            - name: HAPROXY_PEER_PORT
+              value: {{ .Values.ha.haproxyPeerPort | quote }}
+            - name: HAPROXY_PEER_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: KEEPALIVED_VIP
+              value: {{ .Values.ha.keepalived.vip | quote }}
+            - name: KEEPALIVED_VIRTUAL_ROUTER_ID
+              value: {{ .Values.ha.keepalived.virtualRouterId | quote }}
+            - name: KEEPALIVED_PRIORITY
+              value: {{ .Values.ha.keepalived.priority | quote }}
+            - name: KEEPALIVED_INTERFACE
+              value: {{ .Values.ha.keepalived.interface | quote }}
+            - name: KEEPALIVED_AUTH_PASSWORD
+              value: {{ .Values.ha.keepalived.authPassword | quote }}
+            - name: KEEPALIVED_PEER_ADDRESSES
+              value: {{ .Values.ha.keepalived.peerAddresses | quote }}
+            - name: KEEPALIVED_ADVERT_INT
+              value: {{ .Values.ha.keepalived.advertInt | quote }}
+            - name: KEEPALIVED_PREEMPT
+              value: {{ .Values.ha.keepalived.preempt | quote }}
+            - name: KEEPALIVED_TRACK_SCRIPT
+              value: {{ .Values.ha.keepalived.trackScript | quote }}
+          {{- end }}
           resources:
             {{- toYaml .Values.corexPod.corex.resources | nindent 12 }}
 
@@ -96,6 +130,20 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+            {{- if .Values.ha.enabled }}
+            - name: HA_ENABLED
+              value: "true"
+            - name: HAPROXY_PEER_PORT
+              value: {{ .Values.ha.haproxyPeerPort | quote }}
+            {{- if .Values.ha.sentinel.enabled }}
+            - name: VALKEY_SENTINEL_ENABLED
+              value: "true"
+            - name: VALKEY_SENTINEL_HOSTS
+              value: "valkey-sentinel:26379"
+            - name: VALKEY_SENTINEL_SERVICE
+              value: {{ .Values.ha.sentinel.service | quote }}
+            {{- end }}
+            {{- end }}
           ports:
             - name: api-http
               containerPort: 8000

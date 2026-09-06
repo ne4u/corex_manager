@@ -1,0 +1,452 @@
+# =============================================================================
+# docker-swarm.yml — Docker Swarm stack file for coreX Manager
+#
+# Usage:
+#   docker stack deploy -c docker-swarm.yml corex
+#
+# This file is Swarm-compatible: no container_name, no depends_on.condition,
+# no build:, no sysctls. Images must be pre-built and available on all Swarm
+# nodes (via a registry or docker save/load).
+#
+# HA mode (HA_ENABLED=true):
+#   - HAProxy: 2 replicas, Swarm ingress mesh provides VIP + failover
+#   - Coraza SPOA: 2 replicas, load-balanced by HAProxy
+#   - Valkey: primary + replica + 3 Sentinels for quorum failover
+#   - No keepalived (Swarm ingress mesh handles VIP/failover)
+#   - HAProxy stick-table peer sync via tasks.corex DNS (dnsrr endpoint mode)
+#
+# Single-instance mode (HA_ENABLED=false): 
+#   - HAProxy: 1 replica, single instance
+#   - Coraza SPOA: 1 replica
+#   - Valkey: 1 replica (no Sentinel)
+#
+# Required environment variables (set in .env):
+#   SECRET_KEY=<32+ byte key>
+#   DATAPLANE_API_ENABLED=true
+#   DATAPLANE_API_PASSWORD=<password>
+#   POSTGRES_PASSWORD=<password>
+#
+# HA-specific (set when HA_ENABLED=true):
+#   HA_ENABLED=true
+#   SWARM_MODE=true
+#   HAPROXY_INSTANCES=corex=https://corex:5555/v3
+#   HAPROXY_PEER_PORT=10000
+#   VALKEY_SENTINEL_ENABLED=true
+#   VALKEY_SENTINEL_HOSTS=valkey-sentinel:26379
+#   VALKEY_SENTINEL_SERVICE=mymaster
+#
+# Image names (override if using a registry):
+#   SWARM_API_IMAGE=corex-api:latest
+#   SWARM_HAPROXY_IMAGE=corex-haproxy:latest
+#   SWARM_FRONTEND_IMAGE=corex-frontend:latest
+#   SWARM_MCP_GATEWAY_IMAGE=corex-mcp-gateway:latest
+#   SWARM_MCP_SERVER_IMAGE=corex-mcp-server:latest
+# =============================================================================
+
+services:
+  # -------------------------------------------------------------------------
+  # API — backend control plane
+  # -------------------------------------------------------------------------
+  api:
+    image: ${SWARM_API_IMAGE:-corex-api:latest}
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ${DATA_DIR:-./data}/haproxy:/app/data
+      - ${DATA_DIR:-./data}/certs:/app/certs
+      - haproxy-run:/var/run
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER:-haproxy}:${POSTGRES_PASSWORD:-haproxy}@postgres:5432/${POSTGRES_DB:-haproxy_manager}
+      - HAPROXY_CONFIG_PATH=/app/data/haproxy.cfg
+      - HAPROXY_SOCKET_PATH=/var/run/haproxy.sock
+      - HAPROXY_MASTER_SOCKET_PATH=/var/run/haproxy-master.sock
+      - CORAZA_SPOE_CONFIG_PATH=/app/data/coraza.cfg
+      - CORAZA_SPOA_CONFIG_PATH=/app/data/coraza-spoa.yaml
+      - CORAZA_SPOA_LOG_PATH=/app/data/coraza-spoa.log
+      - CORAZA_SPOA_TARGETS=${CORAZA_SPOA_TARGETS:-coraza-spoa:9000}
+      - CERT_DIR=/app/certs
+      - DATAPLANE_API_URL=https://corex:5555/v3
+      - DATAPLANE_API_ENABLED=${DATAPLANE_API_ENABLED:-false}
+      - ACME_SH_ENABLED=true
+      - ACME_SH_HOME=/app/certs/.acme.sh
+      - ACME_SH_BIN=/app/certs/.acme.sh/acme.sh
+      - VALKEY_HOST=${VALKEY_HOST:-valkey}
+      - VALKEY_PORT=6379
+      - VALKEY_PASSWORD=${VALKEY_PASSWORD:-}
+      - VARNISH_CONTAINER_NAME=varnish
+      - VARNISH_PORT=6081
+      - VARNISH_VCL_PATH=/app/data/varnish/default.vcl
+      - VARNISH_STORAGE_SIZE=${VARNISH_STORAGE_SIZE:-1G}
+      - DISK_CACHE_ENABLED=${DISK_CACHE_ENABLED:-false}
+      - HAPROXY_CONTAINER_NAME=corex
+      - HA_ENABLED=${HA_ENABLED:-false}
+      - SWARM_MODE=true
+      - HAPROXY_INSTANCES=${HAPROXY_INSTANCES:-corex=https://corex:5555/v3}
+      - HAPROXY_PEER_PORT=${HAPROXY_PEER_PORT:-10000}
+      - VALKEY_SENTINEL_ENABLED=${VALKEY_SENTINEL_ENABLED:-false}
+      - VALKEY_SENTINEL_HOSTS=${VALKEY_SENTINEL_HOSTS:-valkey-sentinel:26379}
+      - VALKEY_SENTINEL_SERVICE=${VALKEY_SENTINEL_SERVICE:-mymaster}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sk https://localhost:8000/health | grep -q ok || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        order: start-first
+        failure_action: rollback
+      restart_policy:
+        condition: any
+        max_attempts: 3
+    networks:
+      - corex-net
+
+  # -------------------------------------------------------------------------
+  # corex — HAProxy (2 replicas in HA mode, 1 in single mode)
+  #
+  # In HA mode, Swarm's ingress mesh provides the VIP and load balancing.
+  # The peer port (10000) is published with dnsrr endpoint mode so HAProxy
+  # instances can discover each other for stick-table replication.
+  # -------------------------------------------------------------------------
+  corex:
+    image: ${SWARM_HAPROXY_IMAGE:-corex-haproxy:latest}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+      - "8404:8404"
+      - "5555:5555"
+      - "10000:10000"
+    volumes:
+      - ${DATA_DIR:-./data}/haproxy:/app/data
+      - ${DATA_DIR:-./data}/certs:/app/certs
+      - haproxy-run:/var/run
+    environment:
+      - DATAPLANE_API_ENABLED=${DATAPLANE_API_ENABLED:-false}
+      - DATAPLANEAPI_USER=${DATAPLANE_API_USER:-admin}
+      - DATAPLANEAPI_PASS=${DATAPLANE_API_PASSWORD:-}
+      - HAPROXY_STATS_USER=${HAPROXY_STATS_USER:-}
+      - HAPROXY_STATS_PASS=${HAPROXY_STATS_PASS:-}
+      - HA_ENABLED=${HA_ENABLED:-false}
+      - SWARM_MODE=true
+      - HAPROXY_PEER_NAME=${HAPROXY_PEER_NAME:-corex}
+      - HAPROXY_PEER_PORT=${HAPROXY_PEER_PORT:-10000}
+    user: "0:0"
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    deploy:
+      replicas: ${SWARM_HAPROXY_REPLICAS:-1}
+      endpoint_mode: dnsrr
+      update_config:
+        parallelism: 1
+        order: start-first
+        failure_action: rollback
+      restart_policy:
+        condition: any
+        max_attempts: 3
+    networks:
+      - corex-net
+
+  # -------------------------------------------------------------------------
+  # coraza-spoa-init — one-shot init container (runs once per node)
+  #
+  # In Swarm, this runs as a global service with a one-shot command. It
+  # writes the coraza-spoa.yaml config to the shared data volume.
+  # -------------------------------------------------------------------------
+  coraza-spoa-init:
+    image: busybox:1.37
+    command: ["sh", "/init/init.sh"]
+    volumes:
+      - ${DATA_DIR:-./data}/haproxy:/app/data
+      - ./coraza-spoa/init.sh:/init/init.sh:ro
+      - ./coraza-spoa/coraza-spoa.yaml:/init/coraza-spoa.yaml:ro
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: none
+    networks:
+      - corex-net
+
+  # -------------------------------------------------------------------------
+  # coraza-spoa — WAF SPOA (2 replicas in HA mode, 1 in single mode)
+  # -------------------------------------------------------------------------
+  coraza-spoa:
+    image: ghcr.io/corazawaf/coraza-spoa:0.7.2
+    command: ["/coraza-spoa", "--config", "/app/data/coraza-spoa.yaml"]
+    user: "0:0"
+    volumes:
+      - ${DATA_DIR:-./data}/haproxy:/app/data
+    deploy:
+      replicas: ${SWARM_CORAZA_REPLICAS:-1}
+      endpoint_mode: dnsrr
+      update_config:
+        parallelism: 1
+        order: start-first
+        failure_action: rollback
+      restart_policy:
+        condition: any
+        max_attempts: 3
+    networks:
+      - corex-net
+
+  # -------------------------------------------------------------------------
+  # postgres — database (single instance, pinned to a node for persistence)
+  # -------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-haproxy_manager}
+      - POSTGRES_USER=${POSTGRES_USER:-haproxy}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-haproxy}
+    volumes:
+      - ${DATA_DIR:-./data}/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-haproxy} -d ${POSTGRES_DB:-haproxy_manager}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        order: stop-first
+        failure_action: rollback
+      restart_policy:
+        condition: any
+        max_attempts: 3
+    networks:
+      - corex-net
+
+  # -------------------------------------------------------------------------
+  # valkey — primary cache/state store
+  # -------------------------------------------------------------------------
+  valkey:
+    image: valkey/valkey:9-alpine
+    volumes:
+      - ${DATA_DIR:-./data}/valkey:/data
+    command: sh -c 'valkey-server --save 60 1 --loglevel warning --maxmemory-policy noeviction $${VALKEY_PASSWORD:+--requirepass $$VALKEY_PASSWORD}'
+    environment:
+      - VALKEY_PASSWORD=${VALKEY_PASSWORD:-}
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli $${VALKEY_PASSWORD:+-a $$VALKEY_PASSWORD} ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        order: stop-first
+        failure_action: rollback
+      restart_policy:
+        condition: any
+        max_attempts: 3
+    networks:
+      - corex-net
+
+  # -------------------------------------------------------------------------
+  # valkey-replica — replica of the primary (HA mode only)
+  # -------------------------------------------------------------------------
+  valkey-replica:
+    image: valkey/valkey:9-alpine
+    volumes:
+      - ${DATA_DIR:-./data}/valkey-replica:/data
+    command: sh -c 'valkey-server --save 60 1 --loglevel warning --maxmemory-policy noeviction --replicaof valkey 6379 $${VALKEY_PASSWORD:+--requirepass $$VALKEY_PASSWORD --replicaauth $$VALKEY_PASSWORD}'
+    environment:
+      - VALKEY_PASSWORD=${VALKEY_PASSWORD:-}
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli $${VALKEY_PASSWORD:+-a $$VALKEY_PASSWORD} ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    deploy:
+      replicas: ${SWARM_VALKEY_REPLICA_REPLICAS:-0}
+      update_config:
+        parallelism: 1
+        order: start-first
+        failure_action: rollback
+      restart_policy:
+        condition: any
+        max_attempts: 3
+    networks:
+      - corex-net
+
+  # -------------------------------------------------------------------------
+  # valkey-sentinel — Sentinel for Valkey primary/replica failover (HA only)
+  # 3 replicas for quorum. Sentinel monitors the primary and promotes the
+  # replica on failure.
+  # -------------------------------------------------------------------------
+  valkey-sentinel:
+    image: valkey/valkey:9-alpine
+    command: sh -c 'valkey-sentinel /etc/valkey/sentinel.conf'
+    environment:
+      - VALKEY_PASSWORD=${VALKEY_PASSWORD:-}
+    volumes:
+      - ./valkey/sentinel.conf:/etc/valkey/sentinel.conf:ro
+      - ${DATA_DIR:-./data}/valkey-sentinel:/data
+    deploy:
+      replicas: ${SWARM_SENTINEL_REPLICAS:-0}
+      update_config:
+        parallelism: 1
+        order: start-first
+        failure_action: rollback
+      restart_policy:
+        condition: any
+        max_attempts: 3
+    networks:
+      - corex-net
+
+  # -------------------------------------------------------------------------
+  # cap — CAPTCHA service
+  # -------------------------------------------------------------------------
+  cap:
+    image: tiago2/cap:latest
+    ports:
+      - "3001:3000"
+    environment:
+      - ADMIN_KEY=${CAP_ADMIN_KEY:-}
+      - REDIS_URL=redis://valkey:6379
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        order: start-first
+        failure_action: rollback
+      restart_policy:
+        condition: any
+        max_attempts: 3
+    networks:
+      - corex-net
+
+  # -------------------------------------------------------------------------
+  # varnish — disk cache (single instance, pinned for persistence)
+  # -------------------------------------------------------------------------
+  varnish:
+    image: varnish:8-alpine
+    user: "0:0"
+    volumes:
+      - ${DATA_DIR:-./data}/haproxy:/app/data
+      - ${DATA_DIR:-./data}/varnish:/var/lib/varnish
+    command: sh -c 'mkdir -p /app/data/varnish && if [ ! -f /app/data/varnish/default.vcl ]; then printf "vcl 4.1;\n\nbackend default none;\n\nsub vcl_recv {\n    return(synth(200, \"OK\"));\n}\n" > /app/data/varnish/default.vcl; fi && exec varnishd -F -a :6081 -f /app/data/varnish/default.vcl -s file,/var/lib/varnish/varnish_storage.bin,${VARNISH_STORAGE_SIZE:-1G} -p default_ttl=120 -p default_grace=600'
+    ulimits:
+      memlock: -1
+      nofile:
+        soft: 131072
+        hard: 131072
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        order: stop-first
+        failure_action: rollback
+      restart_policy:
+        condition: any
+        max_attempts: 3
+    networks:
+      - corex-net
+
+  # -------------------------------------------------------------------------
+  # frontend — nginx serving the React app + reverse proxy to API
+  # -------------------------------------------------------------------------
+  frontend:
+    image: ${SWARM_FRONTEND_IMAGE:-corex-frontend:latest}
+    ports:
+      - "3000:80"
+      - "3443:443"
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        order: start-first
+        failure_action: rollback
+      restart_policy:
+        condition: any
+        max_attempts: 3
+    networks:
+      - corex-net
+
+  # -------------------------------------------------------------------------
+  # mcp-gateway — MCP Gateway proxy (optional)
+  # -------------------------------------------------------------------------
+  mcp-gateway:
+    image: ${SWARM_MCP_GATEWAY_IMAGE:-corex-mcp-gateway:latest}
+    ports:
+      - "8081:8081"
+    env_file:
+      - .env
+    volumes:
+      - ${DATA_DIR:-./data}/haproxy:/app/data
+    environment:
+      - MCP_GATEWAY_ENABLED=${MCP_GATEWAY_ENABLED:-false}
+      - MCP_GATEWAY_LISTEN=0.0.0.0:8081
+      - MCP_CONFIG_PATH=/app/data/mcp/config.json
+      - MCP_EVENTS_LOG_PATH=/app/data/mcp/events.ndjson
+      - MCP_SECRETS_KEY=${MCP_SECRETS_KEY:-}
+      - VALKEY_HOST=${VALKEY_HOST:-valkey}
+      - VALKEY_PORT=6379
+      - VALKEY_PASSWORD=${VALKEY_PASSWORD:-}
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        order: start-first
+        failure_action: rollback
+      restart_policy:
+        condition: any
+        max_attempts: 3
+    networks:
+      - corex-net
+
+  # -------------------------------------------------------------------------
+  # mcp-server — coreX Manager MCP server (optional)
+  # -------------------------------------------------------------------------
+  mcp-server:
+    image: ${SWARM_MCP_SERVER_IMAGE:-corex-mcp-server:latest}
+    ports:
+      - "8082:8082"
+    env_file:
+      - .env
+    volumes:
+      - ${DATA_DIR:-./data}/haproxy:/app/data
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER:-haproxy}:${POSTGRES_PASSWORD:-haproxy}@postgres:5432/${POSTGRES_DB:-haproxy_manager}
+      - SECRET_KEY=${SECRET_KEY}
+      - VALKEY_HOST=${VALKEY_HOST:-valkey}
+      - VALKEY_PORT=6379
+      - VALKEY_PASSWORD=${VALKEY_PASSWORD:-}
+      - COREX_MCP_TOKEN=${COREX_MCP_TOKEN:-}
+      - MCP_SERVICE_TOKEN=${MCP_SERVICE_TOKEN:-}
+      - MCP_GATEWAY_ENABLED=${MCP_GATEWAY_ENABLED:-false}
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        order: start-first
+        failure_action: rollback
+      restart_policy:
+        condition: any
+        max_attempts: 3
+    networks:
+      - corex-net
+
+networks:
+  corex-net:
+    driver: overlay
+    attachable: true
+
+volumes:
+  haproxy-run:
+    driver: local

@@ -11,6 +11,7 @@ from .ciphers import router as ciphers_router
 from .config import router as config_router
 from .error_pages import router as error_pages_router
 from .fcgi import router as fcgi_router
+from .ha import router as ha_router
 from .headers import router as headers_router
 from .listeners import router as listeners_router
 from .logging import router as logging_router
@@ -45,6 +46,7 @@ def build_v1_router() -> APIRouter:
     router.include_router(config_router)
     router.include_router(error_pages_router)
     router.include_router(fcgi_router)
+    router.include_router(ha_router)
     router.include_router(headers_router)
     router.include_router(listeners_router)
     router.include_router(logging_router)

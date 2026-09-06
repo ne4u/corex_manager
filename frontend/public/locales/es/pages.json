@@ -2500,7 +2500,8 @@
       "features": "Características",
       "snapshots": "Instantáneas",
       "tables": "Tablas Stick",
-      "valkey": "Valkey"
+      "valkey": "Valkey",
+      "ha": "Alta Disponibilidad"
     }
   },
   "mcpGateway": {
@@ -3110,5 +3111,45 @@
     "databases": "Bases de datos",
     "unavailable": "Valkey no está disponible.",
     "actions": "Acciones"
+  },
+  "systemHa": {
+    "title": "Alta Disponibilidad",
+    "disabled": "HA no está habilitado.",
+    "disabledHint": "Establezca HA_ENABLED=true en su .env y redespliegue con el override de HA.",
+    "autoRefresh": "Auto-actualizar",
+    "apply": "Aplicar Config",
+    "applySuccess": "Configuración aplicada a todas las instancias.",
+    "applyFailed": "Aplicación de configuración falló en una o más instancias.",
+    "configSaved": "Configuración HA guardada.",
+    "haproxyInstances": "Instancias HAProxy",
+    "valkeyNodes": "Nodos Valkey",
+    "corazaInstances": "Instancias Coraza SPOA",
+    "noInstances": "No hay instancias HAProxy configuradas.",
+    "noValkeyNodes": "No se encontraron nodos Valkey.",
+    "noCorazaInstances": "No se encontraron instancias Coraza.",
+    "connections": "Conexiones",
+    "configEditor": "Configuración",
+    "topology": "Topología",
+    "peerPort": "Puerto Peer",
+    "haproxyReplicas": "Réplicas HAProxy",
+    "valkeyReplicas": "Réplicas Valkey",
+    "corazaReplicas": "Réplicas Coraza",
+    "sentinelEnabled": "Habilitar Valkey Sentinel",
+    "sentinelService": "Nombre del Servicio Sentinel",
+    "sentinelHosts": "Hosts Sentinel",
+    "instanceEditor": "Instancias HAProxy",
+    "keepalived": "Keepalived",
+    "vip": "IP Virtual (VIP)",
+    "interface": "Interfaz",
+    "vrid": "ID de Router Virtual",
+    "priority": "Prioridad",
+    "advertInt": "Intervalo de Anuncio (s)",
+    "authPassword": "Contraseña de Auth",
+    "peerAddresses": "Direcciones Peer",
+    "trackScript": "Script de Seguimiento",
+    "preempt": "Preempt",
+    "swarmMode": "Modo Swarm",
+    "swarmVip": "Swarm VIP",
+    "swarmModeHint": "Keepalived no se usa en modo Swarm — la malla ingress de Swarm proporciona VIP y conmutación por error."
   }
 }

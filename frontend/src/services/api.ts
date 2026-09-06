@@ -740,3 +740,10 @@ export const valkey = {
   // `{key:path}` route — encode `/` so it survives the path segment.
   deleteKey: (key: string) => api.delete(`/valkey/keys/${encodeURIComponent(key)}`),
 }
+
+export const ha = {
+  getConfig: () => api.get('/ha/config'),
+  updateConfig: (data: Record<string, unknown>) => api.put('/ha/config', data),
+  getHealth: () => api.get('/ha/health'),
+  apply: () => api.post('/ha/apply'),
+}

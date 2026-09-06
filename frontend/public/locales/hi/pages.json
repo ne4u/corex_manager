@@ -2500,7 +2500,8 @@
       "features": "सुविधाएँ",
       "snapshots": "स्नैपशॉट",
       "tables": "स्टिक टेबल्स",
-      "valkey": "Valkey"
+      "valkey": "Valkey",
+      "ha": "उच्च उपलब्धता"
     }
   },
   "mcpGateway": {
@@ -3110,5 +3111,45 @@
     "databases": "डेटाबेस",
     "unavailable": "Valkey उपलब्ध नहीं है।",
     "actions": "क्रियाएँ"
+  },
+  "systemHa": {
+    "title": "उच्च उपलब्धता",
+    "disabled": "HA सक्षम नहीं है।",
+    "disabledHint": "अपनी .env में HA_ENABLED=true सेट करें और HA ओवरराइड के साथ पुनः डिप्लॉय करें।",
+    "autoRefresh": "ऑटो-रिफ्रेश",
+    "apply": "कॉन्फ़िग लागू करें",
+    "applySuccess": "कॉन्फ़िगरेशन सभी इंस्टेंस पर लागू की गई।",
+    "applyFailed": "एक या अधिक इंस्टेंस पर कॉन्फ़िग लागू करना विफल।",
+    "configSaved": "HA कॉन्फ़िगरेशन सहेजी गई।",
+    "haproxyInstances": "HAProxy इंस्टेंस",
+    "valkeyNodes": "Valkey नोड्स",
+    "corazaInstances": "Coraza SPOA इंस्टेंस",
+    "noInstances": "कोई HAProxy इंस्टेंस कॉन्फ़िगर नहीं है।",
+    "noValkeyNodes": "कोई Valkey नोड नहीं मिला।",
+    "noCorazaInstances": "कोई Coraza इंस्टेंस नहीं मिला।",
+    "connections": "कनेक्शन्स",
+    "configEditor": "कॉन्फ़िगरेशन",
+    "topology": "टोपोलॉजी",
+    "peerPort": "पीयर पोर्ट",
+    "haproxyReplicas": "HAProxy रेप्लिकास",
+    "valkeyReplicas": "Valkey रेप्लिकास",
+    "corazaReplicas": "Coraza रेप्लिकास",
+    "sentinelEnabled": "Valkey Sentinel सक्षम करें",
+    "sentinelService": "Sentinel सेवा नाम",
+    "sentinelHosts": "Sentinel होस्ट",
+    "instanceEditor": "HAProxy इंस्टेंस",
+    "keepalived": "Keepalived",
+    "vip": "वर्चुअल IP (VIP)",
+    "interface": "इंटरफ़ेस",
+    "vrid": "वर्चुअल राउटर ID",
+    "priority": "प्राथमिकता",
+    "advertInt": "विज्ञापन अंतराल (सेकंड)",
+    "authPassword": "Auth पासवर्ड",
+    "peerAddresses": "पीयर पते",
+    "trackScript": "ट्रैक स्क्रिप्ट",
+    "preempt": "प्रीएम्प्ट",
+    "swarmMode": "स्वार्म मोड",
+    "swarmVip": "स्वार्म VIP",
+    "swarmModeHint": "स्वार्म मोड में keepalived का उपयोग नहीं होता — स्वार्म ingress मेश VIP और फेलओवर प्रदान करता है।"
   }
 }

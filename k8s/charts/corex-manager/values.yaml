@@ -32,6 +32,7 @@ image:
 # -- The sidecar Pod (api + haproxy + coraza + varnish)
 corexPod:
   # -- replicas (HAProxy is stateful; keep 1 unless you have a multi-node plan)
+  # -- When ha.enabled is true, set this to 2+ for HAProxy redundancy.
   replicas: 1
   # -- shareProcessNamespace allows the api container to signal coraza/varnish PIDs
   shareProcessNamespace: true
@@ -86,6 +87,33 @@ corexPod:
 diskCache:
   enabled: false
 
+# -- High Availability (HA) — disabled by default.
+# When enabled, set corexPod.replicas to 2+ and valkey.replicas to 2+.
+# The chart adds a headless service for HAProxy peer discovery, a peer port
+# on the corex container, Valkey Sentinel, and HA env vars.
+ha:
+  enabled: false
+  # -- HAProxy peer port for stick-table replication
+  haproxyPeerPort: 10000
+  # -- keepalived configuration (VRRP failover for the HAProxy VIP)
+  keepalived:
+    vip: ""
+    virtualRouterId: 51
+    priority: 100
+    interface: eth0
+    authPassword: ""
+    peerAddresses: ""
+    advertInt: 1
+    preempt: true
+    trackScript: ""
+  # -- Valkey Sentinel for primary/replica failover
+  sentinel:
+    enabled: false
+    service: mymaster
+    quorum: 1
+    downAfterMilliseconds: 5000
+    failoverTimeout: 30000
+
 # -- Persistence for haproxy-data (shared volume)
 haproxyData:
   persistence:
@@ -137,6 +165,10 @@ valkey:
   enabled: true
   image: valkey/valkey:9-alpine
   password: ""  # -- set a strong password (optional)
+  # -- Number of Valkey replicas. When ha.enabled is true, set to 2+ for
+  # primary/replica failover via Sentinel. The first pod is the primary;
+  # subsequent pods are replicas.
+  replicas: 1
   persistence:
     storageClass: ""
     size: 5Gi

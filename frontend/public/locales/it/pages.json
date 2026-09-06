@@ -2500,7 +2500,8 @@
       "features": "Funzionalità",
       "snapshots": "Snapshot",
       "tables": "Tabelle Stick",
-      "valkey": "Valkey"
+      "valkey": "Valkey",
+      "ha": "Alta Disponibilità"
     }
   },
   "mcpGateway": {
@@ -3110,5 +3111,45 @@
     "databases": "Database",
     "unavailable": "Valkey non è disponibile.",
     "actions": "Azioni"
+  },
+  "systemHa": {
+    "title": "Alta Disponibilità",
+    "disabled": "HA non è abilitato.",
+    "disabledHint": "Imposta HA_ENABLED=true nel tuo .env e ridistribuisci con l'override HA.",
+    "autoRefresh": "Auto-aggiornamento",
+    "apply": "Applica Config",
+    "applySuccess": "Configurazione applicata a tutte le istanze.",
+    "applyFailed": "Applicazione configurazione fallita su una o più istanze.",
+    "configSaved": "Configurazione HA salvata.",
+    "haproxyInstances": "Istanze HAProxy",
+    "valkeyNodes": "Nodi Valkey",
+    "corazaInstances": "Istanze Coraza SPOA",
+    "noInstances": "Nessuna istanza HAProxy configurata.",
+    "noValkeyNodes": "Nessun nodo Valkey trovato.",
+    "noCorazaInstances": "Nessuna istanza Coraza trovata.",
+    "connections": "Connessioni",
+    "configEditor": "Configurazione",
+    "topology": "Topologia",
+    "peerPort": "Porta Peer",
+    "haproxyReplicas": "Repliche HAProxy",
+    "valkeyReplicas": "Repliche Valkey",
+    "corazaReplicas": "Repliche Coraza",
+    "sentinelEnabled": "Abilita Valkey Sentinel",
+    "sentinelService": "Nome Servizio Sentinel",
+    "sentinelHosts": "Host Sentinel",
+    "instanceEditor": "Istanze HAProxy",
+    "keepalived": "Keepalived",
+    "vip": "IP Virtuale (VIP)",
+    "interface": "Interfaccia",
+    "vrid": "ID Router Virtuale",
+    "priority": "Priorità",
+    "advertInt": "Intervallo Annuncio (s)",
+    "authPassword": "Password Auth",
+    "peerAddresses": "Indirizzi Peer",
+    "trackScript": "Script di Tracciamento",
+    "preempt": "Preempt",
+    "swarmMode": "Modalità Swarm",
+    "swarmVip": "Swarm VIP",
+    "swarmModeHint": "Keepalived non viene utilizzato in modalità Swarm — la mesh ingress di Swarm fornisce VIP e failover."
   }
 }

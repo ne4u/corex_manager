@@ -29,7 +29,15 @@ _client = None
 
 
 def _get_client():
-    """Return a shared Valkey client, or None if Valkey is unreachable."""
+    """Return a shared Valkey client, or None if Valkey is unreachable.
+
+    When ``VALKEY_SENTINEL_ENABLED`` is true, the client is resolved through
+    Sentinel (``master_for``) so that failover is handled transparently —
+    if the current master changes, ``_reset_client()`` is called on the next
+    error and the new master is discovered. When Sentinel is disabled (the
+    default), the direct ``VALKEY_HOST:VALKEY_PORT`` connection is used,
+    preserving the original single-instance behavior.
+    """
     global _client
     if _client is not None:
         return _client
@@ -40,6 +48,43 @@ def _get_client():
     except ImportError:
         return None
 
+    # Sentinel mode (HA)
+    if getattr(_settings, "VALKEY_SENTINEL_ENABLED", False):
+        try:
+            from valkey.sentinel import Sentinel
+            sentinel_hosts_raw = getattr(_settings, "VALKEY_SENTINEL_HOSTS", "") or ""
+            sentinel_hosts = []
+            for chunk in sentinel_hosts_raw.split(","):
+                chunk = chunk.strip()
+                if not chunk:
+                    continue
+                if ":" in chunk:
+                    h, p = chunk.rsplit(":", 1)
+                    sentinel_hosts.append((h, int(p)))
+                else:
+                    sentinel_hosts.append((chunk, 26379))
+            if not sentinel_hosts:
+                logger.warning("Sentinel enabled but no hosts configured; falling back to direct")
+            else:
+                service_name = getattr(_settings, "VALKEY_SENTINEL_SERVICE", "mymaster")
+                sentinel_password = getattr(_settings, "VALKEY_PASSWORD", None) or None
+                sentinel = Sentinel(
+                    sentinel_hosts,
+                    socket_connect_timeout=1,
+                    socket_timeout=1,
+                    password=sentinel_password,
+                    decode_responses=True,
+                )
+                client = sentinel.master_for(service_name, db=_settings.VALKEY_DB)
+                client.ping()
+                _client = client
+                return client
+        except Exception as e:
+            logger.debug("Valkey Sentinel not available: %s", e)
+            _client = None
+            # Fall through to direct mode as a last resort
+
+    # Direct mode (single-instance or Sentinel fallback)
     try:
         client = Valkey(
             host=_settings.VALKEY_HOST,

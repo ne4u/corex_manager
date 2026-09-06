@@ -413,6 +413,72 @@ class Settings(BaseSettings):
     MCP_SERVER_INTERNAL_HOST: str = "mcp-server"
     MCP_SERVER_INTERNAL_PORT: int = 8082
 
+    # ──────────────────────────────────────────────────────────────────────
+    # High Availability (HA) — all disabled by default. When HA_ENABLED=false
+    # (the default), the system is byte-for-byte identical to the single-
+    # instance deployment: no peers section in haproxy.cfg, single Data Plane
+    # API push target, no keepalived, no sentinel, no HA UI tab.
+    # ──────────────────────────────────────────────────────────────────────
+    # Master HA flag (env or DB setting ha_enabled). When false, all HA code
+    # paths are short-circuited.
+    HA_ENABLED: bool = False
+    # Topology: "single" (all HA containers on one host) or "multi" (each
+    # HAProxy instance on a separate host). Affects documentation and
+    # keepalived networking guidance, not the control-plane logic directly.
+    HA_TOPOLOGY: str = "single"
+    # Per-service replica counts (informational; the actual container count
+    # is controlled by docker-compose.ha.yml / Helm values).
+    HAPROXY_HA_REPLICAS: int = 1
+    VALKEY_HA_REPLICAS: int = 1
+    CORAZA_HA_REPLICAS: int = 1
+
+    # HAProxy instance inventory — comma-separated "name=url[,user[,password]]"
+    # pairs. Each entry is one HAProxy container with its own Data Plane API.
+    # Drives both config push (per-instance Data Plane API) and stick-table
+    # peer discovery. When unset or HA disabled, falls back to the single
+    # DATAPLANE_API_URL with name "corex".
+    #   Example: corex1=https://corex1:5555/v3,corex2=https://corex2:5555/v3
+    HAPROXY_INSTANCES: Optional[str] = None
+    # Stick-table peer sync port (HAProxy peers section). Each HAProxy
+    # instance binds this port for stick-table replication.
+    HAPROXY_PEER_PORT: int = 10000
+    # This instance's peer name (defaults to hostname at runtime if empty).
+    HAPROXY_PEER_NAME: str = ""
+
+    # Keepalived configuration (stored in DB settings with env fallback).
+    # The HAProxy entrypoint renders /app/data/keepalived.conf from these
+    # when HA_ENABLED=true.
+    KEEPALIVED_VIP: str = ""
+    KEEPALIVED_VIRTUAL_ROUTER_ID: int = 51
+    KEEPALIVED_PRIORITY: int = 100
+    KEEPALIVED_INTERFACE: str = "eth0"
+    KEEPALIVED_AUTH_PASSWORD: Optional[str] = None
+    # Comma-separated list of peer VRRP interface addresses (other keepalived
+    # instances). Used for unicast peers; if empty, keepalived uses multicast.
+    KEEPALIVED_PEER_ADDRESSES: Optional[str] = None
+    KEEPALIVED_ADVERT_INT: int = 1
+    KEEPALIVED_PREEMPT: bool = True
+    # Optional track script path (HAProxy health check). When set, keepalived
+    # runs the script and enters FAULT state if it fails.
+    KEEPALIVED_TRACK_SCRIPT: Optional[str] = None
+
+    # Valkey Sentinel — when VALKEY_SENTINEL_ENABLED=true, the Valkey client
+    # connects via Sentinel (valkey.Sentinel + master_for) instead of direct
+    # host:port. Enables automatic failover to the replica on primary failure.
+    VALKEY_SENTINEL_ENABLED: bool = False
+    # Comma-separated list of "host:port" sentinel addresses.
+    VALKEY_SENTINEL_HOSTS: Optional[str] = None
+    # Sentinel monitor service name (default "mymaster").
+    VALKEY_SENTINEL_SERVICE: str = "mymaster"
+    # Optional Sentinel auth password (AUTH command).
+    VALKEY_SENTINEL_PASSWORD: Optional[str] = None
+
+    # Docker Swarm mode — when true, the backend knows it's running in a
+    # Swarm stack. Affects HA behavior: keepalived is skipped (Swarm's
+    # ingress mesh provides VIP + failover), and HA health reporting
+    # omits keepalived state.
+    SWARM_MODE: bool = False
+
     @field_validator("SECRET_KEY")
     @classmethod
     def _validate_secret_key(cls, v: str) -> str:

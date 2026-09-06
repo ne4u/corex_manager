@@ -8,7 +8,7 @@ metadata:
     {{- include "corex-manager.labels" . | nindent 4 }}
 spec:
   serviceName: valkey
-  replicas: 1
+  replicas: {{ .Values.valkey.replicas | default 1 }}
   selector:
     matchLabels:
       app.kubernetes.io/name: corex-manager
@@ -26,6 +26,30 @@ spec:
           image: {{ .Values.valkey.image }}
           {{- if .Values.valkey.password }}
           args: ["--requirepass", "{{ .Values.valkey.password }}"]
+          {{- end }}
+          {{- if and .Values.ha.enabled (gt (int (.Values.valkey.replicas | default 1)) 1) }}
+          # In HA mode with replicas > 1, pods after the first are replicas.
+          # The first pod (ordinal 0) is the primary; others use --replicaof.
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: VALKEY_PASSWORD
+              value: {{ .Values.valkey.password | quote }}
+          command:
+            - sh
+            - -c
+            - |
+              ORDINAL=$${POD_NAME##*-}
+              if [ "$$ORDINAL" = "0" ]; then
+                exec valkey-server --save 60 1 --loglevel warning --maxmemory-policy noeviction \
+                  $${VALKEY_PASSWORD:+--requirepass $$VALKEY_PASSWORD}
+              else
+                exec valkey-server --save 60 1 --loglevel warning --maxmemory-policy noeviction \
+                  --replicaof valkey-0.valkey.{{ .Release.Namespace }}.svc.cluster.local 6379 \
+                  $${VALKEY_PASSWORD:+--requirepass $$VALKEY_PASSWORD --replicaauth $$VALKEY_PASSWORD}
+              fi
           {{- end }}
           ports:
             - name: valkey
@@ -67,4 +91,98 @@ spec:
       port: 6379
       targetPort: valkey
       protocol: TCP
+{{- if and .Values.ha.enabled .Values.ha.sentinel.enabled }}
+---
+# Headless service for Valkey StatefulSet stable DNS names (peer discovery)
+apiVersion: v1
+kind: Service
+metadata:
+  name: valkey-headless
+  namespace: {{ include "corex-manager.namespace" . }}
+  labels:
+    {{- include "corex-manager.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: corex-manager
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: valkey
+  ports:
+    - name: valkey
+      port: 6379
+      targetPort: valkey
+      protocol: TCP
+---
+# Valkey Sentinel — monitors the primary and fails over to a replica
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: valkey-sentinel
+  namespace: {{ include "corex-manager.namespace" . }}
+  labels:
+    {{- include "corex-manager.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: corex-manager
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: valkey-sentinel
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: corex-manager
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: valkey-sentinel
+    spec:
+      containers:
+        - name: sentinel
+          image: {{ .Values.valkey.image }}
+          command:
+            - sh
+            - -c
+            - |
+              cat > /tmp/sentinel.conf <<EOF
+              port 26379
+              sentinel monitor {{ .Values.ha.sentinel.service }} valkey 6379 {{ .Values.ha.sentinel.quorum }}
+              sentinel down-after-milliseconds {{ .Values.ha.sentinel.service }} {{ .Values.ha.sentinel.downAfterMilliseconds }}
+              sentinel failover-timeout {{ .Values.ha.sentinel.service }} {{ .Values.ha.sentinel.failoverTimeout }}
+              sentinel parallel-syncs {{ .Values.ha.sentinel.service }} 1
+              {{- if .Values.valkey.password }}
+              sentinel auth-pass {{ .Values.ha.sentinel.service }} {{ .Values.valkey.password }}
+              {{- end }}
+              EOF
+              exec valkey-sentinel /tmp/sentinel.conf
+          ports:
+            - name: sentinel
+              containerPort: 26379
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: valkey-sentinel
+  namespace: {{ include "corex-manager.namespace" . }}
+  labels:
+    {{- include "corex-manager.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: corex-manager
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: valkey-sentinel
+  ports:
+    - name: sentinel
+      port: 26379
+      targetPort: sentinel
+      protocol: TCP
+{{- end }}
 {{- end }}

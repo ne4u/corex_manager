@@ -1,0 +1,26 @@
+{{- if .Values.ha.enabled }}
+# Headless service for HAProxy StatefulSet stable DNS names.
+# Each pod gets a stable DNS name: <pod-name>.<release>-corex-headless.<ns>.svc.cluster.local
+# This enables HAProxy peers section to reference each pod by name.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-corex-headless
+  namespace: {{ include "corex-manager.namespace" . }}
+  labels:
+    {{- include "corex-manager.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    {{- include "corex-manager.podSelectorLabels" . | nindent 4 }}
+  ports:
+    - name: haproxy-peer
+      port: {{ .Values.ha.haproxyPeerPort }}
+      targetPort: haproxy-peer
+      protocol: TCP
+    - name: dataplane
+      port: 5555
+      targetPort: dataplane
+      protocol: TCP
+{{- end }}

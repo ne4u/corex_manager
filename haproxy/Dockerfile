@@ -69,7 +69,7 @@ ARG DATAPLANEAPI_VERSION=3.4.2
 ARG TARGETARCH
 ARG DATAPLANEAPI_ARCH=
 
-RUN apk add --no-cache ca-certificates curl tar util-linux lua5.4 openssl \
+RUN apk add --no-cache ca-certificates curl tar util-linux lua5.4 openssl keepalived \
     && apk upgrade --no-cache \
     && mkdir -p /tmp/dataplaneapi /usr/local/bin \
     && if [ -n "$DATAPLANEAPI_ARCH" ]; then \
@@ -90,6 +90,11 @@ RUN apk add --no-cache ca-certificates curl tar util-linux lua5.4 openssl \
 
 COPY haproxy/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
+
+# keepalived notify script — writes VRRP state to /app/data/keepalived.state
+# so the backend HA health endpoint can report MASTER/BACKUP/FAULT.
+COPY haproxy/keepalived_notify.sh /usr/local/bin/keepalived_notify.sh
+RUN chmod +x /usr/local/bin/keepalived_notify.sh
 
 # JA4 fingerprint Lua script for security rules
 COPY haproxy/lua/ja4.lua /etc/haproxy/ja4.lua
@@ -154,7 +159,7 @@ RUN mkdir -p /app/data /app/data/api-armor /app/certs /var/run /etc/haproxy && c
 # variables or Docker secrets. No defaults are baked into the image.
 # DATAPLANEAPI_USER and DATAPLANEAPI_PASS are consumed by entrypoint.sh.
 
-EXPOSE 80 443/tcp 443/udp 8404 5555
+EXPOSE 80 443/tcp 443/udp 8404 5555 10000
 
 USER haproxy
 

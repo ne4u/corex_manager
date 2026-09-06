@@ -2500,7 +2500,8 @@
       "features": "ميزات",
       "snapshots": "اللقطات",
       "tables": "جداول Stick",
-      "valkey": "Valkey"
+      "valkey": "Valkey",
+      "ha": "التوافر العالي"
     }
   },
   "mcpGateway": {
@@ -3110,5 +3111,45 @@
     "databases": "قواعد البيانات",
     "unavailable": "Valkey غير متاح.",
     "actions": "إجراءات"
+  },
+  "systemHa": {
+    "title": "التوافر العالي",
+    "disabled": "HA غير مفعول.",
+    "disabledHint": "قم بتعيين HA_ENABLED=true في .env وأعد النشر مع تجاوز HA لتمكين التوافر العالي.",
+    "autoRefresh": "تحديث تلقائي",
+    "apply": "تطبيق التكوين",
+    "applySuccess": "تم تطبيق التكوين على جميع المثيلات.",
+    "applyFailed": "فشل تطبيق التكوين على مثيل واحد أو أكثر.",
+    "configSaved": "تم حفظ تكوين HA.",
+    "haproxyInstances": "مثيلات HAProxy",
+    "valkeyNodes": "عقد Valkey",
+    "corazaInstances": "مثيلات Coraza SPOA",
+    "noInstances": "لا توجد مثيلات HAProxy مكونة.",
+    "noValkeyNodes": "لم يتم العثور على عقد Valkey.",
+    "noCorazaInstances": "لم يتم العثور على مثيلات Coraza.",
+    "connections": "الاتصالات",
+    "configEditor": "التكوين",
+    "topology": "الطوبولوجيا",
+    "peerPort": "منفذ النظير",
+    "haproxyReplicas": "نسخ HAProxy",
+    "valkeyReplicas": "نسخ Valkey",
+    "corazaReplicas": "نسخ Coraza",
+    "sentinelEnabled": "تمكين Valkey Sentinel",
+    "sentinelService": "اسم خدمة Sentinel",
+    "sentinelHosts": "مضيفات Sentinel",
+    "instanceEditor": "مثيلات HAProxy",
+    "keepalived": "Keepalived",
+    "vip": "IP الظاهري (VIP)",
+    "interface": "الواجهة",
+    "vrid": "معرف الموجه الظاهري",
+    "priority": "الأولوية",
+    "advertInt": "فاصل الإعلان (ثانية)",
+    "authPassword": "كلمة مرور المصادقة",
+    "peerAddresses": "عناوين النظراء",
+    "trackScript": "سكريبت التتبع",
+    "preempt": "الاستباق",
+    "swarmMode": "وضع السوورم",
+    "swarmVip": "Swarm VIP",
+    "swarmModeHint": "لا يُستخدم keepalived في وضع Swarm — شبكة ingress الخاصة بـ Swarm توفر VIP وتجاوز الفشل."
   }
 }

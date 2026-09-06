@@ -2500,7 +2500,8 @@
       "features": "Funktionen",
       "snapshots": "Schnappschüsse",
       "tables": "Stick-Tabellen",
-      "valkey": "Valkey"
+      "valkey": "Valkey",
+      "ha": "Hochverfügbarkeit"
     }
   },
   "mcpGateway": {
@@ -3110,5 +3111,45 @@
     "databases": "Datenbanken",
     "unavailable": "Valkey ist nicht verfügbar.",
     "actions": "Aktionen"
+  },
+  "systemHa": {
+    "title": "Hochverfügbarkeit",
+    "disabled": "HA ist nicht aktiviert.",
+    "disabledHint": "Setzen Sie HA_ENABLED=true in Ihrer .env und stellen Sie mit dem HA-Override erneut bereit.",
+    "autoRefresh": "Auto-Aktualisierung",
+    "apply": "Konfiguration anwenden",
+    "applySuccess": "Konfiguration auf alle Instanzen angewendet.",
+    "applyFailed": "Konfiguration auf einer oder mehreren Instanzen fehlgeschlagen.",
+    "configSaved": "HA-Konfiguration gespeichert.",
+    "haproxyInstances": "HAProxy-Instanzen",
+    "valkeyNodes": "Valkey-Knoten",
+    "corazaInstances": "Coraza SPOA-Instanzen",
+    "noInstances": "Keine HAProxy-Instanzen konfiguriert.",
+    "noValkeyNodes": "Keine Valkey-Knoten gefunden.",
+    "noCorazaInstances": "Keine Coraza-Instanzen gefunden.",
+    "connections": "Verbindungen",
+    "configEditor": "Konfiguration",
+    "topology": "Topologie",
+    "peerPort": "Peer-Port",
+    "haproxyReplicas": "HAProxy-Replikas",
+    "valkeyReplicas": "Valkey-Replikas",
+    "corazaReplicas": "Coraza-Replikas",
+    "sentinelEnabled": "Valkey Sentinel aktivieren",
+    "sentinelService": "Sentinel-Dienstname",
+    "sentinelHosts": "Sentinel-Hosts",
+    "instanceEditor": "HAProxy-Instanzen",
+    "keepalived": "Keepalived",
+    "vip": "Virtuelle IP (VIP)",
+    "interface": "Schnittstelle",
+    "vrid": "Virtual Router ID",
+    "priority": "Priorität",
+    "advertInt": "Advert-Intervall (s)",
+    "authPassword": "Auth-Passwort",
+    "peerAddresses": "Peer-Adressen",
+    "trackScript": "Track-Skript",
+    "preempt": "Preempt",
+    "swarmMode": "Swarm-Modus",
+    "swarmVip": "Swarm VIP",
+    "swarmModeHint": "Keepalived wird im Swarm-Modus nicht verwendet — das Swarm-Ingress-Mesh bietet VIP und Failover."
   }
 }

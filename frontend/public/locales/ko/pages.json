@@ -2500,7 +2500,8 @@
       "features": "기능",
       "snapshots": "스냅샷",
       "tables": "스틱 테이블",
-      "valkey": "Valkey"
+      "valkey": "Valkey",
+      "ha": "고가용성"
     }
   },
   "mcpGateway": {
@@ -3110,5 +3111,45 @@
     "databases": "데이터베이스",
     "unavailable": "Valkey를 사용할 수 없습니다.",
     "actions": "작업"
+  },
+  "systemHa": {
+    "title": "고가용성",
+    "disabled": "HA가 활성화되지 않았습니다.",
+    "disabledHint": ".env에서 HA_ENABLED=true를 설정하고 HA 오버라이드로 다시 배포하세요.",
+    "autoRefresh": "자동 새로고침",
+    "apply": "설정 적용",
+    "applySuccess": "모든 인스턴스에 설정이 적용되었습니다.",
+    "applyFailed": "하나 이상의 인스턴스에서 설정 적용이 실패했습니다.",
+    "configSaved": "HA 설정이 저장되었습니다.",
+    "haproxyInstances": "HAProxy 인스턴스",
+    "valkeyNodes": "Valkey 노드",
+    "corazaInstances": "Coraza SPOA 인스턴스",
+    "noInstances": "구성된 HAProxy 인스턴스가 없습니다.",
+    "noValkeyNodes": "Valkey 노드를 찾을 수 없습니다.",
+    "noCorazaInstances": "Coraza 인스턴스를 찾을 수 없습니다.",
+    "connections": "연결",
+    "configEditor": "설정",
+    "topology": "토폴로지",
+    "peerPort": "피어 포트",
+    "haproxyReplicas": "HAProxy 복제본",
+    "valkeyReplicas": "Valkey 복제본",
+    "corazaReplicas": "Coraza 복제본",
+    "sentinelEnabled": "Valkey Sentinel 활성화",
+    "sentinelService": "Sentinel 서비스 이름",
+    "sentinelHosts": "Sentinel 호스트",
+    "instanceEditor": "HAProxy 인스턴스",
+    "keepalived": "Keepalived",
+    "vip": "가상 IP (VIP)",
+    "interface": "인터페이스",
+    "vrid": "가상 라우터 ID",
+    "priority": "우선순위",
+    "advertInt": "광고 간격 (초)",
+    "authPassword": "인증 비밀번호",
+    "peerAddresses": "피어 주소",
+    "trackScript": "추적 스크립트",
+    "preempt": "선점",
+    "swarmMode": "Swarm 모드",
+    "swarmVip": "Swarm VIP",
+    "swarmModeHint": "Swarm 모드에서는 keepalived가 사용되지 않습니다 — Swarm ingress 메시가 VIP와 페일오버를 제공합니다."
   }
 }

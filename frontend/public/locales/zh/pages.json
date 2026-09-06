@@ -2500,7 +2500,8 @@
       "features": "功能标志",
       "snapshots": "快照",
       "tables": "粘性表",
-      "valkey": "Valkey"
+      "valkey": "Valkey",
+      "ha": "高可用"
     }
   },
   "mcpGateway": {
@@ -3110,5 +3111,45 @@
     "databases": "数据库",
     "unavailable": "Valkey 不可用。",
     "actions": "操作"
+  },
+  "systemHa": {
+    "title": "高可用",
+    "disabled": "HA未启用。",
+    "disabledHint": "在.env中设置HA_ENABLED=true并使用HA覆盖重新部署。",
+    "autoRefresh": "自动刷新",
+    "apply": "应用配置",
+    "applySuccess": "配置已应用到所有实例。",
+    "applyFailed": "配置在一个或多个实例上应用失败。",
+    "configSaved": "HA配置已保存。",
+    "haproxyInstances": "HAProxy实例",
+    "valkeyNodes": "Valkey节点",
+    "corazaInstances": "Coraza SPOA实例",
+    "noInstances": "未配置HAProxy实例。",
+    "noValkeyNodes": "未找到Valkey节点。",
+    "noCorazaInstances": "未找到Coraza实例。",
+    "connections": "连接",
+    "configEditor": "配置",
+    "topology": "拓扑",
+    "peerPort": "Peer端口",
+    "haproxyReplicas": "HAProxy副本",
+    "valkeyReplicas": "Valkey副本",
+    "corazaReplicas": "Coraza副本",
+    "sentinelEnabled": "启用Valkey Sentinel",
+    "sentinelService": "Sentinel服务名",
+    "sentinelHosts": "Sentinel主机",
+    "instanceEditor": "HAProxy实例",
+    "keepalived": "Keepalived",
+    "vip": "虚拟IP (VIP)",
+    "interface": "接口",
+    "vrid": "虚拟路由器ID",
+    "priority": "优先级",
+    "advertInt": "广播间隔 (秒)",
+    "authPassword": "认证密码",
+    "peerAddresses": "Peer地址",
+    "trackScript": "跟踪脚本",
+    "preempt": "抢占",
+    "swarmMode": "Swarm模式",
+    "swarmVip": "Swarm VIP",
+    "swarmModeHint": "Swarm模式下不使用keepalived — Swarm ingress网格提供VIP和故障转移。"
   }
 }

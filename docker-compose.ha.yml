@@ -1,0 +1,184 @@
+# =============================================================================
+# docker-compose.ha.yml — High Availability override
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.ha.yml up -d
+#
+# This override adds:
+#   - corex2: a second HAProxy instance with keepalived for VRRP failover
+#   - coraza-spoa2: a second Coraza SPOA instance (load-balanced by HAProxy)
+#   - valkey-replica: a Valkey replica of the primary valkey service
+#   - valkey-sentinel: Valkey Sentinel for primary/replica failover
+#
+# When HA_ENABLED is not "true", this file should NOT be used — the base
+# docker-compose.yml provides the single-instance topology.
+#
+# Required environment variables (set in .env):
+#   HA_ENABLED=true
+#   KEEPALIVED_VIP=<virtual IP, e.g. 10.0.0.100>
+#   KEEPALIVED_VIRTUAL_ROUTER_ID=51
+#   KEEPALIVED_PRIORITY=100         (corex) / 90 (corex2)
+#   KEEPALIVED_INTERFACE=eth0
+#   KEEPALIVED_AUTH_PASSWORD=<shared secret>
+#   KEEPALIVED_PEER_ADDRESSES=<comma-separated peer IPs>
+#   HAPROXY_INSTANCES=corex=https://haproxy:5555/v3,corex2=https://haproxy2:5555/v3
+#   DATAPLANE_API_ENABLED=true
+#   DATAPLANE_API_USER=admin
+#   DATAPLANE_API_PASSWORD=<password>
+#   VALKEY_SENTINEL_ENABLED=true
+#   VALKEY_SENTINEL_HOSTS=valkey-sentinel:26379
+#   VALKEY_SENTINEL_SERVICE=mymaster
+# =============================================================================
+
+services:
+  # -------------------------------------------------------------------------
+  # corex (primary HAProxy) — add HA env vars + peer port
+  # -------------------------------------------------------------------------
+  corex:
+    environment:
+      - HA_ENABLED=true
+      - KEEPALIVED_VIP=${KEEPALIVED_VIP:-}
+      - KEEPALIVED_VIRTUAL_ROUTER_ID=${KEEPALIVED_VIRTUAL_ROUTER_ID:-51}
+      - KEEPALIVED_PRIORITY=${KEEPALIVED_PRIORITY:-100}
+      - KEEPALIVED_INTERFACE=${KEEPALIVED_INTERFACE:-eth0}
+      - KEEPALIVED_AUTH_PASSWORD=${KEEPALIVED_AUTH_PASSWORD:-}
+      - KEEPALIVED_ADVERT_INT=${KEEPALIVED_ADVERT_INT:-1}
+      - KEEPALIVED_PREEMPT=${KEEPALIVED_PREEMPT:-true}
+      - KEEPALIVED_TRACK_SCRIPT=${KEEPALIVED_TRACK_SCRIPT:-}
+      - KEEPALIVED_PEER_ADDRESSES=${KEEPALIVED_PEER_ADDRESSES:-}
+      - HAPROXY_PEER_NAME=corex
+      - HAPROXY_PEER_PORT=${HAPROXY_PEER_PORT:-10000}
+    ports:
+      - "10000:10000"
+
+  # -------------------------------------------------------------------------
+  # corex2 — second HAProxy instance
+  # -------------------------------------------------------------------------
+  corex2:
+    container_name: corex2
+    build:
+      context: .
+      dockerfile: haproxy/Dockerfile
+      args:
+        DATAPLANEAPI_ARCH: ${DATAPLANEAPI_ARCH:-}
+    ports:
+      - "8081:80"
+      - "8444:443"
+      - "8444:443/udp"
+      - "8405:8404"
+      - "5556:5555"
+      - "10001:10000"
+    volumes:
+      - ${DATA_DIR:-./data}/haproxy2:/app/data
+      - ${DATA_DIR:-./data}/certs:/app/certs
+      - haproxy2-run:/var/run
+    environment:
+      - HA_ENABLED=true
+      - DATAPLANE_API_ENABLED=${DATAPLANE_API_ENABLED:-false}
+      - DATAPLANEAPI_USER=${DATAPLANE_API_USER:-admin}
+      - DATAPLANEAPI_PASS=${DATAPLANE_API_PASSWORD:-}
+      - HAPROXY_STATS_USER=${HAPROXY_STATS_USER:-}
+      - HAPROXY_STATS_PASS=${HAPROXY_STATS_PASS:-}
+      - KEEPALIVED_VIP=${KEEPALIVED_VIP:-}
+      - KEEPALIVED_VIRTUAL_ROUTER_ID=${KEEPALIVED_VIRTUAL_ROUTER_ID:-51}
+      - KEEPALIVED_PRIORITY=${KEEPALIVED_PRIORITY_2:-90}
+      - KEEPALIVED_INTERFACE=${KEEPALIVED_INTERFACE:-eth0}
+      - KEEPALIVED_AUTH_PASSWORD=${KEEPALIVED_AUTH_PASSWORD:-}
+      - KEEPALIVED_ADVERT_INT=${KEEPALIVED_ADVERT_INT:-1}
+      - KEEPALIVED_PREEMPT=${KEEPALIVED_PREEMPT:-true}
+      - KEEPALIVED_TRACK_SCRIPT=${KEEPALIVED_TRACK_SCRIPT:-}
+      - KEEPALIVED_PEER_ADDRESSES=${KEEPALIVED_PEER_ADDRESSES:-}
+      - HAPROXY_PEER_NAME=corex2
+      - HAPROXY_PEER_PORT=${HAPROXY_PEER_PORT:-10000}
+    restart: unless-stopped
+    networks:
+      corex-net:
+        aliases:
+          - haproxy2
+    user: "0:0"
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    sysctls:
+      - net.core.somaxconn=65535
+      - net.ipv4.tcp_max_syn_backlog=65535
+
+  # -------------------------------------------------------------------------
+  # coraza-spoa2 — second Coraza SPOA instance
+  # -------------------------------------------------------------------------
+  coraza-spoa2:
+    image: ghcr.io/corazawaf/coraza-spoa:0.7.2
+    command: ["/coraza-spoa", "--config", "/app/data/coraza-spoa.yaml"]
+    user: "0:0"
+    depends_on:
+      coraza-spoa-init:
+        condition: service_completed_successfully
+    volumes:
+      - ${DATA_DIR:-./data}/haproxy:/app/data
+    restart: unless-stopped
+    networks:
+      corex-net:
+        aliases:
+          - coraza-spoa2
+
+  # -------------------------------------------------------------------------
+  # valkey-replica — replica of the primary valkey
+  # -------------------------------------------------------------------------
+  valkey-replica:
+    image: valkey/valkey:9-alpine
+    volumes:
+      - ${DATA_DIR:-./data}/valkey-replica:/data
+    command: sh -c 'valkey-server --save 60 1 --loglevel warning --maxmemory-policy noeviction --replicaof valkey 6379 $${VALKEY_PASSWORD:+--requirepass $$VALKEY_PASSWORD --replicaauth $$VALKEY_PASSWORD}'
+    environment:
+      - VALKEY_PASSWORD=${VALKEY_PASSWORD:-}
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli $${VALKEY_PASSWORD:+-a $$VALKEY_PASSWORD} ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    depends_on:
+      valkey:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - corex-net
+
+  # -------------------------------------------------------------------------
+  # valkey-sentinel — Sentinel for Valkey primary/replica failover
+  # -------------------------------------------------------------------------
+  valkey-sentinel:
+    image: valkey/valkey:9-alpine
+    command: sh -c 'valkey-sentinel /etc/valkey/sentinel.conf'
+    environment:
+      - VALKEY_PASSWORD=${VALKEY_PASSWORD:-}
+    volumes:
+      - ./valkey/sentinel.conf:/etc/valkey/sentinel.conf:ro
+      - ${DATA_DIR:-./data}/valkey-sentinel:/data
+    depends_on:
+      valkey:
+        condition: service_healthy
+      valkey-replica:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - corex-net
+
+  # -------------------------------------------------------------------------
+  # api — add HA env vars so the backend knows HA is on
+  # -------------------------------------------------------------------------
+  api:
+    environment:
+      - HA_ENABLED=true
+      - HAPROXY_INSTANCES=${HAPROXY_INSTANCES:-corex=https://haproxy:5555/v3,corex2=https://haproxy2:5555/v3}
+      - HAPROXY_PEER_PORT=${HAPROXY_PEER_PORT:-10000}
+      - VALKEY_SENTINEL_ENABLED=true
+      - VALKEY_SENTINEL_HOSTS=${VALKEY_SENTINEL_HOSTS:-valkey-sentinel:26379}
+      - VALKEY_SENTINEL_SERVICE=${VALKEY_SENTINEL_SERVICE:-mymaster}
+      - CORAZA_SPOA_TARGETS=${CORAZA_SPOA_TARGETS_HA:-coraza-spoa:9000,coraza-spoa2:9000}
+
+volumes:
+  haproxy2-run:

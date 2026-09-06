@@ -1,12 +1,13 @@
 # coreX Manager Deploy
 
-`deploy.py` deploys the project to a remote Linux Docker host or a Kubernetes cluster using `rsync`, `docker compose`, and `helm`. It uses **selective rebuilds** — only rebuilding and redeploying services whose files changed since the last deploy.
+`deploy.py` deploys the project to a remote Linux Docker host, Docker Swarm cluster, or Kubernetes cluster using `rsync`, `docker compose`, `docker stack`, and `helm`. It uses **selective rebuilds** — only rebuilding and redeploying services whose files changed since the last deploy.
 
 ## Deployment Targets
 
 | Target | Description |
 |--------|-------------|
 | `docker` (default) | rsync + `docker compose build/up` on a remote host |
+| `swarm` | rsync + build images + `docker stack deploy` on a Swarm cluster |
 | `k8s-remote` | rsync + build images on remote + load into k8s + `helm upgrade` on remote |
 | `k8s-cluster` | build images locally + load into local cluster + `helm upgrade` locally |
 
@@ -114,6 +115,66 @@ python3 deploy.py --force-rebuild corex --force-rebuild frontend
 | `--dry-run` | Show what would be rebuilt/restarted without making changes | `False` |
 | `--force-rebuild` | Force rebuild of a service (e.g., `--force-rebuild corex`). Use `all` for all buildable services. Can be specified multiple times. | — |
 
+## Docker Swarm deployment
+
+The `--target swarm` mode deploys via `docker stack deploy` using the `docker-swarm.yml` stack file. This is the recommended HA deployment for Docker environments — Swarm's ingress routing mesh provides VIP load balancing and automatic failover without keepalived.
+
+### Prerequisites
+
+1. Docker Swarm must be initialized on the remote host:
+   ```bash
+   docker swarm init  # on the manager node
+   docker swarm join --token <token> <manager-ip>:2377  # on worker nodes
+   ```
+2. Images must be available on all Swarm nodes. Either:
+   - Use a container registry (`--registry registry.example.com`), or
+   - Manually `docker save`/`docker load` images on each node
+
+### Swarm deploy (single-node Swarm)
+
+```bash
+python3 deploy.py --target swarm \
+  --host 1.2.3.4 --user admin
+```
+
+### Swarm deploy with HA (multi-node Swarm + registry)
+
+```bash
+# Set HA_ENABLED=true in .env first, then:
+python3 deploy.py --target swarm \
+  --host 1.2.3.4 --user admin \
+  --stack-name corex \
+  --registry registry.example.com \
+  --image-tag v1.0
+```
+
+### Swarm HA behavior
+
+When `HA_ENABLED=true` + `SWARM_MODE=true`:
+- **HAProxy**: 2 replicas, Swarm ingress mesh provides the VIP (no keepalived)
+- **Coraza SPOA**: 2 replicas, load-balanced by HAProxy
+- **Valkey**: primary + replica + 3 Sentinels for quorum failover
+- **Stick-table sync**: HAProxy peers connect via `tasks.corex` DNS (dnsrr endpoint mode)
+- **No keepalived**: Swarm's routing mesh handles failover
+
+### Swarm-specific options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--target swarm` | Use Docker Swarm deploy flow | — |
+| `--stack-name` | Swarm stack name | `corex` |
+| `--registry` | Container registry URL for multi-node image distribution | — |
+| `--image-tag` | Docker image tag for rebuilt images | `latest` |
+
+### Managing the Swarm stack
+
+```bash
+docker stack services corex       # list services
+docker stack ps corex             # list tasks
+docker service logs corex_api     # view logs
+docker stack rm corex             # remove the stack
+```
+
 ## Kubernetes deployment
 
 The `--target k8s-cluster` and `--target k8s-remote` modes deploy via the Helm chart in `k8s/charts/corex-manager/`. See `k8s/README.md` for full architecture details.
@@ -143,7 +204,7 @@ python3 deploy.py --target k8s-remote \
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--target` | Deployment target: `docker`, `k8s-remote`, `k8s-cluster` | `docker` |
+| `--target` | Deployment target: `docker`, `swarm`, `k8s-remote`, `k8s-cluster` | `docker` |
 | `--release-name` | Helm release name | `corex` |
 | `--namespace` | Kubernetes namespace | `corex` |
 | `--values-file` | Path to Helm values.yaml override | — |

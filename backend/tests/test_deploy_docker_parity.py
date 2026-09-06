@@ -91,11 +91,20 @@ class TestDeployDockerTargetUnchanged:
             assert hasattr(deploy_module, func_name), f"Missing function: {func_name}"
 
     def test_docker_flow_calls_docker_compose(self, deploy_module):
-        """The docker deploy flow source should still reference docker compose."""
+        """The docker deploy flow source should still reference docker compose.
+
+        The deploy flow uses ``_compose_cmd(ha_enabled, ...)`` which expands
+        to ``docker compose ...`` (HA off) or ``docker compose -f ... -f ...``
+        (HA on). Verify the helper is used and the compose actions are present.
+        """
         src = inspect.getsource(deploy_module._deploy_docker)
-        assert "docker compose build" in src
-        assert "docker compose up -d" in src
-        assert "docker compose restart" in src
+        assert "_compose_cmd" in src
+        assert '"build"' in src
+        assert '"up -d"' in src
+        assert '"restart' in src
+        # The _compose_cmd helper itself should produce "docker compose"
+        assert hasattr(deploy_module, "_compose_cmd")
+        assert "docker compose" in deploy_module._compose_cmd(False, "build")
 
     def test_docker_flow_does_not_reference_helm(self, deploy_module):
         """The docker deploy flow should NOT reference helm or k8s."""
