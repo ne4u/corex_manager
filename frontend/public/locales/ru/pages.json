@@ -2235,7 +2235,7 @@
     }
   },
   "pageProtect": {
-    "title": "Page Armor",
+    "title": "Page Protect",
     "description": "Мониторинг безопасности на стороне клиента: сбор отчётов о нарушениях CSP, инвентаризация скриптов и обнаружение изменений кода.",
     "tabs": {
       "dashboard": "Панель",
@@ -2387,7 +2387,7 @@
       "confirmClearAll": "Удалить все отчёты CSP? Это действие нельзя отменить."
     },
     "settings": {
-      "title": "Настройки Page Armor",
+      "title": "Настройки Page Protect",
       "monitoringEnabled": "Мониторинг включён",
       "monitoringEnabledHelp": "Включает захват отчётов CSP в coreX и фоновый сэмплер.",
       "codeChangeDetection": "Обнаружение изменений кода",

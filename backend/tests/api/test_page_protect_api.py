@@ -259,6 +259,40 @@ def test_create_script_extracts_domain(client, db):
     assert r.json()["domain"] == "fonts.googleapis.com"
 
 
+def test_create_script_with_fetch_method(client, db):
+    """Creating a script with fetch_method=POST stores it correctly."""
+    r = client.post("/api/v1/page-protect/scripts", json={
+        "url": "https://cdn.example.com/new.js",
+        "resource_type": "script",
+        "fetch_method": "POST",
+    })
+    assert r.status_code == 201
+    data = r.json()
+    assert data["fetch_method"] == "POST"
+    assert data["last_fetch_method"] is None
+
+
+def test_create_script_invalid_fetch_method_422(client, db):
+    """Invalid fetch_method values are rejected by the schema validator."""
+    r = client.post("/api/v1/page-protect/scripts", json={
+        "url": "https://cdn.example.com/new.js",
+        "fetch_method": "DELETE",
+    })
+    assert r.status_code == 422
+
+
+def test_update_script_fetch_method_clears_last_fetch_method(client, db):
+    """Changing fetch_method clears last_fetch_method so the new setting takes effect."""
+    s = make_page_protect_script(db, fetch_method="auto", last_fetch_method="POST")
+    db.commit()
+    assert s.last_fetch_method == "POST"
+    r = client.put(f"/api/v1/page-protect/scripts/{s.id}", json={"fetch_method": "GET"})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["fetch_method"] == "GET"
+    assert data["last_fetch_method"] is None
+
+
 def test_reset_hash_clears_fields(client, db):
     """POST /scripts/{sid}/reset-hash with recheck=false clears hash fields."""
     from app.models.models import PageProtectScript

@@ -64,6 +64,8 @@ class PageProtectScript(Base):
     hash_changed = Column(Boolean, default=False)
     notes = Column(Text, nullable=True)
     source = Column(String, default="csp")  # csp | manual | beacon
+    fetch_method = Column(String, default="auto")  # auto | GET | POST
+    last_fetch_method = Column(String, nullable=True)  # method used by last successful check (GET | POST)
 
 
 __all__ = ['CspReport', 'PageProtectPolicy', 'PageProtectScript']

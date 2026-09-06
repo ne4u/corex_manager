@@ -194,6 +194,7 @@ def create_page_protect_script(
         notes=s_in.notes,
         source="manual",
         occurrence_count=0,
+        fetch_method=s_in.fetch_method or "auto",
     )
     db.add(obj)
     db.commit()
@@ -206,8 +207,14 @@ def update_page_protect_script(sid: int, s_in: PageProtectScriptUpdate, db: Sess
     obj = db.get(PageProtectScript, sid)
     if not obj:
         raise HTTPException(status_code=404, detail="Script not found")
-    for k, v in s_in.model_dump(exclude_unset=True).items():
+    data = s_in.model_dump(exclude_unset=True)
+    for k, v in data.items():
         setattr(obj, k, v)
+    # When fetch_method changes, clear last_fetch_method so the new setting
+    # takes effect on the next check (auto re-probes; explicit uses the new
+    # method directly).
+    if "fetch_method" in data:
+        obj.last_fetch_method = None
     db.commit()
     db.refresh(obj)
     return obj

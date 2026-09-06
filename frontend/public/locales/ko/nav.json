@@ -12,7 +12,7 @@
     "wafSignatures": "WAF 시그니처",
     "wafLogs": "WAF 로그",
     "captcha": "CAPTCHA",
-    "pageArmor": "페이지 아머",
+    "pageArmor": "페이지 프로텍트",
     "apiArmor": "API 아머",
     "redirects": "리다이렉트 & 재작성",
     "headers": "헤더",

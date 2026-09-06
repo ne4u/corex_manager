@@ -2421,7 +2421,7 @@
     }
   },
   "pageProtect": {
-    "title": "Page Armor",
+    "title": "Page Protect",
     "description": "Client-side security monitoring: CSP violation report collection, script inventory, and code change detection.",
     "tabs": {
       "dashboard": "Dashboard",
@@ -2573,7 +2573,7 @@
       "confirmClearAll": "Delete all CSP reports? This cannot be undone."
     },
     "settings": {
-      "title": "Page Armor Settings",
+      "title": "Page Protect Settings",
       "monitoringEnabled": "Monitoring Enabled",
       "monitoringEnabledHelp": "Enables CSP report capture in coreX and the background sampler.",
       "codeChangeDetection": "Code Change Detection",

@@ -296,7 +296,7 @@ class Settings(BaseSettings):
     PAGE_PROTECT_SAMPLER_INTERVAL_SECONDS: int = 10
     PAGE_PROTECT_REPORT_BODY_MAX_BYTES: int = 16384
     PAGE_PROTECT_HASH_TIMEOUT_SECONDS: int = 10
-    PAGE_PROTECT_HASH_USER_AGENT: str = "coreX-Manager-PageProtect/2.0"
+    PAGE_PROTECT_HASH_USER_AGENT: str = "coreX-Manager-PageProtect/2.0 (https://corex.app/docs/page-protect/)"
     # Internal bypass token sent by the Page Protect hasher in the
     # PAGE_PROTECT_HASHER_BYPASS_HEADER so HAProxy can identify its local
     # requests and skip logging, risk scoring, security rules, rate limiting,

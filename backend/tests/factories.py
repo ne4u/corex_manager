@@ -449,6 +449,8 @@ def make_page_protect_script(
     last_seen=None,
     hash_checked_at=None,
     source: str = "csp",
+    fetch_method: str = "auto",
+    last_fetch_method: Optional[str] = None,
 ) -> PageProtectScript:
     s = PageProtectScript(
         url=url,
@@ -461,6 +463,8 @@ def make_page_protect_script(
         last_seen=last_seen,
         hash_checked_at=hash_checked_at,
         source=source,
+        fetch_method=fetch_method,
+        last_fetch_method=last_fetch_method,
     )
     db.add(s)
     db.flush()

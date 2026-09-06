@@ -57,6 +57,8 @@ interface PageProtectScript {
   hash_changed: boolean
   notes: string | null
   source: string | null
+  fetch_method: string | null
+  last_fetch_method: string | null
 }
 
 interface PageProtectStats {
@@ -808,7 +810,7 @@ function SourceInput({ onAdd }: { onAdd: (source: string) => void }) {
   )
 }
 
-type ScriptSortKey = 'url' | 'resource_type' | 'domain' | 'source' | 'occurrence_count' | 'last_seen' | 'last_hash_at' | 'hash_status'
+type ScriptSortKey = 'url' | 'resource_type' | 'domain' | 'source' | 'fetch_method' | 'occurrence_count' | 'last_seen' | 'last_hash_at' | 'hash_status'
 type SortDir = 'asc' | 'desc'
 
 function SortTh({ label, sortKey, activeKey, dir, onSort }: {
@@ -847,6 +849,7 @@ function ScriptsTab() {
   const [showAddForm, setShowAddForm] = useState(false)
   const [newUrl, setNewUrl] = useState('')
   const [newType, setNewType] = useState('script')
+  const [newMethod, setNewMethod] = useState('auto')
   const [adding, setAdding] = useState(false)
   const [sortKey, setSortKey] = useState<ScriptSortKey | null>(null)
   const [sortDir, setSortDir] = useState<SortDir>('asc')
@@ -876,6 +879,7 @@ function ScriptsTab() {
         case 'resource_type': return s.resource_type || ''
         case 'domain': return s.domain || ''
         case 'source': return s.source || ''
+        case 'fetch_method': return s.fetch_method || 'auto'
         case 'occurrence_count': return s.occurrence_count || 0
         case 'last_seen': return s.last_seen || ''
         case 'last_hash_at': return s.last_hash_at || ''
@@ -941,9 +945,10 @@ function ScriptsTab() {
     if (!newUrl.trim()) return
     setAdding(true)
     try {
-      await pageProtect.scripts.create({ url: newUrl.trim(), resource_type: newType })
+      await pageProtect.scripts.create({ url: newUrl.trim(), resource_type: newType, fetch_method: newMethod })
       setNewUrl('')
       setNewType('script')
+      setNewMethod('auto')
       setShowAddForm(false)
       reload()
     } catch (err) {
@@ -1014,6 +1019,14 @@ function ScriptsTab() {
               <option value="other">Other</option>
             </select>
           </div>
+          <div>
+            <label className="label">Method</label>
+            <select className="input" value={newMethod} onChange={e => setNewMethod(e.target.value)}>
+              <option value="auto">Auto (probe)</option>
+              <option value="GET">GET</option>
+              <option value="POST">POST</option>
+            </select>
+          </div>
           <button onClick={addAsset} disabled={adding || !newUrl.trim()} className="btn-primary text-sm">
             {adding ? 'Adding...' : 'Add'}
           </button>
@@ -1028,6 +1041,7 @@ function ScriptsTab() {
               <SortTh label="Type" sortKey="resource_type" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />
               <SortTh label="Domain" sortKey="domain" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />
               <SortTh label="Source" sortKey="source" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />
+              <SortTh label="Method" sortKey="fetch_method" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />
               <SortTh label="Occurrences" sortKey="occurrence_count" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />
               <SortTh label="Last Seen" sortKey="last_seen" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />
               <SortTh label="Last Checked" sortKey="last_hash_at" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />
@@ -1042,6 +1056,11 @@ function ScriptsTab() {
                 <td className="text-slate-400">{s.resource_type}</td>
                 <td className="text-slate-400">{s.domain}</td>
                 <td>{sourceBadge(s.source)}</td>
+                <td className="text-slate-400 text-xs">
+                  {s.fetch_method?.toUpperCase() === 'AUTO' || !s.fetch_method
+                    ? <span>Auto{s.last_fetch_method ? ` (${s.last_fetch_method})` : ''}</span>
+                    : s.fetch_method.toUpperCase()}
+                </td>
                 <td className="text-slate-400">{s.occurrence_count}</td>
                 <td className="text-slate-400 text-xs">{s.last_seen ? formatDateTime(s.last_seen) : ''}</td>
                 <td className="text-slate-400 text-xs">{s.last_hash_at ? formatDateTime(s.last_hash_at) : ''}</td>
@@ -1071,7 +1090,7 @@ function ScriptsTab() {
                 </td>
               </tr>
             ))}
-            {sorted.length === 0 && <tr><td colSpan={9} className="py-4 text-center text-slate-500">No scripts detected yet</td></tr>}
+            {sorted.length === 0 && <tr><td colSpan={10} className="py-4 text-center text-slate-500">No scripts detected yet</td></tr>}
           </tbody>
         </table>
       </div>
@@ -1241,7 +1260,7 @@ function SettingsTab({ reloadStats }: { reloadStats: () => void }) {
 
   return (
     <div className="space-y-4 max-w-2xl">
-      <h3 className="text-lg font-semibold">Page Armor Settings</h3>
+      <h3 className="text-lg font-semibold">Page Protect Settings</h3>
       <form onSubmit={save} className="card p-6 space-y-4">
         <div className="flex items-center gap-2">
           <input type="checkbox" id="pp-mon" className="rounded border-slate-600 bg-slate-800 text-primary" checked={settings.monitoring_enabled} onChange={e => setSettings({ ...settings, monitoring_enabled: e.target.checked })} />

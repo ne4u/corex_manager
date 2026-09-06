@@ -2235,7 +2235,7 @@
     }
   },
   "pageProtect": {
-    "title": "ページアーマー",
+    "title": "ページプロテクト",
     "description": "クライアント側のセキュリティ監視: CSP違反レポート収集、スクリプトインベントリ、コード変更検出。",
     "tabs": {
       "dashboard": "ダッシュボード",
@@ -2387,7 +2387,7 @@
       "confirmClearAll": "すべてのCSPレポートを削除しますか? この操作は取り消せません。"
     },
     "settings": {
-      "title": "ページアーマー設定",
+      "title": "ページプロテクト設定",
       "monitoringEnabled": "監視を有効化",
       "monitoringEnabledHelp": "coreXでのCSPレポートキャプチャとバックグラウンドサンプラーを有効にします。",
       "codeChangeDetection": "コード変更検出",

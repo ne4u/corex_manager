@@ -37,7 +37,7 @@ def _hasher_headers() -> dict:
         "User-Agent": settings.PAGE_PROTECT_HASH_USER_AGENT,
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
-        "Accept-Encoding": "gzip, deflate, br",
+        "Accept-Encoding": "gzip, deflate",
         "Sec-Fetch-Site": "none",
         "Sec-Fetch-Mode": "navigate",
         "Sec-Fetch-Dest": "document",
@@ -50,7 +50,14 @@ def _hasher_headers() -> dict:
 
 
 def hash_script(script: PageProtectScript) -> Optional[str]:
-    """Fetch a script URL and return the SHA-256 hash of its content, or None on error."""
+    """Fetch a script URL and return the SHA-256 hash of its content, or None on error.
+
+    The HTTP method is determined by ``script.fetch_method``:
+    - ``"GET"`` / ``"POST"``: always use that method.
+    - ``"auto"`` (default): use ``last_fetch_method`` if set; otherwise probe
+      GET, and on 405/403 fall back to POST. The working method is persisted
+      to ``last_fetch_method`` so the probe cost is one-time.
+    """
     url = script.url
     if not url or not url.startswith(("http://", "https://")):
         return None
@@ -59,16 +66,37 @@ def hash_script(script: PageProtectScript) -> Optional[str]:
     except ImportError:
         logger.warning("httpx not installed; cannot hash scripts")
         return None
+
+    configured = (script.fetch_method or "auto").upper()
+    if configured == "AUTO":
+        method = (script.last_fetch_method or "GET").upper()
+    else:
+        method = configured
+
     try:
-        resp = httpx.get(
-            url,
+        with httpx.Client(
             timeout=settings.PAGE_PROTECT_HASH_TIMEOUT_SECONDS,
             headers=_hasher_headers(),
             follow_redirects=True,
-            http2=True,
-        )
-        resp.raise_for_status()
-        return hashlib.sha256(resp.content).hexdigest()
+        ) as client:
+            resp = client.request(method, url)
+            # Auto-probe: if GET is rejected (405 Method Not Allowed or 403
+            # Forbidden), retry with POST. Only probe when configured as
+            # "auto" and we haven't already persisted a working method.
+            if (
+                configured == "AUTO"
+                and not script.last_fetch_method
+                and resp.status_code in (403, 405)
+                and method != "POST"
+            ):
+                logger.info("GET rejected (%d) for %s, retrying with POST", resp.status_code, url)
+                method = "POST"
+                resp = client.request(method, url)
+            resp.raise_for_status()
+            # Persist the working method for auto-mode scripts.
+            if configured == "AUTO" and script.last_fetch_method != method:
+                script.last_fetch_method = method
+            return hashlib.sha256(resp.content).hexdigest()
     except Exception as exc:
         logger.warning("Failed to hash script %s: %s", url, exc)
         return None

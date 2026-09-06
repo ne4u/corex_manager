@@ -12,7 +12,7 @@
     "wafSignatures": "WAFシグネチャ",
     "wafLogs": "WAFログ",
     "captcha": "CAPTCHA",
-    "pageArmor": "ページアーマー",
+    "pageArmor": "ページプロテクト",
     "apiArmor": "APIアーマー",
     "redirects": "リダイレクト & リライト",
     "headers": "ヘッダー",

@@ -2235,7 +2235,7 @@
     }
   },
   "pageProtect": {
-    "title": "页面防护",
+    "title": "页面保护",
     "description": "客户端安全监控：CSP违规报告收集、脚本清单和代码变更检测。",
     "tabs": {
       "dashboard": "仪表板",
@@ -2387,7 +2387,7 @@
       "confirmClearAll": "删除所有CSP报告？此操作无法撤销。"
     },
     "settings": {
-      "title": "页面防护设置",
+      "title": "页面保护设置",
       "monitoringEnabled": "监控已启用",
       "monitoringEnabledHelp": "在coreX中启用CSP报告捕获和后台采样器。",
       "codeChangeDetection": "代码变更检测",

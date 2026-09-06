@@ -2235,7 +2235,7 @@
     }
   },
   "pageProtect": {
-    "title": "페이지 아머",
+    "title": "페이지 프로텍트",
     "description": "클라이언트 측 보안 모니터링: CSP 위반 보고서 수집, 스크립트 인벤토리 및 코드 변경 감지.",
     "tabs": {
       "dashboard": "대시보드",
@@ -2387,7 +2387,7 @@
       "confirmClearAll": "모든 CSP 보고서를 삭제하시겠습니까? 이 작업은 취소할 수 없습니다."
     },
     "settings": {
-      "title": "페이지 아머 설정",
+      "title": "페이지 프로텍트 설정",
       "monitoringEnabled": "모니터링 활성화",
       "monitoringEnabledHelp": "coreX에서 CSP 보고서 캡처 및 백그라운드 샘플러를 활성화합니다.",
       "codeChangeDetection": "코드 변경 감지",

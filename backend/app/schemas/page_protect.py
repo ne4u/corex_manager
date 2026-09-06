@@ -69,11 +69,31 @@ class PageProtectScriptCreate(BaseModel):
     url: str
     resource_type: str = "script"
     notes: Optional[str] = None
+    fetch_method: str = "auto"  # auto | GET | POST
+
+    @field_validator("fetch_method")
+    @classmethod
+    def validate_fetch_method(cls, v: str) -> str:
+        v = (v or "auto").upper()
+        if v not in ("AUTO", "GET", "POST"):
+            raise ValueError("fetch_method must be 'auto', 'GET', or 'POST'")
+        return v
 
 
 class PageProtectScriptUpdate(BaseModel):
     notes: Optional[str] = None
     hash_changed: Optional[bool] = None
+    fetch_method: Optional[str] = None  # auto | GET | POST
+
+    @field_validator("fetch_method")
+    @classmethod
+    def validate_fetch_method(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        v = v.upper()
+        if v not in ("AUTO", "GET", "POST"):
+            raise ValueError("fetch_method must be 'auto', 'GET', or 'POST'")
+        return v
 
 
 class PageProtectScriptResponse(BaseModel):
@@ -92,6 +112,8 @@ class PageProtectScriptResponse(BaseModel):
     hash_changed: bool
     notes: Optional[str] = None
     source: Optional[str] = None
+    fetch_method: Optional[str] = None
+    last_fetch_method: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

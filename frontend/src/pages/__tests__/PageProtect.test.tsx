@@ -52,7 +52,7 @@ function renderPage() {
 describe('PageProtect', () => {
   it('renders the page title', async () => {
     renderPage()
-    expect(screen.getByText('Page Armor')).toBeInTheDocument()
+    expect(screen.getByText('Page Protect')).toBeInTheDocument()
   })
 
   it('renders all 5 tabs', async () => {
@@ -87,7 +87,7 @@ describe('PageProtect', () => {
     renderPage()
     screen.getByText('Settings').click()
     await waitFor(() => {
-      expect(screen.getByText('Page Armor Settings')).toBeInTheDocument()
+      expect(screen.getByText('Page Protect Settings')).toBeInTheDocument()
     })
   })
 

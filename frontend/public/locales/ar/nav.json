@@ -12,7 +12,7 @@
     "wafSignatures": "تواقيع WAF",
     "wafLogs": "سجلات WAF",
     "captcha": "CAPTCHA",
-    "pageArmor": "درع الصفحة",
+    "pageArmor": "حماية الصفحة",
     "apiArmor": "درع API",
     "redirects": "إعادة التوجيه وإعادة الكتابة",
     "headers": "الترويسات",

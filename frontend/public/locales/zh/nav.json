@@ -12,7 +12,7 @@
     "wafSignatures": "WAF 签名",
     "wafLogs": "WAF 日志",
     "captcha": "验证码",
-    "pageArmor": "页面防护",
+    "pageArmor": "页面保护",
     "apiArmor": "API 防护",
     "redirects": "重定向与重写",
     "headers": "请求头",

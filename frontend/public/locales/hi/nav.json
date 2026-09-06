@@ -12,7 +12,7 @@
     "wafSignatures": "WAF सिग्नेचर",
     "wafLogs": "WAF लॉग",
     "captcha": "CAPTCHA",
-    "pageArmor": "पेज आर्मर",
+    "pageArmor": "पेज प्रोटेक्ट",
     "apiArmor": "API आर्मर",
     "redirects": "रीडायरेक्ट और रीराइट",
     "headers": "हेडर",

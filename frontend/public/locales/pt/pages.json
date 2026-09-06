@@ -2235,7 +2235,7 @@
     }
   },
   "pageProtect": {
-    "title": "Page Armor",
+    "title": "Page Protect",
     "description": "Monitoramento de segurança do lado do cliente: coleta de relatórios de violação CSP, inventário de scripts e detecção de mudanças de código.",
     "tabs": {
       "dashboard": "Painel",
@@ -2387,7 +2387,7 @@
       "confirmClearAll": "Excluir todos os relatórios CSP? Isso não pode ser desfeito."
     },
     "settings": {
-      "title": "Configurações do Page Armor",
+      "title": "Configurações do Page Protect",
       "monitoringEnabled": "Monitoramento Ativado",
       "monitoringEnabledHelp": "Ativa a captura de relatórios CSP no coreX e o amostrador em segundo plano.",
       "codeChangeDetection": "Detecção de Mudança de Código",
