@@ -2183,6 +2183,7 @@
         "solved": "已解决",
         "failed": "已失败",
         "solveRate": "解决率",
+        "lastIssued": "最后发出",
         "time": "时间",
         "type": "类型",
         "rule": "规则",
@@ -2191,6 +2192,7 @@
       },
       "chart": "图表",
       "ruleNumber": "规则 #{{id}}",
+      "deletedRule": "已删除规则",
       "chartTitle": "{{name}} — 最近7天",
       "close": "关闭",
       "eventTableHeaders": {

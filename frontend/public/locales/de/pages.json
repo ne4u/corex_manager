@@ -2183,6 +2183,7 @@
         "solved": "Gelöst",
         "failed": "Fehlgeschlagen",
         "solveRate": "Lösungsrate",
+        "lastIssued": "Zuletzt ausgelöst",
         "time": "Zeit",
         "type": "Typ",
         "rule": "Regel",
@@ -2191,6 +2192,7 @@
       },
       "chart": "Diagramm",
       "ruleNumber": "Regel #{{id}}",
+      "deletedRule": "Gelöschte Regel",
       "chartTitle": "{{name}} — letzte 7 Tage",
       "close": "Schließen",
       "eventTableHeaders": {

@@ -2183,6 +2183,7 @@
         "solved": "Resuelto",
         "failed": "Fallido",
         "solveRate": "Tasa de Resolución",
+        "lastIssued": "Último emitido",
         "time": "Hora",
         "type": "Tipo",
         "rule": "Regla",
@@ -2191,6 +2192,7 @@
       },
       "chart": "Gráfico",
       "ruleNumber": "Regla #{{id}}",
+      "deletedRule": "Regla eliminada",
       "chartTitle": "{{name}} — últimos 7 días",
       "close": "Cerrar",
       "eventTableHeaders": {

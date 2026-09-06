@@ -29,10 +29,12 @@ interface ChallengeStatRow {
   rule_type: string
   rule_id: number | null
   rule_name: string | null
+  rule_deleted: boolean
   issued: number
   solved: number
   failed: number
   solve_rate: number
+  last_issued: string | null
 }
 
 interface ChallengeEventRow {
@@ -41,6 +43,7 @@ interface ChallengeEventRow {
   rule_type: string
   rule_id: number | null
   rule_name: string | null
+  rule_deleted: boolean
   event_type: string
   request_id: string | null
   client_ip: string | null
@@ -339,6 +342,15 @@ function StatsTab() {
   const [selectedRule, setSelectedRule] = useState<{ type: string; id: number; name: string } | null>(null)
   const [showEvents, setShowEvents] = useState(false)
 
+  // Build a display name for a challenge stat/event row. If the rule was
+  // deleted (no longer in the DB), show "Deleted Rule #<id>" instead of the
+  // generic "Rule #<id>" fallback so the user knows why the name is missing.
+  const ruleDisplayName = (r: { rule_name: string | null; rule_deleted: boolean; rule_id: number | null }) => {
+    if (r.rule_name) return r.rule_name
+    if (r.rule_deleted) return t('pages:captcha.stats.deletedRule')
+    return t('pages:captcha.stats.ruleNumber', { id: r.rule_id })
+  }
+
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
@@ -393,6 +405,7 @@ function StatsTab() {
                     <th className="py-2 px-3 text-end">{t('pages:captcha.stats.tableHeaders.solved')}</th>
                     <th className="py-2 px-3 text-end">{t('pages:captcha.stats.tableHeaders.failed')}</th>
                     <th className="py-2 px-3 text-end">{t('pages:captcha.stats.tableHeaders.solveRate')}</th>
+                    <th className="py-2 px-3 whitespace-nowrap">{t('pages:captcha.stats.tableHeaders.lastIssued')}</th>
                     <th className="py-2 px-3"></th>
                   </tr>
                 </thead>
@@ -406,15 +419,16 @@ function StatsTab() {
                           'bg-purple-500/20 text-purple-400'
                         }`}>{s.rule_type}</span>
                       </td>
-                      <td className="py-2 px-3">{s.rule_name || t('pages:captcha.stats.ruleNumber', { id: s.rule_id })}</td>
+                      <td className="py-2 px-3">{ruleDisplayName(s)}</td>
                       <td className="py-2 px-3 text-end">{s.issued}</td>
                       <td className="py-2 px-3 text-end text-green-400">{s.solved}</td>
                       <td className="py-2 px-3 text-end text-red-400">{s.failed}</td>
                       <td className="py-2 px-3 text-end">{s.solve_rate}%</td>
+                      <td className="py-2 px-3 text-xs text-slate-400 whitespace-nowrap">{s.last_issued ? formatDateTime(s.last_issued) : '—'}</td>
                       <td className="py-2 px-3">
                         {s.rule_id != null && (
                           <button
-                            onClick={() => setSelectedRule({ type: s.rule_type, id: s.rule_id!, name: s.rule_name || t('pages:captcha.stats.ruleNumber', { id: s.rule_id }) })}
+                            onClick={() => setSelectedRule({ type: s.rule_type, id: s.rule_id!, name: ruleDisplayName(s) })}
                             className="text-primary hover:underline text-xs"
                           >
                             {t('pages:captcha.stats.chart')}
@@ -460,7 +474,7 @@ function StatsTab() {
                           'bg-purple-500/20 text-purple-400'
                         }`}>{e.rule_type}</span>
                       </td>
-                      <td className="py-2 px-3">{e.rule_name || t('pages:captcha.stats.ruleNumber', { id: e.rule_id })}</td>
+                      <td className="py-2 px-3">{ruleDisplayName(e)}</td>
                       <td className="py-2 px-3">
                         <span className={`text-xs font-medium ${
                           e.event_type === 'solved' ? 'text-green-400' :

@@ -2183,6 +2183,7 @@
         "solved": "해결됨",
         "failed": "실패",
         "solveRate": "해결률",
+        "lastIssued": "마지막 발행",
         "time": "시간",
         "type": "유형",
         "rule": "규칙",
@@ -2191,6 +2192,7 @@
       },
       "chart": "차트",
       "ruleNumber": "규칙 #{{id}}",
+      "deletedRule": "삭제된 규칙",
       "chartTitle": "{{name}} — 최근 7일",
       "close": "닫기",
       "eventTableHeaders": {

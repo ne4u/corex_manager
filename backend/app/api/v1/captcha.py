@@ -29,13 +29,80 @@ _RETENTION_DAYS = settings.CAPTCHA_CHALLENGE_RETENTION_DAYS
 def prune_challenge_events(db: Session) -> int:
     """Delete challenge events older than the retention window.
 
-    Called on startup to keep the ``challenge_events`` table bounded.
-    Returns the number of rows deleted.
+    Called on startup (and lazily from stats endpoints) to keep the
+    ``challenge_events`` table bounded. Returns the number of rows deleted.
     """
     cutoff = (datetime.now(timezone.utc) - timedelta(days=_RETENTION_DAYS)).replace(tzinfo=None)
     result = db.query(ChallengeEvent).filter(ChallengeEvent.created_at < cutoff).delete()
     db.commit()
     return result
+
+
+def _resolve_rule_names(db: Session, rows: list) -> None:
+    """Resolve ``rule_name`` to the current DB value and set ``rule_deleted``.
+
+    Challenge events store the rule name as captured at challenge-issue time.
+    If a rule is renamed, events logged before the rename carry the old name.
+    This helper looks up the **current** name from the source table so the UI
+    always shows the up-to-date name and doesn't split one rule into multiple
+    rows just because the name changed.
+
+    If the rule no longer exists (was deleted), ``rule_deleted`` is set to
+    True. The stored ``rule_name`` (if any) is kept so the user can still see
+    what the rule was called when the events were logged. If no name was ever
+    stored, the frontend shows a generic "Deleted Rule" label.
+
+    For events with no ``rule_id`` (e.g. WAF events from direct access to the
+    captcha URL without a cid token), the rule_type is used as the display
+    name so the user sees "WAF" instead of "Rule #".
+    """
+    # First pass: for rows with no rule_id, use the rule_type as the name.
+    # These are events from direct access to /waf/captcha (no cid token) —
+    # they have no associated rule, so we show the rule_type as a label.
+    for r in rows:
+        rid = getattr(r, "rule_id", None)
+        rname = getattr(r, "rule_name", None)
+        rt = getattr(r, "rule_type", None)
+        if not rid and not rname and rt:
+            r.rule_name = rt
+
+    # Second pass: collect all (rule_type, rule_id) pairs that need a DB
+    # lookup. We look up every row with a rule_id — not just ones with a
+    # NULL name — so that renames are reflected.
+    pending: Dict[str, list] = {}
+    for r in rows:
+        rid = getattr(r, "rule_id", None)
+        rt = getattr(r, "rule_type", None)
+        if rid and rt:
+            pending.setdefault(rt, []).append((rid, r))
+    if not pending:
+        return
+    # Lazy imports to avoid circular dependencies
+    from ...models.waf import WafRule
+    from ...models.models import SecurityRule, RateLimit
+    _lookup = {
+        "waf": lambda ids: {r.id: r.name for r in db.query(WafRule).filter(WafRule.id.in_(ids)).all()},
+        "security": lambda ids: {r.id: r.name for r in db.query(SecurityRule).filter(SecurityRule.id.in_(ids)).all()},
+        "rate_limit": lambda ids: {r.id: r.name for r in db.query(RateLimit).filter(RateLimit.id.in_(ids)).all()},
+    }
+    for rt, entries in pending.items():
+        lookup = _lookup.get(rt)
+        if not lookup:
+            continue
+        ids = [rid for rid, _ in entries]
+        names = lookup(ids)
+        for rid, r in entries:
+            if rid in names:
+                # Rule exists — use the current DB name (handles renames).
+                r.rule_name = names[rid]
+            else:
+                # Rule was deleted — keep the stored name (if any) so the
+                # user can see what it was called. Mark as deleted so the
+                # frontend knows this rule no longer exists.
+                # Use setattr so this works on both Pydantic models (which
+                # have the field declared) and SQLAlchemy ORM objects (which
+                # don't — the caller reads it back via getattr).
+                setattr(r, "rule_deleted", True)
 
 
 # ---------------------------------------------------------------------------
@@ -108,10 +175,12 @@ class ChallengeStatRow(BaseModel):
     rule_type: str
     rule_id: Optional[int] = None
     rule_name: Optional[str] = None
+    rule_deleted: bool = False
     issued: int = 0
     solved: int = 0
     failed: int = 0
     solve_rate: float = 0.0
+    last_issued: Optional[str] = None
 
 
 class ChallengeTimeSeriesPoint(BaseModel):
@@ -127,6 +196,7 @@ class ChallengeEventRow(BaseModel):
     rule_type: str
     rule_id: Optional[int] = None
     rule_name: Optional[str] = None
+    rule_deleted: bool = False
     event_type: str
     request_id: Optional[str] = None
     client_ip: Optional[str] = None
@@ -326,12 +396,14 @@ def get_challenge_stats_route(
     _=Depends(rate_limit),
 ):
     """Aggregated challenge stats per rule (last 7 days max)."""
+    # Prune stale events so the table stays bounded even when the server runs
+    # for long periods without a restart (startup pruning alone is insufficient).
+    prune_challenge_events(db)
     # Clamp to retention window — stats are only kept for _RETENTION_DAYS.
     retention_start = (datetime.now(timezone.utc) - timedelta(days=_RETENTION_DAYS)).replace(tzinfo=None)
     q = db.query(
         ChallengeEvent.rule_type,
         ChallengeEvent.rule_id,
-        ChallengeEvent.rule_name,
         ChallengeEvent.event_type,
         func.count().label("cnt"),
     )
@@ -343,29 +415,54 @@ def get_challenge_stats_route(
         q = q.filter(ChallengeEvent.created_at <= datetime.fromtimestamp(to_ts, tz=timezone.utc).replace(tzinfo=None))
     if rule_type:
         q = q.filter(ChallengeEvent.rule_type == rule_type)
-    q = q.group_by(ChallengeEvent.rule_type, ChallengeEvent.rule_id, ChallengeEvent.rule_name, ChallengeEvent.event_type)
+    # Group by (rule_type, rule_id, event_type) — NOT rule_name. Including
+    # rule_name in the GROUP BY would split a rule into multiple rows if it
+    # was renamed (events logged before the rename carry the old name). The
+    # current name is resolved from the DB after aggregation.
+    q = q.group_by(ChallengeEvent.rule_type, ChallengeEvent.rule_id, ChallengeEvent.event_type)
     rows = q.all()
-    # Aggregate into per-rule rows
+    # Aggregate into per-rule rows (keyed by type+id only)
     agg: Dict[tuple, Dict[str, int]] = {}
     for r in rows:
-        key = (r.rule_type, r.rule_id, r.rule_name)
+        key = (r.rule_type, r.rule_id)
         if key not in agg:
             agg[key] = {"issued": 0, "solved": 0, "failed": 0}
         agg[key][r.event_type] = r.cnt
+    # Fetch the last-issued timestamp per rule in a single query.
+    last_issued_map: Dict[tuple, Optional[datetime]] = {}
+    li_q = db.query(
+        ChallengeEvent.rule_type,
+        ChallengeEvent.rule_id,
+        func.max(ChallengeEvent.created_at).label("last"),
+    ).filter(
+        ChallengeEvent.created_at >= effective_from,
+        ChallengeEvent.event_type == "issued",
+    )
+    if to_ts:
+        li_q = li_q.filter(ChallengeEvent.created_at <= datetime.fromtimestamp(to_ts, tz=timezone.utc).replace(tzinfo=None))
+    if rule_type:
+        li_q = li_q.filter(ChallengeEvent.rule_type == rule_type)
+    li_q = li_q.group_by(ChallengeEvent.rule_type, ChallengeEvent.rule_id)
+    for r in li_q.all():
+        last_issued_map[(r.rule_type, r.rule_id)] = r.last
     result = []
-    for (rt, rid, rname), counts in agg.items():
+    for (rt, rid), counts in agg.items():
         issued = counts["issued"]
         solved = counts["solved"]
         solve_rate = (solved / issued * 100) if issued > 0 else 0.0
+        last = last_issued_map.get((rt, rid))
         result.append(ChallengeStatRow(
             rule_type=rt,
             rule_id=rid,
-            rule_name=rname,
+            rule_name=None,  # resolved from DB below
             issued=issued,
             solved=solved,
             failed=counts["failed"],
             solve_rate=round(solve_rate, 1),
+            last_issued=last.isoformat() if last else None,
         ))
+    # Resolve current rule names from the DB (handles renames + deleted rules).
+    _resolve_rule_names(db, result)
     return result
 
 
@@ -423,6 +520,9 @@ def get_challenge_events_route(
     _=Depends(rate_limit),
 ):
     """List recent challenge events with request IDs for correlation (last 7 days)."""
+    # Prune stale events so the table stays bounded even when the server runs
+    # for long periods without a restart (startup pruning alone is insufficient).
+    prune_challenge_events(db)
     retention_start = (datetime.now(timezone.utc) - timedelta(days=_RETENTION_DAYS)).replace(tzinfo=None)
     q = db.query(ChallengeEvent).filter(ChallengeEvent.created_at >= retention_start)
     if rule_type:
@@ -433,6 +533,8 @@ def get_challenge_events_route(
         q = q.filter(ChallengeEvent.request_id == request_id)
     q = q.order_by(ChallengeEvent.created_at.desc()).limit(limit).offset(offset)
     rows = q.all()
+    # Backfill rule names for events where the name was not captured.
+    _resolve_rule_names(db, rows)
     return [
         ChallengeEventRow(
             id=r.id,
@@ -440,6 +542,7 @@ def get_challenge_events_route(
             rule_type=r.rule_type,
             rule_id=r.rule_id,
             rule_name=r.rule_name,
+            rule_deleted=getattr(r, "rule_deleted", False),
             event_type=r.event_type,
             request_id=r.request_id,
             client_ip=r.client_ip,

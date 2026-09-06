@@ -2183,6 +2183,7 @@
         "solved": "محلول",
         "failed": "فاشل",
         "solveRate": "معدل الحل",
+        "lastIssued": "آخر إصدار",
         "time": "الوقت",
         "type": "النوع",
         "rule": "القاعدة",
@@ -2191,6 +2192,7 @@
       },
       "chart": "الرسم البياني",
       "ruleNumber": "قاعدة #{{id}}",
+      "deletedRule": "قاعدة محذوفة",
       "chartTitle": "{{name}} — آخر 7 أيام",
       "close": "إغلاق",
       "eventTableHeaders": {

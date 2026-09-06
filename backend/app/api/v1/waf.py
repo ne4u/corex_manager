@@ -165,8 +165,12 @@ def get_captcha_challenge(
         request_id=request_id,
         is_invisible=provider.is_invisible(),
     )
-    # Log challenge issued event with request_id
-    _log_challenge_event(db, rule_id, rule_type, rule_name, "issued", request_id=request_id or None)
+    # Log challenge issued event — but only if this is a real challenge (has
+    # a cid token). Without a cid, this is a direct access to the captcha URL
+    # (bots/crawlers/bookmarks), not a challenge triggered by a rule. Logging
+    # these would create spurious stats entries with no rule_id or rule_name.
+    if cid:
+        _log_challenge_event(db, rule_id, rule_type, rule_name, "issued", request_id=request_id or None)
     return HTMLResponse(html)
 
 
@@ -305,10 +309,16 @@ def _log_challenge_event(db: Session, rule_id: int, rule_type: str, rule_name: s
     """Log a ChallengeEvent for per-rule solve rate statistics."""
     try:
         from ...models.waf import ChallengeEvent
+        # If the rule name was not captured (e.g. Valkey context missing at
+        # challenge-issue time), look it up from the source table so the stats
+        # UI shows a human-readable label instead of "Rule #<id>".
+        effective_name = rule_name or None
+        if not effective_name and rule_id > 0:
+            effective_name = _lookup_rule_name(db, rule_type, rule_id)
         db.add(ChallengeEvent(
             rule_type=rule_type,
             rule_id=rule_id if rule_id > 0 else None,
-            rule_name=rule_name or None,
+            rule_name=effective_name,
             event_type=event_type,
             client_ip=None,
             request_id=request_id,
@@ -316,6 +326,26 @@ def _log_challenge_event(db: Session, rule_id: int, rule_type: str, rule_name: s
         db.commit()
     except Exception:
         db.rollback()
+
+
+def _lookup_rule_name(db: Session, rule_type: str, rule_id: int) -> Optional[str]:
+    """Look up a rule's name by type and ID from the source table."""
+    try:
+        if rule_type == "waf":
+            from ...models.waf import WafRule
+            rule = db.query(WafRule).filter(WafRule.id == rule_id).first()
+            return rule.name if rule else None
+        elif rule_type == "security":
+            from ...models.models import SecurityRule
+            rule = db.query(SecurityRule).filter(SecurityRule.id == rule_id).first()
+            return rule.name if rule else None
+        elif rule_type == "rate_limit":
+            from ...models.models import RateLimit
+            rule = db.query(RateLimit).filter(RateLimit.id == rule_id).first()
+            return rule.name if rule else None
+    except Exception:
+        pass
+    return None
 
 
 @router.get("/waf/logs")

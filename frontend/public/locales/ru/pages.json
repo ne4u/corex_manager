@@ -2183,6 +2183,7 @@
         "solved": "Решено",
         "failed": "Неудачно",
         "solveRate": "Доля решений",
+        "lastIssued": "Последний выпуск",
         "time": "Время",
         "type": "Тип",
         "rule": "Правило",
@@ -2191,6 +2192,7 @@
       },
       "chart": "График",
       "ruleNumber": "Правило #{{id}}",
+      "deletedRule": "Удалённое правило",
       "chartTitle": "{{name}} — последние 7 дней",
       "close": "Закрыть",
       "eventTableHeaders": {

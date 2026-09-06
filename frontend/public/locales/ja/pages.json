@@ -2183,6 +2183,7 @@
         "solved": "解決",
         "failed": "失敗",
         "solveRate": "解決率",
+        "lastIssued": "最終発行",
         "time": "時刻",
         "type": "タイプ",
         "rule": "ルール",
@@ -2191,6 +2192,7 @@
       },
       "chart": "チャート",
       "ruleNumber": "ルール #{{id}}",
+      "deletedRule": "削除されたルール",
       "chartTitle": "{{name}} — 過去7日間",
       "close": "閉じる",
       "eventTableHeaders": {

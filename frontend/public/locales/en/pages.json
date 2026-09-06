@@ -2369,6 +2369,7 @@
         "solved": "Solved",
         "failed": "Failed",
         "solveRate": "Solve Rate",
+        "lastIssued": "Last Issued",
         "time": "Time",
         "type": "Type",
         "rule": "Rule",
@@ -2377,6 +2378,7 @@
       },
       "chart": "Chart",
       "ruleNumber": "Rule #{{id}}",
+      "deletedRule": "Deleted Rule",
       "chartTitle": "{{name}} — last 7 days",
       "close": "Close",
       "eventTableHeaders": {

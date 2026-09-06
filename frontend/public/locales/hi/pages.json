@@ -2183,6 +2183,7 @@
         "solved": "हल किया",
         "failed": "विफल",
         "solveRate": "हल दर",
+        "lastIssued": "अंतिम जारी",
         "time": "समय",
         "type": "प्रकार",
         "rule": "नियम",
@@ -2191,6 +2192,7 @@
       },
       "chart": "चार्ट",
       "ruleNumber": "नियम #{{id}}",
+      "deletedRule": "हटाया गया नियम",
       "chartTitle": "{{name}} — पिछले 7 दिन",
       "close": "बंद करें",
       "eventTableHeaders": {
