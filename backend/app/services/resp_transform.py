@@ -207,7 +207,10 @@ def _build_resp_transform_configs(db: Session) -> Dict[str, dict]:
 
     # Page Protect beacon injection settings
     beacon = get_beacon_settings(db)
-    beacon_enabled = beacon["enabled"]
+    # The beacon JS is shared by both Inventory Beacon (asset tracking) and
+    # Beacon Trust (cxid validation). It must be injected if either feature is
+    # enabled on the matched backend.
+    beacon_enabled = beacon["enabled"] or beacon["trust_enabled"]
     beacon_backend_ids = beacon.get("backend_ids") or []
     beacon_rule = None
     if beacon_enabled:

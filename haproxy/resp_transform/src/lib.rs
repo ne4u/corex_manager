@@ -16,6 +16,7 @@
 
 use std::env;
 use std::fs;
+use std::io::{self, Read, Write};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock};
@@ -597,6 +598,11 @@ pub struct RespTransformFilter {
     request_rules: Vec<usize>,
     body_buf: Vec<u8>,
     content_type: String,
+    /// Content-Encoding value from the origin response (e.g. "gzip", "br").
+    response_encoding: String,
+    /// Largest max_body_size among the response rules selected for this request,
+    /// used as a size cap when decompressing a compressed response.
+    decompress_limit: usize,
     // Transformed output state (img_2_webp pattern)
     converted: bool,
     out: Vec<u8>,
@@ -670,6 +676,13 @@ impl RespTransformFilter {
             return Ok(());
         }
 
+        let applicable_size = matching
+            .iter()
+            .filter_map(|&i| rules.get(i).map(|r| r.rule.max_body_size))
+            .max()
+            .unwrap_or(0);
+        self.decompress_limit = applicable_size;
+
         // Pre-check: if Content-Length is known and exceeds ALL matching rules'
         // max_body_size, skip the filter entirely. Every rule would skip the
         // body anyway, so there's no point buffering it and removing
@@ -678,16 +691,24 @@ impl RespTransformFilter {
         let cl = headers.get_first::<String>("content-length")?;
         if let Some(ref cl_str) = cl {
             if let Ok(cl_val) = cl_str.trim().parse::<usize>() {
-                let applicable_size = matching
-                    .iter()
-                    .filter_map(|&i| rules.get(i).map(|r| r.rule.max_body_size))
-                    .max()
-                    .unwrap_or(0);
                 if cl_val > applicable_size {
                     self.active_response = false;
                     return Ok(());
                 }
             }
+        }
+
+        // Capture Content-Encoding so we can decompress/recompress if the origin
+        // sent a compressed response. If the encoding is one we don't support,
+        // don't try to transform -- we'll just pass the compressed bytes through.
+        let ce = headers
+            .get_first::<String>("content-encoding")?
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+        self.response_encoding = ce.clone();
+        if !ce.is_empty() && !is_supported_encoding(&ce) {
+            self.active_response = false;
+            return Ok(());
         }
 
         self.response_rules = matching;
@@ -791,7 +812,30 @@ impl RespTransformFilter {
 
     fn transform_response_body(&mut self) -> Vec<u8> {
         let rules = self.get_rules();
-        let mut body = std::mem::take(&mut self.body_buf);
+        // Keep the original compressed bytes. If the origin sent a compressed
+        // response we will decompress, apply rules, and recompress. If no rule
+        // actually changes the body we return the original bytes to avoid a
+        // wasteful decompress/recompress round-trip.
+        let original = std::mem::take(&mut self.body_buf);
+
+        // If the origin sent a compressed body (e.g. gzip, br, zstd), decompress
+        // it before running rules. The body is recompressed with the same
+        // encoding at the end so the Content-Encoding header remains valid.
+        let (mut body, original_compressed) = if self.response_encoding.is_empty() {
+            (original, None)
+        } else {
+            match decompress_response(&self.response_encoding, &original, self.decompress_limit) {
+                Some(decompressed) => (decompressed, Some(original)),
+                None => {
+                    // Decompression failed or the response would exceed the size
+                    // limit: return the original compressed bytes unchanged.
+                    return original;
+                }
+            }
+        };
+
+        let was_compressed = original_compressed.is_some();
+        let decompressed = body.clone();
 
         for &idx in &self.response_rules {
             if idx >= rules.len() {
@@ -824,7 +868,26 @@ impl RespTransformFilter {
                 _ => {}
             }
         }
-        body
+
+        if was_compressed {
+            if body == decompressed {
+                // No rule changed the body; preserve the original encoding.
+                original_compressed.unwrap()
+            } else {
+                // Recompress with the same encoding so the Content-Encoding
+                // header remains valid. If recompression fails, fall back to
+                // sending the decompressed body (best effort).
+                recompress_response(&self.response_encoding, &body).unwrap_or_else(|| {
+                    eprintln!(
+                        "resp_transform: recompression failed for encoding '{}', sending uncompressed",
+                        self.response_encoding
+                    );
+                    body
+                })
+            }
+        } else {
+            body
+        }
     }
 
     fn transform_request_body(&mut self) -> Vec<u8> {
@@ -928,6 +991,110 @@ fn inject_at_anchor(re: &Regex, inject_str: &str, position: &str, body: &[u8]) -
         }
         None => body.to_vec(),
     }
+}
+
+/// Return the canonical encoder name from a Content-Encoding token.
+/// This only normalizes historical `x-` aliases; it does not validate support.
+fn canonical_encoding(encoding: &str) -> String {
+    let raw = encoding.trim().split(',').next().unwrap_or(encoding).trim().to_ascii_lowercase();
+    match raw.as_str() {
+        "x-gzip" => "gzip".to_string(),
+        "x-brotli" => "brotli".to_string(),
+        "x-deflate" => "deflate".to_string(),
+        _ => raw,
+    }
+}
+
+/// Return true for response content-encodings we know how to decompress and
+/// recompress (`gzip`, `deflate`, `br`/`brotli`, `zstd`).
+fn is_supported_encoding(encoding: &str) -> bool {
+    matches!(
+        canonical_encoding(encoding).as_str(),
+        "gzip" | "deflate" | "br" | "brotli" | "zstd"
+    )
+}
+
+/// A concrete decoder wrapper that avoids `dyn Read` lifetime issues.
+enum Decoder<'a> {
+    Gzip(flate2::read::GzDecoder<&'a [u8]>),
+    Deflate(flate2::read::ZlibDecoder<&'a [u8]>),
+    Brotli(brotli::Decompressor<&'a [u8]>),
+    Zstd(zstd::stream::read::Decoder<'a, io::BufReader<&'a [u8]>>),
+}
+
+impl<'a> Read for Decoder<'a> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        match self {
+            Decoder::Gzip(d) => d.read(buf),
+            Decoder::Deflate(d) => d.read(buf),
+            Decoder::Brotli(d) => d.read(buf),
+            Decoder::Zstd(d) => d.read(buf),
+        }
+    }
+}
+
+/// Decode an already-compressed response body, aborting if the decoded size
+/// exceeds `limit` bytes. Returns the decompressed bytes on success, or `None`
+/// if the encoding is unsupported, the data is invalid, or the limit is hit.
+fn decompress_response(encoding: &str, body: &[u8], limit: usize) -> Option<Vec<u8>> {
+    let enc = canonical_encoding(encoding);
+    let mut decoder = match enc.as_str() {
+        "gzip" => Decoder::Gzip(flate2::read::GzDecoder::new(body)),
+        "deflate" => Decoder::Deflate(flate2::read::ZlibDecoder::new(body)),
+        "br" | "brotli" => Decoder::Brotli(brotli::Decompressor::new(body, 4096)),
+        "zstd" => Decoder::Zstd(zstd::stream::read::Decoder::new(body).ok()?),
+        _ => return None,
+    };
+    read_limited(&mut decoder, limit)
+}
+
+/// Recompress a (possibly transformed) body with the same content encoding
+/// so the original `Content-Encoding` response header stays valid.
+fn recompress_response(encoding: &str, body: &[u8]) -> Option<Vec<u8>> {
+    let enc = canonical_encoding(encoding);
+    match enc.as_str() {
+        "gzip" => {
+            let mut enc = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+            enc.write_all(body).ok()?;
+            enc.finish().ok()
+        }
+        "deflate" => {
+            let mut enc = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::default());
+            enc.write_all(body).ok()?;
+            enc.finish().ok()
+        }
+        "br" | "brotli" => {
+            // Quality 5 / lgwin 22 mirrors the compression module defaults.
+            let mut writer = brotli::CompressorWriter::new(Vec::new(), 4096, 5, 22);
+            writer.write_all(body).ok()?;
+            Some(writer.into_inner())
+        }
+        "zstd" => {
+            let mut enc = zstd::stream::Encoder::new(Vec::new(), 3).ok()?;
+            enc.write_all(body).ok()?;
+            enc.finish().ok()
+        }
+        _ => None,
+    }
+}
+
+/// Read from a decoder until EOF or until `limit` bytes have been produced.
+fn read_limited<R: Read>(reader: &mut R, limit: usize) -> Option<Vec<u8>> {
+    let mut result = Vec::with_capacity(8192);
+    let mut buf = [0u8; 8192];
+    loop {
+        match reader.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => {
+                result.extend_from_slice(&buf[..n]);
+                if result.len() > limit {
+                    return None;
+                }
+            }
+            Err(_) => return None,
+        }
+    }
+    Some(result)
 }
 
 /// Tokenize: replace each match with a token, store token→original in Valkey.
