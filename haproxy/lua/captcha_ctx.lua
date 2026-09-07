@@ -19,7 +19,9 @@
 --   rule_id, rule_type, rule_name — passed as action arguments to store_ctx
 --
 -- Valkey keys:
---   cap:cid:<token>  TTL: 120s  Value: JSON {"i","t","n","r","u"} — challenge context
+--   cap:cid:<token>  TTL: 120s (extended by the backend when the challenge
+--     page is rendered; consumed on a successful solve)
+--     Value: JSON {"i","t","n","r","u"} — challenge context
 --   cap:_cv:<token>  TTL: <ttl> Value: <binding_hash>              — solved cookie token
 --     The binding_hash is a 32-char hex SHA-256 truncation of
 --     ip\nuser_agent\nja4, binding the cookie to the client that solved
@@ -145,7 +147,10 @@ local function captcha_store_ctx(txn, rule_id, rule_type, rule_name)
     )
     local token = random_token()
     local key = "cap:cid:" .. token
-    -- SET with 120-second TTL (challenge page load + verify should complete well within this)
+    -- SET with a 120-second TTL covering only the redirect -> challenge page
+    -- load. The backend re-stores the token with a longer solve-window TTL
+    -- when it renders the challenge page, and deletes it on a successful
+    -- verify so each issued challenge mints exactly one _cv cookie.
     local result, err = valkey_command("SET", key, ctx, "EX", "120", "NX")
     if not result then
         core.Warning("captcha_ctx.lua: failed to store context in Valkey: " .. tostring(err))

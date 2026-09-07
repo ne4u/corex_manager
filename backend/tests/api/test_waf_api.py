@@ -386,25 +386,285 @@ def test_waf_haproxy_stats(client, db):
     assert data["totals"] == {"deny": 1, "drop": 1}
 
 
+class _FakeValkey:
+    """Minimal in-memory stand-in for the Valkey client used by the captcha
+    challenge/verify tests. Supports the subset of commands exercised by the
+    endpoints: GET, SET (ex/nx), INCR (rate limiter), and DEL."""
+
+    def __init__(self):
+        self.store = {}
+
+    def get(self, key):
+        return self.store.get(key)
+
+    def set(self, key, value, ex=None, nx=False):
+        if nx and key in self.store:
+            return None
+        self.store[key] = value
+        return True
+
+    def incr(self, key):
+        self.store[key] = int(self.store.get(key, 0)) + 1
+        return self.store[key]
+
+    def delete(self, *keys):
+        removed = 0
+        for key in keys:
+            if key in self.store:
+                del self.store[key]
+                removed += 1
+        return removed
+
+
+def _use_fake_valkey(monkeypatch):
+    """Route all valkey_client helpers through an in-memory fake."""
+    import json as _json
+
+    fake = _FakeValkey()
+    monkeypatch.setattr("app.core.valkey_client._get_client", lambda: fake)
+    return fake
+
+
+def _seed_cid(fake, cid, context):
+    import json as _json
+
+    fake.set(f"cap:cid:{cid}", _json.dumps(context))
+
+
 def test_captcha_challenge_page(client, monkeypatch):
-    # Test that the challenge page includes the redirect URL from Valkey context.
-    # The redirect is now stored server-side to prevent open redirect attacks.
+    # Test that the challenge page is served for a cid that resolves to a real
+    # Valkey context, and that the only hidden field is the cid token itself —
+    # rule details and the redirect target stay server-side.
     test_cid = "test_token_12345"
     context = {"i": 1, "t": "waf", "n": "test_rule", "r": "req_123", "u": "/foo"}
-
-    # Mock cache_get to return our test context (Valkey may not be running in tests)
-    def mock_cache_get(key):
-        if key == f"cap:cid:{test_cid}":
-            return context
-        return None
-
-    monkeypatch.setattr("app.core.valkey_client.cache_get", mock_cache_get)
+    fake = _use_fake_valkey(monkeypatch)
+    _seed_cid(fake, test_cid, context)
 
     res = client.get(f"/api/v1/waf/captcha?cid={test_cid}")
     assert res.status_code == 200
     assert "Security Check" in res.text
-    assert 'name="redirect"' in res.text
-    assert 'value="/foo"' in res.text
+    assert 'name="cid"' in res.text
+    assert f'value="{test_cid}"' in res.text
+
+
+def test_captcha_challenge_page_valid_cid_logs_issued_event(client, db, monkeypatch):
+    # A challenge page served with a cid that resolves to a real Valkey
+    # context must log an "issued" ChallengeEvent tied to the rule.
+    from app.models.waf import ChallengeEvent
+
+    test_cid = "valid_ctx_token"
+    context = {"i": 9, "t": "security", "n": "risky", "r": "req_abc", "u": "/bar"}
+    fake = _use_fake_valkey(monkeypatch)
+    _seed_cid(fake, test_cid, context)
+
+    res = client.get(f"/api/v1/waf/captcha?cid={test_cid}")
+    assert res.status_code == 200
+    events = db.query(ChallengeEvent).all()
+    assert len(events) == 1
+    assert events[0].event_type == "issued"
+    assert events[0].rule_type == "security"
+    assert events[0].rule_id == 9
+    assert events[0].rule_name == "risky"
+    assert events[0].request_id == "req_abc"
+
+
+def test_captcha_challenge_page_rerender_logs_issued_once(client, db, monkeypatch):
+    # Refreshing or re-rendering the same challenge page must not log a second
+    # "issued" event — the context is marked with "l" on first render.
+    from app.models.waf import ChallengeEvent
+
+    test_cid = "rerender_token"
+    context = {"i": 9, "t": "security", "n": "risky", "r": "req_abc", "u": "/bar"}
+    fake = _use_fake_valkey(monkeypatch)
+    _seed_cid(fake, test_cid, context)
+
+    res = client.get(f"/api/v1/waf/captcha?cid={test_cid}")
+    assert res.status_code == 200
+    res = client.get(f"/api/v1/waf/captcha?cid={test_cid}")
+    assert res.status_code == 200
+    events = db.query(ChallengeEvent).all()
+    assert len(events) == 1
+    assert events[0].event_type == "issued"
+
+
+def test_captcha_challenge_page_invalid_cid_rejected(client, db, monkeypatch):
+    # A cid that does not resolve to a Valkey context (expired TTL,
+    # already-solved token, or fabricated) must get an error page instead of a
+    # solvable challenge — otherwise anyone could mint a _cv bypass cookie
+    # without a rule ever matching their traffic.
+    from app.models.waf import ChallengeEvent
+
+    _use_fake_valkey(monkeypatch)
+
+    res = client.get("/api/v1/waf/captcha?cid=nonexistent_token")
+    assert res.status_code == 400
+    assert "Challenge Expired" in res.text
+    assert db.query(ChallengeEvent).count() == 0
+
+
+def test_captcha_challenge_page_no_cid_rejected(client, db):
+    # Direct access to the captcha URL without a cid gets an error page, not a
+    # solvable challenge.
+    from app.models.waf import ChallengeEvent
+
+    res = client.get("/api/v1/waf/captcha")
+    assert res.status_code == 400
+    assert "Challenge Expired" in res.text
+    assert db.query(ChallengeEvent).count() == 0
+
+
+def test_verify_captcha_without_context_rejected(client, db, monkeypatch):
+    # Verify submissions without a live challenge context (no cid, or a cid
+    # that doesn't resolve) are refused — no event logged, no _cv cookie.
+    from app.models.waf import ChallengeEvent
+    from app.services.captcha_providers import CapProvider
+
+    async def mock_verify(self, token, secret, remote_ip=None):
+        return True
+
+    monkeypatch.setattr(CapProvider, "verify", mock_verify)
+    _use_fake_valkey(monkeypatch)
+
+    res = client.post("/api/v1/waf/verify-captcha", data={"cap_token": "tok"})
+    assert res.status_code == 400
+    assert "Challenge Expired" in res.text
+    assert "_cv=" not in res.headers.get("set-cookie", "")
+
+    res = client.post(
+        "/api/v1/waf/verify-captcha",
+        data={"cid": "fabricated", "cap_token": "tok"},
+        follow_redirects=False,
+    )
+    assert res.status_code == 400
+    assert "_cv=" not in res.headers.get("set-cookie", "")
+    assert db.query(ChallengeEvent).count() == 0
+
+
+def test_verify_captcha_with_rule_logs_solved_event(client, db, monkeypatch):
+    # A solved submission bound to a real challenge context logs a "solved"
+    # ChallengeEvent with the context's rule attribution and redirects to the
+    # context's stored URL — not to client-supplied fields.
+    from app.models.waf import ChallengeEvent
+    from app.services.captcha_providers import CapProvider
+
+    async def mock_verify(self, token, secret, remote_ip=None):
+        return True
+
+    monkeypatch.setattr(CapProvider, "verify", mock_verify)
+
+    fake = _use_fake_valkey(monkeypatch)
+    _seed_cid(fake, "ctx_solve", {"i": 9, "t": "security", "n": "risky", "r": "req_xyz", "u": "/protected"})
+
+    res = client.post(
+        "/api/v1/waf/verify-captcha",
+        data={"cid": "ctx_solve", "cap_token": "tok"},
+        follow_redirects=False,
+    )
+    assert res.status_code == 302
+    assert res.headers["location"] == "/protected"
+    events = db.query(ChallengeEvent).all()
+    assert len(events) == 1
+    assert events[0].event_type == "solved"
+    assert events[0].rule_type == "security"
+    assert events[0].rule_id == 9
+    assert events[0].rule_name == "risky"
+
+
+def test_verify_captcha_redirect_same_origin(client, db, monkeypatch):
+    # The post-solve redirect target comes from the stored context "u" field,
+    # which HAProxy built from the original request's Host header — a field an
+    # attacker controls on listeners without host restrictions. Cross-origin
+    # or non-HTTP targets must fall back to "/" so a crafted challenge link
+    # can't be used as an open redirect.
+    from app.services.captcha_providers import CapProvider
+
+    async def mock_verify(self, token, secret, remote_ip=None):
+        return True
+
+    monkeypatch.setattr(CapProvider, "verify", mock_verify)
+    fake = _use_fake_valkey(monkeypatch)
+
+    cases = [
+        ("offsite", "https://evil.example/x", "/"),
+        ("proto_rel", "//evil.example/x", "/"),
+        ("userinfo", "https://testserver@evil.example/x", "/"),
+        ("bad_scheme", "javascript:alert(1)", "/"),
+        ("same_host", "https://testserver/deep?x=1", "https://testserver/deep?x=1"),
+        ("relative", "/some/path?q=1", "/some/path?q=1"),
+    ]
+    for i, (name, target, expected) in enumerate(cases):
+        cid = f"ctx_redir_{name}"
+        _seed_cid(fake, cid, {"i": 9, "t": "security", "n": "risky", "r": "", "u": target})
+        res = client.post(
+            "/api/v1/waf/verify-captcha",
+            data={"cid": cid, "cap_token": "tok"},
+            follow_redirects=False,
+        )
+        assert res.status_code == 302, name
+        assert res.headers["location"] == expected, name
+
+
+def test_verify_captcha_consumes_token(client, db, monkeypatch):
+    # A successful solve deletes the cid token so the same challenge cannot
+    # mint a second _cv cookie.
+    from app.services.captcha_providers import CapProvider
+
+    async def mock_verify(self, token, secret, remote_ip=None):
+        return True
+
+    monkeypatch.setattr(CapProvider, "verify", mock_verify)
+
+    fake = _use_fake_valkey(monkeypatch)
+    _seed_cid(fake, "ctx_once", {"i": 9, "t": "security", "n": "risky", "r": "req_1", "u": "/p"})
+
+    res = client.post(
+        "/api/v1/waf/verify-captcha",
+        data={"cid": "ctx_once", "cap_token": "tok"},
+        follow_redirects=False,
+    )
+    assert res.status_code == 302
+    assert f"cap:cid:ctx_once" not in fake.store
+
+    res = client.post(
+        "/api/v1/waf/verify-captcha",
+        data={"cid": "ctx_once", "cap_token": "tok"},
+        follow_redirects=False,
+    )
+    assert res.status_code == 400
+    assert "_cv=" not in res.headers.get("set-cookie", "")
+
+
+def test_verify_captcha_failed_attempt_keeps_token(client, db, monkeypatch):
+    # A failed solve leaves the cid token in place so the user can retry
+    # within the solve window.
+    from app.services.captcha_providers import CapProvider
+
+    calls = {"n": 0}
+
+    async def mock_verify(self, token, secret, remote_ip=None):
+        calls["n"] += 1
+        return calls["n"] > 1
+
+    monkeypatch.setattr(CapProvider, "verify", mock_verify)
+
+    fake = _use_fake_valkey(monkeypatch)
+    _seed_cid(fake, "ctx_retry", {"i": 9, "t": "security", "n": "risky", "r": "req_2", "u": "/p"})
+
+    res = client.post(
+        "/api/v1/waf/verify-captcha",
+        data={"cid": "ctx_retry", "cap_token": "bad"},
+        follow_redirects=False,
+    )
+    assert res.status_code == 403
+    assert "cap:cid:ctx_retry" in fake.store
+
+    res = client.post(
+        "/api/v1/waf/verify-captcha",
+        data={"cid": "ctx_retry", "cap_token": "good"},
+        follow_redirects=False,
+    )
+    assert res.status_code == 302
+    assert "cap:cid:ctx_retry" not in fake.store
 
 
 def test_verify_captcha_stores_client_binding_hash(client, db, monkeypatch):
@@ -419,14 +679,8 @@ def test_verify_captcha_stores_client_binding_hash(client, db, monkeypatch):
         return True
     monkeypatch.setattr(CapProvider, "verify", mock_verify)
 
-    # Capture the set_cv_token call to inspect the binding hash
-    captured = {}
-    def mock_set_cv_token(token, binding_hash, ttl):
-        captured["token"] = token
-        captured["binding_hash"] = binding_hash
-        captured["ttl"] = ttl
-        return True
-    monkeypatch.setattr("app.core.valkey_client.set_cv_token", mock_set_cv_token)
+    fake = _use_fake_valkey(monkeypatch)
+    _seed_cid(fake, "ctx_bind", {"i": 1, "t": "waf", "n": "test_rule", "r": "", "u": "/protected"})
 
     # Ensure captcha settings are configured (conftest already sets CAPTCHA_SECRET)
     from app.services.settings import set_setting
@@ -435,11 +689,8 @@ def test_verify_captcha_stores_client_binding_hash(client, db, monkeypatch):
     res = client.post(
         "/api/v1/waf/verify-captcha",
         data={
-            "redirect": "/protected",
+            "cid": "ctx_bind",
             "cap_token": "fake-cap-token",
-            "rule_id": "1",
-            "rule_type": "waf",
-            "rule_name": "test_rule",
         },
         headers={
             "User-Agent": "Mozilla/5.0 (Test Browser)",
@@ -449,14 +700,17 @@ def test_verify_captcha_stores_client_binding_hash(client, db, monkeypatch):
     )
 
     assert res.status_code == 302
+    assert res.headers["location"] == "/protected"
     # The _cv cookie should be set in the response
     cookies = res.headers.get("set-cookie", "")
     assert "_cv=" in cookies
 
-    # The binding hash must have been stored, and it must match the hash
-    # computed from the test request's client IP + UA + JA4.
-    assert "binding_hash" in captured
-    assert len(captured["binding_hash"]) == 32
+    # The binding hash must have been stored under cap:_cv:<cookie token>, and
+    # it must match the hash computed from the test request's client IP +
+    # UA + JA4.
+    cv_token = cookies.split("_cv=")[1].split(";")[0]
+    stored_hash = fake.get(f"cap:_cv:{cv_token}")
+    assert stored_hash is not None and len(stored_hash) == 32
 
     # The TestClient connects from 127.0.0.1 (testclient default)
     expected_hash = compute_cv_binding_hash(
@@ -464,8 +718,7 @@ def test_verify_captcha_stores_client_binding_hash(client, db, monkeypatch):
         "Mozilla/5.0 (Test Browser)",
         "t13d1516h2_8daaf6152771_b186095e22b6",
     )
-    assert captured["binding_hash"] == expected_hash
-    assert captured["ttl"] == 3600
+    assert stored_hash == expected_hash
 
 
 @pytest.mark.skip(reason="requires containerized HAProxy/Coraza stack")

@@ -72,6 +72,12 @@ class Settings(BaseSettings):
     # Backend API host/port for the challenge page and verify endpoint proxy
     CAPTCHA_API_BACKEND_HOST: str = "api"
     CAPTCHA_API_BACKEND_PORT: int = 8000
+    # How long a rendered captcha challenge stays solvable (seconds). The cid
+    # token written by HAProxy's Lua action has a short TTL covering only the
+    # redirect -> page load; the backend extends it to this window when the
+    # challenge page is rendered so users have time to solve. The token is
+    # consumed (deleted) on a successful solve.
+    CAPTCHA_CHALLENGE_TTL_SECONDS: int = 900
     # reCAPTCHA (Google) — env-var fallbacks; UI can override via settings table
     RECAPTCHA_SITE_KEY: Optional[str] = None
     RECAPTCHA_SECRET: Optional[str] = None
