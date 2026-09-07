@@ -604,7 +604,9 @@
       "routeMcp": "/mcpをMCPゲートウェイへルーティング",
       "routeMcpHelp": "有効な場合、このリスナーの/mcpへのリクエストはデフォルトバックエンドに加えてMCPゲートウェイバックエンドにルーティングされます。",
       "mcpGatewayBuiltin": "mcp_gateway (組み込み)",
-      "mcpRouteEnabled": "+ /mcp → gateway"
+      "mcpRouteEnabled": "+ /mcp → gateway",
+      "apiArmor": "API Armor を有効にする",
+      "apiArmorHelp": "このリスナーで API Armor のボディ解析、スキーマ検証、認証チェックを実行します。HTTP リクエストフィンガープリントとグローバル API Armor モジュールの有効化が必要です。"
     },
     "rules": {
       "title": "ルーティングルール",
@@ -2073,7 +2075,14 @@
       "settingsSaved": "設定が保存されました。",
       "failedToLoadSettings": "設定の読み込みに失敗しました",
       "failedToSaveSettings": "設定の保存に失敗しました。",
-      "requiresReqFp": "API Armor requires HTTP Request Fingerprinting to be enabled. Enable it in Global Options first."
+      "requiresReqFp": "API Armor を使用するには HTTP Request Fingerprinting を有効にする必要があります。最初にグローバルオプションで有効にしてください。",
+      "scope": "スコープ",
+      "scopeListener": "リスナー別（リスナーごとのオプション）",
+      "scopeBackend": "バックエンド別（選択したバックエンドへの全トラフィック）",
+      "scopePath": "バックエンド + パス別（選択したバックエンド、任意のパスパターン）",
+      "backendIds": "保護対象バックエンド",
+      "pathPatterns": "パス正規表現パターン",
+      "pathPatternsPlaceholder": "^/api/v1/.*\n^/graphql$"
     },
     "presets": {
       "title": "プリセットセキュリティルール",

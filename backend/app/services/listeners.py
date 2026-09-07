@@ -1,6 +1,6 @@
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from ..models.proxy import Listener
+from ..models.proxy import BackendRule, Listener
 from ..schemas.listeners import ListenerCreate, ListenerUpdate
 
 
@@ -35,6 +35,10 @@ def delete_listener(db: Session, lid: int):
     obj = get_listener(db, lid)
     if not obj:
         return False
+    # Remove any routing rules that reference this listener so the delete
+    # doesn't fail due to a foreign-key constraint.
+    for rule in db.query(BackendRule).filter(BackendRule.listener_id == lid).all():
+        db.delete(rule)
     db.delete(obj)
     db.commit()
     return True

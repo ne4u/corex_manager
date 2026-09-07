@@ -604,7 +604,9 @@
       "routeMcp": "/mcp को MCP गेटवे पर रूट करें",
       "routeMcpHelp": "सक्षम होने पर, इस listener पर /mcp के अनुरोध डिफ़ॉल्ट backend के अतिरिक्त MCP गेटवे backend पर रूट किए जाते हैं।",
       "mcpGatewayBuiltin": "mcp_gateway (अंतर्निहित)",
-      "mcpRouteEnabled": "+ /mcp → gateway"
+      "mcpRouteEnabled": "+ /mcp → gateway",
+      "apiArmor": "API Armor सक्षम करें",
+      "apiArmorHelp": "इस listener पर API Armor body parsing, schema validation और auth checks चलाएँ। इसके लिए HTTP Request Fingerprinting और global API Armor module सक्षम हों आवश्यक हैं।"
     },
     "rules": {
       "title": "रूटिंग नियम",
@@ -2073,7 +2075,14 @@
       "settingsSaved": "सेटिंग्स सहेजी गईं।",
       "failedToLoadSettings": "सेटिंग्स लोड करने में विफल",
       "failedToSaveSettings": "सेटिंग्स सहेजने में विफल।",
-      "requiresReqFp": "API Armor requires HTTP Request Fingerprinting to be enabled. Enable it in Global Options first."
+      "requiresReqFp": "API Armor के लिए HTTP Request Fingerprinting सक्षम होना आवश्यक है। इसे पहले Global Options में सक्षम करें।",
+      "scope": "स्कोप",
+      "scopeListener": "Listener के अनुसार (प्रति-Listener विकल्प)",
+      "scopeBackend": "Backend के अनुसार (चयनित backends की सभी ट्रैफिक)",
+      "scopePath": "Backend + Path के अनुसार (चयनित backends, वैकल्पिक path पैटर्न)",
+      "backendIds": "संरक्षित Backends",
+      "pathPatterns": "Path Regex Patterns",
+      "pathPatternsPlaceholder": "^/api/v1/.*\n^/graphql$"
     },
     "presets": {
       "title": "प्रीसेट सुरक्षा नियम",

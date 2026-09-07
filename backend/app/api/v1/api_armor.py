@@ -1,11 +1,11 @@
 """API Armor endpoint router.
 
-Provides settings management for the API Armor feature (GraphQL protection,
-schema validation, auth validation, behavioral profiling). Full CRUD endpoints
-for OpenAPI specs, schemas, auth policies, API key lists, profiles, and
-anomalies will be added in subsequent phases.
+Provides CRUD and runtime-test endpoints for the API Armor feature (GraphQL
+protection, schema validation, auth validation, behavioral profiling).
 """
-from typing import List, Optional
+import json
+import re
+from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -27,10 +27,35 @@ class ApiArmorSettings(BaseModel):
     api_armor_schema_learning_enabled: bool = Field(default=False, description="Enable learned schema inference from traffic")
     api_armor_profiling_learning_enabled: bool = Field(default=False, description="Enable behavioral profile learning from traffic")
     api_armor_profile_retention_days: int = Field(default=30, description="Retention for behavioral profiles and anomalies")
+    api_armor_scope: str = Field(default="listener", description="API Armor scope: listener, backend, or path")
+    api_armor_backend_ids: List[int] = Field(default_factory=list, description="Backend IDs to protect when scope is backend/path")
+    api_armor_path_patterns: List[str] = Field(default_factory=list, description="Path regex patterns to protect when scope is path")
+
+
+def _parse_json_list(value: Optional[str], item_type: type) -> List[Any]:
+    """Parse a JSON list stored as a string, falling back to an empty list."""
+    if not value:
+        return []
+    try:
+        parsed = json.loads(value)
+        if not isinstance(parsed, list):
+            return []
+        return [item_type(x) for x in parsed]
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return []
 
 
 def _get_api_armor_settings(db: Session) -> dict:
     """Read all API Armor settings from DB with env fallbacks."""
+    scope = get_setting(db, "api_armor_scope", settings.API_ARMOR_SCOPE).lower()
+    if scope not in ("listener", "backend", "path"):
+        scope = "listener"
+    backend_ids = _parse_json_list(
+        get_setting(db, "api_armor_backend_ids", settings.API_ARMOR_BACKEND_IDS), int
+    )
+    path_patterns = _parse_json_list(
+        get_setting(db, "api_armor_path_patterns", settings.API_ARMOR_PATH_PATTERNS), str
+    )
     return {
         "api_armor_enabled": get_setting(db, "api_armor_enabled", str(settings.API_ARMOR_ENABLED)).lower() in ("true", "1", "yes"),
         "api_armor_max_body_bytes": int(get_setting(db, "api_armor_max_body_bytes", str(settings.API_ARMOR_MAX_BODY_BYTES))),
@@ -38,6 +63,9 @@ def _get_api_armor_settings(db: Session) -> dict:
         "api_armor_schema_learning_enabled": get_setting(db, "api_armor_schema_learning_enabled", "false").lower() in ("true", "1", "yes"),
         "api_armor_profiling_learning_enabled": get_setting(db, "api_armor_profiling_learning_enabled", "false").lower() in ("true", "1", "yes"),
         "api_armor_profile_retention_days": int(get_setting(db, "api_armor_profile_retention_days", str(settings.API_ARMOR_PROFILE_RETENTION_DAYS))),
+        "api_armor_scope": scope,
+        "api_armor_backend_ids": backend_ids,
+        "api_armor_path_patterns": path_patterns,
     }
 
 
@@ -73,6 +101,23 @@ def _update_api_armor_settings(db: Session, updates: dict) -> dict:
         if val < 1:
             raise HTTPException(status_code=400, detail="api_armor_profile_retention_days must be at least 1")
         set_setting(db, "api_armor_profile_retention_days", str(val))
+    if "api_armor_scope" in updates:
+        scope = str(updates["api_armor_scope"]).lower()
+        if scope not in ("listener", "backend", "path"):
+            raise HTTPException(status_code=400, detail="api_armor_scope must be listener, backend, or path")
+        set_setting(db, "api_armor_scope", scope)
+    if "api_armor_backend_ids" in updates:
+        backend_ids = [int(x) for x in updates["api_armor_backend_ids"] if isinstance(x, int) or (isinstance(x, str) and x.isdigit())]
+        set_setting(db, "api_armor_backend_ids", json.dumps(backend_ids))
+    if "api_armor_path_patterns" in updates:
+        path_patterns = [str(x) for x in updates["api_armor_path_patterns"] if x]
+        # Validate each pattern is a parseable regex to avoid breaking HAProxy
+        for pattern in path_patterns:
+            try:
+                re.compile(pattern)
+            except re.error as e:
+                raise HTTPException(status_code=400, detail=f"Invalid path regex pattern '{pattern}': {e}")
+        set_setting(db, "api_armor_path_patterns", json.dumps(path_patterns))
     db.commit()
     return _get_api_armor_settings(db)
 
@@ -333,7 +378,7 @@ def update_schema(
         name=schema.name,
         method=schema.method,
         path=schema.path,
-        schema_json=schema.schema,
+        schema_def=schema.schema,
         spec_id=schema.spec_id,
         source=schema.source,
         enabled=schema.enabled,
@@ -540,6 +585,114 @@ def create_api_key_list(
     )
 
 
+@router.get("/api-armor/api-key-lists/{lid}", response_model=ApiKeyListResponse)
+def get_api_key_list(
+    lid: int,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+    _=Depends(rate_limit),
+):
+    """Get a single API key list."""
+    from ...models.api_armor import ApiKeyList, ApiKeyListEntry
+    key_list = db.get(ApiKeyList, lid)
+    if not key_list:
+        raise HTTPException(status_code=404, detail="API key list not found")
+    entries = db.query(ApiKeyListEntry).filter(ApiKeyListEntry.list_id == key_list.id).all()
+    return ApiKeyListResponse(
+        id=key_list.id, name=key_list.name, description=key_list.description,
+        entries=[ApiKeyListEntryResponse(id=e.id, value=e.value, note=e.note) for e in entries],
+    )
+
+
+class ApiKeyListUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    entries: List[str] = Field(default_factory=list)
+
+
+@router.put("/api-armor/api-key-lists/{lid}", response_model=ApiKeyListResponse)
+def update_api_key_list(
+    lid: int,
+    k_in: ApiKeyListUpdate,
+    db: Session = Depends(get_db),
+    user=Depends(require_write),
+    _=Depends(rate_limit),
+):
+    """Update an API key list (name, description, and replace entries)."""
+    from ...models.api_armor import ApiKeyList, ApiKeyListEntry
+    key_list = db.get(ApiKeyList, lid)
+    if not key_list:
+        raise HTTPException(status_code=404, detail="API key list not found")
+
+    if k_in.name and k_in.name != key_list.name:
+        existing = db.query(ApiKeyList).filter(ApiKeyList.name == k_in.name).first()
+        if existing:
+            raise HTTPException(status_code=409, detail="API key list with this name already exists")
+        key_list.name = k_in.name
+
+    if k_in.description is not None:
+        key_list.description = k_in.description
+
+    # Replace entries atomically.
+    db.query(ApiKeyListEntry).filter(ApiKeyListEntry.list_id == key_list.id).delete()
+    for value in k_in.entries:
+        db.add(ApiKeyListEntry(list_id=key_list.id, value=value))
+
+    db.commit()
+    db.refresh(key_list)
+    entries = db.query(ApiKeyListEntry).filter(ApiKeyListEntry.list_id == key_list.id).all()
+    return ApiKeyListResponse(
+        id=key_list.id, name=key_list.name, description=key_list.description,
+        entries=[ApiKeyListEntryResponse(id=e.id, value=e.value, note=e.note) for e in entries],
+    )
+
+
+class ApiKeyListEntryCreate(BaseModel):
+    value: str
+    note: Optional[str] = None
+
+
+@router.post("/api-armor/api-key-lists/{lid}/entries", response_model=ApiKeyListEntryResponse)
+def create_api_key_entry(
+    lid: int,
+    e_in: ApiKeyListEntryCreate,
+    db: Session = Depends(get_db),
+    user=Depends(require_write),
+    _=Depends(rate_limit),
+):
+    """Add a single entry to an API key list."""
+    from ...models.api_armor import ApiKeyList, ApiKeyListEntry
+    key_list = db.get(ApiKeyList, lid)
+    if not key_list:
+        raise HTTPException(status_code=404, detail="API key list not found")
+    entry = ApiKeyListEntry(list_id=key_list.id, value=e_in.value, note=e_in.note)
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
+    return ApiKeyListEntryResponse(id=entry.id, value=entry.value, note=entry.note)
+
+
+@router.delete("/api-armor/api-key-lists/{lid}/entries/{eid}")
+def delete_api_key_entry(
+    lid: int,
+    eid: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_write),
+    _=Depends(rate_limit),
+):
+    """Delete a single API key list entry."""
+    from ...models.api_armor import ApiKeyList, ApiKeyListEntry
+    key_list = db.get(ApiKeyList, lid)
+    if not key_list:
+        raise HTTPException(status_code=404, detail="API key list not found")
+    entry = db.get(ApiKeyListEntry, eid)
+    if not entry or entry.list_id != key_list.id:
+        raise HTTPException(status_code=404, detail="API key entry not found")
+    db.delete(entry)
+    db.commit()
+    return {"status": "ok"}
+
+
 @router.delete("/api-armor/api-key-lists/{lid}")
 def delete_api_key_list(
     lid: int,
@@ -701,3 +854,111 @@ def clear_anomalies(
     count = q.delete()
     db.commit()
     return {"status": "ok", "deleted": count}
+
+
+# ----- Manual learning & test ingestion helpers -----
+
+class ApiSchemaLearnRequest(BaseModel):
+    method: str
+    path: str
+    body: Dict
+
+
+@router.post("/api-armor/schemas/learn", response_model=ApiSchemaResponse)
+def learn_schema(
+    req: ApiSchemaLearnRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_write),
+    _=Depends(rate_limit),
+):
+    """Merge an observed request body into a learned schema for method+path."""
+    from ...services.api_armor_schemas import merge_learned_schema
+    schema = merge_learned_schema(db, req.method.upper(), req.path, req.body)
+    return ApiSchemaResponse(
+        id=schema.id,
+        name=schema.name,
+        method=schema.method,
+        path=schema.path,
+        schema_def=schema.schema,
+        spec_id=schema.spec_id,
+        source=schema.source,
+        enabled=schema.enabled,
+        sample_count=schema.sample_count or 0,
+    )
+
+
+class ProfileIngestRequest(BaseModel):
+    method: str
+    path: str
+    content_type: Optional[str] = None
+    auth_type: Optional[str] = "n"
+    response_status: Optional[int] = None
+    listener_id: Optional[int] = None
+    client_ip: Optional[str] = None
+    request_id: Optional[str] = None
+
+
+@router.post("/api-armor/profiles/ingest")
+def ingest_profile(
+    req: ProfileIngestRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_write),
+    _=Depends(rate_limit),
+):
+    """Ingest a single observation into the profiling pipeline (for testing)."""
+    from ...services.api_armor_profiler import ingest_profiling_entry
+    entry = {
+        "method": req.method.upper(),
+        "path": req.path,
+        "content_type": req.content_type,
+        "auth_type": req.auth_type,
+        "response_status": req.response_status,
+        "listener_id": req.listener_id,
+        "client_ip": req.client_ip,
+        "request_id": req.request_id,
+    }
+    ingest_profiling_entry(db, entry)
+    db.commit()
+    return {"status": "ok"}
+
+
+class AnomalyIngestRequest(BaseModel):
+    listener_id: Optional[int] = None
+    method: str
+    path: str
+    dimension: str
+    observed_value: Optional[str] = None
+    expected_values: Optional[dict] = None
+    request_id: Optional[str] = None
+    client_ip: Optional[str] = None
+
+
+@router.post("/api-armor/anomalies/ingest", response_model=ApiAnomalyResponse)
+def ingest_anomaly(
+    req: AnomalyIngestRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_write),
+    _=Depends(rate_limit),
+):
+    """Manually record an anomaly (for testing)."""
+    from ...models.api_armor import ApiAnomaly
+    anomaly = ApiAnomaly(
+        listener_id=req.listener_id,
+        method=req.method.upper(),
+        path=req.path,
+        dimension=req.dimension,
+        observed_value=req.observed_value,
+        expected_values=req.expected_values,
+        request_id=req.request_id,
+        client_ip=req.client_ip,
+    )
+    db.add(anomaly)
+    db.commit()
+    db.refresh(anomaly)
+    return ApiAnomalyResponse(
+        id=anomaly.id, listener_id=anomaly.listener_id, method=anomaly.method, path=anomaly.path,
+        dimension=anomaly.dimension, observed_value=anomaly.observed_value,
+        expected_values=anomaly.expected_values, request_id=anomaly.request_id,
+        client_ip=anomaly.client_ip,
+        created_at=anomaly.created_at.isoformat() if anomaly.created_at else None,
+    )

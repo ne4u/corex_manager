@@ -327,6 +327,11 @@ class Settings(BaseSettings):
     API_ARMOR_MAX_BODY_BYTES: int = 1048576  # 1MB
     # Rust Lua module vs pure-Lua fallback toggle (DB setting api_armor_module_enabled).
     API_ARMOR_MODULE_ENABLED: bool = True
+    # API Armor scoping: listener (per-listener option), backend (all traffic to
+    # selected backends), or path (selected backends + path patterns).
+    API_ARMOR_SCOPE: str = "listener"
+    API_ARMOR_BACKEND_IDS: str = "[]"  # JSON list of backend IDs
+    API_ARMOR_PATH_PATTERNS: str = "[]"  # JSON list of regex patterns
     # API Armor data directory (schemas, api-keys, JWKS, profiles, profiling log).
     API_ARMOR_DIR: str = "data/api-armor"
     # Separate profiling log — written by the Rust body_parser module, tailed by

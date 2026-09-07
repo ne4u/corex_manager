@@ -575,10 +575,6 @@ export const apiArmor = {
     delete: (id: number) => api.delete(`/api-armor/specs/${id}`),
     schemas: (id: number) => api.get(`/api-armor/specs/${id}/schemas`),
   },
-  schemas: {
-    list: (params?: Record<string, unknown>) => api.get('/api-armor/schemas', { params }),
-    update: (id: number, data: Record<string, unknown>) => api.put(`/api-armor/schemas/${id}`, data),
-  },
   authPolicies: {
     list: () => api.get('/api-armor/auth-policies'),
     create: (data: Record<string, unknown>) => api.post('/api-armor/auth-policies', data),
@@ -587,18 +583,32 @@ export const apiArmor = {
   },
   apiKeyLists: {
     list: () => api.get('/api-armor/api-key-lists'),
+    get: (id: number) => api.get(`/api-armor/api-key-lists/${id}`),
     create: (data: Record<string, unknown>) => api.post('/api-armor/api-key-lists', data),
+    update: (id: number, data: Record<string, unknown>) => api.put(`/api-armor/api-key-lists/${id}`, data),
     delete: (id: number) => api.delete(`/api-armor/api-key-lists/${id}`),
+    entries: {
+      create: (listId: number, data: Record<string, unknown>) => api.post(`/api-armor/api-key-lists/${listId}/entries`, data),
+      delete: (listId: number, entryId: number) => api.delete(`/api-armor/api-key-lists/${listId}/entries/${entryId}`),
+    },
+  },
+  schemas: {
+    list: (params?: Record<string, unknown>) => api.get('/api-armor/schemas', { params }),
+    update: (id: number, data: Record<string, unknown>) => api.put(`/api-armor/schemas/${id}`, data),
+    learn: (data: Record<string, unknown>) => api.post('/api-armor/schemas/learn', data),
   },
   profiles: {
     list: (params?: Record<string, unknown>) => api.get('/api-armor/profiles', { params }),
+    get: (id: number) => api.get(`/api-armor/profiles/${id}`),
     finalize: (id: number, minSamples?: number) =>
       api.post(`/api-armor/profiles/${id}/finalize`, {}, { params: minSamples ? { min_samples: minSamples } : {} }),
     delete: (id: number) => api.delete(`/api-armor/profiles/${id}`),
+    ingest: (data: Record<string, unknown>) => api.post('/api-armor/profiles/ingest', data),
   },
   anomalies: {
     list: (params?: Record<string, unknown>) => api.get('/api-armor/anomalies', { params }),
     clear: (params?: Record<string, unknown>) => api.delete('/api-armor/anomalies', { params }),
+    ingest: (data: Record<string, unknown>) => api.post('/api-armor/anomalies/ingest', data),
   },
 }
 

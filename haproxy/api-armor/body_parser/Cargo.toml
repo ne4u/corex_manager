@@ -15,3 +15,4 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 api-armor-graphql = { path = "../graphql" }
 api-armor-schema-validator = { path = "../schema_validator" }
+api-armor-jwt-validator = { path = "../jwt_validator" }

@@ -126,3 +126,88 @@ def test_api_armor_disabled_does_not_load_module(db):
         with open(loader_path) as f:
             loader_content = f.read()
         assert "haproxy_api_armor_module" not in loader_content
+
+
+def test_api_armor_sets_env_and_auth_policy(db):
+    """API Armor enabled → global setenv for data dir and per-listener auth policy id."""
+    from app.models.api_armor import AuthPolicy
+
+    backend = make_backend(db)
+    make_server(db, backend.id)
+    listener = make_listener(db, backend=backend, name="http_in")
+    listener.options = {"api_armor": True}
+    db.commit()
+
+    policy = AuthPolicy(
+        name="test-jwt",
+        auth_type="jwt",
+        enabled=True,
+        jwt_secret_env="JWT_SECRET",
+        jwt_issuer="test",
+        listener_ids=[listener.id],
+    )
+    db.add(policy)
+    db.commit()
+
+    set_setting(db, "api_armor_enabled", "true")
+    db.commit()
+    cfg = haproxy.generate_config(db)
+    assert "setenv API_ARMOR_DIR" in cfg
+    assert "setenv API_ARMOR_PROFILING_LOG_PATH" in cfg
+    assert f"set-var(txn.api_auth_policy_id) int({policy.id}) if is_api_armor" in cfg
+
+
+def test_api_armor_scope_backend(db):
+    """API Armor enabled with backend scope → body buffering in frontend, enforcement in backend."""
+    backend = make_backend(db, name="api_backend")
+    make_server(db, backend.id)
+    listener = make_listener(db, backend=backend, name="http_in")
+    db.commit()
+
+    set_setting(db, "api_armor_enabled", "true")
+    set_setting(db, "api_armor_scope", "backend")
+    set_setting(db, "api_armor_backend_ids", f"[{backend.id}]")
+    db.commit()
+    cfg = haproxy.generate_config(db)
+    assert "is_api_armor" in cfg
+    assert "wait-for-body time 10s if is_api_armor" in cfg
+    # With backend scope the parse/enforcement runs in the backend section.
+    assert "lua.api_body_parse" in cfg
+    assert f"backend {backend.name}" in cfg or f"backend api_backend" in cfg
+
+
+def test_api_armor_scope_path(db):
+    """API Armor enabled with path scope → frontend and backend both use path ACL."""
+    backend = make_backend(db, name="api_backend")
+    make_server(db, backend.id)
+    listener = make_listener(db, backend=backend, name="http_in")
+    db.commit()
+
+    set_setting(db, "api_armor_enabled", "true")
+    set_setting(db, "api_armor_scope", "path")
+    set_setting(db, "api_armor_backend_ids", f"[{backend.id}]")
+    set_setting(db, "api_armor_path_patterns", '["^/api/v1/.*"]')
+    db.commit()
+    cfg = haproxy.generate_config(db)
+    assert "acl is_api_armor_path path_reg -i ^/api/v1/.*" in cfg
+    assert "wait-for-body time 10s if is_api_armor is_api_armor_path" in cfg
+    assert "lua.api_body_parse" in cfg
+    assert "{ var(txn.api_body) -m found } is_api_armor_path" in cfg
+
+
+def test_api_armor_scope_backend_not_matching(db):
+    """API Armor enabled with backend scope → no buffering for listener with different default backend."""
+    backend_a = make_backend(db, name="api_backend_a")
+    backend_b = make_backend(db, name="api_backend_b")
+    make_server(db, backend_a.id)
+    make_server(db, backend_b.id)
+    listener = make_listener(db, backend=backend_a, name="http_in")
+    db.commit()
+
+    set_setting(db, "api_armor_enabled", "true")
+    set_setting(db, "api_armor_scope", "backend")
+    set_setting(db, "api_armor_backend_ids", f"[{backend_b.id}]")
+    db.commit()
+    cfg = haproxy.generate_config(db)
+    # The listener's default backend is not in scope, so no api-armor processing.
+    assert "wait-for-body time 10s if is_api_armor" not in cfg

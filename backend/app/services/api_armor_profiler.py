@@ -20,7 +20,7 @@ import logging
 import os
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Set
 from collections import defaultdict
 
@@ -33,6 +33,33 @@ from .settings import get_setting
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+
+def prune_profiles(db: Session, retention_days: int) -> int:
+    """Delete profiles and their anomalies older than the configured retention."""
+    if retention_days <= 0:
+        return 0
+    from ..models.api_armor import ApiAnomaly
+    cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
+
+    # Delete related anomalies first.
+    deleted_anomalies = (
+        db.query(ApiAnomaly)
+        .filter(ApiAnomaly.created_at < cutoff)
+        .delete(synchronize_session=False)
+    )
+
+    deleted_profiles = (
+        db.query(ApiProfile)
+        .filter(ApiProfile.last_seen < cutoff)
+        .delete(synchronize_session=False)
+    )
+
+    logger.info(
+        "Pruned %d profiles and %d anomalies older than %s days",
+        deleted_profiles, deleted_anomalies, retention_days,
+    )
+    return deleted_profiles
 
 
 # Dimensions tracked per endpoint
@@ -78,9 +105,22 @@ class ApiArmorProfiler:
         while not self._stop_event.is_set():
             try:
                 self._process_new_lines()
+                self._prune_old_profiles()
             except Exception as e:
                 logger.error("API Armor profiler error: %s", e)
             self._stop_event.wait(self.sample_interval)
+
+    def _prune_old_profiles(self) -> None:
+        db = SessionLocal()
+        try:
+            retention_days = getattr(settings, "API_ARMOR_PROFILE_RETENTION_DAYS", 30)
+            prune_profiles(db, retention_days)
+            db.commit()
+        except Exception as e:
+            logger.error("Error pruning profiles: %s", e)
+            db.rollback()
+        finally:
+            db.close()
 
     def _process_new_lines(self) -> int:
         """Read new lines from the log file and process them.
@@ -124,83 +164,91 @@ class ApiArmorProfiler:
 
     def _process_entry(self, entry: Dict) -> None:
         """Process a single profiling log entry — upsert the endpoint profile."""
-        method = entry.get("method", "")
-        path = entry.get("path", "")
-        if not method or not path:
-            return
-
-        # Normalize the path (replace IDs with :id)
-        normalized_path = normalize_path(path)
-
         db = SessionLocal()
         try:
-            # Find or create the profile
-            profile = (
-                db.query(ApiProfile)
-                .filter(ApiProfile.method == method)
-                .filter(ApiProfile.path == normalized_path)
-                .first()
-            )
-
-            if not profile:
-                profile = ApiProfile(
-                    method=method,
-                    path=normalized_path,
-                    dimensions={},
-                    sample_count=0,
-                    status_codes={},
-                    learned=False,
-                )
-                db.add(profile)
-
-            # Update dimensions with observed values
-            dims = profile.dimensions or {}
-            for dim in DIMENSIONS:
-                value = extract_dimension(entry, dim)
-                if value is not None:
-                    if dim not in dims:
-                        dims[dim] = {"values": [], "count": 0}
-                    dim_data = dims[dim]
-                    # Add value if not already seen (cap at 1000 unique values)
-                    value_str = json.dumps(value) if not isinstance(value, str) else value
-                    if value_str not in dim_data["values"] and len(dim_data["values"]) < 1000:
-                        dim_data["values"].append(value_str)
-                    dim_data["count"] = dim_data.get("count", 0) + 1
-
-            profile.dimensions = dims
-            profile.sample_count = (profile.sample_count or 0) + 1
-            profile.last_seen = datetime.now(timezone.utc)
-
-            # Update status codes
-            status = entry.get("response_status")
-            if status:
-                codes = profile.status_codes or {}
-                status_str = str(status)
-                codes[status_str] = codes.get(status_str, 0) + 1
-                profile.status_codes = codes
-
-            # Check for anomalies if profile is learned
-            if profile.learned:
-                anomaly_dim = check_anomaly(profile, entry)
-                if anomaly_dim:
-                    anomaly = ApiAnomaly(
-                        listener_id=entry.get("listener_id"),
-                        method=method,
-                        path=normalized_path,
-                        dimension=anomaly_dim,
-                        observed_value=json.dumps(extract_dimension(entry, anomaly_dim)),
-                        expected_values=json.dumps(dims.get(anomaly_dim, {}).get("values", [])),
-                        request_id=entry.get("request_id"),
-                        client_ip=entry.get("client_ip"),
-                    )
-                    db.add(anomaly)
-
+            ingest_profiling_entry(db, entry)
             db.commit()
         except Exception as e:
             logger.error("Error processing profiling entry: %s", e)
             db.rollback()
         finally:
             db.close()
+
+
+def ingest_profiling_entry(db: Session, entry: Dict) -> None:
+    """Process a single profiling log entry — upsert the endpoint profile and record anomalies.
+
+    This is public so it can be called both by the background sampler and by
+    the manual /api-armor/profiles/ingest test endpoint.
+    """
+    method = entry.get("method", "")
+    path = entry.get("path", "")
+    if not method or not path:
+        return
+
+    # Normalize the path (replace IDs with :id)
+    normalized_path = normalize_path(path)
+
+    # Find or create the profile
+    profile = (
+        db.query(ApiProfile)
+        .filter(ApiProfile.method == method)
+        .filter(ApiProfile.path == normalized_path)
+        .first()
+    )
+
+    if not profile:
+        profile = ApiProfile(
+            method=method,
+            path=normalized_path,
+            dimensions={},
+            sample_count=0,
+            status_codes={},
+            learned=False,
+        )
+        db.add(profile)
+
+    # Update dimensions with observed values
+    dims = profile.dimensions or {}
+    for dim in DIMENSIONS:
+        value = extract_dimension(entry, dim)
+        if value is not None:
+            if dim not in dims:
+                dims[dim] = {"values": [], "count": 0}
+            dim_data = dims[dim]
+            # Add value if not already seen (cap at 1000 unique values)
+            value_str = json.dumps(value) if not isinstance(value, str) else value
+            if value_str not in dim_data["values"] and len(dim_data["values"]) < 1000:
+                dim_data["values"].append(value_str)
+            dim_data["count"] = dim_data.get("count", 0) + 1
+
+    profile.dimensions = dims
+    profile.sample_count = (profile.sample_count or 0) + 1
+    profile.last_seen = datetime.now(timezone.utc)
+
+    # Update status codes
+    status = entry.get("response_status")
+    if status:
+        codes = profile.status_codes or {}
+        status_str = str(status)
+        codes[status_str] = codes.get(status_str, 0) + 1
+        profile.status_codes = codes
+
+    # Check for anomalies if profile is learned
+    if profile.learned:
+        anomaly_dim = check_anomaly(profile, entry)
+        if anomaly_dim:
+            anomaly = ApiAnomaly(
+                listener_id=entry.get("listener_id"),
+                method=method,
+                path=normalized_path,
+                dimension=anomaly_dim,
+                observed_value=json.dumps(extract_dimension(entry, anomaly_dim)),
+                expected_values=json.dumps(dims.get(anomaly_dim, {}).get("values", [])),
+                request_id=entry.get("request_id"),
+                client_ip=entry.get("client_ip"),
+            )
+            db.add(anomaly)
 
 
 def normalize_path(path: str) -> str:

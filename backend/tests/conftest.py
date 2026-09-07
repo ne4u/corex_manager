@@ -20,6 +20,7 @@ os.environ.setdefault("CAPTCHA_SECRET", "test-secret")
 test_data_dir = tempfile.mkdtemp(prefix="hpm_test_")
 os.environ["HAPROXY_CONFIG_PATH"] = os.path.join(test_data_dir, "haproxy.cfg")
 os.environ["CERT_DIR"] = os.path.join(test_data_dir, "certs")
+os.environ["API_ARMOR_DIR"] = os.path.join(test_data_dir, "api-armor")
 atexit.register(shutil.rmtree, test_data_dir, ignore_errors=True)
 
 import pytest

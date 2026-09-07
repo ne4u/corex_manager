@@ -13,6 +13,9 @@ def test_get_api_armor_settings(client):
     assert "api_armor_schema_learning_enabled" in data
     assert "api_armor_profiling_learning_enabled" in data
     assert "api_armor_profile_retention_days" in data
+    assert data["api_armor_scope"] == "listener"
+    assert data["api_armor_backend_ids"] == []
+    assert data["api_armor_path_patterns"] == []
 
 
 def test_update_api_armor_enabled(client, db):
@@ -86,6 +89,42 @@ def test_update_api_armor_retention_invalid(client):
     resp = client.put(
         "/api/v1/api-armor/settings",
         json={"api_armor_profile_retention_days": 0},
+    )
+    assert resp.status_code == 400
+
+
+def test_update_api_armor_scope(client, db):
+    """PUT /api-armor/settings updates scope, backend IDs, and path patterns."""
+    from app.services.settings import set_setting
+    set_setting(db, "req_fp_enabled", "true")
+    db.commit()
+    resp = client.put(
+        "/api/v1/api-armor/settings",
+        json={
+            "api_armor_enabled": True,
+            "api_armor_scope": "path",
+            "api_armor_backend_ids": [1, 2],
+            "api_armor_path_patterns": ["^/api/v1/.*", "^/graphql$"],
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["api_armor_scope"] == "path"
+    assert data["api_armor_backend_ids"] == [1, 2]
+    assert data["api_armor_path_patterns"] == ["^/api/v1/.*", "^/graphql$"]
+
+
+def test_update_api_armor_scope_invalid(client):
+    """PUT /api-armor/settings rejects unknown scope or invalid regex."""
+    resp = client.put(
+        "/api/v1/api-armor/settings",
+        json={"api_armor_scope": "invalid"},
+    )
+    assert resp.status_code == 400
+
+    resp = client.put(
+        "/api/v1/api-armor/settings",
+        json={"api_armor_path_patterns": ["["]},
     )
     assert resp.status_code == 400
 
@@ -342,3 +381,198 @@ def test_delete_api_key_list(client, db):
     resp = client.delete(f"/api/v1/api-armor/api-key-lists/{lid}")
     assert resp.status_code == 200
     assert db.query(ApiKeyList).count() == 0
+
+
+def test_get_api_key_list(client, db):
+    """GET /api-armor/api-key-lists/{lid} returns the list and entries."""
+    create_resp = client.post("/api/v1/api-armor/api-key-lists", json={"name": "test-keys", "entries": ["k1", "k2"]})
+    lid = create_resp.json()["id"]
+    resp = client.get(f"/api/v1/api-armor/api-key-lists/{lid}")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["name"] == "test-keys"
+    assert len(data["entries"]) == 2
+
+
+def test_update_api_key_list(client, db):
+    """PUT /api-armor/api-key-lists/{lid} replaces entries."""
+    from app.models.api_armor import ApiKeyListEntry
+    create_resp = client.post("/api/v1/api-armor/api-key-lists", json={"name": "test-keys", "entries": ["k1"]})
+    lid = create_resp.json()["id"]
+    resp = client.put(f"/api/v1/api-armor/api-key-lists/{lid}", json={
+        "name": "updated-keys",
+        "description": "Updated",
+        "entries": ["new1", "new2"],
+    })
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["name"] == "updated-keys"
+    assert data["description"] == "Updated"
+    assert [e["value"] for e in data["entries"]] == ["new1", "new2"]
+    assert db.query(ApiKeyListEntry).filter(ApiKeyListEntry.list_id == lid).count() == 2
+
+
+def test_update_api_key_list_duplicate_name(client, db):
+    """PUT /api-armor/api-key-lists/{lid} rejects a duplicate name."""
+    client.post("/api/v1/api-armor/api-key-lists", json={"name": "first", "entries": []})
+    create_resp = client.post("/api/v1/api-armor/api-key-lists", json={"name": "second", "entries": []})
+    lid = create_resp.json()["id"]
+    resp = client.put(f"/api/v1/api-armor/api-key-lists/{lid}", json={"name": "first", "entries": []})
+    assert resp.status_code == 409
+
+
+def test_create_api_key_entry(client, db):
+    """POST /api-armor/api-key-lists/{lid}/entries adds a single entry."""
+    create_resp = client.post("/api/v1/api-armor/api-key-lists", json={"name": "test-keys", "entries": []})
+    lid = create_resp.json()["id"]
+    resp = client.post(f"/api/v1/api-armor/api-key-lists/{lid}/entries", json={"value": "new-key", "note": "note"})
+    assert resp.status_code == 200
+    assert resp.json()["value"] == "new-key"
+    assert resp.json()["note"] == "note"
+    list_resp = client.get(f"/api/v1/api-armor/api-key-lists/{lid}")
+    assert len(list_resp.json()["entries"]) == 1
+
+
+def test_delete_api_key_entry(client, db):
+    """DELETE /api-armor/api-key-lists/{lid}/entries/{eid} removes an entry."""
+    create_resp = client.post("/api/v1/api-armor/api-key-lists", json={"name": "test-keys", "entries": ["k1"]})
+    lid = create_resp.json()["id"]
+    eid = create_resp.json()["entries"][0]["id"]
+    resp = client.delete(f"/api/v1/api-armor/api-key-lists/{lid}/entries/{eid}")
+    assert resp.status_code == 200
+    list_resp = client.get(f"/api/v1/api-armor/api-key-lists/{lid}")
+    assert list_resp.json()["entries"] == []
+
+
+# ----- Schema update / learn -----
+
+def test_update_schema(client, db):
+    """PUT /api-armor/schemas/{sid} updates a schema."""
+    client.post("/api/v1/api-armor/specs", json={"name": "test-spec", "spec": SAMPLE_OPENAPI})
+    schema_resp = client.get("/api/v1/api-armor/schemas")
+    sid = schema_resp.json()[0]["id"]
+    new_schema = {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}
+    resp = client.put(f"/api/v1/api-armor/schemas/{sid}", json={
+        "id": sid,
+        "name": "updated",
+        "method": "POST",
+        "path": "/api/v1/users",
+        "schema_def": new_schema,
+        "enabled": True,
+        "sample_count": 0,
+        "source": "openapi",
+    })
+    assert resp.status_code == 200
+    assert resp.json()["schema_def"] == new_schema
+    assert "schema_json" not in resp.json()
+
+
+def test_learn_schema(client, db):
+    """POST /api-armor/schemas/learn merges an observation into a learned schema."""
+    resp = client.post("/api/v1/api-armor/schemas/learn", json={
+        "method": "POST",
+        "path": "/api/v1/users",
+        "body": {"name": "alice", "email": "alice@example.com"},
+    })
+    assert resp.status_code == 200
+    assert resp.json()["source"] == "learned"
+    assert resp.json()["sample_count"] == 1
+    schema_def = resp.json()["schema_def"]
+    assert schema_def["type"] == "object"
+    assert "name" in schema_def["properties"]
+
+    # Second observation merges.
+    resp2 = client.post("/api/v1/api-armor/schemas/learn", json={
+        "method": "POST",
+        "path": "/api/v1/users",
+        "body": {"name": "bob", "age": 30},
+    })
+    assert resp2.status_code == 200
+    assert resp2.json()["sample_count"] == 2
+
+
+# ----- Profiles & Anomalies -----
+
+def test_list_profiles_empty(client):
+    """GET /api-armor/profiles returns an empty list initially."""
+    resp = client.get("/api/v1/api-armor/profiles")
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+def test_finalize_profile(client, db):
+    """POST /api-armor/profiles/{pid}/finalize marks a profile learned."""
+    from app.models.api_armor import ApiProfile
+    profile = ApiProfile(method="POST", path="/api/v1/users", dimensions={}, sample_count=150, learned=False)
+    db.add(profile)
+    db.commit()
+    db.refresh(profile)
+    resp = client.post(f"/api/v1/api-armor/profiles/{profile.id}/finalize", params={"min_samples": 100})
+    assert resp.status_code == 200
+    assert resp.json()["learned"] is True
+
+
+def test_delete_profile(client, db):
+    """DELETE /api-armor/profiles/{pid} removes a profile."""
+    from app.models.api_armor import ApiProfile
+    profile = ApiProfile(method="POST", path="/api/v1/users", dimensions={}, sample_count=1, learned=False)
+    db.add(profile)
+    db.commit()
+    db.refresh(profile)
+    resp = client.delete(f"/api/v1/api-armor/profiles/{profile.id}")
+    assert resp.status_code == 200
+    assert db.query(ApiProfile).count() == 0
+
+
+def test_list_anomalies_empty(client):
+    """GET /api-armor/anomalies returns an empty list initially."""
+    resp = client.get("/api/v1/api-armor/anomalies")
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+def test_clear_anomalies(client, db):
+    """DELETE /api-armor/anomalies clears all anomalies."""
+    from app.models.api_armor import ApiAnomaly
+    for i in range(3):
+        db.add(ApiAnomaly(method="POST", path="/api/v1/users", dimension="content_type"))
+    db.commit()
+    resp = client.delete("/api/v1/api-armor/anomalies")
+    assert resp.status_code == 200
+    assert db.query(ApiAnomaly).count() == 0
+
+
+# ----- Manual ingestion endpoints -----
+
+def test_ingest_profile(client, db):
+    """POST /api-armor/profiles/ingest creates/updates a profile."""
+    from app.models.api_armor import ApiProfile
+    resp = client.post("/api/v1/api-armor/profiles/ingest", json={
+        "method": "POST",
+        "path": "/api/v1/users",
+        "content_type": "application/json",
+        "response_status": 201,
+    })
+    assert resp.status_code == 200
+    assert db.query(ApiProfile).count() == 1
+    profile = db.query(ApiProfile).first()
+    assert profile.method == "POST"
+    assert profile.path == "/api/v1/users"
+    assert "content_type" in (profile.dimensions or {})
+
+
+def test_ingest_anomaly(client, db):
+    """POST /api-armor/anomalies/ingest records an anomaly."""
+    from app.models.api_armor import ApiAnomaly
+    resp = client.post("/api/v1/api-armor/anomalies/ingest", json={
+        "method": "POST",
+        "path": "/api/v1/users",
+        "dimension": "content_type",
+        "observed_value": "text/xml",
+        "expected_values": {"values": ["application/json"]},
+    })
+    assert resp.status_code == 200
+    assert db.query(ApiAnomaly).count() == 1
+    data = resp.json()
+    assert data["dimension"] == "content_type"
+    assert data["observed_value"] == "text/xml"

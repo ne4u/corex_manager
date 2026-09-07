@@ -179,6 +179,44 @@ def test_profiler_processes_log_file(db):
         os.unlink(log_path)
 
 
+def test_prune_profiles_removes_old_profiles_and_anomalies(db):
+    """prune_profiles deletes old profiles and their anomalies."""
+    from datetime import datetime, timedelta, timezone
+    from app.models.api_armor import ApiAnomaly
+    from app.services.api_armor_profiler import prune_profiles
+
+    old = ApiProfile(
+        method="POST",
+        path="/old",
+        dimensions={},
+        sample_count=1,
+        learned=False,
+        last_seen=datetime.now(timezone.utc) - timedelta(days=90),
+    )
+    new = ApiProfile(
+        method="POST",
+        path="/new",
+        dimensions={},
+        sample_count=1,
+        learned=False,
+        last_seen=datetime.now(timezone.utc),
+    )
+    db.add_all([old, new])
+    db.commit()
+    db.refresh(old)
+    db.add(ApiAnomaly(method="POST", path="/old", dimension="content_type", created_at=datetime.now(timezone.utc) - timedelta(days=90)))
+    db.commit()
+
+    count = prune_profiles(db, retention_days=30)
+    assert count == 1
+    db.commit()
+
+    remaining = db.query(ApiProfile).all()
+    assert len(remaining) == 1
+    assert remaining[0].path == "/new"
+    assert db.query(ApiAnomaly).count() == 0
+
+
 def test_profiler_handles_log_rotation(db):
     """ApiArmorProfiler handles log rotation (file shrinks)."""
     with tempfile.NamedTemporaryFile(mode="w", suffix=".log", delete=False) as f:

@@ -16,6 +16,7 @@ name = "api-armor-body-parser"
 version = "0.1.0"
 dependencies = [
  "api-armor-graphql",
+ "api-armor-jwt-validator",
  "api-armor-schema-validator",
  "haproxy-api",
  "mlua",

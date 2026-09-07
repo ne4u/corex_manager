@@ -604,7 +604,9 @@
       "routeMcp": "توجيه /mcp إلى بوابة MCP",
       "routeMcpHelp": "عند التفعيل، تُوجَّه طلبات /mcp على هذا المستمع إلى backend بوابة MCP بالإضافة إلى الـ backend الافتراضي.",
       "mcpGatewayBuiltin": "mcp_gateway (مدمج)",
-      "mcpRouteEnabled": "+ /mcp → gateway"
+      "mcpRouteEnabled": "+ /mcp → gateway",
+      "apiArmor": "تمكين API Armor",
+      "apiArmorHelp": "تشغيل تحليل نص الطلب والتحقق من المخطط وفحوصات المصادقة لـ API Armor على هذا المستمع. يتطلب تمكين HTTP Request Fingerprinting ووحدة API Armor العالمية."
     },
     "rules": {
       "title": "قواعد التوجيه",
@@ -2073,7 +2075,14 @@
       "settingsSaved": "تم حفظ الإعدادات.",
       "failedToLoadSettings": "فشل تحميل الإعدادات",
       "failedToSaveSettings": "فشل حفظ الإعدادات.",
-      "requiresReqFp": "API Armor requires HTTP Request Fingerprinting to be enabled. Enable it in Global Options first."
+      "requiresReqFp": "يتطلب API Armor تمكين HTTP Request Fingerprinting. قم بتمكينه في الخيارات العامة أولاً.",
+      "scope": "النطاق",
+      "scopeListener": "حسب المستمع (خيار لكل مستمع)",
+      "scopeBackend": "حسب الخادم الخلفي (كل حركة المرور إلى الخوادم الخلفية المحددة)",
+      "scopePath": "حسب الخادم الخلفي + المسار (الخوادم الخلفية المحددة، أنماط المسارات اختيارية)",
+      "backendIds": "الخوادم الخلفية المحمية",
+      "pathPatterns": "أنماط Regex للمسار",
+      "pathPatternsPlaceholder": "^/api/v1/.*\n^/graphql$"
     },
     "presets": {
       "title": "قواعد أمان مسبقة",

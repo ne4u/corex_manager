@@ -8,7 +8,7 @@ class SecurityRuleBase(BaseModel):
     enabled: bool = True
     listener_ids: Optional[List[int]] = []
     expression: str
-    action: str = Field(default="block", pattern="^(block|allow|redirect|custom_response|challenge|skip_rules|skip_rules_ratelimit|skip_rules_waf|skip_all)$")
+    action: str = Field(default="block", pattern="^(block|allow|redirect|custom_response|challenge|log|skip_rules|skip_rules_ratelimit|skip_rules_waf|skip_all)$")
     log: bool = True
     no_log: bool = False
     status_code: Optional[int] = Field(default=None, ge=100, le=599)

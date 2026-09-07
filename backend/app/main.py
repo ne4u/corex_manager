@@ -141,11 +141,14 @@ async def lifespan(app: FastAPI):
     except Exception as _exc:
         logging.getLogger(__name__).warning("beacon_trust re-seed on startup failed: %s", _exc)
     start_beacon_trust_persist()
-    # API Armor — start profiler if enabled + profiling learning is on
+    # API Armor — start profiler and schema learner if enabled
     from .services.api_armor_profiler import start_profiler as start_api_armor_profiler, stop_profiler as stop_api_armor_profiler
+    from .services.api_armor_schema_learner import start_schema_learner, stop_schema_learner
     start_api_armor_profiler()
+    start_schema_learner()
     yield
     stop_api_armor_profiler()
+    stop_schema_learner()
     _siem_forwarder.stop()
     _rule_set_updater.stop()
     _security_list_feed_updater.stop()

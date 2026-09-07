@@ -96,26 +96,26 @@ _FIELD_MAP: Dict[str, Tuple[str, str, str]] = {
     # Response-phase subfields
     "http.response.fingerprint.status": ("var(txn.req_fp.status)", "response", "int"),
     "http.response.fingerprint.body_bytes": ("var(txn.req_fp.body_bytes)", "response", "int"),
-    # --- API Armor: GraphQL (set by Rust graphql module via body_parser) ---
-    "graphql.operation": ("var(txn.gql.operation)", "request", "string"),
-    "graphql.depth": ("var(txn.gql.depth)", "request", "int"),
-    "graphql.complexity": ("var(txn.gql.complexity)", "request", "int"),
-    "graphql.field_count": ("var(txn.gql.field_count)", "request", "int"),
-    "graphql.alias_count": ("var(txn.gql.alias_count)", "request", "int"),
-    "graphql.fragment_count": ("var(txn.gql.fragment_count)", "request", "int"),
-    "graphql.query_hash": ("var(txn.gql.query_hash)", "request", "string"),
-    "graphql.valid": ("var(txn.gql.valid)", "request", "bool"),
-    # --- API Armor: Schema Validation (set by Rust schema_validator) ---
-    "api.schema_valid": ("var(txn.api.schema_valid)", "request", "bool"),
-    "api.schema_errors": ("var(txn.api.schema_errors)", "request", "string"),
-    # --- API Armor: Auth Validation (set by Rust jwt_validator) ---
-    "auth.valid": ("var(txn.auth.valid)", "request", "bool"),
-    "auth.type": ("var(txn.auth.type)", "request", "string"),
-    "auth.error": ("var(txn.auth.error)", "request", "string"),
+    # --- API Armor: GraphQL (set by Rust body_parser) ---
+    "graphql.operation": ("var(txn.gql_operation)", "request", "string"),
+    "graphql.depth": ("var(txn.gql_depth)", "request", "int"),
+    "graphql.complexity": ("var(txn.gql_complexity)", "request", "int"),
+    "graphql.field_count": ("var(txn.gql_field_count)", "request", "int"),
+    "graphql.alias_count": ("var(txn.gql_alias_count)", "request", "int"),
+    "graphql.fragment_count": ("var(txn.gql_fragment_count)", "request", "int"),
+    "graphql.query_hash": ("var(txn.gql_query_hash)", "request", "string"),
+    "graphql.valid": ("var(txn.gql_valid)", "request", "bool"),
+    # --- API Armor: Schema Validation (set by Rust body_parser) ---
+    "api.schema_valid": ("var(txn.api_schema_valid)", "request", "bool"),
+    "api.schema_errors": ("var(txn.api_schema_errors)", "request", "string"),
+    # --- API Armor: Auth Validation (set by Rust body_parser) ---
+    "auth.valid": ("var(txn.auth_valid)", "request", "bool"),
+    "auth.type": ("var(txn.auth_type)", "request", "string"),
+    "auth.error": ("var(txn.auth_error)", "request", "string"),
     "auth.claim.sub": ("var(txn.auth.claim_sub)", "request", "string"),
     "auth.claim.iss": ("var(txn.auth.claim_iss)", "request", "string"),
     "auth.claim.aud": ("var(txn.auth.claim_aud)", "request", "string"),
-    # --- API Armor: Behavioral Profiling (set by Rust profile_check) ---
+    # --- API Armor: Behavioral Profiling (set by Rust body_parser) ---
     "api.profile_anomaly": ("var(txn.api.profile_anomaly)", "request", "bool"),
     # --- Risk Scoring engine outputs (set by lua.risk_compute) ---
     "risk.score": ("var(txn.risk.score)", "request", "int"),
@@ -240,16 +240,20 @@ _to_dnf = to_dnf
 # Translator: AST leaf → HAProxy condition fragment
 # ---------------------------------------------------------------------------
 
-def _bool_fetch_cond(fetch: str) -> str:
+def _bool_fetch_cond(fetch: str, field: str = "") -> str:
     """Build a HAProxy condition fragment testing that a boolean fetch is true.
 
     For ``var()`` fetches, HAProxy requires a ``-m`` matching method (the
     ``var`` sample fetch is typeless until a match method is specified).
-    These vars store ``"0"``/``"1"`` strings (set by Lua scripts like
-    risk_score.lua and the Rust auth/GraphQL modules), so we use ``-m str 1``.
+    Most Lua-set vars store ``"0"``/``"1"`` strings, so the default for
+    var fetches is ``-m str 1``. API Armor variables set by the Rust body
+    parser are real booleans, so those use ``-m bool``.
     For native boolean fetches (``ssl_fc``, etc.), the bare form works.
     """
     if fetch.startswith("var("):
+        # API Armor bools are real booleans; risk/legacy vars stay string "1".
+        if field.startswith(("graphql.", "api.", "auth.valid")):
+            return f"{{ {fetch} -m bool }}"
         return f"{{ {fetch} -m str 1 }}"
     return f"{{ {fetch} }}"
 
@@ -397,7 +401,7 @@ def _translate_leaf(node: Dict[str, Any], db: Session) -> str:
             fetch, _, vtype, _ = risk_resolved
             # Handle the same leaf types as below but with the resolved fetch
             if t == "bool_field":
-                cond = _bool_fetch_cond(fetch)
+                cond = _bool_fetch_cond(fetch, field)
                 return f"!{cond}" if negated else cond
             if t == "exists":
                 cond = f"{{ {fetch} -m found }}"
@@ -407,7 +411,7 @@ def _translate_leaf(node: Dict[str, Any], db: Session) -> str:
                 value = node["value"]
                 if isinstance(value, bool):
                     if op == "=":
-                        cond = _bool_fetch_cond(fetch) if value else f"!{_bool_fetch_cond(fetch)}"
+                        cond = _bool_fetch_cond(fetch, field) if value else f"!{_bool_fetch_cond(fetch, field)}"
                         return f"!{cond}" if negated else cond
                     raise ValueError(f"Boolean field {field!r} only supports = operator")
                 if isinstance(value, str):
@@ -446,8 +450,9 @@ def _translate_leaf(node: Dict[str, Any], db: Session) -> str:
                 return f"!{cond}" if negated else cond
 
     if t == "bool_field":
-        fetch, _, _, _ = _resolve_field(node["field"])
-        cond = _bool_fetch_cond(fetch)
+        field = node["field"]
+        fetch, _, _, _ = _resolve_field(field)
+        cond = _bool_fetch_cond(fetch, field)
         return f"!{cond}" if negated else cond
 
     if t == "exists":
@@ -491,10 +496,10 @@ def _translate_leaf(node: Dict[str, Any], db: Session) -> str:
         if isinstance(value, bool):
             if op == "=":
                 if value:
-                    cond = _bool_fetch_cond(fetch)
+                    cond = _bool_fetch_cond(fetch, field)
                 else:
                     # = false → negate the "is true" condition
-                    cond = f"!{_bool_fetch_cond(fetch)}"
+                    cond = f"!{_bool_fetch_cond(fetch, field)}"
                 return f"!{cond}" if negated else cond
             raise ValueError(f"Boolean field {field!r} only supports = operator")
 
@@ -705,6 +710,17 @@ _DONE_GUARD = "!{ var(txn.sec.done) -m found }"
 # Characters that could break a HAProxy set-var str() value or inject config
 _LOG_VALUE_RE = re.compile(r"[\r\n;\\\"']")
 
+# API Armor security rules operate on variables set by the Rust body_parser
+# (gql_*, api_*, auth_*, api.profile_anomaly). Guard them with the `is_api_armor`
+# ACL so they don't fire on non-API-Armor traffic where those vars are unset.
+_API_ARMOR_VAR_RE = re.compile(r"var\(txn\.(?:gql_|api_|auth_|api\.profile_anomaly)")
+
+
+def _api_armor_guarded_condition(condition: str) -> str:
+    """Prepend is_api_armor and append _DONE_GUARD to each OR group."""
+    groups = condition.split(" or ")
+    return " or ".join(f"is_api_armor {g} {_DONE_GUARD}" for g in groups)
+
 
 def _safe_log_value(value: str) -> str:
     """Sanitize a value for use inside a HAProxy set-var str(...) expression.
@@ -776,7 +792,10 @@ def emit_security_rules(listener: Any, db: Session, lines: List[str]) -> None:
 def _emit_request_rule(rule: Any, condition: str, lines: List[str], block_status: int,
                        db: Session = None, listener: Any = None) -> None:
     """Emit http-request lines for a request-phase security rule."""
-    guarded_cond = f"{condition} {_DONE_GUARD}"
+    if _API_ARMOR_VAR_RE.search(condition):
+        guarded_cond = _api_armor_guarded_condition(condition)
+    else:
+        guarded_cond = f"{condition} {_DONE_GUARD}"
 
     # no_log: suppress the entire request log line for matching requests
     if getattr(rule, "no_log", False):

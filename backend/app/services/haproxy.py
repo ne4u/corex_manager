@@ -863,6 +863,7 @@ def generate_global_section(
     api_armor_enabled: bool = False,
     req_fp_enabled: bool = False,
     quic_enabled: bool = False,
+    db: Optional[Session] = None,
 ) -> str:
     lines = ["global"]
     lines.append(f"    maxconn {settings.HAPROXY_MAXCONN}")
@@ -1124,6 +1125,29 @@ def generate_global_section(
 
     if need_geoip or need_compress or need_resp_transform or need_img_2_webp or need_api_armor or need_req_fp:
         lines.append("    lua-prepend-path /etc/haproxy/?.so cpath")
+
+    if need_api_armor:
+        from .settings import get_setting
+        # Tell the Rust module where the API Armor data bundle and profiling log live.
+        api_armor_dir = os.path.abspath(settings.API_ARMOR_DIR)
+        api_armor_log = os.path.abspath(settings.API_ARMOR_PROFILE_LOG_PATH)
+        schema_learning = "1" if get_setting(db, "api_armor_schema_learning_enabled", "false").lower() in ("true", "1", "yes") else "0"
+        profiling_learning = "1" if get_setting(db, "api_armor_profiling_learning_enabled", "false").lower() in ("true", "1", "yes") else "0"
+        lines.append(f"    setenv API_ARMOR_DIR {api_armor_dir}")
+        lines.append(f"    setenv API_ARMOR_PROFILING_LOG_PATH {api_armor_log}")
+        lines.append(f"    setenv API_ARMOR_SCHEMA_LEARNING_ENABLED {schema_learning}")
+        lines.append(f"    setenv API_ARMOR_PROFILING_LEARNING_ENABLED {profiling_learning}")
+        # Expose any JWT secrets that active policies reference so the Rust
+        # validator can read them via std::env::var at runtime.
+        if db is not None:
+            from ..models.api_armor import AuthPolicy
+            for p in db.query(AuthPolicy).filter(AuthPolicy.enabled == True).filter(AuthPolicy.auth_type == "jwt").all():
+                if p.jwt_secret_env:
+                    secret = os.environ.get(p.jwt_secret_env, "")
+                    if secret:
+                        lines.append(f"    setenv {p.jwt_secret_env} {secret}")
+
+    if need_geoip or need_compress or need_resp_transform or need_img_2_webp or need_api_armor or need_req_fp:
         # Generate a combined loader script that loads all modules in sequence
         # with pcall error isolation, so a failure in one doesn't break the others.
         loader_path = os.path.join(
@@ -2144,6 +2168,9 @@ def generate_frontend(
     page_protect_beacon: Optional[Dict[str, Any]] = None,
     api_armor_enabled: bool = False,
     api_armor_max_body_bytes: int = 1048576,
+    api_armor_scope: str = "listener",
+    api_armor_backend_ids: Optional[List[int]] = None,
+    api_armor_path_patterns: Optional[List[str]] = None,
     ja4_enabled: bool = True,
     disk_cache_enabled: bool = False,
     server_timing_metrics_enabled: bool = False,
@@ -2156,6 +2183,8 @@ def generate_frontend(
     listener_options = listener.options or {}
     cipher = db.query(CipherSuite).filter(CipherSuite.name == _safe_token(listener_options.get("cipher_suite", ""))).first()
     backend_default = db.query(Backend).filter(Backend.id == listener.default_backend_id).first()
+    api_armor_backend_ids = api_armor_backend_ids or []
+    api_armor_path_patterns = [p for p in (api_armor_path_patterns or []) if isinstance(p, str) and p.strip()]
 
     def _backend_name(b: Optional[Backend]) -> str:
         if not b:
@@ -2644,7 +2673,29 @@ def generate_frontend(
         # buffered and req_fp.lua falls back to query-only parsing (body params
         # become nil: param_keys/param_types='nil', param_lens='0' when no
         # query params).
-        api_armor_on_listener = api_armor_enabled and listener_options.get("api_armor", False)
+        # Determine whether API Armor is active for this listener based on scope.
+        # listener scope: per-listener option.
+        # backend/path scope: any backend reachable from this listener (default
+        # backend or any backend rule) is in the selected list.
+        def _listener_reachable_backend_ids(l: Listener) -> Set[int]:
+            bids: Set[int] = set()
+            if l.default_backend_id:
+                bids.add(l.default_backend_id)
+            for br in db.query(BackendRule).filter(
+                BackendRule.listener_id == l.id, BackendRule.enabled == True  # noqa: E712
+            ).all():
+                if br.backend_id:
+                    bids.add(br.backend_id)
+            return bids
+
+        api_armor_on_listener = False
+        if api_armor_enabled and not force_https_redirect:
+            if api_armor_scope == "listener":
+                api_armor_on_listener = listener_options.get("api_armor", False)
+            else:
+                reachable = _listener_reachable_backend_ids(listener)
+                api_armor_on_listener = bool(reachable & set(api_armor_backend_ids or []))
+
         # req_fp body buffering is skipped on force_https listeners —
         # lua.req_fp_capture is also skipped (see below), so the buffered
         # body would never be consumed.
@@ -2658,18 +2709,25 @@ def generate_frontend(
 
         # API Armor — conditional body buffering.
         # The set-var(txn.api_body) must run BEFORE lua.req_fp_capture so that
-        # req_fp.lua can read it during capture. The deeper Rust analysis
-        # (lua.api_body_parse) runs AFTER req_fp_capture because it needs req_fp
-        # subfields. Both run BEFORE security rules (so rules can reference
-        # graphql.*/api.*/auth.*).
+        # req_fp.lua can read it during capture. For backend/path scopes the
+        # listener only buffers the body; the deeper analysis (lua.api_body_parse,
+        # auth, schema, profile enforcement) is emitted in the selected backend
+        # section after use_backend has run. The listener id is preserved in a
+        # txn var so backend-scoped auth policies can still match by listener.
         # Skipped on force_https listeners — req_fp_capture is skipped (see
         # below), so api_body_parse would have no req_fp subfields to work
         # with. API Armor fires on the HTTPS listener after the redirect.
         if api_armor_on_listener and not force_https_redirect:
             lines.append('    acl is_api_armor req.hdr(content-type) -m beg application/json application/graphql application/x-www-form-urlencoded')
-            lines.append(f"    http-request deny deny_status 413 if is_api_armor {{ req.body_len gt {api_armor_max_body_bytes} }}")
-            lines.append("    http-request wait-for-body time 10s if is_api_armor")
-            lines.append("    http-request set-var(txn.api_body) req.body if is_api_armor")
+            api_armor_condition = "is_api_armor"
+            if api_armor_path_patterns:
+                for pattern in api_armor_path_patterns:
+                    lines.append(f'    acl is_api_armor_path path_reg -i {_safe_regex(pattern)}')
+                api_armor_condition = "is_api_armor is_api_armor_path"
+            lines.append(f"    http-request deny deny_status 413 if {api_armor_condition} {{ req.body_len gt {api_armor_max_body_bytes} }}")
+            lines.append(f"    http-request wait-for-body time 10s if {api_armor_condition}")
+            lines.append(f"    http-request set-var(txn.api_body) req.body if {api_armor_condition}")
+            lines.append(f"    http-request set-var(txn.api_armor_listener_id) int({listener.id}) if {api_armor_condition}")
 
         # GeoIP set-vars — txn.geo_country and txn.geoip_tz are consumed by
         # lua.risk_capture (risk scoring) and may be referenced by future
@@ -2725,12 +2783,50 @@ def generate_frontend(
 
         # API Armor deeper analysis — runs AFTER req_fp_capture so req_fp
         # subfields are available for security rules.
+        # For backend/path scopes this is emitted in the backend section after
+        # use_backend has selected the real backend. For listener scope it is
+        # emitted here in the frontend.
         # Skipped on force_https listeners — req_fp_capture is skipped above,
         # so req_fp subfields are not available. API Armor fires on the HTTPS
         # listener after the redirect.
-        if api_armor_on_listener and not force_https_redirect:
-            lines.append("    http-request lua.api_body_parse if is_api_armor")
-            lines.append("    http-request unset-var(txn.api_body) if is_api_armor")
+        if api_armor_on_listener and not force_https_redirect and api_armor_scope == "listener":
+            # Tell the Rust module which auth policy applies to this listener.
+            from ..models.api_armor import AuthPolicy
+            listener_ids = {listener.id}
+            policy = (
+                db.query(AuthPolicy)
+                .filter(AuthPolicy.enabled == True)  # noqa: E712
+                .filter(AuthPolicy.auth_type.isnot(None))
+                .all()
+            )
+            matched_id = 0
+            matched_on_failure = "block"
+            for p in policy:
+                if p.listener_ids and any(lid in listener_ids for lid in p.listener_ids):
+                    matched_id = p.id
+                    matched_on_failure = (p.on_failure or "block").lower()
+                    break
+            lines.append(f"    http-request set-var(txn.api_auth_policy_id) int({matched_id}) if {api_armor_condition}")
+            lines.append(f"    http-request lua.api_body_parse if {api_armor_condition}")
+            # Enforce API Armor schema validation and auth policy results.
+            # Schema failure blocks with 400; auth failure blocks with 401.
+            lines.append(f"    http-request deny deny_status 400 if {api_armor_condition} !{{ var(txn.api_schema_valid) -m bool }}")
+            if matched_id > 0:
+                if matched_on_failure == "block":
+                    lines.append(f"    http-request deny deny_status 401 if {api_armor_condition} !{{ var(txn.auth_valid) -m bool }}")
+                elif matched_on_failure == "log_only":
+                    # Log-only: do not block. auth_valid/auth_error are still
+                    # available to the backend and to security rules.
+                    pass
+                elif matched_on_failure == "challenge":
+                    # Auth failure triggers a CAPTCHA challenge. The listener must
+                    # also have the cv cookie validation path (see _listener_has_challenge_action).
+                    challenge_url = _safe_token(settings.CAPTCHA_CHALLENGE_URL)
+                    _emit_challenge_redirect(lines, f"{api_armor_condition} !{{ var(txn.auth_valid) -m bool }}", challenge_url, matched_id, "api_armor_auth", f"API Armor auth policy {matched_id}")
+            # Behavioral profile anomaly: deny with 403 when a learned profile is
+            # violated. Use a positive ACL match (not !) so missing/false vars pass.
+            lines.append(f"    http-request deny deny_status 403 if {api_armor_condition} {{ var(txn.api.profile_anomaly) -m bool }}")
+            lines.append(f"    http-request unset-var(txn.api_body) if {api_armor_condition}")
 
         # Request headers are emitted ONLY in backend sections (see
         # generate_backend). RequestHeader is backend-scoped (backend_id /
@@ -3283,6 +3379,11 @@ def generate_backend(
     resp_transform_enabled: bool = False,
     img_2_webp_enabled: bool = False,
     page_protect_beacon: Optional[Dict[str, Any]] = None,
+    api_armor_enabled: bool = False,
+    api_armor_scope: str = "listener",
+    api_armor_backend_ids: Optional[List[int]] = None,
+    api_armor_path_patterns: Optional[List[str]] = None,
+    api_armor_max_body_bytes: int = 1048576,
 ) -> str:
     backend_name = (backend_names or {}).get(backend.id, _safe_name(backend.name))
     effective_mode = "tcp" if backend.protocol == "tcp" else "http"
@@ -3352,6 +3453,71 @@ def generate_backend(
                 lines.append(f"    http-request add-header {header_name} {header_value}{condition}")
             elif h.action == "del":
                 lines.append(f"    http-request del-header {header_name}{condition}")
+
+    # API Armor enforcement (per backend) for backend/path scopes.
+    # The frontend buffers the request body and carries the listener id in
+    # txn.api_armor_listener_id; here we run schema/auth/profile checks only on
+    # backends that are in scope. This supports shared listeners with routing
+    # rules (no default backend).
+    api_armor_on_backend = (
+        api_armor_enabled
+        and effective_mode == "http"
+        and api_armor_scope in ("backend", "path")
+        and backend.id in (api_armor_backend_ids or [])
+    )
+    if api_armor_on_backend:
+        from ..models.api_armor import AuthPolicy
+        ba_condition = "{ var(txn.api_body) -m found }"
+        if api_armor_path_patterns:
+            for pattern in api_armor_path_patterns:
+                lines.append(f'    acl is_api_armor_path path_reg -i {_safe_regex(pattern)}')
+            ba_condition += " is_api_armor_path"
+        # Default failure mode; listener or backend policies can override.
+        lines.append(f"    http-request set-var(txn.api_auth_on_failure) str(block) if {ba_condition} !{{ var(txn.api_auth_on_failure) -m found }}")
+        # Listener-scoped auth policies (first match, only if not already set).
+        policies = (
+            db.query(AuthPolicy)
+            .filter(AuthPolicy.enabled == True)  # noqa: E712
+            .filter(AuthPolicy.auth_type.isnot(None))
+            .order_by(AuthPolicy.id)
+            .all()
+        )
+        for p in policies:
+            if not p.listener_ids:
+                continue
+            on_failure = (p.on_failure or "block").lower()
+            for lid in p.listener_ids:
+                lines.append(f"    http-request set-var(txn.api_auth_policy_id) int({p.id}) if {ba_condition} !{{ var(txn.api_auth_policy_id) -m found }} {{ var(txn.api_armor_listener_id) -m int eq {lid} }}")
+                lines.append(f"    http-request set-var(txn.api_auth_on_failure) str({on_failure}) if {ba_condition} !{{ var(txn.api_auth_on_failure) -m found }} {{ var(txn.api_armor_listener_id) -m int eq {lid} }}")
+        # Backend-scoped auth policies override listener-scoped ones.
+        matched_id = 0
+        matched_on_failure = "block"
+        for p in policies:
+            if p.backend_ids and backend.id in p.backend_ids:
+                matched_id = p.id
+                matched_on_failure = (p.on_failure or "block").lower()
+                on_failure = matched_on_failure
+                lines.append(f"    http-request set-var(txn.api_auth_policy_id) int({p.id}) if {ba_condition}")
+                lines.append(f"    http-request set-var(txn.api_auth_on_failure) str({on_failure}) if {ba_condition}")
+                break
+        lines.append(f"    http-request lua.api_body_parse if {ba_condition}")
+        lines.append(f"    http-request deny deny_status 400 if {ba_condition} !{{ var(txn.api_schema_valid) -m bool }}")
+        lines.append(f"    http-request deny deny_status 401 if {ba_condition} !{{ var(txn.auth_valid) -m bool }} {{ var(txn.api_auth_on_failure) -m str block }}")
+        if matched_id > 0 and matched_on_failure == "challenge":
+            challenge_url = _safe_token(settings.CAPTCHA_CHALLENGE_URL)
+            _emit_challenge_redirect(lines, f"{ba_condition} !{{ var(txn.auth_valid) -m bool }}", challenge_url, matched_id, "api_armor_auth", f"API Armor auth policy {matched_id}")
+        # Listener-scoped challenge actions: we cannot know which listener will
+        # be used at config time, so we emit a generic challenge for any listener
+        # policy where on_failure=challenge and the listener id matched.
+        for p in policies:
+            if not p.listener_ids or (p.on_failure or "block").lower() != "challenge":
+                continue
+            for lid in p.listener_ids:
+                challenge_url = _safe_token(settings.CAPTCHA_CHALLENGE_URL)
+                _emit_challenge_redirect(lines, f"{ba_condition} !{{ var(txn.auth_valid) -m bool }} {{ var(txn.api_auth_on_failure) -m str challenge }} {{ var(txn.api_armor_listener_id) -m int eq {lid} }}", challenge_url, p.id, "api_armor_auth", f"API Armor auth policy {p.id}")
+        # Behavioral profile anomaly: deny with 403 when a learned profile is violated.
+        lines.append(f"    http-request deny deny_status 403 if {ba_condition} {{ var(txn.api.profile_anomaly) -m bool }}")
+        lines.append(f"    http-request unset-var(txn.api_body) if {ba_condition}")
 
     # Page Protect — CSP response headers (per backend).
     # Each enabled PageProtectPolicy matching this backend emits a CSP header.
@@ -3880,6 +4046,13 @@ def _listener_has_challenge_action(db: Session, listener_id: int) -> bool:
             continue
         if _safe_token(getattr(rl, "action", "")) == "challenge":
             return True
+    # API Armor auth policies
+    from ..models.api_armor import AuthPolicy
+    for p in db.query(AuthPolicy).filter(AuthPolicy.enabled == True).all():  # noqa: E712
+        if p.on_failure == "challenge":
+            lids = p.listener_ids or []
+            if not lids or listener_id in lids:
+                return True
     return False
 
 
@@ -4016,6 +4189,19 @@ def generate_config(
     # inspection per-listener. Also reads the max body size setting.
     api_armor_enabled = get_setting(db, "api_armor_enabled", str(settings.API_ARMOR_ENABLED)).lower() in ("true", "1", "yes")
     api_armor_max_body_bytes = int(get_setting(db, "api_armor_max_body_bytes", str(settings.API_ARMOR_MAX_BODY_BYTES)))
+    api_armor_scope = get_setting(db, "api_armor_scope", settings.API_ARMOR_SCOPE).lower()
+    if api_armor_scope not in ("listener", "backend", "path"):
+        api_armor_scope = "listener"
+    api_armor_backend_ids_raw = get_setting(db, "api_armor_backend_ids", settings.API_ARMOR_BACKEND_IDS) or "[]"
+    try:
+        api_armor_backend_ids = [int(x) for x in json.loads(api_armor_backend_ids_raw) if isinstance(x, (int, str)) and str(x).isdigit()]
+    except (json.JSONDecodeError, TypeError):
+        api_armor_backend_ids = []
+    api_armor_path_patterns_raw = get_setting(db, "api_armor_path_patterns", settings.API_ARMOR_PATH_PATTERNS) or "[]"
+    try:
+        api_armor_path_patterns = [str(x) for x in json.loads(api_armor_path_patterns_raw) if x]
+    except (json.JSONDecodeError, TypeError):
+        api_armor_path_patterns = []
 
     # Defensive guard: API Armor depends on req_fp subfields at runtime
     # (req_fp_ctype, req_fp_method, req_fp_path, etc. are read by the body
@@ -4079,7 +4265,7 @@ def generate_config(
         frontend_names, backend_names, stats_name, coraza_name = _get_section_names(db)
 
     config = "# Generated by coreX Manager\n# Do not edit manually\n\n"
-    config += generate_global_section(ciphers, logs, logged_fields, global_options, ja4_enabled=ja4_enabled, compression_enabled=compression_enabled, disk_cache_enabled=disk_cache_enabled, resp_transform_enabled=resp_transform_enabled, img_2_webp_enabled=img_2_webp_enabled, captcha_challenge_enabled=_any_listener_has_challenge(db), api_armor_enabled=api_armor_enabled, req_fp_enabled=req_fp_enabled, quic_enabled=_any_listener_has_quic(db))
+    config += generate_global_section(ciphers, logs, logged_fields, global_options, ja4_enabled=ja4_enabled, compression_enabled=compression_enabled, disk_cache_enabled=disk_cache_enabled, resp_transform_enabled=resp_transform_enabled, img_2_webp_enabled=img_2_webp_enabled, captcha_challenge_enabled=_any_listener_has_challenge(db), api_armor_enabled=api_armor_enabled, req_fp_enabled=req_fp_enabled, quic_enabled=_any_listener_has_quic(db), db=db)
     # HA peers section (stick-table replication) — only emitted when HA is
     # enabled and ≥2 HAProxy instances are configured. Empty string otherwise.
     config += ha_service.generate_peers_section(db)
@@ -4102,13 +4288,26 @@ def generate_config(
 
     for listener in listeners:
         if listener.enabled:
-            config += generate_frontend(listener, db, frontend_names=frontend_names, backend_names=backend_names, req_fp_enabled=req_fp_enabled, req_fp_parse_body=req_fp_parse_body, req_fp_max_body_bytes=req_fp_max_body_bytes, req_fp_enforce_max_body=req_fp_enforce_max_body, page_protect_enabled=page_protect_enabled, page_protect_report_path=page_protect_report_path, page_protect_beacon=page_protect_beacon, api_armor_enabled=api_armor_enabled, api_armor_max_body_bytes=api_armor_max_body_bytes, ja4_enabled=ja4_enabled, disk_cache_enabled=disk_cache_enabled, server_timing_metrics_enabled=server_timing_metrics_enabled, logged_fields=logged_fields)
+            config += generate_frontend(
+                listener, db, frontend_names=frontend_names, backend_names=backend_names,
+                req_fp_enabled=req_fp_enabled, req_fp_parse_body=req_fp_parse_body, req_fp_max_body_bytes=req_fp_max_body_bytes, req_fp_enforce_max_body=req_fp_enforce_max_body,
+                page_protect_enabled=page_protect_enabled, page_protect_report_path=page_protect_report_path, page_protect_beacon=page_protect_beacon,
+                api_armor_enabled=api_armor_enabled, api_armor_max_body_bytes=api_armor_max_body_bytes,
+                api_armor_scope=api_armor_scope, api_armor_backend_ids=api_armor_backend_ids, api_armor_path_patterns=api_armor_path_patterns,
+                ja4_enabled=ja4_enabled, disk_cache_enabled=disk_cache_enabled, server_timing_metrics_enabled=server_timing_metrics_enabled, logged_fields=logged_fields,
+            )
 
     for app in fcgi_apps:
         config += generate_fcgi_app(app)
 
     for backend in backends:
-        config += generate_backend(backend, db, backend_names=backend_names, page_protect_enabled=page_protect_enabled, compression_enabled=compression_enabled, disk_cache_enabled=disk_cache_enabled, cache_section_names=cache_section_names, resp_transform_enabled=resp_transform_enabled, img_2_webp_enabled=img_2_webp_enabled, page_protect_beacon=page_protect_beacon)
+        config += generate_backend(
+            backend, db, backend_names=backend_names, page_protect_enabled=page_protect_enabled, compression_enabled=compression_enabled,
+            disk_cache_enabled=disk_cache_enabled, cache_section_names=cache_section_names, resp_transform_enabled=resp_transform_enabled,
+            img_2_webp_enabled=img_2_webp_enabled, page_protect_beacon=page_protect_beacon,
+            api_armor_enabled=api_armor_enabled, api_armor_scope=api_armor_scope, api_armor_backend_ids=api_armor_backend_ids,
+            api_armor_path_patterns=api_armor_path_patterns, api_armor_max_body_bytes=api_armor_max_body_bytes,
+        )
 
     # WAF rate-limit stick-table backends for non-src rate keys
     if settings.CORAZA_SPOA_ENABLED:
@@ -4516,6 +4715,13 @@ def write_config(
     logger.info("write_config: step 4 — resp_transform_files")
     from .resp_transform import write_resp_transform_files
     write_resp_transform_files(db)
+
+    logger.info("write_config: step 4b — write_api_armor_files")
+    try:
+        from .api_armor_writer import write_api_armor_files
+        write_api_armor_files(db)
+    except Exception as e:
+        logger.warning("Failed to write API Armor data files: %s", e)
 
     # Write the Page Protect beacon JS to the data directory so HAProxy can
     # serve it via http-request return lf-file. The JS is embedded as a string

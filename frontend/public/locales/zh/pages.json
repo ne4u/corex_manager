@@ -604,7 +604,9 @@
       "routeMcp": "将 /mcp 路由到 MCP 网关",
       "routeMcpHelp": "启用后，此监听器上对 /mcp 的请求将路由到 MCP 网关后端以及默认后端。",
       "mcpGatewayBuiltin": "mcp_gateway (内置)",
-      "mcpRouteEnabled": "+ /mcp → gateway"
+      "mcpRouteEnabled": "+ /mcp → gateway",
+      "apiArmor": "启用 API Armor",
+      "apiArmorHelp": "在此监听器上运行 API Armor 正文解析、模式验证和身份验证检查。需要启用 HTTP 请求指纹识别和全局 API Armor 模块。"
     },
     "rules": {
       "title": "路由规则",
@@ -2073,7 +2075,14 @@
       "settingsSaved": "设置已保存。",
       "failedToLoadSettings": "加载设置失败",
       "failedToSaveSettings": "保存设置失败。",
-      "requiresReqFp": "API Armor 需要启用 HTTP 请求指纹。"
+      "requiresReqFp": "API Armor 需要启用 HTTP 请求指纹识别。请先在全局选项中启用它。",
+      "scope": "范围",
+      "scopeListener": "按监听器（每个监听器选项）",
+      "scopeBackend": "按后端（到所选后端的所有流量）",
+      "scopePath": "按后端 + 路径（所选后端，可选路径模式）",
+      "backendIds": "受保护后端",
+      "pathPatterns": "路径正则表达式",
+      "pathPatternsPlaceholder": "^/api/v1/.*\n^/graphql$"
     },
     "presets": {
       "title": "预设安全规则",

@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { GripVertical, Pencil, Trash2 } from 'lucide-react'
-import { listeners, backends, certificates, ciphers, wafRules, backendRules, settings } from '../services/api'
+import { listeners, backends, certificates, ciphers, wafRules, backendRules, settings, apiArmor } from '../services/api'
 import useApiList from '../hooks/useApiList'
 import Modal from '../components/Modal'
 import HaproxyOptionsEditor, { HaproxyOption } from '../components/HaproxyOptionsEditor'
@@ -21,13 +21,17 @@ export default function Listeners() {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<number | null>(null)
   const [mcpGatewayEnabled, setMcpGatewayEnabled] = useState(false)
-  const initialForm = { name: '', bind_address: '0.0.0.0', bind_port: 80, mode: 'http', protocol: 'http', ssl_enabled: false, http2: false, quic: false, proxy_protocol: false, force_https: false, default_backend_id: null as number | null, certificate_id: null as number | null, certificate_ids: [] as number[], alpn: '', options: { cipher_suite: '', mcp_route_enabled: false, allow_0rtt: false } as any, haproxy_options: [] as HaproxyOption[] }
+  const [apiArmorEnabled, setApiArmorEnabled] = useState(false)
+  const initialForm = { name: '', bind_address: '0.0.0.0', bind_port: 80, mode: 'http', protocol: 'http', ssl_enabled: false, http2: false, quic: false, proxy_protocol: false, force_https: false, default_backend_id: null as number | null, certificate_id: null as number | null, certificate_ids: [] as number[], alpn: '', options: { cipher_suite: '', mcp_route_enabled: false, allow_0rtt: false, api_armor: false } as any, haproxy_options: [] as HaproxyOption[] }
   const [form, setForm] = useState<any>(initialForm)
 
   useEffect(() => {
     settings.get('mcp_gateway_enabled')
       .then((r) => setMcpGatewayEnabled((r.data.value || 'false').toLowerCase() === 'true'))
       .catch(() => setMcpGatewayEnabled(false))
+    apiArmor.settings.get()
+      .then((r) => setApiArmorEnabled(Boolean(r.data.api_armor_enabled)))
+      .catch(() => setApiArmorEnabled(false))
   }, [])
 
   const [ruleModal, setRuleModal] = useState(false)
@@ -65,7 +69,7 @@ export default function Listeners() {
   }, [form.ssl_enabled, form.proxy_protocol, form.http2, form.quic, form.force_https])
 
   const openAdd = () => { setEditing(null); setForm(initialForm); setOpen(true) }
-  const openEdit = (l: any) => { setEditing(l.id); setForm({ ...l, options: { ...(l.options || {}), cipher_suite: l.options?.cipher_suite || '', compression_algorithm: l.options?.compression_algorithm || 'none', mcp_route_enabled: l.options?.mcp_route_enabled || false }, haproxy_options: l.haproxy_options || [], certificate_ids: l.certificate_ids || (l.certificate_id ? [l.certificate_id] : []) }); setOpen(true) }
+  const openEdit = (l: any) => { setEditing(l.id); setForm({ ...l, options: { ...(l.options || {}), cipher_suite: l.options?.cipher_suite || '', compression_algorithm: l.options?.compression_algorithm || 'none', mcp_route_enabled: l.options?.mcp_route_enabled || false, api_armor: l.options?.api_armor || false }, haproxy_options: l.haproxy_options || [], certificate_ids: l.certificate_ids || (l.certificate_id ? [l.certificate_id] : []) }); setOpen(true) }
 
   const openAddRule = () => {
     setRuleEditing(null)
@@ -278,6 +282,15 @@ export default function Listeners() {
                   <input type="checkbox" checked={form.options?.mcp_route_enabled || false} onChange={e => setForm({ ...form, options: { ...(form.options || {}), mcp_route_enabled: e.target.checked } })} />
                   <span>{t('pages:listeners.modal.routeMcp')}</span>
                   <InfoTooltip content={t('pages:listeners.modal.routeMcpHelp')} />
+                </label>
+              </div>
+            )}
+            {apiArmorEnabled && form.protocol !== 'mcp' && form.protocol !== 'tcp' && (
+              <div className="col-span-2">
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" checked={form.options?.api_armor || false} onChange={e => setForm({ ...form, options: { ...(form.options || {}), api_armor: e.target.checked } })} />
+                  <span>{t('pages:listeners.modal.apiArmor')}</span>
+                  <InfoTooltip content={t('pages:listeners.modal.apiArmorHelp')} />
                 </label>
               </div>
             )}

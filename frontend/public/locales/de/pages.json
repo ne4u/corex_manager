@@ -604,7 +604,9 @@
       "routeMcp": "/mcp zum MCP-Gateway leiten",
       "routeMcpHelp": "Wenn aktiviert, werden Requests an /mcp auf diesem Listener zusätzlich zum Standard-Backend an das MCP-Gateway-Backend weitergeleitet.",
       "mcpGatewayBuiltin": "mcp_gateway (eingebaut)",
-      "mcpRouteEnabled": "+ /mcp → gateway"
+      "mcpRouteEnabled": "+ /mcp → gateway",
+      "apiArmor": "API Armor aktivieren",
+      "apiArmorHelp": "Führe API Armor Body-Parsing, Schema-Validierung und Authentifizierungsprüfungen auf diesem Listener aus. Erfordert HTTP Request Fingerprinting und das globale API Armor-Modul."
     },
     "rules": {
       "title": "Routing-Regeln",
@@ -2073,7 +2075,14 @@
       "settingsSaved": "Einstellungen gespeichert.",
       "failedToLoadSettings": "Einstellungen konnten nicht geladen werden",
       "failedToSaveSettings": "Einstellungen konnten nicht gespeichert werden.",
-      "requiresReqFp": "API Armor erfordert HTTP-Request-Fingerprinting. Aktivieren Sie es in den globalen Optionen."
+      "requiresReqFp": "API Armor erfordert HTTP-Request-Fingerprinting. Aktivieren Sie es zuerst in den globalen Optionen.",
+      "scope": "Bereich",
+      "scopeListener": "Nach Listener (pro Listener)",
+      "scopeBackend": "Nach Backend (gesamter Traffic zu ausgewählten Backends)",
+      "scopePath": "Nach Backend + Pfad (ausgewählte Backends, optionale Pfadmuster)",
+      "backendIds": "Geschützte Backends",
+      "pathPatterns": "Pfad-Regex-Muster",
+      "pathPatternsPlaceholder": "^/api/v1/.*\n^/graphql$"
     },
     "presets": {
       "title": "Vordefinierte Sicherheitsregeln",

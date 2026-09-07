@@ -604,7 +604,9 @@
       "routeMcp": "Enrutar /mcp a la pasarela MCP",
       "routeMcpHelp": "Cuando está activado, las solicitudes a /mcp en este listener se enrutan al backend MCP Gateway además del backend predeterminado.",
       "mcpGatewayBuiltin": "mcp_gateway (integrado)",
-      "mcpRouteEnabled": "+ /mcp → gateway"
+      "mcpRouteEnabled": "+ /mcp → gateway",
+      "apiArmor": "Habilitar API Armor",
+      "apiArmorHelp": "Ejecutar el análisis de cuerpo, validación de esquema y comprobaciones de autenticación de API Armor en este listener. Requiere HTTP Request Fingerprinting y el módulo global API Armor habilitado."
     },
     "rules": {
       "title": "Reglas de Enrutamiento",
@@ -2073,7 +2075,14 @@
       "settingsSaved": "Configuración guardada.",
       "failedToLoadSettings": "Error al cargar la configuración",
       "failedToSaveSettings": "Error al guardar la configuración.",
-      "requiresReqFp": "API Armor requiere HTTP Request Fingerprinting."
+      "requiresReqFp": "API Armor requiere que HTTP Request Fingerprinting esté habilitado. Habilítelo primero en Opciones globales.",
+      "scope": "Ámbito",
+      "scopeListener": "Por Listener (opción por listener)",
+      "scopeBackend": "Por Backend (todo el tráfico a los backends seleccionados)",
+      "scopePath": "Por Backend + Ruta (backends seleccionados, patrones de ruta opcionales)",
+      "backendIds": "Backends Protegidos",
+      "pathPatterns": "Patrones Regex de Ruta",
+      "pathPatternsPlaceholder": "^/api/v1/.*\n^/graphql$"
     },
     "presets": {
       "title": "Reglas de Seguridad Predefinidas",

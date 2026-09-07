@@ -607,6 +607,8 @@
       "mcpProtocolHelp": "Routes all traffic to the built-in mcp_gateway backend. Use this for standalone MCP gateway deployments.",
       "routeMcp": "Route /mcp to MCP Gateway",
       "routeMcpHelp": "When enabled, requests to /mcp on this listener are routed to the MCP Gateway backend in addition to the default backend.",
+      "apiArmor": "Enable API Armor",
+      "apiArmorHelp": "Run API Armor body parsing, schema validation, and auth checks on this listener. Requires HTTP request fingerprinting and the global API Armor module to be enabled.",
       "mcpGatewayBuiltin": "mcp_gateway (built-in)",
       "mcpRouteEnabled": "+ /mcp → gateway"
     },
@@ -2259,7 +2261,14 @@
       "settingsSaved": "Settings saved.",
       "failedToLoadSettings": "Failed to load settings",
       "failedToSaveSettings": "Failed to save settings.",
-      "requiresReqFp": "API Armor requires HTTP Request Fingerprinting to be enabled. Enable it in Global Options first."
+      "requiresReqFp": "API Armor requires HTTP Request Fingerprinting to be enabled. Enable it in Global Options first.",
+      "scope": "Scope",
+      "scopeListener": "By Listener (per-listener option)",
+      "scopeBackend": "By Backend (all traffic to selected backends)",
+      "scopePath": "By Backend + Path (selected backends, optional path patterns)",
+      "backendIds": "Protected Backends",
+      "pathPatterns": "Path Regex Patterns",
+      "pathPatternsPlaceholder": "^/api/v1/.*\n^/graphql$"
     },
     "presets": {
       "title": "Preset Security Rules",
@@ -2279,26 +2288,70 @@
       "specImported": "Spec imported successfully.",
       "failedToLoadSpecs": "Failed to load specs",
       "failedToImportSpec": "Failed to import spec.",
-      "schemasCount": "v{{version}} • {{count}} schemas"
+      "schemasCount": "v{{version}} • {{count}} schemas",
+      "viewSchemas": "View schemas"
     },
     "schemas": {
       "title": "API Schemas",
       "noSchemas": "No schemas defined.",
       "schemaJson": "Schema JSON",
-      "samples": "{{count}} samples"
+      "samples": "{{count}} samples",
+      "enabled": "Enabled",
+      "edit": "Edit Schema",
+      "save": "Save Schema",
+      "saving": "Saving...",
+      "saved": "Schema saved.",
+      "failedToLoadSchemas": "Failed to load schemas",
+      "failedToSaveSchema": "Failed to save schema.",
+      "learn": "Learn from body",
+      "learnTitle": "Manual schema learn",
+      "learnBody": "Request body to learn from",
+      "learned": "Learned {{count}} schema(s).",
+      "failedToLearn": "Failed to learn schema."
     },
     "auth": {
       "title": "Auth Policies",
       "noPolicies": "No auth policies configured.",
       "type": "Type",
+      "typeJwt": "JWT",
+      "typeApiKey": "API Key",
+      "typeNone": "None",
       "algorithm": "Algorithm",
       "onFailure": "On failure",
-      "issuer": "Issuer"
+      "issuer": "Issuer",
+      "audience": "Audience",
+      "secretEnv": "JWT Secret Environment Variable",
+      "apiKeyHeader": "API Key Header",
+      "apiKeyList": "API Key List",
+      "listeners": "Listener IDs (comma-separated)",
+      "addPolicy": "Add Auth Policy",
+      "editPolicy": "Edit Auth Policy",
+      "save": "Save Policy",
+      "saving": "Saving...",
+      "saved": "Policy saved.",
+      "failedToLoadPolicies": "Failed to load policies",
+      "failedToSavePolicy": "Failed to save policy.",
+      "delete": "Delete",
+      "confirmDelete": "Delete policy \"{{name}}\"?"
     },
     "keys": {
       "title": "API Key Lists",
       "noLists": "No API key lists configured.",
-      "keysCount": "{{count}} keys"
+      "keysCount": "{{count}} keys",
+      "addList": "Add Key List",
+      "editList": "Edit Key List",
+      "name": "Name",
+      "description": "Description",
+      "entries": "Keys (one per line)",
+      "addKey": "Add Key",
+      "newKey": "New key value",
+      "save": "Save List",
+      "saving": "Saving...",
+      "saved": "List saved.",
+      "delete": "Delete",
+      "confirmDelete": "Delete list \"{{name}}\"?",
+      "failedToLoadLists": "Failed to load lists",
+      "failedToSaveList": "Failed to save list."
     },
     "profiles": {
       "title": "Behavioral Profiles",
@@ -2306,14 +2359,21 @@
       "learned": "Learned",
       "learning": "Learning",
       "samples": "{{count}} samples",
-      "dimensions": "Dimensions: {{dims}}"
+      "dimensions": "Dimensions: {{dims}}",
+      "finalize": "Finalize",
+      "finalized": "Profile finalized.",
+      "failedToFinalize": "Failed to finalize profile.",
+      "delete": "Delete",
+      "confirmDelete": "Delete profile for {{method}} {{path}}?",
+      "failedToLoadProfiles": "Failed to load profiles"
     },
     "anomalies": {
       "title": "Detected Anomalies",
       "clearAll": "Clear All",
       "noAnomalies": "No anomalies detected.",
       "observed": "Observed:",
-      "ip": "IP:"
+      "ip": "IP:",
+      "failedToLoadAnomalies": "Failed to load anomalies"
     }
   },
   "captcha": {

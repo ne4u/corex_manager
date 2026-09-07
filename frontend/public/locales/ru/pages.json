@@ -604,7 +604,9 @@
       "routeMcp": "Направить /mcp к шлюзу MCP",
       "routeMcpHelp": "Когда включено, запросы к /mcp на этом listener направляются на backend MCP Gateway в дополнение к backend по умолчанию.",
       "mcpGatewayBuiltin": "mcp_gateway (встроенный)",
-      "mcpRouteEnabled": "+ /mcp → gateway"
+      "mcpRouteEnabled": "+ /mcp → gateway",
+      "apiArmor": "Включить API Armor",
+      "apiArmorHelp": "Выполнять разбор тела, проверку схемы и аутентификации API Armor на этом listener. Требуется HTTP Request Fingerprinting и включенный глобальный модуль API Armor."
     },
     "rules": {
       "title": "Правила маршрутизации",
@@ -2073,7 +2075,14 @@
       "settingsSaved": "Настройки сохранены.",
       "failedToLoadSettings": "Не удалось загрузить настройки",
       "failedToSaveSettings": "Не удалось сохранить настройки.",
-      "requiresReqFp": "API Armor требует HTTP Request Fingerprinting."
+      "requiresReqFp": "Для работы API Armor требуется включить HTTP Request Fingerprinting. Сначала включите его в Глобальных параметрах.",
+      "scope": "Область",
+      "scopeListener": "По Listener (настройка для listener)",
+      "scopeBackend": "По Backend (весь трафик к выбранным backend)",
+      "scopePath": "По Backend + Путь (выбранные backend, необязательные шаблоны путей)",
+      "backendIds": "Защищаемые Backend",
+      "pathPatterns": "Регулярные выражения путей",
+      "pathPatternsPlaceholder": "^/api/v1/.*\n^/graphql$"
     },
     "presets": {
       "title": "Предустановленные правила безопасности",
