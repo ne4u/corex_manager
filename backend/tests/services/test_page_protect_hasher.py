@@ -182,10 +182,23 @@ def test_check_script_no_change(db):
     assert script.hash_checked_at is not None
 
 
+def test_check_script_ignored_is_skipped(db):
+    """Ignored scripts are not fetched and do not update hash fields."""
+    from tests.factories import make_page_protect_script
+    script = make_page_protect_script(db, url="https://cdn.example.com/ignored.js", ignored=True)
+    db.commit()
+    with patch("httpx.Client") as mock_client_cls:
+        result = check_script(db, script)
+    assert result is None
+    assert script.hash_checked_at is None
+    mock_client_cls.assert_not_called()
+
+
 def test_check_all_scripts_force(db, monkeypatch):
     from tests.factories import make_page_protect_script
     s1 = make_page_protect_script(db, url="https://cdn1.example.com/a.js")
     s2 = make_page_protect_script(db, url="https://cdn2.example.com/b.js")
+    s3 = make_page_protect_script(db, url="https://cdn3.example.com/c.js", ignored=True)
     db.commit()
 
     # Mock settings to enable change detection
@@ -203,6 +216,7 @@ def test_check_all_scripts_force(db, monkeypatch):
     assert checked == 2
     assert s1.last_hash is not None
     assert s2.last_hash is not None
+    assert s3.last_hash is None
 
 
 def test_check_all_scripts_commits_on_all_failures(db, monkeypatch):

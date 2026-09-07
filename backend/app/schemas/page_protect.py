@@ -83,6 +83,7 @@ class PageProtectScriptCreate(BaseModel):
 class PageProtectScriptUpdate(BaseModel):
     notes: Optional[str] = None
     hash_changed: Optional[bool] = None
+    ignored: Optional[bool] = None
     fetch_method: Optional[str] = None  # auto | GET | POST
 
     @field_validator("fetch_method")
@@ -110,6 +111,7 @@ class PageProtectScriptResponse(BaseModel):
     last_hash_at: Optional[datetime] = None
     hash_checked_at: Optional[datetime] = None
     hash_changed: bool
+    ignored: bool = False
     notes: Optional[str] = None
     source: Optional[str] = None
     fetch_method: Optional[str] = None

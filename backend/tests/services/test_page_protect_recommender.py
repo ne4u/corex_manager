@@ -290,3 +290,18 @@ def test_recommend_includes_report_uri(db):
 def test_recommend_uses_custom_report_path(db):
     result = recommend_policy(db, report_path="/custom-csp")
     assert result["directives"]["report-uri"] == ["/custom-csp"]
+
+
+def test_recommend_skips_ignored_scripts(db):
+    """Ignored inventory entries should not be recommended as CSP sources."""
+    make_page_protect_script(db, url="https://cdn.example.com/app.js",
+                             resource_type="script", domain="cdn.example.com")
+    make_page_protect_script(db, url="https://ignored.example.com/track.js",
+                             resource_type="script", domain="ignored.example.com",
+                             ignored=True)
+    db.commit()
+    result = recommend_policy(db)
+    d = result["directives"]
+    assert "script-src" in d
+    assert "https://cdn.example.com" in d["script-src"]
+    assert "https://ignored.example.com" not in d["script-src"]

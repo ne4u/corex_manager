@@ -62,6 +62,7 @@ class PageProtectScript(Base):
     last_hash_at = Column(DateTime, nullable=True)  # When last_hash was set (last successful check)
     hash_checked_at = Column(DateTime, nullable=True)
     hash_changed = Column(Boolean, default=False)
+    ignored = Column(Boolean, default=False)
     notes = Column(Text, nullable=True)
     source = Column(String, default="csp")  # csp | manual | beacon
     fetch_method = Column(String, default="auto")  # auto | GET | POST

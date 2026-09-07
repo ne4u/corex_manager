@@ -109,7 +109,12 @@ def check_script(db: Session, script: PageProtectScript) -> Optional[str]:
     is not) so the UI can distinguish "checked but failed" (``hash_checked_at``
     more recent than ``last_hash_at``) from "never checked" (both None) and
     from "checked successfully" (``last_hash_at`` == ``hash_checked_at``).
+
+    Ignored assets are skipped entirely so dynamic or authenticated resources
+    are not repeatedly probed.
     """
+    if script.ignored:
+        return None
     new_hash = hash_script(script)
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     if new_hash is None:
@@ -166,7 +171,7 @@ def check_all_scripts(db: Session, force: bool = False) -> int:
     interval_hours = pp_settings.get("change_detection_interval_hours", 24)
     cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=interval_hours)
 
-    scripts = db.query(PageProtectScript).all()
+    scripts = db.query(PageProtectScript).filter(PageProtectScript.ignored == False).all()  # noqa: E712
     checked = 0
     attempted = 0
     for script in scripts:

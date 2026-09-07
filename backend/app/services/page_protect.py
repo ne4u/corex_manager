@@ -421,6 +421,7 @@ def prune_stale_scripts(db: Session, stale_days: int) -> int:
     cutoff = (datetime.now(timezone.utc) - timedelta(days=stale_days)).replace(tzinfo=None)
     stale = db.query(PageProtectScript).filter(
         PageProtectScript.hash_changed == False,  # noqa: E712
+        PageProtectScript.ignored == False,  # noqa: E712
         PageProtectScript.last_seen < cutoff,
         or_(
             PageProtectScript.last_hash_at == None,  # noqa: E711
@@ -533,7 +534,8 @@ def get_stats(db: Session) -> Dict[str, Any]:
     total_scripts = db.query(func.count(PageProtectScript.id)).scalar() or 0
     total_reports = db.query(func.count(CspReport.id)).scalar() or 0
     changed_scripts = db.query(func.count(PageProtectScript.id)).filter(
-        PageProtectScript.hash_changed == True  # noqa: E712
+        PageProtectScript.hash_changed == True,  # noqa: E712
+        PageProtectScript.ignored == False,  # noqa: E712
     ).scalar() or 0
     active_policies = db.query(func.count(PageProtectPolicy.id)).filter(
         PageProtectPolicy.enabled == True  # noqa: E712
@@ -759,7 +761,10 @@ def recommend_policy(
     # --- Build per-directive origin lists from inventory ---
     # Group by resource_type → domain → {urls, occurrence_count}
     by_type: Dict[str, Dict[str, dict]] = {}
+    ignored_urls = {s.url for s in scripts if s.ignored}
     for s in scripts:
+        if s.ignored:
+            continue
         rt = s.resource_type or "other"
         if rt not in _RESOURCE_TYPE_TO_DIRECTIVE:
             continue  # skip "other" — let default-src cover it
@@ -778,6 +783,8 @@ def recommend_policy(
     # Enrich with distinct-IP counts from CSP reports
     for r in reports:
         if not r.blocked_uri or r.blocked_uri in ("inline", "eval", "data", "blob", "wasm"):
+            continue
+        if r.blocked_uri in ignored_urls:
             continue
         if r.blocked_uri.startswith("'"):
             continue

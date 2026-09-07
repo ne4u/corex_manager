@@ -208,6 +208,26 @@ def test_update_script_notes(client, db):
     assert r.json()["notes"] == "trusted CDN"
 
 
+def test_update_script_ignored(client, db):
+    s = make_page_protect_script(db)
+    db.commit()
+    r = client.put(f"/api/v1/page-protect/scripts/{s.id}", json={"ignored": True})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["ignored"] is True
+
+
+def test_list_scripts_filter_ignored(client, db):
+    make_page_protect_script(db, url="https://cdn1.example.com/a.js", ignored=False)
+    make_page_protect_script(db, url="https://cdn2.example.com/b.js", ignored=True)
+    db.commit()
+    r = client.get("/api/v1/page-protect/scripts?ignored=true")
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data) == 1
+    assert data[0]["ignored"] is True
+
+
 def test_delete_script(client, db):
     s = make_page_protect_script(db)
     db.commit()
@@ -291,6 +311,14 @@ def test_update_script_fetch_method_clears_last_fetch_method(client, db):
     data = r.json()
     assert data["fetch_method"] == "GET"
     assert data["last_fetch_method"] is None
+
+
+def test_check_ignored_script_400(client, db):
+    """Manually checking an ignored asset returns 400."""
+    s = make_page_protect_script(db, ignored=True)
+    db.commit()
+    r = client.post(f"/api/v1/page-protect/scripts/{s.id}/check")
+    assert r.status_code == 400
 
 
 def test_reset_hash_clears_fields(client, db):

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ScanEye, Plus, Trash2, RefreshCw, Download, AlertTriangle, CheckCircle2, Play, Square, Wand2, LayoutDashboard, Shield, FileCode, ClipboardList, Settings as SettingsIcon, History, Pencil, Activity, RotateCcw, ChevronUp, ChevronDown, ArrowUpDown } from 'lucide-react'
+import { ScanEye, Plus, Trash2, RefreshCw, Download, AlertTriangle, CheckCircle2, Play, Square, Wand2, LayoutDashboard, Shield, FileCode, ClipboardList, Settings as SettingsIcon, History, Pencil, Activity, RotateCcw, ChevronUp, ChevronDown, ArrowUpDown, Eye, EyeOff } from 'lucide-react'
 import { pageProtect, backends, getErrorDetail, settings as settingsApi } from '../services/api'
 import useApiList from '../hooks/useApiList'
 import Modal from '../components/Modal'
@@ -55,6 +55,7 @@ interface PageProtectScript {
   last_hash_at: string | null
   hash_checked_at: string | null
   hash_changed: boolean
+  ignored: boolean
   notes: string | null
   source: string | null
   fetch_method: string | null
@@ -844,7 +845,7 @@ function ScriptsTab() {
   const { formatDateTime } = useDateTime()
   const { items: scripts, reload } = useApiList<PageProtectScript>(pageProtect.scripts.list)
   const [filterType, setFilterType] = useState('')
-  const [filterChanged, setFilterChanged] = useState('')
+  const [filterStatus, setFilterStatus] = useState('')
   const [checking, setChecking] = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
   const [newUrl, setNewUrl] = useState('')
@@ -865,8 +866,9 @@ function ScriptsTab() {
 
   const filtered = scripts.filter(s => {
     if (filterType && s.resource_type !== filterType) return false
-    if (filterChanged === 'changed' && !s.hash_changed) return false
-    if (filterChanged === 'unchanged' && s.hash_changed) return false
+    if (filterStatus === 'changed' && !s.hash_changed) return false
+    if (filterStatus === 'unchanged' && s.hash_changed) return false
+    if (filterStatus === 'ignored' && !s.ignored) return false
     return true
   })
 
@@ -884,12 +886,13 @@ function ScriptsTab() {
         case 'last_seen': return s.last_seen || ''
         case 'last_hash_at': return s.last_hash_at || ''
         case 'hash_status': {
-          // Derive a sortable rank: Error(0) < Changed(1) < Unchecked(2) < OK(3)
+          // Derive a sortable rank: Ignored(0) < Error(1) < Changed(2) < Unchecked(3) < OK(4)
+          if (s.ignored) return 0
           const checkFailed = s.hash_checked_at && (!s.last_hash_at || s.hash_checked_at > s.last_hash_at)
-          if (checkFailed) return 0
-          if (s.hash_changed) return 1
-          if (s.last_hash) return 3
-          return 2
+          if (checkFailed) return 1
+          if (s.hash_changed) return 2
+          if (s.last_hash) return 4
+          return 3
         }
       }
     }
@@ -941,6 +944,17 @@ function ScriptsTab() {
     }
   }
 
+  const toggleIgnore = async (script: PageProtectScript) => {
+    const action = script.ignored ? 'stop ignoring' : 'ignore'
+    if (!window.confirm(`${action === 'ignore' ? 'Ignore' : 'Stop ignoring'} this asset?`)) return
+    try {
+      await pageProtect.scripts.update(script.id, { ignored: !script.ignored })
+      reload()
+    } catch (err) {
+      alert(getErrorDetail(err))
+    }
+  }
+
   const addAsset = async () => {
     if (!newUrl.trim()) return
     setAdding(true)
@@ -980,10 +994,11 @@ function ScriptsTab() {
             <option value="object">Object</option>
             <option value="other">Other</option>
           </select>
-          <select className="input text-sm" value={filterChanged} onChange={e => setFilterChanged(e.target.value)}>
+          <select className="input text-sm" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
             <option value="">All</option>
             <option value="changed">Changed</option>
             <option value="unchanged">Unchanged</option>
+            <option value="ignored">Ignored</option>
           </select>
           <button onClick={() => setShowAddForm(!showAddForm)} className="btn-secondary text-sm">
             <Plus className="w-4 h-4 inline me-1" /> Add Asset
@@ -1057,15 +1072,20 @@ function ScriptsTab() {
                 <td className="text-slate-400">{s.domain}</td>
                 <td>{sourceBadge(s.source)}</td>
                 <td className="text-slate-400 text-xs">
-                  {s.fetch_method?.toUpperCase() === 'AUTO' || !s.fetch_method
-                    ? <span>Auto{s.last_fetch_method ? ` (${s.last_fetch_method})` : ''}</span>
-                    : s.fetch_method.toUpperCase()}
+                  {s.ignored
+                    ? ''
+                    : s.fetch_method?.toUpperCase() === 'AUTO' || !s.fetch_method
+                      ? <span>Auto{s.last_fetch_method ? ` (${s.last_fetch_method})` : ''}</span>
+                      : s.fetch_method.toUpperCase()}
                 </td>
                 <td className="text-slate-400">{s.occurrence_count}</td>
                 <td className="text-slate-400 text-xs">{s.last_seen ? formatDateTime(s.last_seen) : ''}</td>
-                <td className="text-slate-400 text-xs">{s.last_hash_at ? formatDateTime(s.last_hash_at) : ''}</td>
+                <td className="text-slate-400 text-xs">{s.ignored ? '' : (s.last_hash_at ? formatDateTime(s.last_hash_at) : '')}</td>
                 <td>
                   {(() => {
+                    if (s.ignored) {
+                      return <span className="flex items-center gap-1 text-slate-400 text-xs"><EyeOff className="w-3 h-3" /> Ignored</span>
+                    }
                     // A check was attempted but failed if hash_checked_at is set
                     // and last_hash_at is None or older than hash_checked_at.
                     const checkFailed = s.hash_checked_at && (!s.last_hash_at || s.hash_checked_at > s.last_hash_at)
@@ -1083,8 +1103,17 @@ function ScriptsTab() {
                 </td>
                 <td>
                   <div className="flex gap-1">
-                    <IconButton icon={Activity} aria-label="Check" onClick={() => checkOne(s.id)} />
-                    <IconButton icon={RotateCcw} aria-label="Reset Hash" onClick={() => resetHash(s.id)} />
+                    {!s.ignored && (
+                      <>
+                        <IconButton icon={Activity} aria-label="Check" onClick={() => checkOne(s.id)} />
+                        <IconButton icon={RotateCcw} aria-label="Reset Hash" onClick={() => resetHash(s.id)} />
+                      </>
+                    )}
+                    <IconButton
+                      icon={s.ignored ? Eye : EyeOff}
+                      aria-label={s.ignored ? 'Stop ignoring' : 'Ignore'}
+                      onClick={() => toggleIgnore(s)}
+                    />
                     <IconButton icon={Trash2} variant="danger" aria-label="Delete" onClick={() => remove(s.id)} />
                   </div>
                 </td>

@@ -149,6 +149,7 @@ def clear_csp_reports(
 def list_page_protect_scripts(
     resource_type: Optional[str] = Query(None),
     hash_changed: Optional[bool] = Query(None),
+    ignored: Optional[bool] = Query(None),
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
     _=Depends(rate_limit),
@@ -158,6 +159,8 @@ def list_page_protect_scripts(
         q = q.filter(PageProtectScript.resource_type == resource_type)
     if hash_changed is not None:
         q = q.filter(PageProtectScript.hash_changed == hash_changed)
+    if ignored is not None:
+        q = q.filter(PageProtectScript.ignored == ignored)
     return q.order_by(PageProtectScript.last_seen.desc()).all()
 
 
@@ -236,6 +239,8 @@ def check_page_protect_script(sid: int, db: Session = Depends(get_db), user=Depe
     obj = db.get(PageProtectScript, sid)
     if not obj:
         raise HTTPException(status_code=404, detail="Script not found")
+    if obj.ignored:
+        raise HTTPException(status_code=400, detail="Ignored assets are not checked")
     result = check_script(db, obj)
     if result is None:
         raise HTTPException(status_code=502, detail="Failed to fetch or hash the script URL")

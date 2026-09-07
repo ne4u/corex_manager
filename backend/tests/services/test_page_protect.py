@@ -195,6 +195,15 @@ def test_get_stats_empty(db):
     assert stats["reports_24h"] == 0
 
 
+def test_get_stats_ignores_ignored_changed(db):
+    from tests.factories import make_page_protect_script
+    make_page_protect_script(db, hash_changed=True, ignored=True)
+    make_page_protect_script(db, url="https://other.example.com/b.js", hash_changed=True, ignored=False)
+    db.commit()
+    stats = get_stats(db)
+    assert stats["changed_scripts"] == 1
+
+
 def test_get_stats_with_data(db):
     from tests.factories import make_page_protect_policy, make_csp_report, make_page_protect_script
     make_page_protect_policy(db, enabled=True)
@@ -362,6 +371,19 @@ def test_prune_stale_scripts_prunes_manual_source(db):
     pruned = prune_stale_scripts(db, 7)
     assert pruned == 1
     assert db.query(PageProtectScript).filter(PageProtectScript.url == "https://cdn.example.com/manual-old.js").first() is None
+
+
+def test_prune_stale_scripts_preserves_ignored(db):
+    """prune_stale_scripts preserves ignored rows even if stale."""
+    from datetime import datetime, timezone, timedelta
+    from tests.factories import make_page_protect_script
+    from app.models.models import PageProtectScript
+    old = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30)
+    s = make_page_protect_script(db, url="https://cdn.example.com/ignored.js", ignored=True, last_hash="abc", last_hash_at=old, last_seen=old)
+    db.commit()
+    pruned = prune_stale_scripts(db, 7)
+    assert pruned == 0
+    assert db.query(PageProtectScript).filter(PageProtectScript.url == "https://cdn.example.com/ignored.js").first() is not None
 
 
 def test_prune_stale_scripts_disabled_when_zero(db):
