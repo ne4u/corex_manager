@@ -855,9 +855,6 @@ function ScriptsTab() {
   const [adding, setAdding] = useState(false)
   const [sortKey, setSortKey] = useState<ScriptSortKey | null>(null)
   const [sortDir, setSortDir] = useState<SortDir>('asc')
-  const [contentModalOpen, setContentModalOpen] = useState(false)
-  const [contentText, setContentText] = useState('')
-  const [contentLoading, setContentLoading] = useState(false)
 
   const toggleSort = (key: ScriptSortKey) => {
     if (sortKey === key) {
@@ -960,15 +957,17 @@ function ScriptsTab() {
   }
 
   const viewContent = async (id: number) => {
-    setContentLoading(true)
-    setContentModalOpen(true)
     try {
       const res = await pageProtect.scripts.content(id)
-      setContentText(res.data as string)
+      const text = res.data as string
+      const blob = new Blob([text], { type: 'text/plain' })
+      const url = URL.createObjectURL(blob)
+      const win = window.open(url, '_blank', 'width=900,height=700,noopener,noreferrer')
+      if (!win) {
+        alert('Popup blocked — please allow popups to view content')
+      }
     } catch (err) {
-      setContentText(`Error loading content: ${getErrorDetail(err)}`)
-    } finally {
-      setContentLoading(false)
+      alert(getErrorDetail(err))
     }
   }
 
@@ -1146,27 +1145,6 @@ function ScriptsTab() {
           </tbody>
         </table>
       </div>
-      <Modal open={contentModalOpen} onClose={() => setContentModalOpen(false)} title="Asset Content">
-        {contentLoading ? (
-          <div className="text-slate-400 text-sm">Loading...</div>
-        ) : (
-          <div className="space-y-3">
-            <textarea
-              readOnly
-              value={contentText}
-              className="input w-full h-96 font-mono text-xs"
-            />
-            <div className="flex justify-end">
-              <button
-                onClick={() => navigator.clipboard.writeText(contentText)}
-                className="btn-secondary text-sm"
-              >
-                Copy
-              </button>
-            </div>
-          </div>
-        )}
-      </Modal>
     </div>
   )
 }
