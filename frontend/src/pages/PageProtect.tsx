@@ -56,6 +56,7 @@ interface PageProtectScript {
   hash_checked_at: string | null
   hash_changed: boolean
   ignored: boolean
+  has_content: boolean
   notes: string | null
   source: string | null
   fetch_method: string | null
@@ -854,6 +855,9 @@ function ScriptsTab() {
   const [adding, setAdding] = useState(false)
   const [sortKey, setSortKey] = useState<ScriptSortKey | null>(null)
   const [sortDir, setSortDir] = useState<SortDir>('asc')
+  const [contentModalOpen, setContentModalOpen] = useState(false)
+  const [contentText, setContentText] = useState('')
+  const [contentLoading, setContentLoading] = useState(false)
 
   const toggleSort = (key: ScriptSortKey) => {
     if (sortKey === key) {
@@ -952,6 +956,19 @@ function ScriptsTab() {
       reload()
     } catch (err) {
       alert(getErrorDetail(err))
+    }
+  }
+
+  const viewContent = async (id: number) => {
+    setContentLoading(true)
+    setContentModalOpen(true)
+    try {
+      const res = await pageProtect.scripts.content(id)
+      setContentText(res.data as string)
+    } catch (err) {
+      setContentText(`Error loading content: ${getErrorDetail(err)}`)
+    } finally {
+      setContentLoading(false)
     }
   }
 
@@ -1110,6 +1127,12 @@ function ScriptsTab() {
                       </>
                     )}
                     <IconButton
+                      icon={FileCode}
+                      aria-label="View Content"
+                      onClick={() => viewContent(s.id)}
+                      disabled={!s.has_content}
+                    />
+                    <IconButton
                       icon={s.ignored ? Eye : EyeOff}
                       aria-label={s.ignored ? 'Stop ignoring' : 'Ignore'}
                       onClick={() => toggleIgnore(s)}
@@ -1123,6 +1146,27 @@ function ScriptsTab() {
           </tbody>
         </table>
       </div>
+      <Modal open={contentModalOpen} onClose={() => setContentModalOpen(false)} title="Asset Content">
+        {contentLoading ? (
+          <div className="text-slate-400 text-sm">Loading...</div>
+        ) : (
+          <div className="space-y-3">
+            <textarea
+              readOnly
+              value={contentText}
+              className="input w-full h-96 font-mono text-xs"
+            />
+            <div className="flex justify-end">
+              <button
+                onClick={() => navigator.clipboard.writeText(contentText)}
+                className="btn-secondary text-sm"
+              >
+                Copy
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }

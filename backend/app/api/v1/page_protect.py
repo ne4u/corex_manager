@@ -249,6 +249,21 @@ def check_page_protect_script(sid: int, db: Session = Depends(get_db), user=Depe
     return obj
 
 
+@router.get("/page-protect/scripts/{sid}/content")
+def get_page_protect_script_content(sid: int, db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
+    """Return the stored fetched content for a script asset.
+
+    The content is persisted by the hasher when the asset is first checked or
+    when its hash changes, and is intended for AI/manual analysis.
+    """
+    obj = db.get(PageProtectScript, sid)
+    if not obj:
+        raise HTTPException(status_code=404, detail="Script not found")
+    if not obj.content:
+        raise HTTPException(status_code=404, detail="No content stored for this asset")
+    return Response(content=obj.content, media_type="text/plain; charset=utf-8")
+
+
 @router.post("/page-protect/scripts/{sid}/reset-hash", response_model=PageProtectScriptResponse)
 def reset_page_protect_script_hash(
     sid: int,

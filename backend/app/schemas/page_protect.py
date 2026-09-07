@@ -112,6 +112,7 @@ class PageProtectScriptResponse(BaseModel):
     hash_checked_at: Optional[datetime] = None
     hash_changed: bool
     ignored: bool = False
+    has_content: bool = False
     notes: Optional[str] = None
     source: Optional[str] = None
     fetch_method: Optional[str] = None

@@ -2,12 +2,14 @@
 
 Background thread that periodically fetches each detected script URL, computes
 a SHA-256 hash of its content, and compares it to the last-known hash. When a
-change is detected, the script's hash_changed flag is set.
+change is detected, the script's hash_changed flag is set. The decoded body is
+persisted so an AI agent or user can later inspect the actual content.
 """
 import hashlib
 import logging
 import threading
 import time
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -21,6 +23,55 @@ from .page_protect import get_page_protect_settings
 logger = logging.getLogger(__name__)
 
 settings = get_settings()
+
+
+@dataclass
+class FetchResult:
+    """Result of a successful asset fetch."""
+    hash: str
+    content: Optional[str]
+    content_type: Optional[str]
+
+
+# Content types we are willing to store as text for AI/manual analysis.
+_TEXT_CONTENT_TYPES = {
+    "text/html",
+    "text/plain",
+    "text/javascript",
+    "text/css",
+    "text/xml",
+    "application/javascript",
+    "application/json",
+    "application/xml",
+    "application/xhtml+xml",
+    "application/rss+xml",
+    "application/atom+xml",
+    "application/x-javascript",
+    "application/ecmascript",
+    "application/manifest+json",
+    "application/ld+json",
+}
+
+
+def _decode_text_content(resp) -> Optional[str]:
+    """Decode response bytes to text if the content type looks text-ish.
+
+    Returns None for obvious binary payloads (images, fonts, etc.) or if the
+    decoded text is empty. Unknown/missing content types are treated as text.
+    """
+    content_type = resp.headers.get("content-type")
+    if content_type:
+        ct = content_type.split(";")[0].strip().lower()
+        if ct and ct not in _TEXT_CONTENT_TYPES:
+            # Known binary or non-text content type -- don't store as text.
+            return None
+    try:
+        text = resp.content.decode("utf-8", errors="replace")
+    except Exception:
+        return None
+    if not text:
+        return None
+    return text
 
 
 def _hasher_headers() -> dict:
@@ -49,8 +100,12 @@ def _hasher_headers() -> dict:
     }
 
 
-def hash_script(script: PageProtectScript) -> Optional[str]:
-    """Fetch a script URL and return the SHA-256 hash of its content, or None on error.
+def hash_script(script: PageProtectScript) -> Optional[FetchResult]:
+    """Fetch a script URL and return its hash, decoded text, and content type.
+
+    Returns None on error or if the URL is not HTTP(S). The decoded text is
+    only included for text-like content types so the database is not filled
+    with binary payloads.
 
     The HTTP method is determined by ``script.fetch_method``:
     - ``"GET"`` / ``"POST"``: always use that method.
@@ -96,7 +151,10 @@ def hash_script(script: PageProtectScript) -> Optional[str]:
             # Persist the working method for auto-mode scripts.
             if configured == "AUTO" and script.last_fetch_method != method:
                 script.last_fetch_method = method
-            return hashlib.sha256(resp.content).hexdigest()
+            content_hash = hashlib.sha256(resp.content).hexdigest()
+            content_type = resp.headers.get("content-type")
+            text = _decode_text_content(resp)
+            return FetchResult(hash=content_hash, content=text, content_type=content_type)
     except Exception as exc:
         logger.warning("Failed to hash script %s: %s", url, exc)
         return None
@@ -104,6 +162,10 @@ def hash_script(script: PageProtectScript) -> Optional[str]:
 
 def check_script(db: Session, script: PageProtectScript) -> Optional[str]:
     """Hash a single script and update its hash fields. Returns the new hash or None.
+
+    On a successful fetch the decoded body is also persisted (when the hash
+    changes, on the first successful check, or if no content has been stored
+    yet) so an AI agent or user can later inspect the actual payload.
 
     On fetch failure, ``hash_checked_at`` is still updated (but ``last_hash_at``
     is not) so the UI can distinguish "checked but failed" (``hash_checked_at``
@@ -115,13 +177,15 @@ def check_script(db: Session, script: PageProtectScript) -> Optional[str]:
     """
     if script.ignored:
         return None
-    new_hash = hash_script(script)
+    result = hash_script(script)
     now = datetime.now(timezone.utc).replace(tzinfo=None)
-    if new_hash is None:
+    if result is None:
         # Record that a check was attempted even on failure
         script.hash_checked_at = now
         db.flush()
         return None
+    new_hash = result.hash
+    text = result.content
     if script.first_hash is None:
         script.first_hash = new_hash
         script.first_hash_at = now
@@ -129,15 +193,21 @@ def check_script(db: Session, script: PageProtectScript) -> Optional[str]:
         script.last_hash_at = now
         script.hash_checked_at = now
         script.hash_changed = False
+        if text is not None:
+            script.content = text
     elif script.last_hash != new_hash:
         script.last_hash = new_hash
         script.last_hash_at = now
         script.hash_checked_at = now
         script.hash_changed = True
+        if text is not None:
+            script.content = text
         logger.info("Code change detected for script %s", script.url)
     else:
         script.last_hash_at = now
         script.hash_checked_at = now
+        if script.content is None and text is not None:
+            script.content = text
     db.flush()
     return new_hash
 

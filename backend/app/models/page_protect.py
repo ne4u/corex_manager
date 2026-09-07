@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, Boolean, Text, DateTime, ForeignKey, JSON
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, column_property
 from .base import Base, utcnow
 
 
@@ -63,6 +63,8 @@ class PageProtectScript(Base):
     hash_checked_at = Column(DateTime, nullable=True)
     hash_changed = Column(Boolean, default=False)
     ignored = Column(Boolean, default=False)
+    content = Column(Text, nullable=True)  # fetched body text for AI/manual analysis
+    has_content = column_property(content.isnot(None))
     notes = Column(Text, nullable=True)
     source = Column(String, default="csp")  # csp | manual | beacon
     fetch_method = Column(String, default="auto")  # auto | GET | POST

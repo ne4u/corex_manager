@@ -6,7 +6,7 @@ from app.services.page_protect_hasher import hash_script, check_script, check_al
 from app.models.models import PageProtectScript
 
 
-def _mock_response(content=b"console.log(1);", status_code=200):
+def _mock_response(content=b"console.log(1);", status_code=200, content_type="text/javascript"):
     """Build a mock httpx.Response.
 
     raise_for_status() raises ValueError for non-2xx status codes, mirroring
@@ -14,6 +14,7 @@ def _mock_response(content=b"console.log(1);", status_code=200):
     """
     r = MagicMock()
     r.content = content
+    r.headers = {"content-type": content_type} if content_type else {}
     r.status_code = status_code
     if status_code >= 400:
         r.raise_for_status.side_effect = ValueError(f"HTTP {status_code}")
@@ -47,12 +48,13 @@ def _mock_httpx_client(responses=None, side_effect=None):
 def test_hash_script_success():
     script = MagicMock()
     script.url = "https://cdn.example.com/lib.js"
-    mock_response = MagicMock()
-    mock_response.content = b"console.log(1);"
-    mock_response.raise_for_status = MagicMock()
+    mock_response = _mock_response(b"console.log(1);")
     with patch("httpx.Client", return_value=_mock_httpx_client(responses=mock_response)):
         result = hash_script(script)
-    assert result == hashlib.sha256(b"console.log(1);").hexdigest()
+    assert result is not None
+    assert result.hash == hashlib.sha256(b"console.log(1);").hexdigest()
+    assert result.content == "console.log(1);"
+    assert result.content_type == "text/javascript"
 
 
 def test_hash_script_non_http_url():
@@ -315,7 +317,8 @@ def test_hash_script_explicit_get():
     resp = _mock_response(b"console.log(1);")
     with patch("httpx.Client", return_value=_mock_httpx_client(responses=resp)) as mock_client_cls:
         result = hash_script(script)
-    assert result == hashlib.sha256(b"console.log(1);").hexdigest()
+    assert result is not None
+    assert result.hash == hashlib.sha256(b"console.log(1);").hexdigest()
     # Verify GET was used (not POST)
     mock_client_cls.return_value.request.assert_called_with("GET", script.url)
 
@@ -329,7 +332,8 @@ def test_hash_script_explicit_post():
     resp = _mock_response(b"console.log(1);")
     with patch("httpx.Client", return_value=_mock_httpx_client(responses=resp)) as mock_client_cls:
         result = hash_script(script)
-    assert result == hashlib.sha256(b"console.log(1);").hexdigest()
+    assert result is not None
+    assert result.hash == hashlib.sha256(b"console.log(1);").hexdigest()
     mock_client_cls.return_value.request.assert_called_with("POST", script.url)
 
 
@@ -342,7 +346,8 @@ def test_hash_script_auto_uses_last_fetch_method():
     resp = _mock_response(b"console.log(1);")
     with patch("httpx.Client", return_value=_mock_httpx_client(responses=resp)) as mock_client_cls:
         result = hash_script(script)
-    assert result == hashlib.sha256(b"console.log(1);").hexdigest()
+    assert result is not None
+    assert result.hash == hashlib.sha256(b"console.log(1);").hexdigest()
     # Should use POST (from last_fetch_method) without probing
     mock_client_cls.return_value.request.assert_called_once_with("POST", script.url)
 
@@ -359,7 +364,8 @@ def test_hash_script_auto_probes_get_then_post_on_405():
     resp_200 = _mock_response(b"console.log(1);", status_code=200)
     with patch("httpx.Client", return_value=_mock_httpx_client(responses=[resp_405, resp_200])):
         result = hash_script(script)
-    assert result == hashlib.sha256(b"console.log(1);").hexdigest()
+    assert result is not None
+    assert result.hash == hashlib.sha256(b"console.log(1);").hexdigest()
     assert script.last_fetch_method == "POST"
 
 
@@ -373,7 +379,8 @@ def test_hash_script_auto_probes_get_then_post_on_403():
     resp_200 = _mock_response(b"console.log(1);", status_code=200)
     with patch("httpx.Client", return_value=_mock_httpx_client(responses=[resp_403, resp_200])):
         result = hash_script(script)
-    assert result == hashlib.sha256(b"console.log(1);").hexdigest()
+    assert result is not None
+    assert result.hash == hashlib.sha256(b"console.log(1);").hexdigest()
     assert script.last_fetch_method == "POST"
 
 
@@ -386,7 +393,8 @@ def test_hash_script_auto_get_success_persists_get():
     resp = _mock_response(b"console.log(1);", status_code=200)
     with patch("httpx.Client", return_value=_mock_httpx_client(responses=resp)):
         result = hash_script(script)
-    assert result == hashlib.sha256(b"console.log(1);").hexdigest()
+    assert result is not None
+    assert result.hash == hashlib.sha256(b"console.log(1);").hexdigest()
     assert script.last_fetch_method == "GET"
 
 
@@ -419,3 +427,81 @@ def test_hash_script_auto_both_methods_fail():
     assert result is None
     # last_fetch_method should NOT be persisted since POST also failed
     assert script.last_fetch_method is None
+
+
+# ----- content persistence tests -----
+
+
+def test_check_script_stores_content_on_first_check(db):
+    """A first successful check persists the decoded body."""
+    script = PageProtectScript(
+        url="https://cdn.example.com/lib.js",
+        resource_type="script",
+        domain="cdn.example.com",
+    )
+    db.add(script)
+    db.flush()
+    resp = _mock_response(b"console.log('hello');")
+    with patch("httpx.Client", return_value=_mock_httpx_client(responses=resp)):
+        result = check_script(db, script)
+    assert result is not None
+    assert script.content == "console.log('hello');"
+
+
+def test_check_script_updates_content_when_hash_changes(db):
+    """When the hash changes, the stored content is replaced."""
+    script = PageProtectScript(
+        url="https://cdn.example.com/lib.js",
+        resource_type="script",
+        domain="cdn.example.com",
+        first_hash="abc123",
+        last_hash="abc123",
+        hash_changed=False,
+        content="old content",
+    )
+    db.add(script)
+    db.flush()
+    resp = _mock_response(b"console.log('changed');")
+    with patch("httpx.Client", return_value=_mock_httpx_client(responses=resp)):
+        result = check_script(db, script)
+    assert result is not None
+    assert script.hash_changed is True
+    assert script.content == "console.log('changed');"
+
+
+def test_check_script_keeps_content_when_unchanged(db):
+    """When the hash is unchanged, existing content is preserved."""
+    content = b"console.log(1);"
+    h = hashlib.sha256(content).hexdigest()
+    script = PageProtectScript(
+        url="https://cdn.example.com/lib.js",
+        resource_type="script",
+        domain="cdn.example.com",
+        first_hash=h,
+        last_hash=h,
+        hash_changed=False,
+        content="console.log(1);",
+    )
+    db.add(script)
+    db.flush()
+    resp = _mock_response(content)
+    with patch("httpx.Client", return_value=_mock_httpx_client(responses=resp)):
+        result = check_script(db, script)
+    assert result == h
+    assert script.hash_changed is False
+    assert script.content == "console.log(1);"
+
+
+def test_hash_script_skips_binary_content():
+    """Binary content types (e.g., images) are hashed but not stored as text."""
+    script = MagicMock()
+    script.url = "https://cdn.example.com/logo.png"
+    script.resource_type = "img"
+    script.fetch_method = "GET"
+    script.last_fetch_method = None
+    resp = _mock_response(b"\x89PNG\r\n\x1a\n", status_code=200, content_type="image/png")
+    with patch("httpx.Client", return_value=_mock_httpx_client(responses=resp)):
+        result = hash_script(script)
+    assert result is not None
+    assert result.hash is not None
+    assert result.content is None

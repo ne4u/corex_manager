@@ -228,6 +228,19 @@ def test_list_scripts_filter_ignored(client, db):
     assert data[0]["ignored"] is True
 
 
+def test_list_scripts_has_content(client, db):
+    make_page_protect_script(db, url="https://cdn1.example.com/a.js", content="console.log(1);")
+    make_page_protect_script(db, url="https://cdn2.example.com/b.js")
+    db.commit()
+    r = client.get("/api/v1/page-protect/scripts")
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data) == 2
+    by_url = {s["url"]: s for s in data}
+    assert by_url["https://cdn1.example.com/a.js"]["has_content"] is True
+    assert by_url["https://cdn2.example.com/b.js"]["has_content"] is False
+
+
 def test_delete_script(client, db):
     s = make_page_protect_script(db)
     db.commit()
@@ -364,3 +377,19 @@ def test_sample_reports(client, monkeypatch):
     r = client.post("/api/v1/page-protect/sample")
     assert r.status_code == 200
     assert r.json()["stored"] == 7
+
+
+def test_get_script_content(client, db):
+    s = make_page_protect_script(db, content="console.log('stored content');")
+    db.commit()
+    r = client.get(f"/api/v1/page-protect/scripts/{s.id}/content")
+    assert r.status_code == 200
+    assert r.text == "console.log('stored content');"
+    assert "text/plain" in r.headers.get("content-type", "")
+
+
+def test_get_script_content_404(client, db):
+    s = make_page_protect_script(db)
+    db.commit()
+    r = client.get(f"/api/v1/page-protect/scripts/{s.id}/content")
+    assert r.status_code == 404

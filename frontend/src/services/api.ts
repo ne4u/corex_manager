@@ -510,6 +510,7 @@ export const pageProtect = {
     check: (id: number) => api.post(`/page-protect/scripts/${id}/check`),
     resetHash: (id: number, recheck: boolean = true) => api.post(`/page-protect/scripts/${id}/reset-hash`, null, { params: { recheck } }),
     checkAll: () => api.post('/page-protect/scripts/check-all'),
+    content: (id: number) => api.get(`/page-protect/scripts/${id}/content`, { responseType: 'text' }),
   },
   stats: () => api.get('/page-protect/stats'),
   sample: () => api.post('/page-protect/sample'),
