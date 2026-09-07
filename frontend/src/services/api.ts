@@ -293,6 +293,8 @@ export const wafExceptions = {
   create: (data: Record<string, unknown>) => api.post('/waf-exceptions', data),
   update: (id: number, data: Record<string, unknown>) => api.put(`/waf-exceptions/${id}`, data),
   remove: (id: number) => api.delete(`/waf-exceptions/${id}`),
+  options: () => api.get('/waf/exception-options'),
+  preview: (data: Record<string, unknown>) => api.post('/waf/exceptions/preview', data),
 }
 
 export const waf = {

@@ -24,6 +24,15 @@ vi.mock('../../services/api', () => ({
     create: vi.fn(() => Promise.resolve({ data: {} })),
     update: vi.fn(() => Promise.resolve({ data: {} })),
     remove: vi.fn(() => Promise.resolve({ data: {} })),
+    options: vi.fn(() => Promise.resolve({ data: {
+      rules: [{ id: '942100', msg: 'SQL Injection', tags: ['attack-sqli'], hits: 10 }],
+      tags: ['attack-sqli'],
+      msgs: [{ msg: 'SQL Injection', rule_id: '942100', hits: 10 }],
+      zones: ['ARGS', 'REQUEST_HEADERS'],
+      variables: [{ zone: 'ARGS', key: 'password' }],
+      condition_variables: ['REQUEST_URI'],
+    } })),
+    preview: vi.fn(() => Promise.resolve({ data: { conditional: [], unconditional: ['SecRuleRemoveById 942100'] } })),
   },
   listeners: {
     list: vi.fn(() => Promise.resolve({ data: [
@@ -89,6 +98,48 @@ describe('Waf page', () => {
     const addButton = screen.getByRole('button', { name: /Add Rule/i })
     await user.click(addButton)
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Add WAF Rule' })).toBeInTheDocument())
+  })
+
+  test('exception modal shows sections and hides exclusion for remove action', async () => {
+    renderWaf()
+    const user = userEvent.setup()
+    await waitFor(() => expect(screen.getByText('WAF Signatures')).toBeInTheDocument())
+    await user.click(screen.getByRole('button', { name: /Exceptions/i }))
+    await waitFor(() => expect(screen.getByText('allow-admin')).toBeInTheDocument())
+    await user.click(screen.getByRole('button', { name: /Add Exception/i }))
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Add WAF Exception' })).toBeInTheDocument())
+    expect(screen.getByText('Rule selection')).toBeInTheDocument()
+    expect(screen.getByText('Apply only when request matches')).toBeInTheDocument()
+    expect(screen.getByText('Generated directives')).toBeInTheDocument()
+    // Variable exclusion is only relevant for the "allow" action.
+    expect(screen.queryByText('Variable exclusion')).not.toBeInTheDocument()
+  })
+
+  test('exception modal rule id typeahead adds a chip and previews directives', async () => {
+    renderWaf()
+    const user = userEvent.setup()
+    await waitFor(() => expect(screen.getByText('WAF Signatures')).toBeInTheDocument())
+    await user.click(screen.getByRole('button', { name: /Exceptions/i }))
+    await waitFor(() => expect(screen.getByText('allow-admin')).toBeInTheDocument())
+    await user.click(screen.getByRole('button', { name: /Add Exception/i }))
+    const input = await screen.findByPlaceholderText('942100')
+    await user.type(input, '942')
+    await waitFor(() => expect(screen.getByText(/SQL Injection/)).toBeInTheDocument())
+    await user.click(screen.getByRole('button', { name: /942100/ }))
+    // Debounced preview renders the generated directive.
+    await waitFor(() => expect(screen.getByText(/SecRuleRemoveById 942100/)).toBeInTheDocument(), { timeout: 3000 })
+  })
+
+  test('exception modal shows exclusion section for allow action', async () => {
+    renderWaf()
+    const user = userEvent.setup()
+    await waitFor(() => expect(screen.getByText('WAF Signatures')).toBeInTheDocument())
+    await user.click(screen.getByRole('button', { name: /Exceptions/i }))
+    await user.click(screen.getByRole('button', { name: /Add Exception/i }))
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Add WAF Exception' })).toBeInTheDocument())
+    const actionSelect = screen.getAllByRole('combobox').find(el => (el as HTMLSelectElement).value === 'remove')!
+    await user.selectOptions(actionSelect, 'allow')
+    await waitFor(() => expect(screen.getByText('Variable exclusion')).toBeInTheDocument())
   })
 
   test('renders the Versions tab with max editor', async () => {

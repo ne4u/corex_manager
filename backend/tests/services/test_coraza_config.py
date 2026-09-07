@@ -559,3 +559,139 @@ def test_generate_coraza_spoa_config_remote_rule_set_downloaded(db, tmp_path, mo
 
     cfg = coraza_config.generate_coraza_spoa_config(db)
     assert "Include /app/data/custom-rules/remote-waf.conf" in cfg
+
+
+def test_exception_multi_rule_ids_unconditional(db):
+    """Comma-separated rule IDs expand to one SecRuleRemoveById each."""
+    backend = make_backend(db)
+    listener = make_listener(db, backend=backend)
+    rule = make_waf_rule(db, name="waf", listener_id=listener.id)
+    make_waf_exception(db, waf_rule_id=rule.id, rule_id="942100,942200 942300", action="remove")
+    cfg = coraza_config.generate_coraza_spoa_config(db)
+    assert "SecRuleRemoveById 942100" in cfg
+    assert "SecRuleRemoveById 942200" in cfg
+    assert "SecRuleRemoveById 942300" in cfg
+
+
+def test_exception_multi_rule_ids_conditional(db):
+    """Comma-separated rule IDs expand to one ctl:ruleRemoveById SecRule each."""
+    backend = make_backend(db)
+    listener = make_listener(db, backend=backend)
+    rule = make_waf_rule(db, name="waf", listener_id=listener.id)
+    make_waf_exception(
+        db,
+        waf_rule_id=rule.id,
+        rule_id="942100,942200",
+        action="remove",
+        condition_variable="REQUEST_URI",
+        condition_operator="contains",
+        condition_value="/api/",
+    )
+    cfg = coraza_config.generate_coraza_spoa_config(db)
+    assert "ctl:ruleRemoveById=942100" in cfg
+    assert "ctl:ruleRemoveById=942200" in cfg
+    # Two distinct conditional SecRules, both gated on the URI condition.
+    assert cfg.count('REQUEST_URI "@contains /api/"') == 2
+
+
+def test_exception_multi_tags_and_msgs(db):
+    """Multiple tags and messages each produce their own directives."""
+    backend = make_backend(db)
+    listener = make_listener(db, backend=backend)
+    rule = make_waf_rule(db, name="waf", listener_id=listener.id)
+    make_waf_exception(
+        db,
+        waf_rule_id=rule.id,
+        rule_tag="attack-sqli,attack-xss",
+        rule_msg="Path Traversal Attack,SQL Injection Attack",
+        action="remove",
+    )
+    cfg = coraza_config.generate_coraza_spoa_config(db)
+    assert "SecRuleRemoveByTag attack-sqli" in cfg
+    assert "SecRuleRemoveByTag attack-xss" in cfg
+    # Messages keep internal spaces — only commas split them.
+    assert "SecRuleRemoveByMsg Path Traversal Attack" in cfg
+    assert "SecRuleRemoveByMsg SQL Injection Attack" in cfg
+
+
+def test_exception_multi_zones_unconditional_allow(db):
+    """Multi-zone allow emits one SecRuleUpdateTargetById per zone."""
+    backend = make_backend(db)
+    listener = make_listener(db, backend=backend)
+    rule = make_waf_rule(db, name="waf", listener_id=listener.id)
+    make_waf_exception(
+        db,
+        waf_rule_id=rule.id,
+        rule_id="942100",
+        action="allow",
+        zone="ARGS,REQUEST_HEADERS",
+        variable="foo",
+    )
+    cfg = coraza_config.generate_coraza_spoa_config(db)
+    assert "SecRuleUpdateTargetById 942100 !ARGS:foo" in cfg
+    assert "SecRuleUpdateTargetById 942100 !REQUEST_HEADERS:foo" in cfg
+
+
+def test_exception_multi_zones_conditional_allow(db):
+    """Conditional multi-zone allow emits a chained SecRule per zone."""
+    backend = make_backend(db)
+    listener = make_listener(db, backend=backend)
+    rule = make_waf_rule(db, name="waf", listener_id=listener.id)
+    make_waf_exception(
+        db,
+        waf_rule_id=rule.id,
+        rule_id="942100",
+        action="allow",
+        zone="ARGS,REQUEST_COOKIES",
+        variable="foo",
+        matcher="contains",
+        value="bar",
+        condition_variable="REMOTE_ADDR",
+        condition_operator="equals",
+        condition_value="10.0.0.1",
+    )
+    cfg = coraza_config.generate_coraza_spoa_config(db)
+    assert "ctl:ruleRemoveTargetById=942100;ARGS:foo" in cfg
+    assert "ctl:ruleRemoveTargetById=942100;REQUEST_COOKIES:foo" in cfg
+    assert 'ARGS:foo "@contains bar"' in cfg
+    assert 'REQUEST_COOKIES:foo "@contains bar"' in cfg
+
+
+def test_exception_conditional_rule_id_and_tag(db):
+    """A conditional exception with both id and tag emits both ctl actions."""
+    backend = make_backend(db)
+    listener = make_listener(db, backend=backend)
+    rule = make_waf_rule(db, name="waf", listener_id=listener.id)
+    make_waf_exception(
+        db,
+        waf_rule_id=rule.id,
+        rule_id="942100",
+        rule_tag="attack-sqli",
+        action="remove",
+        condition_variable="REQUEST_METHOD",
+        condition_operator="equals",
+        condition_value="POST",
+    )
+    cfg = coraza_config.generate_coraza_spoa_config(db)
+    assert "ctl:ruleRemoveById=942100" in cfg
+    assert "ctl:ruleRemoveByTag=attack-sqli" in cfg
+
+
+def test_exception_ids_are_unique_per_expanded_rule(db):
+    """Expanded multi-value rules get unique ids so Coraza doesn't error."""
+    backend = make_backend(db)
+    listener = make_listener(db, backend=backend)
+    rule = make_waf_rule(db, name="waf", listener_id=listener.id)
+    make_waf_exception(
+        db,
+        waf_rule_id=rule.id,
+        rule_id="942100,942200",
+        action="remove",
+        condition_variable="REQUEST_URI",
+        condition_operator="contains",
+        condition_value="/x/",
+    )
+    cfg = coraza_config.generate_coraza_spoa_config(db)
+    import re
+    ids = re.findall(r'"id:(\d+),phase:1', cfg)
+    assert len(ids) == len(set(ids)), f"duplicate SecRule ids emitted: {ids}"

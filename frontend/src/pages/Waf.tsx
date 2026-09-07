@@ -7,6 +7,7 @@ import useApiList from '../hooks/useApiList'
 import Modal from '../components/Modal'
 import LabelWithTooltip from '../components/LabelWithTooltip'
 import InfoTooltip from '../components/InfoTooltip'
+import MultiValueInput, { MultiValueOption } from '../components/MultiValueInput'
 import { Tabs, IconButton } from '../components/ui'
 import { useDateTime } from '../contexts/DateTimeContext'
 import WafLogs from './WafLogs'
@@ -23,20 +24,16 @@ const wafRuleTooltips = {
   listener: 'waf.tooltips.listener',
   backendScope: 'waf.tooltips.backendScope',
   ruleSet: 'waf.tooltips.ruleSet',
-  ruleSetVersion: 'waf.tooltips.ruleSetVersion',
   ruleSetUrl: 'waf.tooltips.ruleSetUrl',
   ruleSetSha256: 'waf.tooltips.ruleSetSha256',
   ruleSetUpdateIntervalHours: 'waf.tooltips.ruleSetUpdateIntervalHours',
   ruleSetAutoUpdate: 'waf.tooltips.ruleSetAutoUpdate',
-  plugins: 'waf.tooltips.plugins',
   engine: 'waf.tooltips.engine',
   paranoiaLevel: 'waf.tooltips.paranoiaLevel',
   inboundAnomalyThreshold: 'waf.tooltips.inboundAnomalyThreshold',
-  outboundAnomalyThreshold: 'waf.tooltips.outboundAnomalyThreshold',
   action: 'waf.tooltips.action',
   siemIntegration: 'waf.tooltips.siemIntegration',
   redirectUrl: 'waf.tooltips.redirectUrl',
-  captchaValidSeconds: 'waf.tooltips.captchaValidSeconds',
   statusCode: 'waf.tooltips.statusCode',
   pathPattern: 'waf.tooltips.pathPattern',
   httpMethods: 'waf.tooltips.httpMethods',
@@ -85,13 +82,13 @@ const wafSiemTooltips = {
 function emptyRule() {
   return {
     name: '', listener_id: null as number | null, backend_id: null as number | null,
-    enabled: true, rule_set: 'crs', rule_set_version: '', rule_set_url: '',
+    enabled: true, rule_set: 'crs', rule_set_url: '',
     rule_set_sha256: '', rule_set_auto_update: false, rule_set_update_interval_hours: 24,
     rule_set_last_updated_at: null as string | null, rule_set_last_error: null as string | null,
     rule_set_plugins: [] as string[],
     engine: 'On', paranoia_level: 1, inbound_anomaly_threshold: 5,
     outbound_anomaly_threshold: 4, sec_rules: '', action: 'block', redirect_url: '',
-    status_code: 403, captcha_valid_seconds: 3600,
+    status_code: 403,
     path_pattern: '', http_methods: '', content_types: '',
     rate_enabled: false, rate_events: 100, rate_window_seconds: 60, rate_key: 'src',
     rate_header: '', rate_action: 'block', rate_duration_seconds: 0, fail_open: false, siem_integration_id: null as number | null,
@@ -101,7 +98,7 @@ function emptyRule() {
 function emptyException() {
   return {
     waf_rule_id: '' as number | string, name: '', rule_id: '', rule_tag: '', rule_msg: '',
-    zone: '', variable: '', matcher: 'equals', value: '', description: '', action: 'remove',
+    zone: '', variable: '', matcher: '', value: '', description: '', action: 'remove',
     update_action: '', update_target: '', condition_variable: '', condition_operator: 'equals',
     condition_value: '',
   }
@@ -128,6 +125,8 @@ export default function Waf() {
   const [exOpen, setExOpen] = useState(false)
   const [exEditing, setExEditing] = useState<number | null>(null)
   const [exForm, setExForm] = useState<any>(emptyException())
+  const [exOptions, setExOptions] = useState<any>(null)
+  const [exPreview, setExPreview] = useState<{ conditional: string[]; unconditional: string[] } | null>(null)
 
   const [siemOpen, setSiemOpen] = useState(false)
   const [siemEditing, setSiemEditing] = useState<number | null>(null)
@@ -207,7 +206,6 @@ export default function Waf() {
       outbound_anomaly_threshold: r.outbound_anomaly_threshold ?? 4,
       status_code: r.status_code ?? 403,
       redirect_url: r.redirect_url || '',
-      captcha_valid_seconds: r.captcha_valid_seconds ?? 3600,
       rule_set_plugins: r.rule_set_plugins || [],
       rule_set_last_updated_at: r.rule_set_last_updated_at || null,
       rule_set_last_error: r.rule_set_last_error || null,
@@ -222,8 +220,49 @@ export default function Waf() {
     setOpen(true)
   }
 
+  // Load the suggestion catalog (rule ids/tags/msgs/zones) when the exception
+  // editor opens.
+  useEffect(() => {
+    if (!exOpen) return
+    wafExceptions.options()
+      .then(res => setExOptions(res.data))
+      .catch(() => setExOptions(null))
+  }, [exOpen])
+
+  // Debounced live preview of the directives the exception will generate.
+  useEffect(() => {
+    if (!exOpen) {
+      setExPreview(null)
+      return
+    }
+    const timer = setTimeout(() => {
+      const payload = {
+        ...exForm,
+        name: exForm.name || 'preview',
+        waf_rule_id: exForm.waf_rule_id ? Number(exForm.waf_rule_id) : null,
+      }
+      wafExceptions.preview(payload)
+        .then(res => setExPreview(res.data))
+        .catch(() => setExPreview(null))
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [exForm, exOpen])
+
   const openExAdd = () => { setExEditing(null); setExForm(emptyException()); setExOpen(true) }
   const openExEdit = (e: any) => { setExEditing(e.id); setExForm({ ...e, waf_rule_id: e.waf_rule_id ? String(e.waf_rule_id) : '' }); setExOpen(true) }
+  const openExFromLog = (row: any) => {
+    const rid = row.rule_id || row.id || ''
+    setExEditing(null)
+    setExForm({
+      ...emptyException(),
+      name: rid ? `exception-${rid}` : '',
+      rule_id: rid ? String(rid) : '',
+      condition_variable: 'REQUEST_URI',
+      condition_operator: 'startsWith',
+      condition_value: row.uri || row.path || '',
+    })
+    setExOpen(true)
+  }
 
   const handleExport = async () => {
     try {
@@ -312,6 +351,24 @@ export default function Waf() {
     }
   }
 
+  // Suggestion option lists for the exception editor's type-ahead fields.
+  const exRuleIdOptions: MultiValueOption[] = (exOptions?.rules || []).map((r: any) => ({
+    value: String(r.id),
+    hint: [r.msg, r.hits ? t('waf.exceptions.fields.hits', { count: r.hits }) : ''].filter(Boolean).join(' — '),
+  }))
+  const exTagOptions: MultiValueOption[] = (exOptions?.tags || []).map((v: string) => ({ value: v }))
+  const exMsgOptions: MultiValueOption[] = (exOptions?.msgs || []).map((m: any) => ({
+    value: m.msg,
+    hint: m.rule_id ? `#${m.rule_id}` : undefined,
+  }))
+  const exZoneOptions: MultiValueOption[] = (exOptions?.zones || []).map((v: string) => ({ value: v }))
+  const exSelectedZones = String(exForm.zone || '').split(',').map((s: string) => s.trim()).filter(Boolean)
+  const exVariableOptions: MultiValueOption[] = (exOptions?.variables || [])
+    .filter((v: any) => v.key && (exSelectedZones.length === 0 || exSelectedZones.includes(v.zone)))
+    .map((v: any) => ({ value: v.key, hint: v.zone }))
+  const exCondVarOptions: MultiValueOption[] = (exOptions?.condition_variables || []).map((v: string) => ({ value: v }))
+  const exPreviewLines = exPreview ? [...exPreview.conditional, ...exPreview.unconditional] : []
+
   return (
     <div className="flex flex-col h-full space-y-6">
       <div className="flex items-center justify-between">
@@ -381,11 +438,11 @@ export default function Waf() {
           <div className="flex items-center justify-between"><h3 className="text-xl font-bold">{t('waf.exceptions.title')}</h3><button onClick={openExAdd} className="btn-primary">{t('waf.exceptions.addException')}</button></div>
           <div className="card overflow-x-auto">
             <table className="w-full text-sm text-start">
-              <thead className="text-slate-400 border-b border-slate-800"><tr><th>{t('waf.exceptions.tableHeaders.name')}</th><th>{t('waf.exceptions.tableHeaders.ruleId')}</th><th>{t('waf.exceptions.tableHeaders.tag')}</th><th>{t('waf.exceptions.tableHeaders.msg')}</th><th>{t('waf.exceptions.tableHeaders.action')}</th><th className="w-40 whitespace-nowrap">{t('waf.exceptions.tableHeaders.updated')}</th><th></th></tr></thead>
+              <thead className="text-slate-400 border-b border-slate-800"><tr><th>{t('waf.exceptions.tableHeaders.name')}</th><th>{t('waf.exceptions.fields.conditionVariable')}</th><th>{t('waf.exceptions.fields.conditionOperator')}</th><th>{t('waf.exceptions.fields.conditionValue')}</th><th>{t('waf.exceptions.tableHeaders.action')}</th><th className="w-40 whitespace-nowrap">{t('waf.exceptions.tableHeaders.updated')}</th><th></th></tr></thead>
               <tbody>
                 {exceptions.map((e: any) => (
                   <tr key={e.id} className="border-b border-slate-800 last:border-0">
-                    <td className="py-2">{e.name}</td><td>{e.rule_id}</td><td>{e.rule_tag}</td><td>{e.rule_msg}</td><td>{e.action}</td><td className="py-2 text-xs text-slate-400 whitespace-nowrap">{e.updated_at ? formatDateTime(e.updated_at) : '-'}</td>
+                    <td className="py-2">{e.name}</td><td className="font-mono text-xs">{e.condition_variable || '-'}</td><td>{e.condition_variable ? e.condition_operator : '-'}</td><td className="max-w-xs truncate" title={e.condition_value || undefined}>{e.condition_value || '-'}</td><td>{e.action}</td><td className="py-2 text-xs text-slate-400 whitespace-nowrap">{e.updated_at ? formatDateTime(e.updated_at) : '-'}</td>
                     <td>
                       <div className="flex gap-1">
                         <IconButton icon={Pencil} aria-label={t('common:actions.edit')} onClick={() => openExEdit(e)} />
@@ -585,7 +642,7 @@ export default function Waf() {
         </div>
       )}
 
-      {tab === 'logs' && <WafLogs />}
+      {tab === 'logs' && <WafLogs onCreateException={openExFromLog} />}
 
       {tab === 'health' && (
         <div className="space-y-4">
@@ -626,7 +683,6 @@ export default function Waf() {
             <div><LabelWithTooltip tooltip={t(wafRuleTooltips.backendScope)} className="label">{t('waf.rules.fields.backendScope')}</LabelWithTooltip><select className="input" value={form.backend_id || ''} onChange={e => setForm({ ...form, backend_id: e.target.value ? Number(e.target.value) : null })}><option value="">{t('waf.rules.fields.anyBackend')}</option>{backendList.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}</select></div>
             <div className="col-span-2 text-xs text-slate-500 -mt-1">{t('waf.rules.fields.backendScopeHint')}</div>
             <div><LabelWithTooltip tooltip={t(wafRuleTooltips.ruleSet)} className="label">{t('waf.rules.fields.ruleSet')}</LabelWithTooltip><select className="input" value={form.rule_set} onChange={e => setForm({ ...form, rule_set: e.target.value })}><option value="crs">{t('waf.rules.ruleSet.crs')}</option><option value="custom">{t('waf.rules.ruleSet.custom')}</option><option value="remote">{t('waf.rules.ruleSet.remote')}</option>{(form.rule_set === 'coraza' || form.rule_set === 'owasp-crs' || form.rule_set === 'commercial') && <option value={form.rule_set}>{form.rule_set}</option>}</select></div>
-            <div><LabelWithTooltip tooltip={t(wafRuleTooltips.ruleSetVersion)} className="label">{t('waf.rules.fields.ruleSetVersion')}</LabelWithTooltip><input className="input" value={form.rule_set_version || ''} onChange={e => setForm({ ...form, rule_set_version: e.target.value })} /></div>
             {form.rule_set === 'remote' && (
               <>
                 <div><LabelWithTooltip tooltip={t(wafRuleTooltips.ruleSetUrl)} className="label">{t('waf.rules.fields.ruleSetUrl')}</LabelWithTooltip><input className="input" value={form.rule_set_url || ''} onChange={e => setForm({ ...form, rule_set_url: e.target.value })} placeholder="https://example.com/rules.conf" /></div>
@@ -637,11 +693,9 @@ export default function Waf() {
                 {form.rule_set_last_error && <div className="col-span-2 text-xs text-red-400">{t('waf.rules.fields.lastError')} {form.rule_set_last_error}</div>}
               </>
             )}
-            <div><LabelWithTooltip tooltip={t(wafRuleTooltips.plugins)} className="label">{t('waf.rules.fields.plugins')}</LabelWithTooltip><input className="input" value={(form.rule_set_plugins || []).join(', ')} onChange={e => setForm({ ...form, rule_set_plugins: e.target.value.split(',').map((x: string) => x.trim()).filter(Boolean) })} placeholder="plugin1, plugin2" /></div>
             <div><LabelWithTooltip tooltip={t(wafRuleTooltips.engine)} className="label">{t('waf.rules.fields.engine')}</LabelWithTooltip><select className="input" value={form.engine} onChange={e => setForm({ ...form, engine: e.target.value })}><option value="On">{t('waf.rules.fields.engineOn')}</option><option value="DetectionOnly">{t('waf.rules.fields.engineDetectionOnly')}</option><option value="Off">{t('waf.rules.fields.engineOff')}</option></select></div>
             <div><LabelWithTooltip tooltip={t(wafRuleTooltips.paranoiaLevel)} className="label">{t('waf.rules.fields.paranoiaLevel')}</LabelWithTooltip><input type="number" className="input" min={1} max={4} value={form.paranoia_level} onChange={e => setForm({ ...form, paranoia_level: Number(e.target.value) })} /></div>
             <div><LabelWithTooltip tooltip={t(wafRuleTooltips.inboundAnomalyThreshold)} className="label">{t('waf.rules.fields.inboundAnomalyThreshold')}</LabelWithTooltip><input type="number" className="input" min={0} value={form.inbound_anomaly_threshold} onChange={e => setForm({ ...form, inbound_anomaly_threshold: Number(e.target.value) })} /></div>
-            <div><LabelWithTooltip tooltip={t(wafRuleTooltips.outboundAnomalyThreshold)} className="label">{t('waf.rules.fields.outboundAnomalyThreshold')}</LabelWithTooltip><input type="number" className="input" min={0} value={form.outbound_anomaly_threshold} onChange={e => setForm({ ...form, outbound_anomaly_threshold: Number(e.target.value) })} /></div>
             <div><LabelWithTooltip tooltip={t(wafRuleTooltips.action)} className="label">{t('waf.rules.fields.action')}</LabelWithTooltip><select className="input" value={form.action} onChange={e => {
               const next = e.target.value
               // Rate-based counting is a no-op for the "allow" action; clear it
@@ -650,8 +704,8 @@ export default function Waf() {
             }}>{actionOptions.map(a => <option key={a} value={a}>{a}</option>)}</select></div>
             <div><LabelWithTooltip tooltip={t(wafRuleTooltips.siemIntegration)} className="label">{t('waf.rules.fields.siemIntegration')}</LabelWithTooltip><select className="input" value={form.siem_integration_id || ''} onChange={e => setForm({ ...form, siem_integration_id: e.target.value ? Number(e.target.value) : null })}><option value="">{t('waf.rules.fields.none')}</option>{siemIntegrations.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
           </div>
-          {(form.action === 'redirect' || form.action === 'challenge') && (
-            <div><LabelWithTooltip tooltip={t(wafRuleTooltips.redirectUrl)} className="label">{t('waf.rules.fields.redirectUrl')}</LabelWithTooltip><input className="input" placeholder="/_cap/challenge" value={form.redirect_url || ''} onChange={e => setForm({ ...form, redirect_url: e.target.value })} /></div>
+          {form.action === 'redirect' && (
+            <div><LabelWithTooltip tooltip={t(wafRuleTooltips.redirectUrl)} className="label">{t('waf.rules.fields.redirectUrl')}</LabelWithTooltip><input className="input" value={form.redirect_url || ''} onChange={e => setForm({ ...form, redirect_url: e.target.value })} /></div>
           )}
           {form.action === 'challenge' && (
             <div className="text-xs text-slate-500"><span dangerouslySetInnerHTML={{ __html: t('waf.rules.challengeNote') }} /></div>
@@ -687,36 +741,77 @@ export default function Waf() {
         </form>
       </Modal>
 
-      <Modal open={exOpen} onClose={() => setExOpen(false)} title={exEditing ? t('waf.exceptions.editTitle') : t('waf.exceptions.addTitle')}>
-        <form onSubmit={exSubmit} className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+      <Modal open={exOpen} onClose={() => setExOpen(false)} title={exEditing ? t('waf.exceptions.editTitle') : t('waf.exceptions.addTitle')} size="xl">
+        <form onSubmit={exSubmit} className="space-y-5">
+          {/* Details */}
+          <div className="grid grid-cols-3 gap-3">
             <div><LabelWithTooltip tooltip={t(wafExceptionTooltips.name)} className="label">{t('waf.exceptions.fields.name')}</LabelWithTooltip><input className="input" value={exForm.name} onChange={e => setExForm({ ...exForm, name: e.target.value })} /></div>
             <div><LabelWithTooltip tooltip={t(wafExceptionTooltips.wafRule)} className="label">{t('waf.exceptions.fields.wafRule')}</LabelWithTooltip><select className="input" value={exForm.waf_rule_id} onChange={e => setExForm({ ...exForm, waf_rule_id: e.target.value })}><option value="">{t('waf.exceptions.fields.global')}</option>{rules.map((r: any) => <option key={r.id} value={r.id}>{r.name}</option>)}</select></div>
-            <div><LabelWithTooltip tooltip={t(wafExceptionTooltips.ruleId)} className="label">{t('waf.exceptions.fields.ruleId')}</LabelWithTooltip><input className="input" value={exForm.rule_id} onChange={e => setExForm({ ...exForm, rule_id: e.target.value })} /></div>
-            <div><LabelWithTooltip tooltip={t(wafExceptionTooltips.ruleTag)} className="label">{t('waf.exceptions.fields.ruleTag')}</LabelWithTooltip><input className="input" value={exForm.rule_tag || ''} onChange={e => setExForm({ ...exForm, rule_tag: e.target.value })} /></div>
-            <div><LabelWithTooltip tooltip={t(wafExceptionTooltips.ruleMsg)} className="label">{t('waf.exceptions.fields.ruleMsg')}</LabelWithTooltip><input className="input" value={exForm.rule_msg || ''} onChange={e => setExForm({ ...exForm, rule_msg: e.target.value })} /></div>
             <div><LabelWithTooltip tooltip={t(wafExceptionTooltips.exceptionAction)} className="label">{t('waf.exceptions.fields.exceptionAction')}</LabelWithTooltip><select className="input" value={exForm.action} onChange={e => setExForm({ ...exForm, action: e.target.value })}><option value="remove">{t('waf.exceptions.fields.actionRemove')}</option><option value="allow">{t('waf.exceptions.fields.actionAllow')}</option><option value="comment">{t('waf.exceptions.fields.actionComment')}</option><option value="update">{t('waf.exceptions.fields.actionUpdate')}</option></select></div>
           </div>
-          {exForm.action === 'update' && (
-            <div className="grid grid-cols-2 gap-3">
-              <div><LabelWithTooltip tooltip={t(wafExceptionTooltips.updateAction)} className="label">{t('waf.exceptions.fields.updateAction')}</LabelWithTooltip><input className="input" value={exForm.update_action || ''} onChange={e => setExForm({ ...exForm, update_action: e.target.value })} placeholder="pass" /></div>
-              <div><LabelWithTooltip tooltip={t(wafExceptionTooltips.updateTarget)} className="label">{t('waf.exceptions.fields.updateTarget')}</LabelWithTooltip><input className="input" value={exForm.update_target || ''} onChange={e => setExForm({ ...exForm, update_target: e.target.value })} placeholder="ARGS:param" /></div>
+
+          {/* Rule selection: which rules this exception modifies */}
+          <div className="border-t border-slate-800 pt-3 space-y-3">
+            <div>
+              <h4 className="font-semibold">{t('waf.exceptions.sections.selection')}</h4>
+              <p className="text-xs text-slate-500">{t('waf.exceptions.sections.selectionHint')}</p>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div><LabelWithTooltip tooltip={t(wafExceptionTooltips.ruleId)} className="label">{t('waf.exceptions.fields.ruleId')}</LabelWithTooltip><MultiValueInput value={exForm.rule_id} onChange={v => setExForm({ ...exForm, rule_id: v })} options={exRuleIdOptions} placeholder="942100" loading={exOpen && !exOptions} /></div>
+              <div><LabelWithTooltip tooltip={t(wafExceptionTooltips.ruleTag)} className="label">{t('waf.exceptions.fields.ruleTag')}</LabelWithTooltip><MultiValueInput value={exForm.rule_tag || ''} onChange={v => setExForm({ ...exForm, rule_tag: v })} options={exTagOptions} placeholder="attack-sqli" /></div>
+              <div><LabelWithTooltip tooltip={t(wafExceptionTooltips.ruleMsg)} className="label">{t('waf.exceptions.fields.ruleMsg')}</LabelWithTooltip><MultiValueInput value={exForm.rule_msg || ''} onChange={v => setExForm({ ...exForm, rule_msg: v })} options={exMsgOptions} placeholder={t('waf.exceptions.fields.ruleMsgPlaceholder')} /></div>
+            </div>
+            {exForm.action === 'update' && (
+              <div className="grid grid-cols-2 gap-3">
+                <div><LabelWithTooltip tooltip={t(wafExceptionTooltips.updateAction)} className="label">{t('waf.exceptions.fields.updateAction')}</LabelWithTooltip><input className="input" value={exForm.update_action || ''} onChange={e => setExForm({ ...exForm, update_action: e.target.value })} placeholder="pass" /></div>
+                <div><LabelWithTooltip tooltip={t(wafExceptionTooltips.updateTarget)} className="label">{t('waf.exceptions.fields.updateTarget')}</LabelWithTooltip><input className="input" value={exForm.update_target || ''} onChange={e => setExForm({ ...exForm, update_target: e.target.value })} placeholder="ARGS:param" /></div>
+              </div>
+            )}
+          </div>
+
+          {/* Variable exclusion: only relevant for the "allow" action */}
+          {exForm.action === 'allow' && (
+            <div className="border-t border-slate-800 pt-3 space-y-3">
+              <div>
+                <h4 className="font-semibold">{t('waf.exceptions.sections.exclusion')}</h4>
+                <p className="text-xs text-slate-500">{t('waf.exceptions.sections.exclusionHint')}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><LabelWithTooltip tooltip={t(wafExceptionTooltips.zone)} className="label">{t('waf.exceptions.fields.zone')}</LabelWithTooltip><MultiValueInput value={exForm.zone} onChange={v => setExForm({ ...exForm, zone: v })} options={exZoneOptions} placeholder="ARGS" /></div>
+                <div><LabelWithTooltip tooltip={t(wafExceptionTooltips.variable)} className="label">{t('waf.exceptions.fields.variable')}</LabelWithTooltip><MultiValueInput value={exForm.variable} onChange={v => setExForm({ ...exForm, variable: v })} options={exVariableOptions} placeholder="password" max={1} /></div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><LabelWithTooltip tooltip={t(wafExceptionTooltips.matcher)} className="label">{t('waf.exceptions.fields.matcher')}</LabelWithTooltip><select className="input" value={exForm.matcher} onChange={e => setExForm({ ...exForm, matcher: e.target.value })}><option value="">{t('waf.exceptions.fields.matcherNone')}</option><option>equals</option><option>contains</option><option>regex</option><option>startsWith</option></select></div>
+                <div><LabelWithTooltip tooltip={t(wafExceptionTooltips.value)} className="label">{t('waf.exceptions.fields.value')}</LabelWithTooltip><input className="input" value={exForm.value} onChange={e => setExForm({ ...exForm, value: e.target.value })} disabled={!exForm.matcher} /></div>
+              </div>
             </div>
           )}
-          <div className="grid grid-cols-2 gap-3">
-            <div><LabelWithTooltip tooltip={t(wafExceptionTooltips.zone)} className="label">{t('waf.exceptions.fields.zone')}</LabelWithTooltip><input className="input" value={exForm.zone} onChange={e => setExForm({ ...exForm, zone: e.target.value })} placeholder="ARGS, HEADERS, etc" /></div>
-            <div><LabelWithTooltip tooltip={t(wafExceptionTooltips.variable)} className="label">{t('waf.exceptions.fields.variable')}</LabelWithTooltip><input className="input" value={exForm.variable} onChange={e => setExForm({ ...exForm, variable: e.target.value })} /></div>
+
+          {/* Condition: gate the whole exception on a request attribute */}
+          <div className="border-t border-slate-800 pt-3 space-y-3">
+            <div>
+              <h4 className="font-semibold">{t('waf.exceptions.sections.condition')}</h4>
+              <p className="text-xs text-slate-500">{t('waf.exceptions.sections.conditionHint')}</p>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div><LabelWithTooltip tooltip={t(wafExceptionTooltips.conditionVariable)} className="label">{t('waf.exceptions.fields.conditionVariable')}</LabelWithTooltip><MultiValueInput value={exForm.condition_variable || ''} onChange={v => setExForm({ ...exForm, condition_variable: v })} options={exCondVarOptions} placeholder="REQUEST_URI" max={1} /></div>
+              <div><LabelWithTooltip tooltip={t(wafExceptionTooltips.conditionOperator)} className="label">{t('waf.exceptions.fields.conditionOperator')}</LabelWithTooltip><select className="input" value={exForm.condition_operator} onChange={e => setExForm({ ...exForm, condition_operator: e.target.value })}><option>equals</option><option>contains</option><option>startsWith</option><option>regex</option><option>gt</option><option>lt</option></select></div>
+              <div><LabelWithTooltip tooltip={t(wafExceptionTooltips.conditionValue)} className="label">{t('waf.exceptions.fields.conditionValue')}</LabelWithTooltip><input className="input" value={exForm.condition_value || ''} onChange={e => setExForm({ ...exForm, condition_value: e.target.value })} placeholder="/api/" /></div>
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div><LabelWithTooltip tooltip={t(wafExceptionTooltips.matcher)} className="label">{t('waf.exceptions.fields.matcher')}</LabelWithTooltip><select className="input" value={exForm.matcher} onChange={e => setExForm({ ...exForm, matcher: e.target.value })}><option>equals</option><option>contains</option><option>regex</option><option>startsWith</option></select></div>
-            <div><LabelWithTooltip tooltip={t(wafExceptionTooltips.value)} className="label">{t('waf.exceptions.fields.value')}</LabelWithTooltip><input className="input" value={exForm.value} onChange={e => setExForm({ ...exForm, value: e.target.value })} /></div>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div><LabelWithTooltip tooltip={t(wafExceptionTooltips.conditionVariable)} className="label">{t('waf.exceptions.fields.conditionVariable')}</LabelWithTooltip><input className="input" value={exForm.condition_variable || ''} onChange={e => setExForm({ ...exForm, condition_variable: e.target.value })} placeholder="REMOTE_ADDR" /></div>
-            <div><LabelWithTooltip tooltip={t(wafExceptionTooltips.conditionOperator)} className="label">{t('waf.exceptions.fields.conditionOperator')}</LabelWithTooltip><select className="input" value={exForm.condition_operator} onChange={e => setExForm({ ...exForm, condition_operator: e.target.value })}><option>equals</option><option>contains</option><option>startsWith</option><option>regex</option><option>gt</option><option>lt</option></select></div>
-            <div><LabelWithTooltip tooltip={t(wafExceptionTooltips.conditionValue)} className="label">{t('waf.exceptions.fields.conditionValue')}</LabelWithTooltip><input className="input" value={exForm.condition_value || ''} onChange={e => setExForm({ ...exForm, condition_value: e.target.value })} /></div>
-          </div>
+
           <div><LabelWithTooltip tooltip={t(wafExceptionTooltips.description)} className="label">{t('waf.exceptions.fields.description')}</LabelWithTooltip><input className="input" value={exForm.description || ''} onChange={e => setExForm({ ...exForm, description: e.target.value })} /></div>
+
+          {/* Live preview of the generated directives */}
+          <div className="border-t border-slate-800 pt-3 space-y-2">
+            <h4 className="font-semibold">{t('waf.exceptions.sections.preview')}</h4>
+            {exPreviewLines.length > 0 ? (
+              <pre className="text-xs bg-slate-950 border border-slate-800 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap font-mono text-slate-300">{exPreviewLines.join('\n')}</pre>
+            ) : (
+              <p className="text-xs text-slate-500">{t('waf.exceptions.previewEmpty')}</p>
+            )}
+          </div>
+
           <button className="btn-primary w-full">{t('waf.exceptions.fields.save')}</button>
         </form>
       </Modal>

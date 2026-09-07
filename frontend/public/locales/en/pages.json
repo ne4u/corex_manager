@@ -1580,9 +1580,6 @@
       "addException": "Add Exception",
       "tableHeaders": {
         "name": "Name",
-        "ruleId": "Rule ID",
-        "tag": "Tag",
-        "msg": "Msg",
         "action": "Action",
         "updated": "Updated",
         "actions": "Actions"
@@ -1611,8 +1608,21 @@
         "conditionOperator": "Condition Operator",
         "conditionValue": "Condition Value",
         "description": "Description",
-        "save": "Save"
-      }
+        "save": "Save",
+        "hits": "{{count}} hits",
+        "ruleMsgPlaceholder": "e.g. SQL Injection Attack",
+        "matcherNone": "Always (no content match)"
+      },
+      "sections": {
+        "selection": "Rule selection",
+        "selectionHint": "Choose which rules this exception applies to — by rule ID, tag, or message. Start typing to search suggestions; multiple values are allowed.",
+        "exclusion": "Variable exclusion",
+        "exclusionHint": "For the 'Allow variable' action: the request variables the selected rules should stop inspecting (e.g. ARGS:password). 'Matcher' + 'Value' further restrict the exclusion to matching content.",
+        "condition": "Apply only when request matches",
+        "conditionHint": "Optional. Restrict the whole exception to requests where this variable matches (e.g. REQUEST_URI starts with /api/).",
+        "preview": "Generated directives"
+      },
+      "previewEmpty": "Nothing will be generated yet — select rules, a variable target, or a condition to preview the result."
     },
     "siem": {
       "title": "SIEM Integrations",
@@ -1751,19 +1761,19 @@
       "versionName": "Label for this point-in-time copy of the rule.",
       "exName": "Display name for this exception.",
       "exWafRule": "Rule this exception applies to, or global for all rules.",
-      "exRuleId": "Numeric rule ID from the rule set to match.",
-      "exRuleTag": "Rule tag to match.",
-      "exRuleMsg": "Rule message text to match.",
-      "exExceptionAction": "What to do with the matched rule or variable.",
+      "exRuleId": "Rule ID(s) to match — start typing to search rules that fired or come from the installed rule set. Multiple IDs allowed.",
+      "exRuleTag": "Rule tag(s) to match, e.g. attack-sqli. Multiple tags allowed.",
+      "exRuleMsg": "Rule message text to match (substring match). Multiple messages allowed.",
+      "exExceptionAction": "What to do with the matched rules: 'remove' disables them, 'allow' excludes specific request variables from them, 'comment' disables with a note, 'update' changes their action/target.",
       "exUpdateAction": "New action to assign to a rule when update is selected.",
       "exUpdateTarget": "Variable or collection to update.",
-      "exZone": "Request collection/zone to inspect, e.g. ARGS, HEADERS.",
-      "exVariable": "Specific variable inside the zone.",
-      "exMatcher": "How to compare the variable to the value.",
-      "exValue": "Value the variable must match.",
-      "exConditionVariable": "Variable used in an optional extra condition.",
-      "exConditionOperator": "Operator for the extra condition.",
-      "exConditionValue": "Value for the extra condition.",
+      "exZone": "Request collection(s) to exclude from inspection, e.g. ARGS or REQUEST_HEADERS. Multiple zones allowed.",
+      "exVariable": "The variable name inside the zone — e.g. 'password' for ARGS:password. Leave empty to exclude the whole zone.",
+      "exMatcher": "Optional — only exclude the variable when its content matches. Leave empty to always exclude it.",
+      "exValue": "The content the variable must match for the exclusion to apply.",
+      "exConditionVariable": "Optional — only apply this exception when this request variable matches, e.g. REQUEST_URI or REQUEST_HEADERS:Host.",
+      "exConditionOperator": "How to compare the condition variable to the value.",
+      "exConditionValue": "The value the condition variable must match, e.g. /api/ or an IP address.",
       "exDescription": "Human-readable note about this exception.",
       "siemName": "Display name for this integration.",
       "siemIntegrationType": "Delivery mechanism: webhook, syslog, or Elastic.",
@@ -1819,7 +1829,8 @@
     },
     "noWafEvents": "No WAF events captured.",
     "noEventsMatchFilter": "No events match the filter.",
-    "failedToLoadWafLogs": "Failed to load WAF logs."
+    "failedToLoadWafLogs": "Failed to load WAF logs.",
+    "createException": "Create exception"
   },
   "ciphers": {
     "title": "Cipher Suites",
@@ -3382,5 +3393,10 @@
     "swarmMode": "Swarm Mode",
     "swarmVip": "Swarm VIP",
     "swarmModeHint": "Keepalived is not used in Swarm mode — the Swarm ingress mesh provides VIP and failover."
+  },
+  "multiValue": {
+    "loading": "Loading…",
+    "addValue": "Add \"{{value}}\"",
+    "noOptions": "No suggestions"
   }
 }

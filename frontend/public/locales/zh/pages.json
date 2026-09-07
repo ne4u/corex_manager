@@ -1396,9 +1396,6 @@
       "addException": "添加例外",
       "tableHeaders": {
         "name": "名称",
-        "ruleId": "规则ID",
-        "tag": "标签",
-        "msg": "消息",
         "action": "操作",
         "updated": "更新时间",
         "actions": "操作"
@@ -1427,8 +1424,21 @@
         "conditionOperator": "条件运算符",
         "conditionValue": "条件值",
         "description": "描述",
-        "save": "保存"
-      }
+        "save": "保存",
+        "hits": "{{count}} 次命中",
+        "ruleMsgPlaceholder": "例如 SQL Injection Attack",
+        "matcherNone": "始终（不匹配内容）"
+      },
+      "sections": {
+        "selection": "规则选择",
+        "selectionHint": "选择此例外适用的规则——按规则 ID、标签或消息。输入以搜索建议；允许多个值。",
+        "exclusion": "变量排除",
+        "exclusionHint": "用于“允许变量”操作：所选规则应停止检查的请求变量（例如 ARGS:password）。“匹配器”+“值”可将排除限制为匹配的内容。",
+        "condition": "仅在请求匹配时应用",
+        "conditionHint": "可选。将例外限制为变量匹配的请求（例如 REQUEST_URI 以 /api/ 开头）。",
+        "preview": "生成的指令"
+      },
+      "previewEmpty": "尚不会生成任何内容——请选择规则、变量目标或条件以预览结果。"
     },
     "siem": {
       "title": "SIEM集成",
@@ -1567,19 +1577,19 @@
       "versionName": "此规则时间点副本的标签。",
       "exName": "此例外的显示名称。",
       "exWafRule": "此例外适用的规则，或对所有规则全局生效。",
-      "exRuleId": "规则集中要匹配的数字规则ID。",
-      "exRuleTag": "要匹配的规则标签。",
-      "exRuleMsg": "要匹配的规则消息文本。",
-      "exExceptionAction": "对匹配的规则或变量执行的操作。",
+      "exRuleId": "要匹配的规则 ID——输入以搜索已触发的规则或已安装规则集中的规则。允许多个 ID。",
+      "exRuleTag": "要匹配的规则标签，例如 attack-sqli。允许多个标签。",
+      "exRuleMsg": "要匹配的规则消息文本（子串匹配）。允许多条消息。",
+      "exExceptionAction": "对匹配规则执行的操作：“remove”禁用规则，“allow”排除特定请求变量，“comment”带备注禁用，“update”更改其动作/目标。",
       "exUpdateAction": "选择update时分配给规则的新操作。",
       "exUpdateTarget": "要更新的变量或集合。",
-      "exZone": "要检查的请求集合/区域，例如ARGS、HEADERS。",
-      "exVariable": "区域内的特定变量。",
-      "exMatcher": "如何将变量与值进行比较。",
-      "exValue": "变量必须匹配的值。",
-      "exConditionVariable": "可选额外条件中使用的变量。",
-      "exConditionOperator": "额外条件的运算符。",
-      "exConditionValue": "额外条件的值。",
+      "exZone": "要从检查中排除的请求集合，例如 ARGS 或 REQUEST_HEADERS。允许多个区域。",
+      "exVariable": "区域内的变量名——例如 ARGS:password 中的“password”。留空则排除整个区域。",
+      "exMatcher": "可选——仅当变量内容匹配时才排除。留空则始终排除。",
+      "exValue": "变量必须匹配的内容，排除才会生效。",
+      "exConditionVariable": "可选——仅当此请求变量匹配时才应用例外，例如 REQUEST_URI 或 REQUEST_HEADERS:Host。",
+      "exConditionOperator": "如何将条件变量与值进行比较。",
+      "exConditionValue": "条件变量必须匹配的值，例如 /api/ 或 IP 地址。",
       "exDescription": "关于此例外的人类可读备注。",
       "siemName": "此集成的显示名称。",
       "siemIntegrationType": "交付机制：webhook、syslog或Elastic。",
@@ -1635,7 +1645,8 @@
     },
     "noWafEvents": "未捕获WAF事件。",
     "noEventsMatchFilter": "没有事件匹配过滤器。",
-    "failedToLoadWafLogs": "加载WAF日志失败。"
+    "failedToLoadWafLogs": "加载WAF日志失败。",
+    "createException": "创建例外"
   },
   "ciphers": {
     "title": "密码套件",
@@ -3162,5 +3173,10 @@
     "swarmMode": "Swarm模式",
     "swarmVip": "Swarm VIP",
     "swarmModeHint": "Swarm模式下不使用keepalived — Swarm ingress网格提供VIP和故障转移。"
+  },
+  "multiValue": {
+    "loading": "加载中…",
+    "addValue": "添加“{{value}}”",
+    "noOptions": "无建议"
   }
 }

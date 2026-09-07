@@ -1396,9 +1396,6 @@
       "addException": "Aggiungi Eccezione",
       "tableHeaders": {
         "name": "Nome",
-        "ruleId": "ID Regola",
-        "tag": "Tag",
-        "msg": "Messaggio",
         "action": "Azione",
         "updated": "Aggiornata",
         "actions": "Azioni"
@@ -1427,8 +1424,21 @@
         "conditionOperator": "Operatore Condizione",
         "conditionValue": "Valore Condizione",
         "description": "Descrizione",
-        "save": "Salva"
-      }
+        "save": "Salva",
+        "hits": "{{count}} occorrenze",
+        "ruleMsgPlaceholder": "es. SQL Injection Attack",
+        "matcherNone": "Sempre (nessuna corrispondenza di contenuto)"
+      },
+      "sections": {
+        "selection": "Selezione delle regole",
+        "selectionHint": "Scegli a quali regole si applica questa eccezione — per ID, tag o messaggio. Digita per cercare suggerimenti; sono consentiti più valori.",
+        "exclusion": "Esclusione di variabili",
+        "exclusionHint": "Per l'azione «Consenti variabile»: le variabili della richiesta che le regole selezionate devono smettere di ispezionare (es. ARGS:password). «Matcher» + «Valore» limitano l'esclusione ai contenuti corrispondenti.",
+        "condition": "Applica solo quando la richiesta corrisponde",
+        "conditionHint": "Opzionale. Limita l'eccezione alle richieste in cui questa variabile corrisponde (es. REQUEST_URI inizia con /api/).",
+        "preview": "Direttive generate"
+      },
+      "previewEmpty": "Non verrà ancora generato nulla — seleziona regole, una variabile di destinazione o una condizione per vedere l'anteprima."
     },
     "siem": {
       "title": "Integrazioni SIEM",
@@ -1567,19 +1577,19 @@
       "versionName": "Etichetta per questa copia point-in-time della regola.",
       "exName": "Nome visualizzato per questa eccezione.",
       "exWafRule": "Regola a cui si applica questa eccezione, o globale per tutte le regole.",
-      "exRuleId": "ID regola numerico dal set di regole da corrispondere.",
-      "exRuleTag": "Tag della regola da corrispondere.",
-      "exRuleMsg": "Testo del messaggio della regola da corrispondere.",
-      "exExceptionAction": "Cosa fare con la regola o variabile corrispondente.",
+      "exRuleId": "ID regola da corrispondere — digita per cercare le regole attivate o del set installato. Più ID consentiti.",
+      "exRuleTag": "Tag di regola da corrispondere, es. attack-sqli. Più tag consentiti.",
+      "exRuleMsg": "Testo del messaggio di regola da corrispondere (sottostringa). Più messaggi consentiti.",
+      "exExceptionAction": "Cosa fare con le regole corrispondenti: «remove» le disattiva, «allow» esclude variabili di richiesta specifiche, «comment» disattiva con nota, «update» ne modifica azione/destinazione.",
       "exUpdateAction": "Nuova azione da assegnare a una regola quando è selezionato update.",
       "exUpdateTarget": "Variabile o collezione da aggiornare.",
-      "exZone": "Collezione/zona della richiesta da ispezionare, es. ARGS, HEADERS.",
-      "exVariable": "Variabile specifica all'interno della zona.",
-      "exMatcher": "Come comparare la variabile al valore.",
-      "exValue": "Valore che la variabile deve corrispondere.",
-      "exConditionVariable": "Variabile utilizzata in una condizione aggiuntiva opzionale.",
-      "exConditionOperator": "Operatore per la condizione aggiuntiva.",
-      "exConditionValue": "Valore per la condizione aggiuntiva.",
+      "exZone": "Collezione/i di richiesta da escludere dall'ispezione, es. ARGS o REQUEST_HEADERS. Più zone consentite.",
+      "exVariable": "Il nome della variabile nella zona — es. «password» per ARGS:password. Lascia vuoto per escludere l'intera zona.",
+      "exMatcher": "Opzionale — escludi la variabile solo quando il suo contenuto corrisponde. Lascia vuoto per escluderla sempre.",
+      "exValue": "Il contenuto che la variabile deve corrispondere per l'esclusione.",
+      "exConditionVariable": "Opzionale — applica l'eccezione solo quando questa variabile di richiesta corrisponde, es. REQUEST_URI o REQUEST_HEADERS:Host.",
+      "exConditionOperator": "Come confrontare la variabile di condizione con il valore.",
+      "exConditionValue": "Il valore che la variabile di condizione deve corrispondere, es. /api/ o un indirizzo IP.",
       "exDescription": "Nota leggibile dall'utente su questa eccezione.",
       "siemName": "Nome visualizzato per questa integrazione.",
       "siemIntegrationType": "Meccanismo di consegna: webhook, syslog, o Elastic.",
@@ -1635,7 +1645,8 @@
     },
     "noWafEvents": "Nessun evento WAF acquisito.",
     "noEventsMatchFilter": "Nessun evento corrisponde al filtro.",
-    "failedToLoadWafLogs": "Caricamento log WAF fallito."
+    "failedToLoadWafLogs": "Caricamento log WAF fallito.",
+    "createException": "Crea eccezione"
   },
   "ciphers": {
     "title": "Cipher Suite",
@@ -3162,5 +3173,10 @@
     "swarmMode": "Modalità Swarm",
     "swarmVip": "Swarm VIP",
     "swarmModeHint": "Keepalived non viene utilizzato in modalità Swarm — la mesh ingress di Swarm fornisce VIP e failover."
+  },
+  "multiValue": {
+    "loading": "Caricamento…",
+    "addValue": "Aggiungi \"{{value}}\"",
+    "noOptions": "Nessun suggerimento"
   }
 }

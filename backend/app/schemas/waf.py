@@ -132,6 +132,42 @@ class WafExceptionResponse(WafExceptionBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class WafExceptionPreviewRequest(WafExceptionBase):
+    name: str = ""
+
+
+class WafExceptionPreviewResponse(BaseModel):
+    conditional: List[str]
+    unconditional: List[str]
+
+
+class WafExceptionRuleOption(BaseModel):
+    id: str
+    msg: Optional[str] = None
+    tags: List[str] = []
+    hits: int = 0
+
+
+class WafExceptionMsgOption(BaseModel):
+    msg: str
+    rule_id: Optional[str] = None
+    hits: int = 0
+
+
+class WafExceptionVariableOption(BaseModel):
+    zone: str
+    key: str = ""
+
+
+class WafExceptionOptionsResponse(BaseModel):
+    rules: List[WafExceptionRuleOption]
+    tags: List[str]
+    msgs: List[WafExceptionMsgOption]
+    zones: List[str]
+    variables: List[WafExceptionVariableOption]
+    condition_variables: List[str]
+
+
 class WafSiemIntegrationBase(BaseModel):
     name: str
     integration_type: str = Field(default="webhook", pattern="^(webhook|syslog|elastic)$")
@@ -177,4 +213,4 @@ class WafRuleVersionResponse(WafRuleVersionBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-__all__ = ['WafExceptionBase', 'WafExceptionCreate', 'WafExceptionResponse', 'WafExceptionUpdate', 'WafRuleBase', 'WafRuleCreate', 'WafRuleResponse', 'WafRuleUpdate', 'WafRuleVersionBase', 'WafRuleVersionCreate', 'WafRuleVersionResponse', 'WafRuleVersionUpdate', 'WafSiemIntegrationBase', 'WafSiemIntegrationCreate', 'WafSiemIntegrationResponse', 'WafSiemIntegrationUpdate']
+__all__ = ['WafExceptionBase', 'WafExceptionCreate', 'WafExceptionMsgOption', 'WafExceptionOptionsResponse', 'WafExceptionPreviewRequest', 'WafExceptionPreviewResponse', 'WafExceptionResponse', 'WafExceptionRuleOption', 'WafExceptionUpdate', 'WafExceptionVariableOption', 'WafRuleBase', 'WafRuleCreate', 'WafRuleResponse', 'WafRuleUpdate', 'WafRuleVersionBase', 'WafRuleVersionCreate', 'WafRuleVersionResponse', 'WafRuleVersionUpdate', 'WafSiemIntegrationBase', 'WafSiemIntegrationCreate', 'WafSiemIntegrationResponse', 'WafSiemIntegrationUpdate']

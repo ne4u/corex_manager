@@ -1396,9 +1396,6 @@
       "addException": "例外を追加",
       "tableHeaders": {
         "name": "名前",
-        "ruleId": "ルールID",
-        "tag": "タグ",
-        "msg": "メッセージ",
         "action": "アクション",
         "updated": "更新日",
         "actions": "アクション"
@@ -1427,8 +1424,21 @@
         "conditionOperator": "条件演算子",
         "conditionValue": "条件値",
         "description": "説明",
-        "save": "保存"
-      }
+        "save": "保存",
+        "hits": "{{count}} 件",
+        "ruleMsgPlaceholder": "例: SQL Injection Attack",
+        "matcherNone": "常に（内容一致なし）"
+      },
+      "sections": {
+        "selection": "ルール選択",
+        "selectionHint": "この例外を適用するルールを ID・タグ・メッセージで選択します。入力すると候補が表示されます。複数値を指定できます。",
+        "exclusion": "変数の除外",
+        "exclusionHint": "「変数を許可」アクション用：選択したルールが検査をやめるリクエスト変数（例: ARGS:password）。「マッチャー」+「値」で除外を一致する内容に限定できます。",
+        "condition": "リクエストが一致する場合のみ適用",
+        "conditionHint": "任意。この変数が一致するリクエストに例外を限定します（例: REQUEST_URI が /api/ で始まる）。",
+        "preview": "生成されるディレクティブ"
+      },
+      "previewEmpty": "まだ何も生成されません — ルール、変数ターゲット、条件を選択するとプレビューが表示されます。"
     },
     "siem": {
       "title": "SIEM統合",
@@ -1567,19 +1577,19 @@
       "versionName": "ルールのこのポイントインタイムコピーのラベル。",
       "exName": "この例外の表示名。",
       "exWafRule": "この例外が適用されるルール、またはすべてのルールにグローバル。",
-      "exRuleId": "一致するルールセットからの数値ルールID。",
-      "exRuleTag": "一致するルールタグ。",
-      "exRuleMsg": "一致するルールメッセージテキスト。",
-      "exExceptionAction": "一致したルールまたは変数に対する処理。",
+      "exRuleId": "一致させるルール ID — 入力すると発火したルールやインストール済みルールを検索できます。複数 ID 可。",
+      "exRuleTag": "一致させるルールタグ（例: attack-sqli）。複数タグ可。",
+      "exRuleMsg": "一致させるルールメッセージ（部分一致）。複数可。",
+      "exExceptionAction": "一致したルールへの操作: 「remove」は無効化、「allow」は特定のリクエスト変数を除外、「comment」は注記付きで無効化、「update」はアクション/ターゲットを変更。",
       "exUpdateAction": "updateが選択された場合にルールに割り当てる新しいアクション。",
       "exUpdateTarget": "更新する変数またはコレクション。",
-      "exZone": "検査するリクエストコレクション/ゾーン、例: ARGS、HEADERS。",
-      "exVariable": "ゾーン内の特定の変数。",
-      "exMatcher": "変数と値を比較する方法。",
-      "exValue": "変数が一致する必要がある値。",
-      "exConditionVariable": "オプションの追加条件で使用される変数。",
-      "exConditionOperator": "追加条件の演算子。",
-      "exConditionValue": "追加条件の値。",
+      "exZone": "検査から除外するリクエストコレクション（例: ARGS、REQUEST_HEADERS）。複数ゾーン可。",
+      "exVariable": "ゾーン内の変数名 — 例: ARGS:password の「password」。空欄でゾーン全体を除外。",
+      "exMatcher": "任意 — 変数の内容が一致する場合のみ除外。空欄で常に除外。",
+      "exValue": "除外が適用されるために変数が一致すべき内容。",
+      "exConditionVariable": "任意 — このリクエスト変数が一致する場合のみ例外を適用（例: REQUEST_URI、REQUEST_HEADERS:Host）。",
+      "exConditionOperator": "条件変数と値の比較方法。",
+      "exConditionValue": "条件変数が一致すべき値（例: /api/ や IP アドレス）。",
       "exDescription": "この例外に関する人間が読めるメモ。",
       "siemName": "この統合の表示名。",
       "siemIntegrationType": "配信メカニズム: webhook、syslog、またはElastic。",
@@ -1635,7 +1645,8 @@
     },
     "noWafEvents": "WAFイベントがキャプチャされていません。",
     "noEventsMatchFilter": "フィルタに一致するイベントがありません。",
-    "failedToLoadWafLogs": "WAFログの読み込みに失敗しました。"
+    "failedToLoadWafLogs": "WAFログの読み込みに失敗しました。",
+    "createException": "例外を作成"
   },
   "ciphers": {
     "title": "暗号スイート",
@@ -3162,5 +3173,10 @@
     "swarmMode": "Swarmモード",
     "swarmVip": "Swarm VIP",
     "swarmModeHint": "Swarmモードではkeepalivedは使用されません — Swarm ingressメッシュがVIPとフェイルオーバーを提供します。"
+  },
+  "multiValue": {
+    "loading": "読み込み中…",
+    "addValue": "「{{value}}」を追加",
+    "noOptions": "候補なし"
   }
 }

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { waf, geoip } from '../services/api'
 import { decodeUniqueId } from '../lib/uniqueId'
 import { computePopoverPosition } from '../lib/popover'
-import { ChevronRight, Search } from 'lucide-react'
+import { Ban, ChevronRight, Search } from 'lucide-react'
 import { useDateTime } from '../contexts/DateTimeContext'
 
 interface WafLogEvent {
@@ -23,7 +23,12 @@ interface WafLogEvent {
   raw?: string
 }
 
-export default function WafLogs() {
+interface WafLogsProps {
+  /** When provided, expanded rows get a "Create exception" shortcut. */
+  onCreateException?: (row: WafLogEvent) => void
+}
+
+export default function WafLogs({ onCreateException }: WafLogsProps = {}) {
   const { t } = useTranslation(['pages', 'common'])
   const { formatLogTimestamp } = useDateTime()
   const [events, setEvents] = useState<WafLogEvent[]>([])
@@ -256,6 +261,17 @@ export default function WafLogs() {
                           <div className="mt-3">
                             <span className="text-slate-400 text-xs">{t('pages:wafLogs.expandedFields.rawLogLine')}</span>
                             <pre className="text-xs mt-1 bg-slate-950 p-2 rounded overflow-auto max-h-40 break-all whitespace-pre-wrap">{row.raw}</pre>
+                          </div>
+                        )}
+                        {onCreateException && (row.rule_id || row.id) && (
+                          <div className="mt-3">
+                            <button
+                              type="button"
+                              className="btn-secondary"
+                              onClick={(e) => { e.stopPropagation(); onCreateException(row) }}
+                            >
+                              <Ban className="w-4 h-4 inline me-1" /> {t('pages:wafLogs.createException')}
+                            </button>
                           </div>
                         )}
                       </td>

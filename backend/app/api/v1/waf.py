@@ -95,6 +95,23 @@ def delete_waf_exception(eid: int, db: Session = Depends(get_db), user=Depends(r
     return {"status": "ok"}
 
 
+@router.get("/waf/exception-options", response_model=WafExceptionOptionsResponse)
+def get_waf_exception_options(db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
+    """Merged suggestion catalog (rule ids/tags/msgs/zones/variables) used to
+    populate the exception editor's type-ahead fields."""
+    from ...services.waf_exception_options import get_exception_options
+    return get_exception_options(db)
+
+
+@router.post("/waf/exceptions/preview", response_model=WafExceptionPreviewResponse)
+def preview_waf_exception(e: WafExceptionPreviewRequest, user=Depends(get_current_user), _=Depends(rate_limit)):
+    """Render the Coraza directives an exception would generate, without saving."""
+    from ...services.coraza_config import _exception_lines
+    obj = WafException(**e.model_dump())
+    conditional, unconditional = _exception_lines([obj])
+    return {"conditional": conditional, "unconditional": unconditional}
+
+
 @router.get("/waf/captcha", response_class=HTMLResponse)
 def get_captcha_challenge(
     request: Request,

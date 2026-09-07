@@ -1396,9 +1396,6 @@
       "addException": "Ausnahme hinzufügen",
       "tableHeaders": {
         "name": "Name",
-        "ruleId": "Regel-ID",
-        "tag": "Tag",
-        "msg": "Meldung",
         "action": "Aktion",
         "updated": "Aktualisiert",
         "actions": "Aktionen"
@@ -1427,8 +1424,21 @@
         "conditionOperator": "Bedingungs-Operator",
         "conditionValue": "Bedingungs-Wert",
         "description": "Beschreibung",
-        "save": "Speichern"
-      }
+        "save": "Speichern",
+        "hits": "{{count}} Treffer",
+        "ruleMsgPlaceholder": "z. B. SQL Injection Attack",
+        "matcherNone": "Immer (kein Inhaltsabgleich)"
+      },
+      "sections": {
+        "selection": "Regelauswahl",
+        "selectionHint": "Wählen Sie, auf welche Regeln sich diese Ausnahme bezieht — nach Regel-ID, Tag oder Meldung. Tippen Sie, um Vorschläge zu suchen; mehrere Werte sind möglich.",
+        "exclusion": "Variablen-Ausschluss",
+        "exclusionHint": "Für die Aktion „Variable erlauben“: die Anfragevariablen, die die ausgewählten Regeln nicht mehr prüfen sollen (z. B. ARGS:password). „Matcher“ + „Wert“ schränken den Ausschluss auf passende Inhalte ein.",
+        "condition": "Nur anwenden, wenn die Anfrage übereinstimmt",
+        "conditionHint": "Optional. Beschränkt die Ausnahme auf Anfragen, bei denen diese Variable übereinstimmt (z. B. REQUEST_URI beginnt mit /api/).",
+        "preview": "Generierte Direktiven"
+      },
+      "previewEmpty": "Es wird noch nichts generiert — wählen Sie Regeln, ein Variablenziel oder eine Bedingung, um eine Vorschau zu sehen."
     },
     "siem": {
       "title": "SIEM-Integrationen",
@@ -1567,19 +1577,19 @@
       "versionName": "Bezeichnung für diese zeitpunktbezogene Kopie der Regel.",
       "exName": "Anzeigename für diese Ausnahme.",
       "exWafRule": "Regel, auf die diese Ausnahme angewendet wird, oder global für alle Regeln.",
-      "exRuleId": "Numerische Regel-ID aus dem Rule-Set zum Abgleichen.",
-      "exRuleTag": "Regel-Tag zum Abgleichen.",
-      "exRuleMsg": "Regel-Meldungstext zum Abgleichen.",
-      "exExceptionAction": "Was mit der übereinstimmenden Regel oder Variable geschehen soll.",
+      "exRuleId": "Zu treffende Regel-ID(s) — tippen Sie, um ausgelöste oder installierte Regeln zu suchen. Mehrere IDs möglich.",
+      "exRuleTag": "Zu treffende(r) Regel-Tag(s), z. B. attack-sqli. Mehrere Tags möglich.",
+      "exRuleMsg": "Zu treffender Regelmeldungstext (Teilstring). Mehrere Meldungen möglich.",
+      "exExceptionAction": "Was mit den getroffenen Regeln geschehen soll: „remove“ deaktiviert sie, „allow“ schließt bestimmte Anfragevariablen aus, „comment“ deaktiviert mit Notiz, „update“ ändert Aktion/Ziel.",
       "exUpdateAction": "Neue Aktion, die einer Regel zugewiesen wird, wenn update ausgewählt ist.",
       "exUpdateTarget": "Variable oder Collection, die aktualisiert werden soll.",
-      "exZone": "Anfrage-Collection/Zone zum Inspezieren, z.B. ARGS, HEADERS.",
-      "exVariable": "Spezifische Variable innerhalb der Zone.",
-      "exMatcher": "Wie die Variable mit dem Wert verglichen wird.",
-      "exValue": "Wert, dem die Variable entsprechen muss.",
-      "exConditionVariable": "Variable, die in einer optionalen zusätzlichen Bedingung verwendet wird.",
-      "exConditionOperator": "Operator für die zusätzliche Bedingung.",
-      "exConditionValue": "Wert für die zusätzliche Bedingung.",
+      "exZone": "Auszuschließende Anfrage-Collection(s), z. B. ARGS oder REQUEST_HEADERS. Mehrere Zonen möglich.",
+      "exVariable": "Der Variablenname innerhalb der Zone — z. B. „password“ für ARGS:password. Leer lassen, um die ganze Zone auszuschließen.",
+      "exMatcher": "Optional — die Variable nur ausschließen, wenn ihr Inhalt übereinstimmt. Leer lassen, um sie immer auszuschließen.",
+      "exValue": "Der Inhalt, den die Variable für den Ausschluss erfüllen muss.",
+      "exConditionVariable": "Optional — die Ausnahme nur anwenden, wenn diese Anfragevariable übereinstimmt, z. B. REQUEST_URI oder REQUEST_HEADERS:Host.",
+      "exConditionOperator": "Wie die Bedingungsvariable mit dem Wert verglichen wird.",
+      "exConditionValue": "Der Wert, den die Bedingungsvariable erfüllen muss, z. B. /api/ oder eine IP-Adresse.",
       "exDescription": "Lesbare Notiz zu dieser Ausnahme.",
       "siemName": "Anzeigename für diese Integration.",
       "siemIntegrationType": "Zustellmechanismus: Webhook, Syslog oder Elastic.",
@@ -1635,7 +1645,8 @@
     },
     "noWafEvents": "Keine WAF-Ereignisse erfasst.",
     "noEventsMatchFilter": "Keine Ereignisse entsprechen dem Filter.",
-    "failedToLoadWafLogs": "WAF-Logs konnten nicht geladen werden."
+    "failedToLoadWafLogs": "WAF-Logs konnten nicht geladen werden.",
+    "createException": "Ausnahme erstellen"
   },
   "ciphers": {
     "title": "Cipher-Suiten",
@@ -3162,5 +3173,10 @@
     "swarmMode": "Swarm-Modus",
     "swarmVip": "Swarm VIP",
     "swarmModeHint": "Keepalived wird im Swarm-Modus nicht verwendet — das Swarm-Ingress-Mesh bietet VIP und Failover."
+  },
+  "multiValue": {
+    "loading": "Laden…",
+    "addValue": "„{{value}}“ hinzufügen",
+    "noOptions": "Keine Vorschläge"
   }
 }

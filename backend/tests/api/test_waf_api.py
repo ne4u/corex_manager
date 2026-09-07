@@ -664,3 +664,65 @@ def test_crs_set_pinned_version_empty(client, db):
     assert res.status_code == 200
     res2 = client.get("/api/v1/waf/crs/status")
     assert res2.json()["pinned_version"] is None or res2.json()["pinned_version"] == ""
+
+
+def test_waf_exception_options(client, db, monkeypatch):
+    """GET /waf/exception-options returns the merged suggestion catalog."""
+    # Bypass the Valkey-backed @cache wrapper so a running local Valkey can't
+    # serve stale results across test runs.
+    from app.services import waf_exception_options
+    monkeypatch.setattr(
+        waf_exception_options, "get_exception_options", waf_exception_options.get_exception_options.__wrapped__
+    )
+    make_waf_exception(db, rule_id="942100", zone="ARGS", variable="q")
+    res = client.get("/api/v1/waf/exception-options")
+    assert res.status_code == 200
+    data = res.json()
+    assert "ARGS" in data["zones"]
+    assert "REQUEST_URI" in data["condition_variables"]
+    assert any(r["id"] == "942100" for r in data["rules"])
+    assert any(v == {"zone": "ARGS", "key": "q"} for v in data["variables"])
+
+
+def test_waf_exception_preview_remove(client):
+    """POST /waf/exceptions/preview renders unconditional directives."""
+    res = client.post(
+        "/api/v1/waf/exceptions/preview",
+        json={"name": "ex", "rule_id": "942100,942200", "action": "remove"},
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert "SecRuleRemoveById 942100" in data["unconditional"]
+    assert "SecRuleRemoveById 942200" in data["unconditional"]
+    assert data["conditional"] == []
+
+
+def test_waf_exception_preview_conditional(client):
+    """Preview renders a conditional ctl: rule for a scoped exception."""
+    res = client.post(
+        "/api/v1/waf/exceptions/preview",
+        json={
+            "name": "ex",
+            "rule_id": "942100",
+            "action": "remove",
+            "condition_variable": "REQUEST_URI",
+            "condition_operator": "contains",
+            "condition_value": "/api/",
+        },
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert any("ctl:ruleRemoveById=942100" in line for line in data["conditional"])
+    assert any('REQUEST_URI "@contains /api/"' in line for line in data["conditional"])
+    assert data["unconditional"] == []
+
+
+def test_waf_exception_preview_does_not_persist(client, db):
+    """Preview must not write a WafException row."""
+    res = client.post(
+        "/api/v1/waf/exceptions/preview",
+        json={"name": "ghost", "rule_id": "942100", "action": "remove"},
+    )
+    assert res.status_code == 200
+    from app.models.models import WafException
+    assert db.query(WafException).filter(WafException.name == "ghost").count() == 0

@@ -1,4 +1,5 @@
 import os
+import re
 from typing import List, Optional
 
 from sqlalchemy.orm import Session
@@ -76,36 +77,89 @@ def _coraza_op(op: Optional[str]) -> str:
     return _OP_MAP.get(_safe_token(op), "@streq")
 
 
-def _exception_ctl_action(action: str, rule_id: str, rule_tag: str, rule_msg: str, target: str) -> Optional[str]:
-    """Build the ctl: action string for a conditional exception."""
+def _split_multi(value: Optional[str]) -> List[str]:
+    """Split a multi-value exception field into clean, de-duplicated tokens.
+
+    The UI stores multi-select values as comma-separated strings, but values
+    saved before that UI existed may be whitespace-separated. Split on both.
+    """
+    tok = _safe_token(value)
+    if not tok:
+        return []
+    out: List[str] = []
+    seen = set()
+    for part in re.split(r"[,\s]+", tok):
+        part = part.strip()
+        if part and part not in seen:
+            seen.add(part)
+            out.append(part)
+    return out
+
+
+def _split_msgs(value: Optional[str]) -> List[str]:
+    """Split a multi-message field on commas only.
+
+    Rule messages legitimately contain spaces ("Path Traversal Attack"), so
+    unlike _split_multi only commas are treated as separators.
+    """
+    tok = _safe_token(value)
+    if not tok:
+        return []
+    out: List[str] = []
+    seen = set()
+    for part in tok.split(","):
+        part = part.strip()
+        if part and part not in seen:
+            seen.add(part)
+            out.append(part)
+    return out
+
+
+def _exception_targets(zone: Optional[str], variable: Optional[str]) -> List[str]:
+    """Build exclusion target list ("ZONE:variable") from multi-zone + variable."""
+    zones = _split_multi(zone)
+    var = _safe_token(variable)
+    if zones:
+        return [f"{z}:{var}" if var else z for z in zones]
+    return [var] if var else []
+
+
+def _exception_ctl_actions(
+    action: str,
+    rule_ids: List[str],
+    rule_tags: List[str],
+    rule_msgs: List[str],
+    targets: List[str],
+) -> List[str]:
+    """Build the ctl: action strings for a conditional exception.
+
+    Returns one ctl action per selector value (and per target for target
+    exclusions), so a multi-value exception removes/excludes every selected
+    rule and zone.
+    """
+    selectors = (
+        [("Id", v) for v in rule_ids]
+        + [("Tag", v) for v in rule_tags]
+        + [("Msg", v) for v in rule_msgs]
+    )
     if action == "remove":
-        if rule_id:
-            return f"ctl:ruleRemoveById={rule_id}"
-        if rule_tag:
-            return f"ctl:ruleRemoveByTag={rule_tag}"
-        if rule_msg:
-            return f"ctl:ruleRemoveByMsg={rule_msg}"
+        if selectors:
+            return [f"ctl:ruleRemoveBy{k}={v}" for k, v in selectors]
         # No specific rule target: disable the entire rule engine for the
         # remainder of this transaction. This is the "bypass all rules" case
         # (e.g. skip the WAF entirely when REQUEST_URI contains a given path).
         # Without this, a "remove" exception with no rule_id/tag/msg was
         # silently dropped and never reached the generated config.
-        return "ctl:ruleEngine=Off"
-    elif action == "allow" and target:
-        if rule_id:
-            return f"ctl:ruleRemoveTargetById={rule_id};{target}"
-        if rule_tag:
-            return f"ctl:ruleRemoveTargetByTag={rule_tag};{target}"
-        if rule_msg:
-            return f"ctl:ruleRemoveTargetByMsg={rule_msg};{target}"
+        return ["ctl:ruleEngine=Off"]
+    elif action == "allow" and targets:
+        return [
+            f"ctl:ruleRemoveTargetBy{k}={v};{t}"
+            for k, v in selectors
+            for t in targets
+        ]
     elif action == "comment":
-        if rule_id:
-            return f"ctl:ruleRemoveById={rule_id}"
-        if rule_tag:
-            return f"ctl:ruleRemoveByTag={rule_tag}"
-        if rule_msg:
-            return f"ctl:ruleRemoveByMsg={rule_msg}"
-    return None
+        return [f"ctl:ruleRemoveBy{k}={v}" for k, v in selectors]
+    return []
 
 
 def _exception_lines(exceptions: List[WafException]) -> tuple[List[str], List[str]]:
@@ -131,10 +185,11 @@ def _exception_lines(exceptions: List[WafException]) -> tuple[List[str], List[st
 
     for ex in exceptions:
         action = _safe_token(ex.action) or "remove"
-        rule_id = _safe_token(ex.rule_id)
-        rule_tag = _safe_token(ex.rule_tag)
-        rule_msg = _safe_token(ex.rule_msg)
-        zone = _safe_token(ex.zone)
+        # rule_id/rule_tag/zone may hold comma- or space-separated lists;
+        # rule_msg only splits on commas (messages legitimately contain spaces).
+        rule_ids = _split_multi(ex.rule_id)
+        rule_tags = _split_multi(ex.rule_tag)
+        rule_msgs = _split_msgs(ex.rule_msg)
         variable = _safe_token(ex.variable)
         update_action = _safe_token(ex.update_action)
         update_target = _safe_token(ex.update_target)
@@ -143,82 +198,98 @@ def _exception_lines(exceptions: List[WafException]) -> tuple[List[str], List[st
         cond_var = _safe_token(ex.condition_variable)
         cond_op = _safe_token(ex.condition_operator)
         cond_val = _safe_token(ex.condition_value)
+        first_selector = (rule_ids or rule_tags or rule_msgs or [""])[0]
 
-        target = f"{zone}:{variable}" if zone and variable else (variable or zone)
+        targets = _exception_targets(ex.zone, variable)
         has_condition = bool(cond_var and cond_val)
-        has_matcher = bool(matcher and value and target and action == "allow")
+        has_matcher = bool(matcher and value and targets and action == "allow")
+
+        # Each emitted conditional SecRule gets its own rule id, spaced per
+        # exception so multi-value expansions can't collide with the next
+        # exception's ids. ex.id is None for unsaved (preview) exceptions.
+        id_base = 990200 + (ex.id or 0) * 100
+        id_seq = 0
 
         # --- Conditional exceptions (condition_variable + condition_value) ---
         # Use ctl:ruleRemoveById / ctl:ruleRemoveTargetById as SecRule actions
         # so the exception only applies when the condition matches.
         if has_condition:
-            ctl = _exception_ctl_action(action, rule_id, rule_tag, rule_msg, target)
-            if ctl is None:
-                continue
             cond_operator = _coraza_op(cond_op)
             cond_pattern = _escape_pattern(cond_val)
-            ex_id = 990200 + ex.id
             if has_matcher:
-                # Chain condition + matcher: only exclude when both match
+                # Chain condition + matcher: only exclude when both match.
+                # Emit one chained pair per target so each selected zone is
+                # checked against the matcher independently.
                 matcher_op = _coraza_op(matcher)
                 matcher_pattern = _escape_pattern(value)
-                conditional.append(
-                    f'SecRule {cond_var} "{cond_operator} {cond_pattern}" '
-                    f'"id:{ex_id},phase:1,pass,nolog,chain"'
-                )
-                conditional.append(
-                    f'    SecRule {target} "{matcher_op} {matcher_pattern}" "{ctl}"'
-                )
+                for target in targets:
+                    for ctl in _exception_ctl_actions("allow", rule_ids, rule_tags, rule_msgs, [target]):
+                        ex_id = id_base + id_seq
+                        id_seq += 1
+                        conditional.append(
+                            f'SecRule {cond_var} "{cond_operator} {cond_pattern}" '
+                            f'"id:{ex_id},phase:1,pass,nolog,chain"'
+                        )
+                        conditional.append(
+                            f'    SecRule {target} "{matcher_op} {matcher_pattern}" "{ctl}"'
+                        )
             else:
-                conditional.append(
-                    f'SecRule {cond_var} "{cond_operator} {cond_pattern}" '
-                    f'"id:{ex_id},phase:1,pass,nolog,{ctl}"'
-                )
+                for ctl in _exception_ctl_actions(action, rule_ids, rule_tags, rule_msgs, targets):
+                    ex_id = id_base + id_seq
+                    id_seq += 1
+                    conditional.append(
+                        f'SecRule {cond_var} "{cond_operator} {cond_pattern}" '
+                        f'"id:{ex_id},phase:1,pass,nolog,{ctl}"'
+                    )
             if action == "comment":
-                conditional.append(f"# Exception '{_safe_token(ex.name)}': conditional {action} for {rule_id or rule_tag or rule_msg}")
+                conditional.append(f"# Exception '{_safe_token(ex.name)}': conditional {action} for {first_selector}")
             continue
 
         # --- Matcher-only exceptions (matcher + value, no condition) ---
         # Exclude a variable from a rule only when the variable content matches.
-        if has_matcher and not has_condition:
+        if has_matcher:
             matcher_op = _coraza_op(matcher)
             matcher_pattern = _escape_pattern(value)
-            ex_id = 990200 + ex.id
-            ctl = _exception_ctl_action("allow", rule_id, rule_tag, rule_msg, target)
-            if ctl:
-                conditional.append(
-                    f'SecRule {target} "{matcher_op} {matcher_pattern}" '
-                    f'"id:{ex_id},phase:1,pass,nolog,{ctl}"'
-                )
+            for target in targets:
+                for ctl in _exception_ctl_actions("allow", rule_ids, rule_tags, rule_msgs, [target]):
+                    ex_id = id_base + id_seq
+                    id_seq += 1
+                    conditional.append(
+                        f'SecRule {target} "{matcher_op} {matcher_pattern}" '
+                        f'"id:{ex_id},phase:1,pass,nolog,{ctl}"'
+                    )
             continue
 
         # --- Unconditional exceptions (no condition, no matcher) ---
-        if rule_id:
+        for rule_id in rule_ids:
             if action == "remove":
                 unconditional.append(f"SecRuleRemoveById {rule_id}")
             elif action == "comment":
                 unconditional.append(f"# Exception '{_safe_token(ex.name)}': disabled rule {rule_id}")
                 unconditional.append(f"SecRuleRemoveById {rule_id}")
-            elif action == "allow" and (variable or zone):
-                unconditional.append(f"SecRuleUpdateTargetById {rule_id} !{target}")
+            elif action == "allow" and targets:
+                for target in targets:
+                    unconditional.append(f"SecRuleUpdateTargetById {rule_id} !{target}")
             elif action == "update" and update_target and update_action:
                 unconditional.append(f"SecRuleUpdateActionById {rule_id} \"{update_action}\"")
                 unconditional.append(f"SecRuleUpdateTargetById {rule_id} !{update_target}")
 
-        if rule_tag:
+        for rule_tag in rule_tags:
             if action == "remove":
                 unconditional.append(f"SecRuleRemoveByTag {rule_tag}")
-            elif action == "allow" and (variable or zone):
-                unconditional.append(f"SecRuleUpdateTargetByTag {rule_tag} !{target}")
+            elif action == "allow" and targets:
+                for target in targets:
+                    unconditional.append(f"SecRuleUpdateTargetByTag {rule_tag} !{target}")
             elif action == "update" and update_target and update_action:
                 unconditional.append(f"SecRuleUpdateActionByTag {rule_tag} \"{update_action}\"")
                 unconditional.append(f"SecRuleUpdateTargetByTag {rule_tag} !{update_target}")
 
-        if rule_msg:
+        for rule_msg in rule_msgs:
             if action == "remove":
                 unconditional.append(f"SecRuleRemoveByMsg {rule_msg}")
-            elif action == "allow" and (variable or zone):
-                unconditional.append(f"SecRuleUpdateTargetByMsg {rule_msg} !{target}")
+            elif action == "allow" and targets:
+                for target in targets:
+                    unconditional.append(f"SecRuleUpdateTargetByMsg {rule_msg} !{target}")
             elif action == "update" and update_target and update_action:
                 unconditional.append(f"SecRuleUpdateActionByMsg {rule_msg} \"{update_action}\"")
                 unconditional.append(f"SecRuleUpdateTargetByMsg {rule_msg} !{update_target}")
