@@ -30,7 +30,9 @@ Bundle format (produced by backend/app/services/mcp_config.py):
   "jwt_issuer": null, "jwt_audience": null, "jwt_jwks_url": null,
   "allowed_origins": ["https://example.com"],
   "log_payloads": false,
-  "default_rpm": 60,
+  "default_rpm": 600,
+  "per_ip_limit": 0,
+  "concurrent_limit": 0,
   "catalog_refresh_seconds": 60
 }
 """

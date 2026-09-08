@@ -658,14 +658,23 @@ function Autocomplete({ value, options, onChange, placeholder }: { value: string
 
   // Close the dropdown whenever the page or any scrollable ancestor scrolls,
   // because the menu is rendered with fixed positioning and would otherwise
-  // detach from the input while scrolling.
+  // detach from the input while scrolling.  Keep it open when the user is
+  // scrolling the dropdown list itself.
   useEffect(() => {
-    const close = () => setOpen(false)
-    window.addEventListener('resize', close)
-    window.addEventListener('scroll', close, true)
+    const closeOnResize = () => setOpen(false)
+    const closeOnScroll = (e: Event) => {
+      const target = e.target
+      if (target instanceof Node) {
+        if (dropdownRef.current && (dropdownRef.current === target || dropdownRef.current.contains(target))) return
+        if (containerRef.current && (containerRef.current === target || containerRef.current.contains(target))) return
+      }
+      setOpen(false)
+    }
+    window.addEventListener('resize', closeOnResize)
+    window.addEventListener('scroll', closeOnScroll, true)
     return () => {
-      window.removeEventListener('resize', close)
-      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('resize', closeOnResize)
+      window.removeEventListener('scroll', closeOnScroll, true)
     }
   }, [])
 
@@ -679,21 +688,26 @@ function Autocomplete({ value, options, onChange, placeholder }: { value: string
     if (!open || !containerRef.current) return
     const rect = containerRef.current.getBoundingClientRect()
     const desiredWidth = Math.max(rect.width, 240)
-    const dropdownWidth = Math.min(desiredWidth, 480)
+    const maxAllowedWidth = Math.min(480, window.innerWidth - 8)
+    const dropdownWidth = Math.min(desiredWidth, maxAllowedWidth)
     const maxDropdownHeight = 192 // max-h-48
     const spaceBelow = window.innerHeight - rect.bottom - 4
     let top = rect.bottom + 4
     if (spaceBelow < maxDropdownHeight) {
       top = Math.max(4, rect.top - 4 - maxDropdownHeight)
     }
-    setCoords({ top, left: rect.left, width: dropdownWidth })
+    let left = rect.left
+    if (left + dropdownWidth > window.innerWidth - 4) {
+      left = Math.max(4, window.innerWidth - dropdownWidth - 4)
+    }
+    setCoords({ top, left, width: dropdownWidth })
   }, [open, matches.length, input])
 
   const dropdown = open && matches.length > 0 && (
     <div
       ref={dropdownRef}
       className="fixed z-[200] max-h-48 overflow-auto rounded-md border border-border bg-card shadow-xl py-1"
-      style={{ top: coords.top, left: coords.left, minWidth: `${coords.width}px` }}
+      style={{ top: coords.top, left: coords.left, width: `${coords.width}px`, maxWidth: `${coords.width}px` }}
     >
       {matches.map(o => (
         <button
@@ -709,7 +723,7 @@ function Autocomplete({ value, options, onChange, placeholder }: { value: string
   )
 
   return (
-    <div ref={containerRef} className="min-w-[160px]">
+    <div ref={containerRef} className="min-w-[160px] w-full">
       <input
         className="input text-xs py-1 w-full"
         value={input}
@@ -739,12 +753,20 @@ function ChipInput({ values, options, onChange, placeholder }: { values: string[
   }, [])
 
   useEffect(() => {
-    const close = () => setOpen(false)
-    window.addEventListener('resize', close)
-    window.addEventListener('scroll', close, true)
+    const closeOnResize = () => setOpen(false)
+    const closeOnScroll = (e: Event) => {
+      const target = e.target
+      if (target instanceof Node) {
+        if (dropdownRef.current && (dropdownRef.current === target || dropdownRef.current.contains(target))) return
+        if (containerRef.current && (containerRef.current === target || containerRef.current.contains(target))) return
+      }
+      setOpen(false)
+    }
+    window.addEventListener('resize', closeOnResize)
+    window.addEventListener('scroll', closeOnScroll, true)
     return () => {
-      window.removeEventListener('resize', close)
-      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('resize', closeOnResize)
+      window.removeEventListener('scroll', closeOnScroll, true)
     }
   }, [])
 
@@ -768,21 +790,26 @@ function ChipInput({ values, options, onChange, placeholder }: { values: string[
     if (!open || !containerRef.current) return
     const rect = containerRef.current.getBoundingClientRect()
     const desiredWidth = Math.max(rect.width, 240)
-    const dropdownWidth = Math.min(desiredWidth, 480)
+    const maxAllowedWidth = Math.min(480, window.innerWidth - 8)
+    const dropdownWidth = Math.min(desiredWidth, maxAllowedWidth)
     const maxDropdownHeight = 192
     const spaceBelow = window.innerHeight - rect.bottom - 4
     let top = rect.bottom + 4
     if (spaceBelow < maxDropdownHeight) {
       top = Math.max(4, rect.top - 4 - maxDropdownHeight)
     }
-    setCoords({ top, left: rect.left, width: dropdownWidth })
+    let left = rect.left
+    if (left + dropdownWidth > window.innerWidth - 4) {
+      left = Math.max(4, window.innerWidth - dropdownWidth - 4)
+    }
+    setCoords({ top, left, width: dropdownWidth })
   }, [open, matches.length, input, values.length])
 
   const dropdown = open && matches.length > 0 && (
     <div
       ref={dropdownRef}
       className="fixed z-[200] max-h-48 overflow-auto rounded-md border border-border bg-card shadow-xl py-1"
-      style={{ top: coords.top, left: coords.left, minWidth: `${coords.width}px` }}
+      style={{ top: coords.top, left: coords.left, width: `${coords.width}px`, maxWidth: `${coords.width}px` }}
     >
       {matches.map(o => (
         <button
@@ -798,7 +825,7 @@ function ChipInput({ values, options, onChange, placeholder }: { values: string[
   )
 
   return (
-    <div ref={containerRef} className="min-w-[200px]">
+    <div ref={containerRef} className="min-w-[160px] w-full">
       <div className="input w-full flex flex-wrap items-center gap-1 py-1 px-2 min-h-[2rem]">
         {values.map(v => (
           <span key={v} className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-xs">

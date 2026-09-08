@@ -250,3 +250,14 @@ def ensure_self_registration(db: Session) -> None:
         logger.info("MCP config bundle regenerated after self-registration")
     except Exception as e:
         logger.warning("Failed to regenerate MCP config bundle: %s", e)
+
+    # 5. Refresh the coreX catalog immediately and retry for a short window.
+    # The bundle has just been written, but mcp-server may still be starting, so
+    # we retry every 5 seconds for up to a minute instead of waiting for the
+    # gateway's 60-second refresh cycle.
+    try:
+        from .mcp_policies import trigger_background_catalog_refresh
+        trigger_background_catalog_refresh([server.id], max_attempts=12, interval_seconds=5)
+        logger.info("Triggered catalog refresh for coreX Manager (id=%d)", server.id)
+    except Exception as e:
+        logger.warning("Failed to trigger catalog refresh for coreX Manager: %s", e)

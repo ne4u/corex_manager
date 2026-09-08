@@ -13,7 +13,7 @@
       "memoryUsage": "Utilizzo Memoria",
       "currentConnections": "Connessioni Attuali",
       "totalRps": "Richieste/s totali",
-      "totalThroughput": "Velocità totale",
+      "totalThroughput": "Velocit\u00e0 totale",
       "bandwidthSaved24h": "Banda risparmiata (24 h)"
     },
     "tableHeaders": {
@@ -31,7 +31,7 @@
       "geoipDatabases": "Database GeoIP",
       "corazaSpoa": "Coraza SPOA",
       "countryDb": "DB Paese",
-      "cityDb": "DB Città",
+      "cityDb": "DB Citt\u00e0",
       "asnDb": "DB ASN",
       "enabled": "Abilitato",
       "disabled": "Disabilitato",
@@ -52,7 +52,7 @@
     "closePreview": "Chiudi anteprima",
     "diffFailed": "Diff fallito",
     "diffFailedMsg": "Impossibile caricare diff",
-    "revertConfirm": "Questo annullerà tutte le modifiche non applicate e ripristinerà l'ultima config.\n\nSei sicuro?",
+    "revertConfirm": "Questo annuller\u00e0 tutte le modifiche non applicate e ripristiner\u00e0 l'ultima config.\n\nSei sicuro?",
     "configRevert": "Ripristina config",
     "configRevertStarted": "Ripristino avviato...",
     "configRevertedSuccessfully": "Configurazione ripristinata.",
@@ -75,7 +75,7 @@
     "last250": "Ultimi 250",
     "last500": "Ultimi 500",
     "refresh": "Aggiorna",
-    "loadingEllipsis": "Caricamento…",
+    "loadingEllipsis": "Caricamento\u2026",
     "error": "Errore",
     "filterLogs": "Filtra log...",
     "linesCount": "{{filtered}} di {{total}} righe",
@@ -85,7 +85,7 @@
     "tableHeaders": {
       "timestamp": "Timestamp",
       "client": "Client",
-      "city": "Città",
+      "city": "Citt\u00e0",
       "country": "Paese",
       "asn": "ASN",
       "path": "Percorso",
@@ -138,7 +138,7 @@
       "targetPlaceholder": "stdout o 127.0.0.1:514",
       "facility": "Struttura",
       "level": "Livello",
-      "format": "Formato (deprecato — usa Campi Registrati)",
+      "format": "Formato (deprecato \u2014 usa Campi Registrati)",
       "field": "Campo",
       "fieldPlaceholder": "%ci o %[var(txn.sec.action)]",
       "enabled": "Abilitato"
@@ -173,7 +173,7 @@
     "lookingUp": "Ricerca...",
     "asnFields": {
       "country": "Paese:",
-      "city": "Città:",
+      "city": "Citt\u00e0:",
       "organization": "Organizzazione:",
       "network": "Rete:",
       "ip": "IP:"
@@ -240,7 +240,7 @@
       "breakdown": "Dettaglio",
       "breakdownAction": "Azione",
       "breakdownRuleId": "ID Regola",
-      "breakdownSeverity": "Gravità",
+      "breakdownSeverity": "Gravit\u00e0",
       "breakdownMsg": "Messaggio",
       "totals": "Totali",
       "events": "Eventi",
@@ -272,7 +272,7 @@
     "exportCsv": "Esporta CSV",
     "pendingChanges": "Modifiche in Sospeso",
     "appliedChanges": "Modifiche Applicate",
-    "snapshotGroup": "Snapshot {{id}} — {{comment}}",
+    "snapshotGroup": "Snapshot {{id}} \u2014 {{comment}}",
     "noComment": "Nessun commento",
     "tableHeaders": {
       "time": "Ora",
@@ -286,7 +286,7 @@
     "noEvents": "Nessun evento di audit trovato.",
     "loading": "Caricamento...",
     "exportFailed": "Esportazione fallita",
-    "otherActivity": "Altra Attività",
+    "otherActivity": "Altra Attivit\u00e0",
     "earlierApplies": "Applicazioni precedenti"
   },
   "snapshots": {
@@ -308,7 +308,7 @@
     "revert": "Ripristina",
     "review": "Rivedi",
     "noSnapshots": "Nessuno snapshot ancora.",
-    "confirmRevert": "Ripristinare questo snapshot? Questo sostituirà la configurazione attuale.",
+    "confirmRevert": "Ripristinare questo snapshot? Questo sostituir\u00e0 la configurazione attuale.",
     "confirmDelete": "Eliminare questo snapshot?",
     "revertedSuccessfully": "Snapshot ripristinato con successo.",
     "snapshotDeleted": "Snapshot eliminato.",
@@ -338,7 +338,7 @@
       "password": "Password",
       "newPassword": "Nuova Password (lascia vuoto per mantenere)",
       "passwordPlaceholder": "Lascia vuoto per mantenere l'esistente",
-      "passwordRequired": "La password è obbligatoria per i nuovi utenti",
+      "passwordRequired": "La password \u00e8 obbligatoria per i nuovi utenti",
       "role": "Ruolo",
       "roleAdmin": "Admin",
       "roleUser": "Utente",
@@ -399,7 +399,7 @@
         "rateLimitWindow": "finestra limite in secondi",
         "rateLimitDuration": "durata blocco in secondi"
       },
-      "advanced": "Qualsiasi altro {{name}} è trattato come variabile di transazione %[var(txn.name)]. Puoi anche usare direttamente la sintassi sample-fetch di HAProxy, come %[req.hdr(X-Custom)]."
+      "advanced": "Qualsiasi altro {{name}} \u00e8 trattato come variabile di transazione %[var(txn.name)]. Puoi anche usare direttamente la sintassi sample-fetch di HAProxy, come %[req.hdr(X-Custom)]."
     },
     "actions": {
       "preview": "Anteprima"
@@ -408,7 +408,7 @@
   "globalOptions": {
     "title": "Opzioni Globali",
     "tabs": {
-      "features": "Flag delle funzionalità",
+      "features": "Flag delle funzionalit\u00e0",
       "advanced": "Opzioni coreX avanzate",
       "ciphers": "Suite di cifratura",
       "customPages": "Pagine Personalizzate"
@@ -449,7 +449,7 @@
     },
     "ja4": {
       "title": "Impronta TLS JA4",
-      "description": "Calcola le impronte client JA4 TLS dal ClientHello. Utilizzato dalle Security Rules che fanno riferimento a <code>http.request.ja4</code>. La disabilitazione disattiverà automaticamente eventuali regole di sicurezza che fanno riferimento a JA4; il riattivazione le riaccenderà.",
+      "description": "Calcola le impronte client JA4 TLS dal ClientHello. Utilizzato dalle Security Rules che fanno riferimento a <code>http.request.ja4</code>. La disabilitazione disattiver\u00e0 automaticamente eventuali regole di sicurezza che fanno riferimento a JA4; il riattivazione le riaccender\u00e0.",
       "enable": "Abilita impronta JA4",
       "save": "Salva Impostazione JA4",
       "enabled": "Impronta JA4 abilitata.",
@@ -466,7 +466,7 @@
       "failedToSave": "Salvataggio dell'impostazione dell'impronta di richiesta non riuscito.",
       "parseBody": {
         "enable": "Analizza i corpi delle richieste per i parametri dell'impronta",
-        "description": "Quando abilitato, i corpi delle richieste form-urlencoded e JSON vengono memorizzati nel buffer e analizzati per estrarre chiavi, tipi e lunghezze dei parametri nei campi param dell'impronta. Ciò aggiunge un overhead di buffering del corpo a ogni POST/PUT/PATCH corrispondente. Quando API Armor è abilitato su un listener, gestisce automaticamente il buffering del corpo e questa impostazione non ha alcun effetto aggiuntivo. I corpi più grandi della dimensione massima di ispezione configurata vengono respinti con HTTP 413 (se l'applicazione è abilitata) o saltano l'analisi del corpo — i parametri del corpo vengono restituiti come nil (chiavi/tipi di parametri = nil, lunghezze dei parametri = 0) e la richiesta procede normalmente.",
+        "description": "Quando abilitato, i corpi delle richieste form-urlencoded e JSON vengono memorizzati nel buffer e analizzati per estrarre chiavi, tipi e lunghezze dei parametri nei campi param dell'impronta. Ci\u00f2 aggiunge un overhead di buffering del corpo a ogni POST/PUT/PATCH corrispondente. Quando API Armor \u00e8 abilitato su un listener, gestisce automaticamente il buffering del corpo e questa impostazione non ha alcun effetto aggiuntivo. I corpi pi\u00f9 grandi della dimensione massima di ispezione configurata vengono respinti con HTTP 413 (se l'applicazione \u00e8 abilitata) o saltano l'analisi del corpo \u2014 i parametri del corpo vengono restituiti come nil (chiavi/tipi di parametri = nil, lunghezze dei parametri = 0) e la richiesta procede normalmente.",
         "save": "Salva Impostazione Analisi Corpo",
         "enabled": "Analisi del corpo abilitata.",
         "disabled": "Analisi del corpo disabilitata.",
@@ -474,17 +474,17 @@
       },
       "maxBodyBytes": {
         "label": "Dimensione massima ispezione corpo",
-        "description": "Dimensione massima del corpo della richiesta (in byte) che verrà memorizzato nel buffer e analizzato per i parametri dell'impronta. I corpi più grandi vengono respinti (se l'applicazione è abilitata) o saltano l'analisi del corpo. Il valore predefinito è 1048576 (1 MB).",
+        "description": "Dimensione massima del corpo della richiesta (in byte) che verr\u00e0 memorizzato nel buffer e analizzato per i parametri dell'impronta. I corpi pi\u00f9 grandi vengono respinti (se l'applicazione \u00e8 abilitata) o saltano l'analisi del corpo. Il valore predefinito \u00e8 1048576 (1 MB).",
         "save": "Salva Dimensione Max Corpo",
         "saved": "Dimensione massima corpo salvata.",
         "failedToSave": "Salvataggio della dimensione massima corpo non riuscito."
       },
       "enforceMaxBody": {
         "enable": "Applica dimensione massima ispezione corpo",
-        "description": "Quando abilitato, le richieste con corpi più grandi della dimensione massima di ispezione vengono respinte con HTTP 413. Quando disabilitato, i corpi troppo grandi saltano l'analisi del corpo e la richiesta procede normalmente (i parametri del corpo vengono restituiti come nil).",
+        "description": "Quando abilitato, le richieste con corpi pi\u00f9 grandi della dimensione massima di ispezione vengono respinte con HTTP 413. Quando disabilitato, i corpi troppo grandi saltano l'analisi del corpo e la richiesta procede normalmente (i parametri del corpo vengono restituiti come nil).",
         "save": "Salva Impostazione Applicazione",
-        "enabled": "Applicazione abilitata — i corpi troppo grandi vengono respinti con 413.",
-        "disabled": "Applicazione disabilitata — i corpi troppo grandi saltano l'analisi del corpo.",
+        "enabled": "Applicazione abilitata \u2014 i corpi troppo grandi vengono respinti con 413.",
+        "disabled": "Applicazione disabilitata \u2014 i corpi troppo grandi saltano l'analisi del corpo.",
         "failedToSave": "Salvataggio dell'impostazione di applicazione non riuscito."
       },
       "requiredByApiArmor": "Richiesto da API Armor."
@@ -500,7 +500,7 @@
     },
     "diskCache": {
       "title": "Cache su Disco",
-      "description": "Abilita la cache su disco basata su file per oggetti di grandi dimensioni. Quando abilitato, l'opzione di cache su disco diventa disponibile per backend nella pagina Caching. La cache in memoria (nativa coreX) è sempre disponibile e non richiede questo interruttore.",
+      "description": "Abilita la cache su disco basata su file per oggetti di grandi dimensioni. Quando abilitato, l'opzione di cache su disco diventa disponibile per backend nella pagina Caching. La cache in memoria (nativa coreX) \u00e8 sempre disponibile e non richiede questo interruttore.",
       "enable": "Abilita cache su disco per file di grandi dimensioni",
       "save": "Salva Impostazione Cache su Disco",
       "enabled": "Cache su disco abilitata.",
@@ -509,7 +509,7 @@
     },
     "respTransform": {
       "title": "Trasformazioni Risposta",
-      "description": "Abilita la riscrittura, l'iniezione e la mascheratura/smascheratura bidirezionale del corpo della risposta tramite il modulo Rust Lua haproxy-resp-transform. Quando abilitato, le regole di trasformazione diventano configurabili per backend nella pagina Trasformazioni Risposta. La modalità mascheratura utilizza Valkey (tokenizzazione) o AES-256-GCM (crittografia) per la protezione dei dati sensibili.",
+      "description": "Abilita la riscrittura, l'iniezione e la mascheratura/smascheratura bidirezionale del corpo della risposta tramite il modulo Rust Lua haproxy-resp-transform. Quando abilitato, le regole di trasformazione diventano configurabili per backend nella pagina Trasformazioni Risposta. La modalit\u00e0 mascheratura utilizza Valkey (tokenizzazione) o AES-256-GCM (crittografia) per la protezione dei dati sensibili.",
       "enable": "Abilita modulo trasformazioni risposta",
       "save": "Salva Impostazione Trasformazioni Risposta",
       "enabled": "Modulo Trasformazioni Risposta abilitato.",
@@ -527,7 +527,7 @@
     },
     "img2Webp": {
       "title": "Conversione Immagini (WebP)",
-      "description": "Abilita il modulo di conversione al volo da JPEG/PNG/GIF a WebP. Quando abilitato, le impostazioni di conversione delle immagini per backend diventano disponibili nella pagina Backends. Il filtro esegue la negoziazione dei contenuti in base all'intestazione Accept — non sono necessarie regole di riscrittura o sostituzione di link src. Le risposte convertite includono Vary: Accept per una corretta memorizzazione nella cache.",
+      "description": "Abilita il modulo di conversione al volo da JPEG/PNG/GIF a WebP. Quando abilitato, le impostazioni di conversione delle immagini per backend diventano disponibili nella pagina Backends. Il filtro esegue la negoziazione dei contenuti in base all'intestazione Accept \u2014 non sono necessarie regole di riscrittura o sostituzione di link src. Le risposte convertite includono Vary: Accept per una corretta memorizzazione nella cache.",
       "enable": "Abilita modulo conversione immagini",
       "save": "Salva Impostazione Conversione Immagini",
       "enabled": "Modulo conversione immagini abilitato.",
@@ -536,7 +536,7 @@
     },
     "serverTimingMetrics": {
       "title": "Metriche Server-Timing",
-      "description": "Aggiunge metriche di tempo di connessione, risposta e totale (in millisecondi) all'intestazione di risposta Server-Timing su tutte le risposte. Visibile negli strumenti di sviluppo del browser e tramite Resource Timing API. Quando anche la fiducia del beacon di Page Protect è abilitata, cxid e metriche di tempo vengono combinati in un'unica intestazione Server-Timing sulle risposte HTML.",
+      "description": "Aggiunge metriche di tempo di connessione, risposta e totale (in millisecondi) all'intestazione di risposta Server-Timing su tutte le risposte. Visibile negli strumenti di sviluppo del browser e tramite Resource Timing API. Quando anche la fiducia del beacon di Page Protect \u00e8 abilitata, cxid e metriche di tempo vengono combinati in un'unica intestazione Server-Timing sulle risposte HTML.",
       "enable": "Abilita metriche Server-Timing",
       "save": "Salva",
       "enabledMsg": "Metriche Server-Timing abilitate.",
@@ -564,7 +564,7 @@
       "name": "Nome",
       "bind": "Bind",
       "protocol": "Protocollo",
-      "mode": "Modalità",
+      "mode": "Modalit\u00e0",
       "ssl": "SSL",
       "certs": "Cert",
       "http2": "HTTP2",
@@ -604,7 +604,7 @@
       "routeMcp": "Instrada /mcp al gateway MCP",
       "routeMcpHelp": "Quando abilitato, le richieste a /mcp su questo listener vengono indirizzate al backend MCP Gateway in aggiunta al backend predefinito.",
       "mcpGatewayBuiltin": "mcp_gateway (integrato)",
-      "mcpRouteEnabled": "+ /mcp → gateway",
+      "mcpRouteEnabled": "+ /mcp \u2192 gateway",
       "apiArmor": "Abilita API Armor",
       "apiArmorHelp": "Esegui l'analisi del body, la validazione dello schema e i controlli di autenticazione di API Armor su questo listener. Richiede HTTP Request Fingerprinting e il modulo API Armor globale abilitato."
     },
@@ -645,13 +645,13 @@
       "certificates": "Certificati TLS presentati ai client su questo listener.",
       "cipherSuite": "Configurazione della cipher suite OpenSSL/TLS con nome.",
       "alpn": "Stringa Application-Layer Protocol Negotiation, es. `h2,http/1.1`.",
-      "altSvcHeader": "Header Alt-Svc annunciato ai client quando QUIC è abilitato.",
-      "allow0rtt": "Abilita TLS 1.3 0-RTT (early data) per riconnessione più rapida. Questo introduce un rischio di attacco replay (RFC 9001 §9.2): un attaccante che cattura pacchetti 0-RTT può riprodurli. Le richieste non idempotenti (POST/PUT/DELETE/PATCH) vengono automaticamente rifiutate con HTTP 425 (Too Early) quando inviate via early data, forzando il client a riprovare dopo il completamento dell'handshake. Abilitare solo se si comprende il compromesso tra latenza e rischio di replay.",
+      "altSvcHeader": "Header Alt-Svc annunciato ai client quando QUIC \u00e8 abilitato.",
+      "allow0rtt": "Abilita TLS 1.3 0-RTT (early data) per riconnessione pi\u00f9 rapida. Questo introduce un rischio di attacco replay (RFC 9001 \u00a79.2): un attaccante che cattura pacchetti 0-RTT pu\u00f2 riprodurli. Le richieste non idempotenti (POST/PUT/DELETE/PATCH) vengono automaticamente rifiutate con HTTP 425 (Too Early) quando inviate via early data, forzando il client a riprovare dopo il completamento dell'handshake. Abilitare solo se si comprende il compromesso tra latenza e rischio di replay.",
       "ssl": "Termina TLS su questo listener.",
       "http2": "Consenti ai client di negoziare HTTP/2 tramite ALPN.",
       "quic": "Abilita QUIC/HTTP3 su questo listener.",
       "proxyProtocol": "Accetta un header PROXY protocol da un proxy upstream.",
-      "forceHttps": "Reindirizza le richieste HTTP non crittografate a HTTPS. Disabilitato quando SSL, HTTP/2, QUIC o Proxy Protocol sono attivi perché il traffico è già sicuro o proxato.",
+      "forceHttps": "Reindirizza le richieste HTTP non crittografate a HTTPS. Disabilitato quando SSL, HTTP/2, QUIC o Proxy Protocol sono attivi perch\u00e9 il traffico \u00e8 gi\u00e0 sicuro o proxato.",
       "conditionType": "Sample fetch usato per corrispondere alla richiesta (path, host, header, cookie, ecc.).",
       "operator": "Come confrontare il sample con il valore (`beg`, `eq`, `reg`, ecc.).",
       "conditionName": "Nome dell'header, cookie o parametro URL quando applicabile.",
@@ -661,7 +661,7 @@
       "additionalConditionName": "Nome header/cookie/parametro per una condizione aggiuntiva.",
       "additionalValue": "Valore di corrispondenza per una condizione aggiuntiva.",
       "ruleBackend": "Backend a cui instradare quando la regola corrisponde.",
-      "ruleEnabled": "Se questa regola è attiva nella configurazione."
+      "ruleEnabled": "Se questa regola \u00e8 attiva nella configurazione."
     },
     "routingRules": "Regole di Routing",
     "routingRulesAdd": "Aggiungi Regola",
@@ -680,7 +680,7 @@
     "loading": "Caricamento...",
     "tableHeaders": {
       "name": "Nome",
-      "mode": "Modalità",
+      "mode": "Modalit\u00e0",
       "algorithm": "Algoritmo",
       "fcgiApp": "App FCGI",
       "sticky": "Sticky",
@@ -728,7 +728,7 @@
       "clientIpHeaderPlaceholder": "X-Forwarded-For",
       "restoreClientIp": "Ripristina IP client",
       "restoreClientIpWarning": "Abilita solo per pool con traffico via CDN attendibile.",
-      "sourceStickTableRedundant": "L'algoritmo 'source' fornisce già affinità IP; una stick table 'ip' è ridondante.",
+      "sourceStickTableRedundant": "L'algoritmo 'source' fornisce gi\u00e0 affinit\u00e0 IP; una stick table 'ip' \u00e8 ridondante.",
       "stickyCookieRedundant": "Sessioni sticky e stick table 'cookie' sono ridondanti."
     },
     "compression": {
@@ -741,20 +741,20 @@
       "algorithmRawDeflate": "Raw Deflate (nativo)",
       "algorithmBrotli": "Brotli",
       "levelQuality": "Livello (1-22)",
-      "quality": "Qualità (0-11)",
+      "quality": "Qualit\u00e0 (0-11)",
       "contentTypes": "Tipi di Contenuto (prefissi separati da virgola, vuoto = tutti)",
       "contentTypesPlaceholder": "text/,application/json",
       "window": "Finestra (10-24)",
       "offload": "Offload (rimuovi Accept-Encoding dalla richiesta al backend)",
-      "notEnabledWarning": "{{algorithm}} non è abilitato nelle Opzioni Globali. Abilitalo lì affinché la compressione abbia effetto."
+      "notEnabledWarning": "{{algorithm}} non \u00e8 abilitato nelle Opzioni Globali. Abilitalo l\u00ec affinch\u00e9 la compressione abbia effetto."
     },
     "warnings": {
-      "sourceRedundant": "L'algoritmo 'source' fornisce già affinità per IP sorgente; una stick table 'ip' è ridondante.",
-      "cookieRedundant": "Sessioni Sticky e una stick table 'cookie' fanno entrambe persistenza basata su cookie; questo è generalmente ridondante."
+      "sourceRedundant": "L'algoritmo 'source' fornisce gi\u00e0 affinit\u00e0 per IP sorgente; una stick table 'ip' \u00e8 ridondante.",
+      "cookieRedundant": "Sessioni Sticky e una stick table 'cookie' fanno entrambe persistenza basata su cookie; questo \u00e8 generalmente ridondante."
     },
     "errors": {
-      "cookieNameRequiredSticky": "Il Nome Cookie è obbligatorio quando le Sessioni Sticky sono abilitate",
-      "cookieNameRequiredStickTable": "Il Nome Cookie è obbligatorio quando il Tipo Stick Table è cookie",
+      "cookieNameRequiredSticky": "Il Nome Cookie \u00e8 obbligatorio quando le Sessioni Sticky sono abilitate",
+      "cookieNameRequiredStickTable": "Il Nome Cookie \u00e8 obbligatorio quando il Tipo Stick Table \u00e8 cookie",
       "stickyNotSupportedTcp": "Le Sessioni Sticky non sono supportate per i backend TCP",
       "cookieStickTableNotSupportedTcp": "Le stick table basate su cookie non sono supportate per i backend TCP",
       "failedToSaveBackend": "Salvataggio backend fallito"
@@ -810,7 +810,7 @@
       "none": "Nessuno",
       "backendPool": "Pool backend",
       "backendPoolHelp": "Seleziona il pool di backend.",
-      "selectPool": "Seleziona un pool…",
+      "selectPool": "Seleziona un pool\u2026",
       "name": "Nome",
       "address": "Indirizzo",
       "port": "Porta",
@@ -824,7 +824,7 @@
     "tooltips": {
       "name": "Identificatore univoco per questo pool di backend nella configurazione HAProxy.",
       "protocol": "Protocollo di livello 7 parlato dai server backend (HTTP, TCP, gRPC, JSON-RPC, FastCGI).",
-      "fcgiApp": "Applicazione FastCGI da usare quando il protocollo backend è FastCGI.",
+      "fcgiApp": "Applicazione FastCGI da usare quando il protocollo backend \u00e8 FastCGI.",
       "algorithm": "Algoritmo di bilanciamento del carico: roundrobin, leastconn, hash sorgente, basato su URI, ecc.",
       "balanceArgs": "Argomento opzionale per l'algoritmo, es. `hdr(host)` per bilanciamento basato su header.",
       "healthCheckMethod": "Metodo HTTP usato per le sonde di health check attivo.",
@@ -845,7 +845,7 @@
       "resolvers": "Sezione resolver DNS usata per la risoluzione dinamica dei server.",
       "hostHeader": "Header Host inviato al backend, sovrascrivendo la richiesta originale.",
       "compressionAlgorithm": "Algoritmo di compressione da applicare alle risposte idonee.",
-      "compressionLevelQuality": "Livello di compressione; più alto significa output più piccolo ma più CPU.",
+      "compressionLevelQuality": "Livello di compressione; pi\u00f9 alto significa output pi\u00f9 piccolo ma pi\u00f9 CPU.",
       "compressionContentTypes": "Prefissi di content-type separati da virgola idonei per la compressione; vuoto significa tutti.",
       "compressionWindow": "Dimensione della finestra di compressione Brotli (10-24).",
       "compressionOffload": "Rimuovi `Accept-Encoding` prima di inviare la richiesta al backend.",
@@ -854,10 +854,10 @@
       "stickTable": "Abilita una tabella condivisa in memoria per tracciare lo stato del client.",
       "serverName": "Identificatore univoco per questa riga di server nella configurazione HAProxy.",
       "serverAddress": "Nome host o indirizzo IP del server backend.",
-      "serverPort": "Porta TCP su cui il server backend è in ascolto.",
-      "serverWeight": "Peso relativo per il bilanciamento del carico; valori più alti ricevono più traffico.",
+      "serverPort": "Porta TCP su cui il server backend \u00e8 in ascolto.",
+      "serverWeight": "Peso relativo per il bilanciamento del carico; valori pi\u00f9 alti ricevono pi\u00f9 traffico.",
       "serverMaxconn": "Numero massimo di connessioni simultanee consentite a questo server.",
-      "serverCheck": "Abilita health check attivi per determinare se il server è attivo.",
+      "serverCheck": "Abilita health check attivi per determinare se il server \u00e8 attivo.",
       "serverBackup": "Usa questo server solo quando tutti i server non di backup non sono disponibili.",
       "serverSsl": "Cifra il traffico verso il server usando SSL/TLS.",
       "serverProtocol": "Protocollo applicativo per questo server (HTTP, TCP, gRPC, JSON-RPC, FastCGI).",
@@ -866,9 +866,9 @@
       "serverFall": "Health check consecutivi falliti prima che un server sia considerato inattivo.",
       "serverSlowstart": "Tempo in secondi per riportare gradualmente un server al peso pieno dopo il ripristino.",
       "serverMaxqueue": "Numero massimo di connessioni da accodare quando si raggiunge maxconn.",
-      "serverVerify": "Modalità di verifica del certificato SSL per questa connessione al server.",
+      "serverVerify": "Modalit\u00e0 di verifica del certificato SSL per questa connessione al server.",
       "serverVerifyhost": "Nome host atteso da corrispondere nel certificato del server.",
-      "serverCaCertificate": "Bundle di autorità di certificazione usato per verificare il certificato del server.",
+      "serverCaCertificate": "Bundle di autorit\u00e0 di certificazione usato per verificare il certificato del server.",
       "serverClientCertificate": "Certificato client (e chiave privata) presentato al server per TLS reciproco.",
       "serverCiphers": "Lista cipher OpenSSL per la connessione TLS.",
       "serverAlpn": "Stringa Application-Layer Protocol Negotiation (es., h2,http/1.1).",
@@ -881,7 +881,7 @@
       "serverResolve": "Risolvi l'indirizzo del server a runtime usando un resolver DNS configurato.",
       "serverInitAddr": "Lista di indirizzi iniziali usata prima della prima risoluzione DNS.",
       "serverAgentCheck": "Abilita un agent check sul server per decisioni di up/down.",
-      "serverAgentPort": "Porta su cui l'agent check è in ascolto.",
+      "serverAgentPort": "Porta su cui l'agent check \u00e8 in ascolto.",
       "serverTrack": "Eredita lo stato di salute di un altro server invece di eseguire check separati.",
       "clientIpHeader": "Ripristina IP reale client dall'header.",
       "restoreClientIp": "Ripristina IP reale client dall'header."
@@ -903,8 +903,8 @@
     "imageConversion": {
       "title": "Conversione immagini (WebP)",
       "description": "Converti JPEG/PNG/GIF in WebP al volo.",
-      "quality": "Qualità (0-100)",
-      "qualityHelp": "Qualità WebP (0-100). 100 = migliore, 0 = più piccolo.",
+      "quality": "Qualit\u00e0 (0-100)",
+      "qualityHelp": "Qualit\u00e0 WebP (0-100). 100 = migliore, 0 = pi\u00f9 piccolo.",
       "maxDimension": "Dimensione max (px)",
       "maxDimensionHelp": "Dimensione massima in pixel.",
       "maxFileSize": "Dimensione max file (byte)",
@@ -932,7 +932,7 @@
     "enabled": "Abilitato",
     "noRules": "Nessuna regola",
     "ruleCount": "{{count}} regola/e",
-    "rulesWarning": "La cache è abilitata ma nessuna regola è definita, quindi nulla verrà memorizzato nella cache. Aggiungi una regola per iniziare il caching.",
+    "rulesWarning": "La cache \u00e8 abilitata ma nessuna regola \u00e8 definita, quindi nulla verr\u00e0 memorizzato nella cache. Aggiungi una regola per iniziare il caching.",
     "memoryDetails": "Memoria: {{size}}MB, max-age {{age}}s",
     "diskDetails": "Disco: TTL {{ttl}}s, grace {{grace}}s",
     "actions": {
@@ -987,12 +987,12 @@
       "backend": "Backend a cui si applica questa configurazione di cache per le risposte.",
       "memoryCache": "Abilita la cache in memoria di HAProxy per oggetti piccoli.",
       "totalMaxSize": "Dimensione totale della cache in memoria in megabyte (1-4095).",
-      "maxObjectSize": "Oggetto più grande che può essere memorizzato nella cache in memoria.",
+      "maxObjectSize": "Oggetto pi\u00f9 grande che pu\u00f2 essere memorizzato nella cache in memoria.",
       "maxAge": "Tempo in cui un oggetto rimane valido nella cache in memoria prima della riconvalida.",
       "maxSecondaryEntries": "Numero di varianti memorizzate per oggetto per la gestione dell'header Vary.",
       "processVary": "Memorizza copie separate per diversi valori dell'header Vary.",
-      "rfc7234Compliance": "Conformità RFC 7234 (comportamento CDN — consigliato disabilitato). Quando disabilitato (predefinito), gli header Cache-Control e Pragma lato richiesta vengono rimossi prima della lookup nella cache in memoria, così un hard-reload di un singolo client (che invia Cache-Control: no-cache) non bypassa la cache condivisa per tutti. Quando abilitato, HAProxy onora rigorosamente la RFC 7234 e una richiesta con Cache-Control: no-cache bypassa la cache.",
-      "diskCache": "Abilita cache su disco basata su file per oggetti più grandi. Richiede che la cache su disco sia abilitata a livello globale.",
+      "rfc7234Compliance": "Conformit\u00e0 RFC 7234 (comportamento CDN \u2014 consigliato disabilitato). Quando disabilitato (predefinito), gli header Cache-Control e Pragma lato richiesta vengono rimossi prima della lookup nella cache in memoria, cos\u00ec un hard-reload di un singolo client (che invia Cache-Control: no-cache) non bypassa la cache condivisa per tutti. Quando abilitato, HAProxy onora rigorosamente la RFC 7234 e una richiesta con Cache-Control: no-cache bypassa la cache.",
+      "diskCache": "Abilita cache su disco basata su file per oggetti pi\u00f9 grandi. Richiede che la cache su disco sia abilitata a livello globale.",
       "ttl": "Quanto a lungo gli oggetti nella cache su disco rimangono validi.",
       "grace": "Quanto a lungo gli oggetti stale nella cache su disco possono ancora essere serviti durante la riconvalida.",
       "purge": "Consenti l'invalidazione della cache tramite richieste BAN.",
@@ -1012,10 +1012,10 @@
         "subtitle": "(cache nativa in memoria per oggetti piccoli)",
         "totalMaxSize": "Dimensione totale max (MB, 1-4095)",
         "maxObjectSize": "Dimensione max oggetto (byte)",
-        "maxAge": "Età max (secondi)",
+        "maxAge": "Et\u00e0 max (secondi)",
         "maxSecondaryEntries": "Voci secondarie max",
         "processVary": "Elabora header Vary",
-        "rfc7234Compliance": "Conformità RFC 7234"
+        "rfc7234Compliance": "Conformit\u00e0 RFC 7234"
       },
       "disk": {
         "title": "Cache su disco",
@@ -1037,7 +1037,7 @@
       "failedToSave": "Salvataggio config cache fallito"
     },
     "rules": {
-      "title": "Regole di cacheabilità: {{name}}",
+      "title": "Regole di cacheabilit\u00e0: {{name}}",
       "description": "Regole valutate dall'alto, prima corrispondenza vince.",
       "noCacheableWarning": "Cache abilitato ma nessuna regola memorizza.",
       "loading": "Caricamento regole...",
@@ -1052,7 +1052,7 @@
         "enabled": "Abilitato"
       },
       "moveUp": "Sposta su",
-      "moveDown": "Sposta giù",
+      "moveDown": "Sposta gi\u00f9",
       "dragToReorder": "Trascina per riordinare",
       "editRule": "Modifica regola",
       "phaseRequest": "Valutata all'arrivo della richiesta",
@@ -1101,8 +1101,8 @@
       "cancelled": "Annullato",
       "polling": "(in polling)"
     },
-    "bulkRenewDescription": "Rinnova Tutti Ora verifica ogni certificato ACME e rinnova quelli che sono entro 30 giorni dalla scadenza. L'API esegue anche un rinnovo automatico ogni giorno (configurabile con AUTO_RENEW_INTERVAL_SECONDS). Il rinnovo automatico scrive i nuovi certificati su disco e ricarica coreX, quindi normalmente non è necessario cliccare questo pulsante.",
-    "issueNote": "Nota: L'emissione di un certificato può richiedere diversi minuti (propagazione DNS, challenge ACME, firma del certificato). La colonna Stato Emissione mostra l'ultimo tentativo di emissione e si aggiorna automaticamente durante l'avanzamento.",
+    "bulkRenewDescription": "Rinnova Tutti Ora verifica ogni certificato ACME e rinnova quelli che sono entro 30 giorni dalla scadenza. L'API esegue anche un rinnovo automatico ogni giorno (configurabile con AUTO_RENEW_INTERVAL_SECONDS). Il rinnovo automatico scrive i nuovi certificati su disco e ricarica coreX, quindi normalmente non \u00e8 necessario cliccare questo pulsante.",
+    "issueNote": "Nota: L'emissione di un certificato pu\u00f2 richiedere diversi minuti (propagazione DNS, challenge ACME, firma del certificato). La colonna Stato Emissione mostra l'ultimo tentativo di emissione e si aggiorna automaticamente durante l'avanzamento.",
     "modal": {
       "editTitle": "Modifica Certificato",
       "addTitle": "Aggiungi Certificato",
@@ -1132,12 +1132,12 @@
       "privateKey": "Chiave Privata",
       "chainOptional": "Chain (opzionale)",
       "additionalCaChainOptional": "Chain CA Aggiuntiva (opzionale)",
-      "fullchainHelp": "Certificato end-entity più tutte le CA intermedie, concatenate. coreX serve questa chain.",
-      "caCertificatesHelp": "Uno o più certificati CA, concatenati. Non deve essere inclusa alcuna chiave privata.",
-      "chainHelp": "File CA intermedio separato opzionale. Lascia vuoto se le intermedie sono già nel Fullchain PEM.",
+      "fullchainHelp": "Certificato end-entity pi\u00f9 tutte le CA intermedie, concatenate. coreX serve questa chain.",
+      "caCertificatesHelp": "Uno o pi\u00f9 certificati CA, concatenati. Non deve essere inclusa alcuna chiave privata.",
+      "chainHelp": "File CA intermedio separato opzionale. Lascia vuoto se le intermedie sono gi\u00e0 nel Fullchain PEM.",
       "additionalCaChainHelp": "Certificati CA aggiuntivi opzionali da accodare al bundle CA.",
       "save": "Salva",
-      "dnsCredentialsLabel": "Credenziali DNS ({{status}} — il valore è solo scrittura)",
+      "dnsCredentialsLabel": "Credenziali DNS ({{status}} \u2014 il valore \u00e8 solo scrittura)",
       "dnsCredentialsSet": "impostato",
       "dnsCredentialsNotSet": "non impostato",
       "customCodeLabelAcmeSh": "codice API DNS acme.sh",
@@ -1156,16 +1156,16 @@
     "issueModal": {
       "reissueTitle": "Ri-emetti Certificato",
       "issueTitle": "Emetti Certificato",
-      "reissueDescription": "La ri-emissione sostituirà il certificato esistente. Questo può richiedere diversi minuti (propagazione DNS, challenge ACME, firma del certificato).",
-      "issueDescription": "L'emissione di un certificato può richiedere diversi minuti (propagazione DNS, challenge ACME, firma del certificato).",
-      "backgroundNote": "La richiesta verrà elaborata in background e la colonna Stato Emissione si aggiornerà automaticamente.",
+      "reissueDescription": "La ri-emissione sostituir\u00e0 il certificato esistente. Questo pu\u00f2 richiedere diversi minuti (propagazione DNS, challenge ACME, firma del certificato).",
+      "issueDescription": "L'emissione di un certificato pu\u00f2 richiedere diversi minuti (propagazione DNS, challenge ACME, firma del certificato).",
+      "backgroundNote": "La richiesta verr\u00e0 elaborata in background e la colonna Stato Emissione si aggiorner\u00e0 automaticamente.",
       "cancel": "Annulla",
       "reissue": "Ri-emetti",
       "issue": "Emetti"
     },
     "renewModal": {
       "title": "Rinnovo Massivo Certificati",
-      "description": "Questo verificherà ogni certificato ACME e tenterà di rinnovare quelli entro 30 giorni dalla scadenza. L'operazione può richiedere diversi minuti e può attivare più attività in background.",
+      "description": "Questo verificher\u00e0 ogni certificato ACME e tenter\u00e0 di rinnovare quelli entro 30 giorni dalla scadenza. L'operazione pu\u00f2 richiedere diversi minuti e pu\u00f2 attivare pi\u00f9 attivit\u00e0 in background.",
       "cancel": "Annulla",
       "renewNow": "Rinnova Ora"
     },
@@ -1178,13 +1178,13 @@
       "failedToQueueIssueTask": "Accodamento task di emissione fallito",
       "taskCancelled": "Task annullato dall'utente.",
       "queuedForBackgroundProcessing": "Accodato per elaborazione in background",
-      "timedOut": "Timeout in attesa del completamento del task. Il task potrebbe essere ancora in esecuzione in background — ricarica la pagina per verificare."
+      "timedOut": "Timeout in attesa del completamento del task. Il task potrebbe essere ancora in esecuzione in background \u2014 ricarica la pagina per verificare."
     },
     "tooltips": {
       "name": "Nome visualizzato per questo record di certificato.",
-      "kind": "Se il certificato è un certificato server, certificato client o bundle CA.",
+      "kind": "Se il certificato \u00e8 un certificato server, certificato client o bundle CA.",
       "domain": "Dominio principale per cui richiedere il certificato.",
-      "acmeCa": "Autorità di certificazione / directory ACME usata per l'emissione.",
+      "acmeCa": "Autorit\u00e0 di certificazione / directory ACME usata per l'emissione.",
       "acmeCaCustom": "Inserisci un URL di directory ACME personalizzato.",
       "email": "Email di contatto passata al provider ACME.",
       "keyType": "Tipo e dimensione della chiave crittografica per il certificato.",
@@ -1192,10 +1192,10 @@
       "dnsProvider": "Provider DNS usato per la validazione DNS-01.",
       "wildcard": "Richiedi un certificato wildcard per *.domain.",
       "autoRenew": "Riemetti automaticamente il certificato prima della scadenza.",
-      "fullchain": "Certificato end-entity più tutte le CA intermedie, concatenate. HAProxy serve questa chain.",
+      "fullchain": "Certificato end-entity pi\u00f9 tutte le CA intermedie, concatenate. HAProxy serve questa chain.",
       "privateKey": "La chiave privata corrispondente al certificato.",
-      "chain": "File CA intermedio separato opzionale. Lascia vuoto se le intermedie sono già nel Fullchain PEM.",
-      "caCertificates": "Uno o più certificati CA, concatenati. Non deve essere inclusa alcuna chiave privata.",
+      "chain": "File CA intermedio separato opzionale. Lascia vuoto se le intermedie sono gi\u00e0 nel Fullchain PEM.",
+      "caCertificates": "Uno o pi\u00f9 certificati CA, concatenati. Non deve essere inclusa alcuna chiave privata.",
       "additionalCaChain": "Certificati CA aggiuntivi opzionali da accodare al bundle CA.",
       "dnsCredentials": "Credenziali del provider DNS usate per automatizzare la challenge ACME DNS-01. I valori memorizzati sono solo scrittura.",
       "dnsCredentialFallback": "Credenziale richiesta dal provider DNS selezionato per la validazione ACME DNS-01.",
@@ -1250,7 +1250,7 @@
       "redirectUrl": "URL di Reindirizzamento",
       "redirectCode": "Codice di Reindirizzamento",
       "customResponsePage": "Pagina di Risposta Personalizzata",
-      "selectPage": "— Seleziona una pagina —",
+      "selectPage": "\u2014 Seleziona una pagina \u2014",
       "listenerScope": "Ambito Listener",
       "allListeners": "Tutti i listener",
       "selectedListeners": "Listener selezionati",
@@ -1259,7 +1259,7 @@
       "create": "Crea",
       "save": "Salva"
     },
-    "challengeNote": "Le richieste corrispondenti vengono reindirizzate a una pagina di verifica CAPTCHA. La durata di validità della verifica è configurata globalmente nella <a href=\"/captcha\">pagina CAPTCHA</a>.",
+    "challengeNote": "Le richieste corrispondenti vengono reindirizzate a una pagina di verifica CAPTCHA. La durata di validit\u00e0 della verifica \u00e8 configurata globalmente nella <a href=\"/captcha\">pagina CAPTCHA</a>.",
     "challengeCustomUrl": "URL di verifica personalizzato in uso: {{url}}",
     "captchaPage": "pagina CAPTCHA",
     "confirmDelete": "Eliminare la regola \"{{name}}\"?",
@@ -1277,8 +1277,8 @@
       "remove": "Rimuovi",
       "addCondition": "+ Aggiungi condizione",
       "addOrGroup": "+ Aggiungi gruppo OR",
-      "selectPlaceholder": "— Seleziona —",
-      "selectList": "— Seleziona una lista —",
+      "selectPlaceholder": "\u2014 Seleziona \u2014",
+      "selectList": "\u2014 Seleziona una lista \u2014",
       "otherManual": "Altro (inserisci manualmente)",
       "headerNamePlaceholder": "nome header",
       "valuePlaceholder": "valore"
@@ -1327,7 +1327,7 @@
       },
       "all": "Tutti",
       "any": "Qualsiasi",
-      "yes": "Sì",
+      "yes": "S\u00ec",
       "no": "No",
       "editTitle": "Modifica Regola WAF",
       "addTitle": "Aggiungi Regola WAF",
@@ -1388,7 +1388,7 @@
         "custom": "Personalizzato",
         "remote": "Remoto"
       },
-      "challengeNote": "La durata di validità della verifica è configurata globalmente nella <a href=\"/captcha\">pagina CAPTCHA</a>.",
+      "challengeNote": "La durata di validit\u00e0 della verifica \u00e8 configurata globalmente nella <a href=\"/captcha\">pagina CAPTCHA</a>.",
       "blockDurationPlaceholder": "0 = nessun blocco"
     },
     "exceptions": {
@@ -1431,14 +1431,14 @@
       },
       "sections": {
         "selection": "Selezione delle regole",
-        "selectionHint": "Scegli a quali regole si applica questa eccezione — per ID, tag o messaggio. Digita per cercare suggerimenti; sono consentiti più valori.",
+        "selectionHint": "Scegli a quali regole si applica questa eccezione \u2014 per ID, tag o messaggio. Digita per cercare suggerimenti; sono consentiti pi\u00f9 valori.",
         "exclusion": "Esclusione di variabili",
-        "exclusionHint": "Per l'azione «Consenti variabile»: le variabili della richiesta che le regole selezionate devono smettere di ispezionare (es. ARGS:password). «Matcher» + «Valore» limitano l'esclusione ai contenuti corrispondenti.",
+        "exclusionHint": "Per l'azione \u00abConsenti variabile\u00bb: le variabili della richiesta che le regole selezionate devono smettere di ispezionare (es. ARGS:password). \u00abMatcher\u00bb + \u00abValore\u00bb limitano l'esclusione ai contenuti corrispondenti.",
         "condition": "Applica solo quando la richiesta corrisponde",
         "conditionHint": "Opzionale. Limita l'eccezione alle richieste in cui questa variabile corrisponde (es. REQUEST_URI inizia con /api/).",
         "preview": "Direttive generate"
       },
-      "previewEmpty": "Non verrà ancora generato nulla — seleziona regole, una variabile di destinazione o una condizione per vedere l'anteprima."
+      "previewEmpty": "Non verr\u00e0 ancora generato nulla \u2014 seleziona regole, una variabile di destinazione o una condizione per vedere l'anteprima."
     },
     "siem": {
       "title": "Integrazioni SIEM",
@@ -1486,7 +1486,7 @@
       "snapshotTitle": "Snapshot Regola WAF",
       "versionName": "Nome Versione",
       "saveSnapshot": "Salva Snapshot",
-      "confirmDelete": "Eliminare lo snapshot \"{{version}}\" per {{ruleName}}?\n\nQuesta operazione non può essere annullata.",
+      "confirmDelete": "Eliminare lo snapshot \"{{version}}\" per {{ruleName}}?\n\nQuesta operazione non pu\u00f2 essere annullata.",
       "deleteFailed": "Eliminazione snapshot fallita",
       "maxInvalid": "Il valore massimo deve essere un intero non negativo (0 = illimitato)",
       "updateMaxFailed": "Aggiornamento del valore massimo fallito"
@@ -1494,23 +1494,23 @@
     "crs": {
       "title": "Gestione OWASP CRS",
       "currentStatus": "Stato Attuale",
-      "mode": "Modalità:",
+      "mode": "Modalit\u00e0:",
       "modeFilesystem": "Filesystem (scaricato)",
       "modeEmbedded": "Incorporato (immagine)",
       "activeVersion": "Versione attiva:",
       "pinnedVersion": "Versione bloccata:",
-      "pinnedLatest": "più recente",
+      "pinnedLatest": "pi\u00f9 recente",
       "filesPresent": "File presenti:",
       "includePath": "Percorso di inclusione:",
-      "loadingStatus": "Caricamento stato…",
+      "loadingStatus": "Caricamento stato\u2026",
       "downloadUpdate": "Scarica / Aggiorna CRS",
-      "downloadLatest": "Scarica CRS più recente",
+      "downloadLatest": "Scarica CRS pi\u00f9 recente",
       "downloadVersion": "Scarica CRS v{{version}}",
       "downloadHint": "Scarica dalle release ufficiali su GitHub di OWASP CRS",
       "pinVersion": "Blocca versione:",
       "pinPlaceholder": "es. 4.0.0",
       "pinSave": "Salva",
-      "pinEmptyHint": "Vuoto = sempre più recente",
+      "pinEmptyHint": "Vuoto = sempre pi\u00f9 recente",
       "snapshotsTitle": "Snapshot CRS",
       "tableHeaders": {
         "version": "Versione",
@@ -1521,8 +1521,8 @@
       },
       "active": "(attiva)",
       "noSnapshots": "Nessuno snapshot CRS ancora. Scarica CRS per crearne uno.",
-      "confirmRollback": "Ripristinare CRS {{version}}? Questo riavvierà il container Coraza SPOA.",
-      "confirmDelete": "Eliminare lo snapshot CRS {{version}}? Questa operazione non può essere annullata.",
+      "confirmRollback": "Ripristinare CRS {{version}}? Questo riavvier\u00e0 il container Coraza SPOA.",
+      "confirmDelete": "Eliminare lo snapshot CRS {{version}}? Questa operazione non pu\u00f2 essere annullata.",
       "rollbackFailed": "Ripristino fallito",
       "deleteFailed": "Eliminazione fallita",
       "downloadFailed": "Download fallito",
@@ -1552,42 +1552,42 @@
       "ruleSetUpdateIntervalHours": "Ogni quanto riscaricare il set di regole remoto.",
       "ruleSetAutoUpdate": "Attiva il riscaricamento automatico all'intervallo configurato.",
       "plugins": "Elenco separato da virgole di plugin Coraza da caricare.",
-      "engine": "Modalità WAF: attiva, solo rilevamento, o disabilitata.",
-      "paranoiaLevel": "Livello di paranoia CRS (1-4); livelli più alti sono più aggressivi.",
+      "engine": "Modalit\u00e0 WAF: attiva, solo rilevamento, o disabilitata.",
+      "paranoiaLevel": "Livello di paranoia CRS (1-4); livelli pi\u00f9 alti sono pi\u00f9 aggressivi.",
       "inboundAnomalyThreshold": "Punteggio anomalia in ingresso che attiva l'azione configurata.",
       "outboundAnomalyThreshold": "Punteggio anomalia in uscita (risposta) che attiva l'azione.",
       "action": "Azione predefinita per le regole attivate: block, allow, log, redirect, challenge.",
       "siemIntegration": "Endpoint SIEM a cui inviare gli eventi WAF.",
-      "redirectUrl": "URL a cui reindirizzare il client quando l'azione è redirect o challenge.",
+      "redirectUrl": "URL a cui reindirizzare il client quando l'azione \u00e8 redirect o challenge.",
       "captchaValidSeconds": "Per quanto tempo una sessione di verifica rimane valida.",
       "statusCode": "Stato HTTP restituito quando una regola si attiva e l'azione lo utilizza.",
       "pathPattern": "Limita la regola ai percorsi corrispondenti a questo pattern.",
       "httpMethods": "Metodi separati da virgole a cui si applica la regola.",
       "contentTypes": "Tipi di contenuto di risposta separati da virgole a cui si applica la regola.",
-      "failOpen": "Consenti il traffico se il Coraza SPOA è irraggiungibile.",
+      "failOpen": "Consenti il traffico se il Coraza SPOA \u00e8 irraggiungibile.",
       "rateBasedRule": "Abilita il rate limiting delle richieste all'interno di questa regola.",
       "rateEvents": "Numero di richieste consentite nella finestra di rate.",
       "rateWindowSeconds": "Finestra temporale per il rate limiting.",
       "rateKey": "Dimensione per contare le richieste: IP sorgente, ID utente, header, percorso, o ASN (richiede database MaxMind ASN).",
-      "rateHeader": "Header contenente l'ID utente o la chiave API quando la Chiave Rate è impostata su header/user_id.",
+      "rateHeader": "Header contenente l'ID utente o la chiave API quando la Chiave Rate \u00e8 impostata su header/user_id.",
       "rateAction": "Azione intrapresa quando il limite di rate viene superato.",
       "rateDurationSeconds": "Per quanto tempo bloccare il client; 0 significa nessun blocco.",
       "customSecRules": "Regole ModSecurity / Coraza in formato libero aggiunte a questa configurazione.",
-      "enabled": "Se questa regola WAF è attiva.",
+      "enabled": "Se questa regola WAF \u00e8 attiva.",
       "versionName": "Etichetta per questa copia point-in-time della regola.",
       "exName": "Nome visualizzato per questa eccezione.",
       "exWafRule": "Regola a cui si applica questa eccezione, o globale per tutte le regole.",
-      "exRuleId": "ID regola da corrispondere — digita per cercare le regole attivate o del set installato. Più ID consentiti.",
-      "exRuleTag": "Tag di regola da corrispondere, es. attack-sqli. Più tag consentiti.",
-      "exRuleMsg": "Testo del messaggio di regola da corrispondere (sottostringa). Più messaggi consentiti.",
-      "exExceptionAction": "Cosa fare con le regole corrispondenti: «remove» le disattiva, «allow» esclude variabili di richiesta specifiche, «comment» disattiva con nota, «update» ne modifica azione/destinazione.",
-      "exUpdateAction": "Nuova azione da assegnare a una regola quando è selezionato update.",
+      "exRuleId": "ID regola da corrispondere \u2014 digita per cercare le regole attivate o del set installato. Pi\u00f9 ID consentiti.",
+      "exRuleTag": "Tag di regola da corrispondere, es. attack-sqli. Pi\u00f9 tag consentiti.",
+      "exRuleMsg": "Testo del messaggio di regola da corrispondere (sottostringa). Pi\u00f9 messaggi consentiti.",
+      "exExceptionAction": "Cosa fare con le regole corrispondenti: \u00abremove\u00bb le disattiva, \u00aballow\u00bb esclude variabili di richiesta specifiche, \u00abcomment\u00bb disattiva con nota, \u00abupdate\u00bb ne modifica azione/destinazione.",
+      "exUpdateAction": "Nuova azione da assegnare a una regola quando \u00e8 selezionato update.",
       "exUpdateTarget": "Variabile o collezione da aggiornare.",
-      "exZone": "Collezione/i di richiesta da escludere dall'ispezione, es. ARGS o REQUEST_HEADERS. Più zone consentite.",
-      "exVariable": "Il nome della variabile nella zona — es. «password» per ARGS:password. Lascia vuoto per escludere l'intera zona.",
-      "exMatcher": "Opzionale — escludi la variabile solo quando il suo contenuto corrisponde. Lascia vuoto per escluderla sempre.",
+      "exZone": "Collezione/i di richiesta da escludere dall'ispezione, es. ARGS o REQUEST_HEADERS. Pi\u00f9 zone consentite.",
+      "exVariable": "Il nome della variabile nella zona \u2014 es. \u00abpassword\u00bb per ARGS:password. Lascia vuoto per escludere l'intera zona.",
+      "exMatcher": "Opzionale \u2014 escludi la variabile solo quando il suo contenuto corrisponde. Lascia vuoto per escluderla sempre.",
       "exValue": "Il contenuto che la variabile deve corrispondere per l'esclusione.",
-      "exConditionVariable": "Opzionale — applica l'eccezione solo quando questa variabile di richiesta corrisponde, es. REQUEST_URI o REQUEST_HEADERS:Host.",
+      "exConditionVariable": "Opzionale \u2014 applica l'eccezione solo quando questa variabile di richiesta corrisponde, es. REQUEST_URI o REQUEST_HEADERS:Host.",
       "exConditionOperator": "Come confrontare la variabile di condizione con il valore.",
       "exConditionValue": "Il valore che la variabile di condizione deve corrispondere, es. /api/ o un indirizzo IP.",
       "exDescription": "Nota leggibile dall'utente su questa eccezione.",
@@ -1596,7 +1596,7 @@
       "siemTarget": "URL, host syslog, o endpoint Elastic.",
       "siemFormat": "Formato di output: JSON, Syslog, o CEF.",
       "siemAuthHeader": "Header di autorizzazione opzionale inviato con le richieste webhook.",
-      "siemEnabled": "Se questa integrazione è attiva."
+      "siemEnabled": "Se questa integrazione \u00e8 attiva."
     },
     "errors": {
       "exportFailed": "Esportazione regole WAF fallita",
@@ -1610,7 +1610,7 @@
     "last250": "Ultimi 250",
     "last500": "Ultimi 500",
     "refresh": "Aggiorna",
-    "loadingEllipsis": "Caricamento…",
+    "loadingEllipsis": "Caricamento\u2026",
     "health": {
       "status": "Stato",
       "spoaReachable": "SPOA Raggiungibile",
@@ -1627,7 +1627,7 @@
       "eventId": "ID Evento",
       "action": "Azione",
       "ruleId": "ID Regola",
-      "severity": "Gravità",
+      "severity": "Gravit\u00e0",
       "client": "Client",
       "uri": "URI",
       "message": "Messaggio"
@@ -1637,7 +1637,7 @@
       "uniqueId": "ID Univoco:",
       "action": "Azione:",
       "ruleId": "ID Regola:",
-      "severity": "Gravità:",
+      "severity": "Gravit\u00e0:",
       "clientIp": "IP Client:",
       "fullUri": "URI Completo:",
       "fullMessage": "Messaggio Completo:",
@@ -1670,7 +1670,7 @@
       "baselinePci": "PCI",
       "baselineCustom": "Personalizzato",
       "minTls": "TLS Min",
-      "hstsMaxAge": "Età Max HSTS",
+      "hstsMaxAge": "Et\u00e0 Max HSTS",
       "ciphers": "Cipher",
       "quantumSafe": "Quantum Safe",
       "hsts": "HSTS",
@@ -1703,7 +1703,7 @@
       "pathInfoRegex": "Regex Path Info",
       "pathInfoRegexPlaceholder": "^(/.+\\.php)(/.*)?$",
       "maxConcurrentRequests": "Richieste simultanee max.",
-      "maxReqsHint": "Utilizzato solo quando il multiplexing di connessione è abilitato.",
+      "maxReqsHint": "Utilizzato solo quando il multiplexing di connessione \u00e8 abilitato.",
       "stderrLogTarget": "Destinazione log STDERR (opzionale, predefinito: global)",
       "stderrLogTargetPlaceholder": "globale",
       "logStderr": "Registra STDERR",
@@ -1728,11 +1728,11 @@
       "description": "Nota opzionale leggibile dall'utente.",
       "docroot": "Percorso del filesystem alla radice dell'applicazione.",
       "pathInfoRegex": "Regex che divide l'URI della richiesta in script e path-info.",
-      "maxConcurrentRequests": "Numero massimo di richieste gestite contemporaneamente quando il multiplexing di connessione è attivo.",
+      "maxConcurrentRequests": "Numero massimo di richieste gestite contemporaneamente quando il multiplexing di connessione \u00e8 attivo.",
       "stderrLogTarget": "Dove inviare i log stderr di FastCGI (predefinito: global).",
       "logStderr": "Cattura e registra l'output stderr dell'applicazione.",
       "keepConnectionOpen": "Riutilizza le connessioni FastCGI tra le richieste.",
-      "connectionMultiplexing": "Consenti più richieste su una singola connessione FastCGI.",
+      "connectionMultiplexing": "Consenti pi\u00f9 richieste su una singola connessione FastCGI.",
       "paramName": "Nome del parametro FastCGI passato all'applicazione.",
       "paramValue": "Valore o espressione sample-fetch di HAProxy, es. `%[req.uri]`.",
       "paramEnabled": "Se questo parametro viene inviato."
@@ -1824,7 +1824,7 @@
       "blockStatusCode": "Codice di stato blocco",
       "save": "Salva"
     },
-    "responseCodeDescription": "Blocca i client che ricevono più di {{events}} risposte con stato {{statusCode}} entro {{window}}s. Il contatore si incrementa nella fase di risposta (dopo la risposta del backend), quindi vengono contate solo le risposte effettive del backend.",
+    "responseCodeDescription": "Blocca i client che ricevono pi\u00f9 di {{events}} risposte con stato {{statusCode}} entro {{window}}s. Il contatore si incrementa nella fase di risposta (dopo la risposta del backend), quindi vengono contate solo le risposte effettive del backend.",
     "tooltips": {
       "name": "Nome visualizzato per questo limite di frequenza.",
       "listener": "Listener a cui applicare il limite di frequenza, o tutti i listener.",
@@ -1846,7 +1846,7 @@
       "matchStatusCode": "Codice di stato del backend che incrementa il contatore, es. `404`.",
       "blockStatusCode": "Codice di stato restituito al client quando il limite viene raggiunto.",
       "rateKey": "Dimensione per contare le richieste: IP sorgente, ID utente, header, percorso o ASN (richiede database MaxMind ASN). Solo i tipi base, avanzato e attivato da WAF supportano chiavi non-src; il codice di risposta conta sempre per IP sorgente.",
-      "rateHeader": "Header contenente l'ID utente o la chiave API quando la chiave di frequenza è impostata su header/ID utente."
+      "rateHeader": "Header contenente l'ID utente o la chiave API quando la chiave di frequenza \u00e8 impostata su header/ID utente."
     }
   },
   "redirects": {
@@ -1875,13 +1875,13 @@
       "listenersNoneAll": "Listener (nessuno = tutti)",
       "source": "Sorgente",
       "customResponsePage": "Pagina di risposta personalizzata",
-      "urlRedirect": "— Reindirizzamento URL —",
+      "urlRedirect": "\u2014 Reindirizzamento URL \u2014",
       "target": "Destinazione",
       "code": "Codice",
       "responsePageQueryString": "Query string della pagina di risposta",
       "responsePageQueryPlaceholder": "message=hello+world&foo=bar",
       "responsePageQueryHelp": "I parametri vengono impostati sulla richiesta prima che la pagina di risposta venga restituita. Usa la sintassi sample-fetch di HAProxy come %[url_param(message)] o %[query].",
-      "responsePageNote": "Questo reindirizzamento restituirà direttamente il contenuto della pagina di risposta personalizzata selezionata invece di eseguire un reindirizzamento URL.",
+      "responsePageNote": "Questo reindirizzamento restituir\u00e0 direttamente il contenuto della pagina di risposta personalizzata selezionata invece di eseguire un reindirizzamento URL.",
       "type": "Tipo",
       "typePermanent": "Permanente",
       "typeTemporary": "Temporaneo",
@@ -1908,7 +1908,7 @@
       "rewriteName": "Nome visualizzato per questa riscrittura.",
       "rewriteListeners": "Listener a cui si applica questa riscrittura; nessuno significa tutti.",
       "hostMatch": "Valore header Host opzionale per limitare la riscrittura.",
-      "regex": "Espressione regolare che corrisponde al percorso (e alla query string quando il tipo è `both`).",
+      "regex": "Espressione regolare che corrisponde al percorso (e alla query string quando il tipo \u00e8 `both`).",
       "rewriteTarget": "Percorso o query string di sostituzione.",
       "rewriteType": "Riscrivere il percorso, la query string o entrambi."
     }
@@ -1946,10 +1946,10 @@
       "injectPositionAfter": "Dopo la corrispondenza",
       "injectPositionReplace": "Sostituisci corrispondenza",
       "injectString": "Stringa di Iniezione",
-      "maskMode": "Modalità Mascheramento",
+      "maskMode": "Modalit\u00e0 Mascheramento",
       "maskModeDetector": "Rilevatore (PII integrato)",
       "maskModeRegex": "Regex Personalizzato",
-      "tokenMode": "Modalità Token",
+      "tokenMode": "Modalit\u00e0 Token",
       "tokenModeTokenize": "Tokenizza (archivio Valkey + TTL)",
       "tokenModeEncrypt": "Crittografa (AES-256-GCM)",
       "detector": "Rilevatore",
@@ -1979,11 +1979,11 @@
       "injectPosition": "Dove iniettare rispetto alla corrispondenza regex: prima, dopo, o sostituisci la corrispondenza.",
       "maskMode": "detector = usa rilevatore PII integrato; regex = usa regex personalizzato.",
       "detector": "Rilevatore PII integrato: email, phone, ssn, credit_card, ip.",
-      "tokenMode": "tokenize = memorizza token→originale in Valkey con TTL; encrypt = crittografa AES-256-GCM con chiave d'ambiente.",
+      "tokenMode": "tokenize = memorizza token\u2192originale in Valkey con TTL; encrypt = crittografa AES-256-GCM con chiave d'ambiente.",
       "tokenPrefix": "Prefisso per i token generati (es. TOK_ o ENC_). Usato per trovare i token nei corpi di richiesta per il demascheramento.",
-      "tokenTtl": "TTL in secondi per la modalità tokenizzazione. Dopo la scadenza, i dati originali sono irrecuperabili.",
+      "tokenTtl": "TTL in secondi per la modalit\u00e0 tokenizzazione. Dopo la scadenza, i dati originali sono irrecuperabili.",
       "encryptKeyEnv": "Nome della variabile d'ambiente che contiene la chiave AES-256 (minimo 32 byte). La chiave stessa non viene mai memorizzata nel database.",
-      "enabled": "Se questa regola è attiva."
+      "enabled": "Se questa regola \u00e8 attiva."
     }
   },
   "securityLists": {
@@ -2113,7 +2113,7 @@
       "specImported": "Specifica importata con successo.",
       "failedToLoadSpecs": "Caricamento specifiche fallito",
       "failedToImportSpec": "Importazione specifica fallita.",
-      "schemasCount": "v{{version}} • {{count}} schemi"
+      "schemasCount": "v{{version}} \u2022 {{count}} schemi"
     },
     "schemas": {
       "title": "Schemi API",
@@ -2164,7 +2164,7 @@
       "providerRecaptcha": "reCAPTCHA",
       "providerTurnstile": "Turnstile",
       "providerHelp": "Seleziona il provider CAPTCHA globale. Tutte le azioni di sfida (WAF, regole di sicurezza, limiti di frequenza) usano questo provider.",
-      "challengeValidDuration": "Durata Validità Sfida (secondi)",
+      "challengeValidDuration": "Durata Validit\u00e0 Sfida (secondi)",
       "challengeValidDurationHelp": "Per quanto tempo una sfida risolta rimane valida (durata del cookie _cv).",
       "nativeConfig": "Configurazione Nativa (Cap)",
       "siteKey": "Chiave Sito",
@@ -2213,7 +2213,7 @@
       "chart": "Grafico",
       "ruleNumber": "Regola #{{id}}",
       "deletedRule": "Regola eliminata",
-      "chartTitle": "{{name}} — ultimi 7 giorni",
+      "chartTitle": "{{name}} \u2014 ultimi 7 giorni",
       "close": "Chiudi",
       "eventTableHeaders": {
         "time": "Ora",
@@ -2250,9 +2250,9 @@
       "confirmDeleteKey": "Eliminare la chiave {{key}}?",
       "secretKey": "Chiave Segreta",
       "secretCreatedTitle": "Chiave Segreta Creata",
-      "secretWarning": "Copia questo segreto ora — non verrà più mostrato.",
+      "secretWarning": "Copia questo segreto ora \u2014 non verr\u00e0 pi\u00f9 mostrato.",
       "rotateSecret": "Ruota Segreto",
-      "confirmRotateSecret": "Ruotare il segreto per la chiave {{key}}? Il vecchio segreto smetterà immediatamente di funzionare.",
+      "confirmRotateSecret": "Ruotare il segreto per la chiave {{key}}? Il vecchio segreto smetter\u00e0 immediatamente di funzionare.",
       "deleteKey": "Elimina Chiave"
     }
   },
@@ -2272,8 +2272,8 @@
       "violations24h": "Violazioni (24h)",
       "changedScripts": "Script modificati",
       "activePolicies": "Policy attive",
-      "topViolatedDirectives": "Direttive più violate (7g)",
-      "topBlockedUris": "URI più bloccati (7g)",
+      "topViolatedDirectives": "Direttive pi\u00f9 violate (7g)",
+      "topBlockedUris": "URI pi\u00f9 bloccati (7g)",
       "noData": "Nessun dato",
       "loading": "Caricamento..."
     },
@@ -2286,7 +2286,7 @@
       "noteOptional": "Nota (facoltativo)",
       "notePlaceholder": "es. Baseline post-distribuzione v2.3",
       "window": "Finestra",
-      "windowInProgress": "→ (in corso)",
+      "windowInProgress": "\u2192 (in corso)",
       "scripts": "Script",
       "reports": "Rapporti",
       "distinctIps": "IP distinte",
@@ -2304,7 +2304,7 @@
       "tableHeaders": {
         "name": "Nome",
         "backends": "Backend",
-        "mode": "Modalità",
+        "mode": "Modalit\u00e0",
         "sample": "Campione",
         "enabled": "Attivo"
       },
@@ -2316,7 +2316,7 @@
         "editTitle": "Modifica policy",
         "addTitle": "Aggiungi policy",
         "name": "Nome",
-        "mode": "Modalità",
+        "mode": "Modalit\u00e0",
         "modeMonitor": "Monitora (solo rapporto)",
         "modeEnforce": "Applica (blocca)",
         "sampleRate": "Tasso di campionamento (%)",
@@ -2326,7 +2326,7 @@
         "enabled": "Attivo",
         "cspDirectives": "Direttive CSP",
         "recommendPolicy": "Raccomanda policy",
-        "analyzing": "Analisi…",
+        "analyzing": "Analisi\u2026",
         "addDirective": "Aggiungi direttiva",
         "noSources": "Nessuna fonte (direttiva solo flag)",
         "noDirectives": "Nessuna direttiva ancora aggiunta",
@@ -2340,7 +2340,7 @@
       "recommend": {
         "title": "Policy CSP raccomandata",
         "basedOn": "Basato su {{scripts}} script e {{reports}} rapporti di violazione",
-        "withinBaseline": " entro la finestra di baseline ({{start}} → {{end}})",
+        "withinBaseline": " entro la finestra di baseline ({{start}} \u2192 {{end}})",
         "forBackends": " per i backend: {{backends}}",
         "warnings": "Avvisi ({{count}})",
         "recommendedDirectives": "Direttive raccomandate",
@@ -2348,7 +2348,7 @@
         "origin": "Origine",
         "occurrences": "Occorrenze",
         "distinctIps": "IP distinte",
-        "reviewNote": "Rivedi le raccomandazioni sopra. Fai clic su Applica per compilare il modulo della policy — puoi modificare ulteriormente prima di salvare. Le origini viste da meno di 2 IP distinte sono evidenziate in ambra e potrebbero essere sonde di attaccanti.",
+        "reviewNote": "Rivedi le raccomandazioni sopra. Fai clic su Applica per compilare il modulo della policy \u2014 puoi modificare ulteriormente prima di salvare. Le origini viste da meno di 2 IP distinte sono evidenziate in ambra e potrebbero essere sonde di attaccanti.",
         "applyToForm": "Applica al modulo",
         "cancel": "Annulla"
       },
@@ -2406,7 +2406,7 @@
       },
       "loading": "Caricamento...",
       "noReports": "Nessun rapporto",
-      "confirmClearAll": "Eliminare tutti i rapporti CSP? Questa operazione non può essere annullata."
+      "confirmClearAll": "Eliminare tutti i rapporti CSP? Questa operazione non pu\u00f2 essere annullata."
     },
     "settings": {
       "title": "Impostazioni Protezione Pagina",
@@ -2429,9 +2429,9 @@
       "beaconSectionTitle": "Beacon di Inventario e Fiducia del Beacon",
       "beaconRequiresRespTransform": "Le Trasformazioni di Risposta devono essere abilitate nelle Opzioni Globali per utilizzare il Beacon di Inventario e la Fiducia del Beacon.",
       "inventoryBeacon": "Beacon di Inventario",
-      "inventoryBeaconHelp": "Inietta un beacon JS nelle risposte HTML che raccoglie tutte le risorse caricate tramite la Resource Timing API. Fornisce un inventario completo delle risorse indipendentemente dalla modalità CSP.",
+      "inventoryBeaconHelp": "Inietta un beacon JS nelle risposte HTML che raccoglie tutte le risorse caricate tramite la Resource Timing API. Fornisce un inventario completo delle risorse indipendentemente dalla modalit\u00e0 CSP.",
       "beaconTrust": "Fiducia del Beacon",
-      "beaconTrustHelp": "Inserisce un ID univoco nell'intestazione di risposta Server-Timing. Il beacon JS lo legge e lo invia con il POST del beacon. HAProxy valida l'ID per provare che l'IP ha ricevuto una risposta reale, quindi marca l'IP come affidabile per il punteggio di rischio. Può essere abilitato indipendentemente dal tracciamento delle risorse.",
+      "beaconTrustHelp": "Inserisce un ID univoco nell'intestazione di risposta Server-Timing. Il beacon JS lo legge e lo invia con il POST del beacon. HAProxy valida l'ID per provare che l'IP ha ricevuto una risposta reale, quindi marca l'IP come affidabile per il punteggio di rischio. Pu\u00f2 essere abilitato indipendentemente dal tracciamento delle risorse.",
       "beaconEndpointPath": "Percorso dell'Endpoint del Beacon",
       "beaconEndpointPathHelp": "Percorso URL a cui il beacon JS invia gli elenchi di risorse.",
       "beaconScriptPath": "Percorso dello Script del Beacon",
@@ -2482,7 +2482,7 @@
       "pathBase62": "Percorso (base62)",
       "method": "Metodo",
       "httpVersion": "Versione HTTP",
-      "pathDepth": "Profondità percorso",
+      "pathDepth": "Profondit\u00e0 percorso",
       "paramKeys": "Chiavi parametri",
       "paramTypes": "Tipi parametri",
       "paramLengths": "Lunghezze parametri",
@@ -2519,21 +2519,21 @@
     "tabs": {
       "settings": "Impostazioni",
       "users": "Utenti",
-      "features": "Funzionalità",
+      "features": "Funzionalit\u00e0",
       "snapshots": "Snapshot",
       "tables": "Tabelle Stick",
       "valkey": "Valkey",
-      "ha": "Alta Disponibilità"
+      "ha": "Alta Disponibilit\u00e0"
     }
   },
   "mcpGateway": {
     "title": "Gateway MCP",
-    "description": "Configura e gestisci la federazione dei server MCP, le identità, le policy, le regole DLP, i guardrail e le competenze.",
+    "description": "Configura e gestisci la federazione dei server MCP, le identit\u00e0, le policy, le regole DLP, i guardrail e le competenze.",
     "tabs": {
       "teams": "Team",
       "servers": "Server",
       "marketplace": "Marketplace",
-      "identities": "Identità",
+      "identities": "Identit\u00e0",
       "policies": "Policy",
       "dlp": "Regole DLP",
       "guardrails": "Guardrail",
@@ -2543,10 +2543,10 @@
       "settings": "Impostazioni"
     },
     "identities": {
-      "count": "{{count}} identità",
-      "addIdentity": "Aggiungi identità",
-      "editIdentity": "Modifica identità",
-      "noIdentities": "Nessuna identità configurata.",
+      "count": "{{count}} identit\u00e0",
+      "addIdentity": "Aggiungi identit\u00e0",
+      "editIdentity": "Modifica identit\u00e0",
+      "noIdentities": "Nessuna identit\u00e0 configurata.",
       "enabled": "Abilitato",
       "disabled": "Disabilitato",
       "patPrefix": "PAT {{prefix}}...",
@@ -2558,13 +2558,13 @@
       "revokeAll": "Revoca tutti",
       "noActiveSessions": "Nessuna sessione attiva.",
       "sessionCreated": "Creato: {{date}}",
-      "deleteConfirm": "Eliminare questa identità?",
+      "deleteConfirm": "Eliminare questa identit\u00e0?",
       "revokeIdentityConfirm": "Revocare tutti i token e sessioni?",
-      "saveFailed": "Salvataggio identità fallito",
+      "saveFailed": "Salvataggio identit\u00e0 fallito",
       "tooltips": {
         "revokeAllTokens": "Revoca tutti i token",
-        "editIdentity": "Modifica identità",
-        "deleteIdentity": "Elimina identità",
+        "editIdentity": "Modifica identit\u00e0",
+        "deleteIdentity": "Elimina identit\u00e0",
         "revokeSession": "Revoca sessione"
       },
       "modal": {
@@ -2580,7 +2580,7 @@
         "jwksUrl": "JWKS URL",
         "expiresAt": "Scade il",
         "patIssued": "PAT emesso",
-        "patWarning": "Copia questo token ora — non verrà più mostrato."
+        "patWarning": "Copia questo token ora \u2014 non verr\u00e0 pi\u00f9 mostrato."
       }
     },
     "policies": {
@@ -2625,8 +2625,8 @@
         "mcpTool": "Nome dello strumento (con namespace)",
         "mcpResource": "URI della risorsa",
         "mcpPrompt": "Nome del prompt",
-        "mcpIdentity": "Nome dell'identità autenticata",
-        "mcpIdentityKind": "Tipo di identità (pat o jwt)",
+        "mcpIdentity": "Nome dell'identit\u00e0 autenticata",
+        "mcpIdentityKind": "Tipo di identit\u00e0 (pat o jwt)",
         "mcpTeam": "Slug del team",
         "mcpArg": "Argomento dello strumento per chiave",
         "authClaimSub": "Claim subject del JWT",
@@ -2655,7 +2655,7 @@
         "exists": "esiste"
       },
       "staleCatalogsTitle": "{{count}} catalogo/i server non caricato/i",
-      "staleCatalogsHint": "I suggerimenti per strumenti, risorse e prompt non sono disponibili finché il catalogo non viene aggiornato.",
+      "staleCatalogsHint": "I suggerimenti per strumenti, risorse e prompt non sono disponibili finch\u00e9 il catalogo non viene aggiornato.",
       "refreshingCatalogs": "Aggiornamento dei cataloghi in background...",
       "refreshAllCatalogs": "Aggiorna tutto",
       "refreshServerCatalog": "Aggiorna",
@@ -2666,7 +2666,7 @@
         "allowSpecificTool": "Consenti strumento specifico",
         "allowToolPrefix": "Consenti strumenti per prefisso",
         "allowToolList": "Consenti lista di strumenti",
-        "denyByIdentity": "Nega per identità",
+        "denyByIdentity": "Nega per identit\u00e0",
         "jwtSubjectCheck": "Controllo subject JWT",
         "serverMethod": "Server + metodo",
         "pathTraversalGuard": "Protezione da path traversal"
@@ -2790,7 +2790,7 @@
       "fields": {
         "requestId": "ID richiesta:",
         "session": "Sessione:",
-        "identity": "Identità:",
+        "identity": "Identit\u00e0:",
         "team": "Team:",
         "server": "Server:",
         "status": "Stato:",
@@ -2824,7 +2824,7 @@
       "published": "Pubblicato",
       "draft": "Bozza",
       "noDescription": "Nessuna descrizione",
-      "enableWhenLabel": " · enable_when: {{value}}",
+      "enableWhenLabel": " \u00b7 enable_when: {{value}}",
       "newVersion": "Nuova versione",
       "versions": "Versioni",
       "editSkillAria": "Modifica competenza",
@@ -2937,7 +2937,7 @@
         "tools": "Strumenti ({{count}})",
         "resources": "Risorse ({{count}})",
         "prompts": "Prompt ({{count}})",
-        "noCatalog": "Nessuna voce di catalogo in cache. Il catalogo verrà popolato dopo il prossimo ciclo di aggiornamento."
+        "noCatalog": "Nessuna voce di catalogo in cache. Il catalogo verr\u00e0 popolato dopo il prossimo ciclo di aggiornamento."
       },
       "modal": {
         "team": "Team",
@@ -2962,7 +2962,7 @@
         "authOAuth": "OAuth",
         "authHeaderLabel": "Header Auth",
         "authSecret": "Secret Auth",
-        "authSecretKeep": "•••••• (lascia per mantenere)",
+        "authSecretKeep": "\u2022\u2022\u2022\u2022\u2022\u2022 (lascia per mantenere)",
         "timeoutMs": "Timeout (ms)",
         "maxBodyBytes": "Byte max body",
         "enabled": "Abilitato",
@@ -3018,13 +3018,16 @@
       "saveAlertConfigFailed": "Salvataggio config avvisi fallito",
       "recentAlerts": "Avvisi recenti",
       "webhookStatus": "Webhook {{status}}",
-      "noWebhook": "Nessun webhook"
+      "noWebhook": "Nessun webhook",
+      "defaultRpmHelp": "Limite per identit\u00e0, per strumento. 0 disabilita.",
+      "perIpLimitHelp": "Limite di richieste per IP prima dell'autenticazione. 0 disabilita.",
+      "concurrentLimitHelp": "Numero massimo di richieste simultanee per identit\u00e0. 0 disabilita."
     }
   },
   "featureFlags": {
     "mcpGateway": {
       "title": "Gateway MCP",
-      "description": "Abilita o disabilita l'UI di gestione MCP Gateway. Quando abilitata, la pagina MCP Gateway appare nel menu di navigazione per configurare federazione dei server, identità, policy, regole DLP, guardrail e competenze.",
+      "description": "Abilita o disabilita l'UI di gestione MCP Gateway. Quando abilitata, la pagina MCP Gateway appare nel menu di navigazione per configurare federazione dei server, identit\u00e0, policy, regole DLP, guardrail e competenze.",
       "enable": "Abilita gateway MCP",
       "save": "Salva",
       "enabledMsg": "Gateway MCP abilitato.",
@@ -3032,14 +3035,14 @@
       "saveFailed": "Salvataggio impostazione MCP fallito."
     },
     "restoreClientIp": {
-      "title": "Ripristina IP client — Sorgenti Proxy/CDN attendibili",
-      "description": "Quando un pool di backend ha Restore Client IP abilitato, il ripristino viene applicato solo alle connessioni da questi IP/CIDR edge CDN/proxy attendibili. Lascia vuoto per applicare incondizionatamente (non raccomandato — un client diretto potrebbe falsificare l'header). Più liste sono combinate con OR.",
+      "title": "Ripristina IP client \u2014 Sorgenti Proxy/CDN attendibili",
+      "description": "Quando un pool di backend ha Restore Client IP abilitato, il ripristino viene applicato solo alle connessioni da questi IP/CIDR edge CDN/proxy attendibili. Lascia vuoto per applicare incondizionatamente (non raccomandato \u2014 un client diretto potrebbe falsificare l'header). Pi\u00f9 liste sono combinate con OR.",
       "trustedNetworkLists": "Liste di reti attendibili",
       "noNetworkLists": "Nessuna lista di rete. Creane una in Security Lists.",
-      "noTrustedWarning": "Nessuna lista attendibile selezionata: qualsiasi client può fornire l'header e influenzare le regole basate sull'IP sorgente. Crea liste di rete dei tuoi range edge CDN/proxy e selezionale.",
+      "noTrustedWarning": "Nessuna lista attendibile selezionata: qualsiasi client pu\u00f2 fornire l'header e influenzare le regole basate sull'IP sorgente. Crea liste di rete dei tuoi range edge CDN/proxy e selezionale.",
       "save": "Salva",
       "savedMsg": "Liste attendibili salvate.",
-      "clearedMsg": "Liste attendibili cancellate — ripristino non protetto.",
+      "clearedMsg": "Liste attendibili cancellate \u2014 ripristino non protetto.",
       "saveFailed": "Salvataggio liste attendibili fallito."
     }
   },
@@ -3093,7 +3096,7 @@
     "polling": "polling",
     "scanHistory": "Scan History",
     "viewDetails": "View Details",
-    "viewOnlyAccess": "View-only access — you can view scan results but cannot submit scans.",
+    "viewOnlyAccess": "View-only access \u2014 you can view scan results but cannot submit scans.",
     "contactFieldsRequired": "Complete your profile (email, first name, last name, organization) to submit SSL Labs scans. Update your profile via the user menu.",
     "retention": "Retention",
     "settingsTitle": "SSL Labs Scan Retention",
@@ -3130,7 +3133,7 @@
   },
   "systemTables": {
     "title": "Tabelle Stick HAProxy",
-    "description": "Visualizza e gestisci le tabelle stick di HAProxy (contatori rate-limit, beacon trust, affinità di sessione). Le tabelle grandi sono impaginate e memorizzate nella cache lato server.",
+    "description": "Visualizza e gestisci le tabelle stick di HAProxy (contatori rate-limit, beacon trust, affinit\u00e0 di sessione). Le tabelle grandi sono impaginate e memorizzate nella cache lato server.",
     "tableName": "Tabella",
     "type": "Tipo",
     "size": "Dimensione",
@@ -3146,12 +3149,12 @@
     "clearAll": "Cancella tutto",
     "clearEntry": "Cancella voce",
     "confirmClearEntry": "Cancellare la voce \"{{key}}\" dalla tabella {{name}}?",
-    "confirmClearAll": "Rimuovere tutte le voci dalla tabella \"{{name}}\"? Questa azione non può essere annullata.",
+    "confirmClearAll": "Rimuovere tutte le voci dalla tabella \"{{name}}\"? Questa azione non pu\u00f2 essere annullata.",
     "entryCleared": "Voce cancellata.",
     "tableCleared": "Tabella cancellata.",
     "clearFailed": "Impossibile cancellare la voce.",
     "noEntries": "Nessuna voce in questa tabella.",
-    "noTables": "Nessuna tabella stick trovata. HAProxy potrebbe non essere in esecuzione o il socket delle statistiche non è disponibile.",
+    "noTables": "Nessuna tabella stick trovata. HAProxy potrebbe non essere in esecuzione o il socket delle statistiche non \u00e8 disponibile.",
     "showing": "Mostra {{from}}-{{to}} di {{total}}",
     "pageOf": "Pagina {{page}} di {{total}}",
     "expiresAt": "Scade alle"
@@ -3175,7 +3178,7 @@
     "page": "pagina",
     "autoRefresh": "Auto-aggiorna",
     "deleteKey": "Elimina chiave",
-    "confirmDeleteKey": "Eliminare la chiave \"{{key}}\"? Questa azione non può essere annullata.",
+    "confirmDeleteKey": "Eliminare la chiave \"{{key}}\"? Questa azione non pu\u00f2 essere annullata.",
     "keyDeleted": "Chiave eliminata.",
     "deleteFailed": "Impossibile eliminare la chiave.",
     "noKeys": "Nessuna chiave in questo spazio dei nomi.",
@@ -3191,17 +3194,17 @@
     "peakMemory": "Memoria picco",
     "totalKeys": "Chiavi totali",
     "databases": "Database",
-    "unavailable": "Valkey non è disponibile.",
+    "unavailable": "Valkey non \u00e8 disponibile.",
     "actions": "Azioni"
   },
   "systemHa": {
-    "title": "Alta Disponibilità",
-    "disabled": "HA non è abilitato.",
+    "title": "Alta Disponibilit\u00e0",
+    "disabled": "HA non \u00e8 abilitato.",
     "disabledHint": "Imposta HA_ENABLED=true nel tuo .env e ridistribuisci con l'override HA.",
     "autoRefresh": "Auto-aggiornamento",
     "apply": "Applica Config",
     "applySuccess": "Configurazione applicata a tutte le istanze.",
-    "applyFailed": "Applicazione configurazione fallita su una o più istanze.",
+    "applyFailed": "Applicazione configurazione fallita su una o pi\u00f9 istanze.",
     "configSaved": "Configurazione HA salvata.",
     "haproxyInstances": "Istanze HAProxy",
     "valkeyNodes": "Nodi Valkey",
@@ -3224,18 +3227,18 @@
     "vip": "IP Virtuale (VIP)",
     "interface": "Interfaccia",
     "vrid": "ID Router Virtuale",
-    "priority": "Priorità",
+    "priority": "Priorit\u00e0",
     "advertInt": "Intervallo Annuncio (s)",
     "authPassword": "Password Auth",
     "peerAddresses": "Indirizzi Peer",
     "trackScript": "Script di Tracciamento",
     "preempt": "Preempt",
-    "swarmMode": "Modalità Swarm",
+    "swarmMode": "Modalit\u00e0 Swarm",
     "swarmVip": "Swarm VIP",
-    "swarmModeHint": "Keepalived non viene utilizzato in modalità Swarm — la mesh ingress di Swarm fornisce VIP e failover."
+    "swarmModeHint": "Keepalived non viene utilizzato in modalit\u00e0 Swarm \u2014 la mesh ingress di Swarm fornisce VIP e failover."
   },
   "multiValue": {
-    "loading": "Caricamento…",
+    "loading": "Caricamento\u2026",
     "addValue": "Aggiungi \"{{value}}\"",
     "noOptions": "Nessun suggerimento"
   }

@@ -210,25 +210,60 @@ def refresh_server_catalog(server: McpServer, db: Session) -> Optional[Dict[str,
     return catalog
 
 
-def _background_refresh_thread(server_ids: List[int]) -> None:
-    """Refresh catalogs for the given server IDs in a background thread."""
+def _background_refresh_thread(
+    server_ids: List[int],
+    max_attempts: int = 1,
+    interval_seconds: int = 5,
+) -> None:
+    """Refresh catalogs for the given server IDs in a background thread.
+
+    If max_attempts > 1, retry each server until it becomes healthy or the
+    attempts are exhausted. This is useful for self-registration, where the
+    mcp-server may not be fully ready when the control plane first tries.
+    """
     from ..core.database import SessionLocal
+    import time
+
     for sid in server_ids:
         db = SessionLocal()
         try:
-            try:
-                server = db.get(McpServer, sid)
-                if not server or not server.enabled:
-                    continue
-                refresh_server_catalog(server, db)
-            except Exception:
-                # Tests may delete/lock rows while the thread runs; ignore.
-                logger.exception("Background catalog refresh failed for server %s", sid)
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    server = db.get(McpServer, sid)
+                    if not server or not server.enabled:
+                        break
+
+                    # If another worker already cataloged this server, stop retrying.
+                    if server.health_status == "healthy" and server.last_catalog_at:
+                        logger.debug("Server %s already healthy, skipping refresh", server.name)
+                        break
+
+                    logger.info(
+                        "Background catalog refresh for server %s (attempt %d/%d)",
+                        server.name, attempt, max_attempts,
+                    )
+                    catalog = refresh_server_catalog(server, db)
+                    if catalog:
+                        logger.info("Catalog refresh succeeded for server %s", server.name)
+                        break
+
+                    if attempt < max_attempts:
+                        time.sleep(interval_seconds)
+                        db.refresh(server)
+                except Exception:
+                    # Tests may delete/lock rows while the thread runs; ignore.
+                    logger.exception("Background catalog refresh failed for server %s", sid)
+                    if attempt < max_attempts:
+                        time.sleep(interval_seconds)
         finally:
             db.close()
 
 
-def trigger_background_catalog_refresh(server_ids: List[int]) -> None:
+def trigger_background_catalog_refresh(
+    server_ids: List[int],
+    max_attempts: int = 1,
+    interval_seconds: int = 5,
+) -> None:
     """Fire-and-forget background refresh for a list of server IDs."""
     if not server_ids:
         return
@@ -236,7 +271,11 @@ def trigger_background_catalog_refresh(server_ids: List[int]) -> None:
     # database and threadpools can deadlock with the test teardown.
     if os.environ.get("PYTEST_VERSION"):
         return
-    t = threading.Thread(target=_background_refresh_thread, args=(server_ids,), daemon=True)
+    t = threading.Thread(
+        target=_background_refresh_thread,
+        args=(server_ids, max_attempts, interval_seconds),
+        daemon=True,
+    )
     t.start()
 
 

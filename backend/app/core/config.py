@@ -417,7 +417,7 @@ class Settings(BaseSettings):
     MCP_JWT_JWKS_URL: Optional[str] = None
     MCP_ALLOWED_ORIGINS: Optional[str] = None  # comma-separated list
     MCP_LOG_PAYLOADS: bool = False
-    MCP_DEFAULT_RPM: int = 60
+    MCP_DEFAULT_RPM: int = 600
     # MCP Server (coreX Manager's own MCP server exposing the control plane)
     MCP_SELF_REGISTER: bool = True  # auto-register the coreX Manager MCP server into the gateway
     MCP_SERVICE_TOKEN: Optional[str] = None  # shared secret for rate-limit bypass on in-process MCP calls

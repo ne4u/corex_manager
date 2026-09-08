@@ -40,7 +40,12 @@ try:
         MCP_POLICY_DENIED,
     )
     from .expression import build_mcp_context
-    from .ratelimit import check_rate_limit, check_ip_rate_limit, acquire_concurrent_slot, release_concurrent_slot, get_team_rpm, MCP_RATE_LIMITED
+    from .ratelimit import (
+        check_rate_limit, check_ip_rate_limit,
+        acquire_concurrent_slot, release_concurrent_slot,
+        get_team_rpm, MCP_RATE_LIMITED,
+        _DEFAULT_MAX_IP_RPM, _DEFAULT_MAX_CONCURRENT,
+    )
     from .events import log_event, generate_request_id
     from .alerting import record_event as record_alert
     from .dlp import (
@@ -77,7 +82,12 @@ except ImportError:
         MCP_POLICY_DENIED,
     )
     from expression import build_mcp_context
-    from ratelimit import check_rate_limit, check_ip_rate_limit, acquire_concurrent_slot, release_concurrent_slot, get_team_rpm, MCP_RATE_LIMITED
+    from ratelimit import (
+        check_rate_limit, check_ip_rate_limit,
+        acquire_concurrent_slot, release_concurrent_slot,
+        get_team_rpm, MCP_RATE_LIMITED,
+        _DEFAULT_MAX_IP_RPM, _DEFAULT_MAX_CONCURRENT,
+    )
     from events import log_event, generate_request_id
     from alerting import record_event as record_alert
     from dlp import (
@@ -112,8 +122,24 @@ def _get_default_rpm() -> int:
     """Get default RPM from config bundle."""
     config = get_config()
     if config:
-        return int(config.get("default_rpm", 60))
-    return 60
+        return int(config.get("default_rpm", 600))
+    return 600
+
+
+def _get_per_ip_limit() -> int:
+    """Get per-IP RPM limit from config bundle (or env fallback)."""
+    config = get_config()
+    if config:
+        return int(config.get("per_ip_limit", _DEFAULT_MAX_IP_RPM))
+    return _DEFAULT_MAX_IP_RPM
+
+
+def _get_concurrent_limit() -> int:
+    """Get per-identity concurrent request limit from config bundle (or env fallback)."""
+    config = get_config()
+    if config:
+        return int(config.get("concurrent_limit", _DEFAULT_MAX_CONCURRENT))
+    return _DEFAULT_MAX_CONCURRENT
 
 
 def _get_max_body_bytes(config: dict) -> int:
@@ -250,7 +276,7 @@ async def handle_mcp_post(request: Request) -> Response:
     client_ip = request.headers.get("x-forwarded-for", "").split(",")[0].strip() or request.client.host if request.client else ""
 
     # Per-IP rate limiting (before auth to block credential stuffing)
-    ip_allowed, _ = check_ip_rate_limit(client_ip)
+    ip_allowed, _ = check_ip_rate_limit(client_ip, _get_per_ip_limit())
     if not ip_allowed:
         return _error_response(None, MCP_RATE_LIMITED, "IP rate limit exceeded")
 
@@ -739,7 +765,7 @@ async def _route_call(
     upstream_sid = get_upstream_session(session_id, server["id"])
 
     # Concurrent request limiting
-    if not acquire_concurrent_slot(auth_ctx.identity_id):
+    if not acquire_concurrent_slot(auth_ctx.identity_id, _get_concurrent_limit()):
         log_event(
             request_id=req_id, session_id=session_id,
             identity_id=auth_ctx.identity_id, team_id=auth_ctx.team_id,

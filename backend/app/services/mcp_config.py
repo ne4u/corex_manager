@@ -325,6 +325,11 @@ def build_config_bundle(db: Session) -> dict:
     allowed_origins_str = get_setting(db, "mcp_allowed_origins", settings.MCP_ALLOWED_ORIGINS or "")
     allowed_origins = sorted([o.strip() for o in allowed_origins_str.split(",") if o.strip()]) if allowed_origins_str else []
 
+    # Per-IP and concurrent limits are exposed in the UI and can be set via the
+    # settings table; fall back to env vars for backward compatibility.
+    per_ip_limit = int(get_setting(db, "mcp_per_ip_limit", os.environ.get("MCP_MAX_IP_RPM", "0")))
+    concurrent_limit = int(get_setting(db, "mcp_concurrent_limit", os.environ.get("MCP_MAX_CONCURRENT", "0")))
+
     bundle = {
         "servers": server_list,
         "identities": identity_list,
@@ -339,6 +344,8 @@ def build_config_bundle(db: Session) -> dict:
         "allowed_origins": allowed_origins,
         "log_payloads": get_setting(db, "mcp_log_payloads", str(settings.MCP_LOG_PAYLOADS)).lower() in ("true", "1", "yes"),
         "default_rpm": int(get_setting(db, "mcp_default_rpm", str(settings.MCP_DEFAULT_RPM))),
+        "per_ip_limit": per_ip_limit,
+        "concurrent_limit": concurrent_limit,
         "catalog_refresh_seconds": settings.MCP_CATALOG_REFRESH_SECONDS,
         "team_rpm_overrides": _build_team_rpm_overrides(db, teams),
     }

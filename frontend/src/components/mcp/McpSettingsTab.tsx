@@ -37,9 +37,9 @@ export default function McpSettingsTab() {
   const [jwtAudience, setJwtAudience] = useState('')
   const [jwtJwksUrl, setJwtJwksUrl] = useState('')
   const [logPayloads, setLogPayloads] = useState(false)
-  const [defaultRpm, setDefaultRpm] = useState(60)
-  const [perIpLimit, setPerIpLimit] = useState(120)
-  const [concurrentLimit, setConcurrentLimit] = useState(10)
+  const [defaultRpm, setDefaultRpm] = useState(600)
+  const [perIpLimit, setPerIpLimit] = useState(0)
+  const [concurrentLimit, setConcurrentLimit] = useState(0)
   const [teams, setTeams] = useState<Team[]>([])
   const [teamRpmOverrides, setTeamRpmOverrides] = useState<Record<number, number>>({})
   const [saving, setSaving] = useState(false)
@@ -66,9 +66,9 @@ export default function McpSettingsTab() {
       setJwtAudience(results[2].data.value || '')
       setJwtJwksUrl(results[3].data.value || '')
       setLogPayloads((results[4].data.value || 'false').toLowerCase() === 'true')
-      setDefaultRpm(Number(results[5].data.value) || 60)
-      setPerIpLimit(Number(results[6].data.value) || 120)
-      setConcurrentLimit(Number(results[7].data.value) || 10)
+      setDefaultRpm(Number(results[5].data.value) || 600)
+      setPerIpLimit(Number(results[6].data.value) || 0)
+      setConcurrentLimit(Number(results[7].data.value) || 0)
       try {
         const overrides = JSON.parse(results[8].data.value || '{}')
         setTeamRpmOverrides(overrides)
@@ -180,14 +180,17 @@ export default function McpSettingsTab() {
             <div>
               <label className="label">{t('pages:mcpGateway.settings.defaultRpm')}</label>
               <input type="number" min={0} className="input w-full" value={defaultRpm} onChange={e => setDefaultRpm(Number(e.target.value))} />
+              <p className="text-xs text-muted-foreground mt-1">{t('pages:mcpGateway.settings.defaultRpmHelp')}</p>
             </div>
             <div>
               <label className="label">{t('pages:mcpGateway.settings.perIpLimit')}</label>
               <input type="number" min={0} className="input w-full" value={perIpLimit} onChange={e => setPerIpLimit(Number(e.target.value))} />
+              <p className="text-xs text-muted-foreground mt-1">{t('pages:mcpGateway.settings.perIpLimitHelp')}</p>
             </div>
             <div>
               <label className="label">{t('pages:mcpGateway.settings.concurrentLimit')}</label>
               <input type="number" min={0} className="input w-full" value={concurrentLimit} onChange={e => setConcurrentLimit(Number(e.target.value))} />
+              <p className="text-xs text-muted-foreground mt-1">{t('pages:mcpGateway.settings.concurrentLimitHelp')}</p>
             </div>
           </div>
           {teams.length > 0 && (
