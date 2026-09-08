@@ -212,7 +212,7 @@ def get_mcp_metrics(
     )
 
     if not rows:
-        return {"time": [], "series": [], "breakdown": breakdown, "totals": {}, "latency": {}}
+        return {"time": [], "series": [], "breakdown": breakdown, "totals": {}, "latency": []}
 
     # Build time buckets
     buckets: Dict[datetime, List[McpEvent]] = {}

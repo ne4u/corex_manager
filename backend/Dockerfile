@@ -37,6 +37,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend/app /app/app
 COPY shared /app/shared
+COPY mcp-gateway /app/mcp-gateway
 COPY backend/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 

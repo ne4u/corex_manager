@@ -57,7 +57,12 @@ export default {
 
         // Aliases used in a few places
         surface: 'rgb(var(--color-bg-primary) / <alpha-value>)',
-        muted: 'rgb(var(--color-text-tertiary) / <alpha-value>)',
+        background: 'rgb(var(--color-bg-primary) / <alpha-value>)',
+        card: 'rgb(var(--color-bg-secondary) / <alpha-value>)',
+        muted: 'rgb(var(--color-bg-tertiary) / <alpha-value>)',
+        'muted-foreground': 'rgb(var(--color-text-tertiary) / <alpha-value>)',
+        foreground: 'rgb(var(--color-text-primary) / <alpha-value>)',
+        border: 'rgb(var(--color-border-default) / <alpha-value>)',
       },
     },
   },

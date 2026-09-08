@@ -393,7 +393,7 @@ async def _handle_initialize(
 
     for server in servers:
         upstream_sid = await initialize_upstream(server)
-        if upstream_sid:
+        if upstream_sid is not None:
             set_upstream_session(session_id, server["id"], upstream_sid)
         # Check catalog for capabilities
         catalog = get_catalog(server["id"])

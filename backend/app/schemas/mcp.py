@@ -576,6 +576,55 @@ class ServerCatalogResponse(BaseModel):
     last_refresh: Optional[str] = None
 
 
+class McpServerTestResponse(BaseModel):
+    ok: bool
+    error: Optional[str] = None
+    tools: List[Dict[str, Any]] = []
+    resources: List[Dict[str, Any]] = []
+    prompts: List[Dict[str, Any]] = []
+
+
+# --- Policy Validation ---
+
+class McpPolicyValidateRequest(BaseModel):
+    expression: str
+
+
+class McpPolicyValidateResponse(BaseModel):
+    ok: bool
+    ast: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+
+
+# --- Policy Builder Metadata ---
+
+class McpPolicyBuilderServer(BaseModel):
+    id: int
+    namespace: str
+    name: str
+    last_catalog_at: Optional[str] = None
+    stale: bool = True
+
+
+class McpPolicyBuilderTeam(BaseModel):
+    id: int
+    name: str
+    slug: str
+
+
+class McpPolicyBuilderMetadataResponse(BaseModel):
+    methods: List[str] = []
+    servers: List[McpPolicyBuilderServer] = []
+    stale_servers: List[McpPolicyBuilderServer] = []
+    tools: List[str] = []
+    resources: List[str] = []
+    prompts: List[str] = []
+    identities: List[str] = []
+    identity_kinds: List[str] = []
+    teams: List[McpPolicyBuilderTeam] = []
+    refreshing: bool = False
+
+
 __all__ = [
     "TeamBase", "TeamCreate", "TeamUpdate", "TeamResponse",
     "UserTeamBase", "UserTeamCreate", "UserTeamResponse",
@@ -600,5 +649,7 @@ __all__ = [
     "SessionInfo", "SessionListResponse",
     "ConfigStatusResponse",
     "AlertConfigResponse", "AlertConfigUpdate", "AlertHistoryItem",
-    "ServerCatalogResponse",
+    "ServerCatalogResponse", "McpServerTestResponse",
+    "McpPolicyValidateRequest", "McpPolicyValidateResponse",
+    "McpPolicyBuilderServer", "McpPolicyBuilderTeam", "McpPolicyBuilderMetadataResponse",
 ]

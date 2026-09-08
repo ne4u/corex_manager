@@ -16,6 +16,8 @@ services:
       - haproxy-run:/var/run
       - /var/run/docker.sock:/var/run/docker.sock
       - ./backend/app:/app/app
+      - ./shared:/app/shared
+      - ./mcp-gateway:/app/mcp-gateway
     environment:
       - DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER:-haproxy}:${POSTGRES_PASSWORD:-haproxy}@postgres:5432/${POSTGRES_DB:-haproxy_manager}
       - HAPROXY_CONFIG_PATH=/app/data/haproxy.cfg
@@ -40,6 +42,11 @@ services:
       - VARNISH_STORAGE_SIZE=${VARNISH_STORAGE_SIZE:-1G}
       - DISK_CACHE_ENABLED=${DISK_CACHE_ENABLED:-false}
       - HAPROXY_CONTAINER_NAME=corex
+      - MCP_GATEWAY_ENABLED=${MCP_GATEWAY_ENABLED:-false}
+      - MCP_SELF_REGISTER=${MCP_SELF_REGISTER:-true}
+      - MCP_CONFIG_PATH=/app/data/mcp/config.json
+      - MCP_SERVER_INTERNAL_HOST=mcp-server
+      - MCP_SERVER_INTERNAL_PORT=8082
     depends_on:
       postgres:
         condition: service_healthy
@@ -232,6 +239,8 @@ services:
     depends_on:
       valkey:
         condition: service_healthy
+      mcp-server:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - corex-net
@@ -263,6 +272,11 @@ services:
         condition: service_healthy
       api:
         condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen(\\\"http://localhost:8082/healthz\\\")\""]
+      interval: 5s
+      timeout: 3s
+      retries: 10
     restart: unless-stopped
     networks:
       - corex-net

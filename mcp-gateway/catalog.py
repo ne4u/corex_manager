@@ -164,8 +164,16 @@ class CatalogWorker:
 
     async def _run(self):
         """Main loop: refresh catalogs periodically."""
-        # Initial refresh on startup
-        await self.refresh_all()
+        # Initial refresh on startup, then a few quick retries in case upstreams
+        # are still booting (the gateway may start before mcp-server is fully
+        # reachable even after the compose healthcheck passes).
+        startup_attempts = 5
+        for i in range(startup_attempts):
+            if not self._running:
+                return
+            await self.refresh_all()
+            if i < startup_attempts - 1:
+                await asyncio.sleep(5)
 
         while self._running:
             try:
@@ -193,6 +201,7 @@ class CatalogWorker:
         if not servers:
             return
 
+        logger.info("Catalog worker refreshing %d server(s)", len(servers))
         tasks = [self._refresh_one(s, fetch_catalog, initialize_upstream) for s in servers]
         await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -210,7 +219,17 @@ class CatalogWorker:
         catalog_session_key = f"catalog:{sid}"
         upstream_sid = get_upstream_session(catalog_session_key, sid)
         if not upstream_sid:
-            upstream_sid = await initialize_upstream_fn(server)
+            try:
+                upstream_sid = await initialize_upstream_fn(server)
+            except Exception as e:
+                clear_catalog(sid)
+                logger.warning("Failed to initialize upstream for server %s: %s; catalog cleared", server.get("name"), e)
+                return
+            if upstream_sid is None:
+                # Upstream is not reachable; clear any stale empty catalog
+                clear_catalog(sid)
+                logger.warning("Failed to initialize upstream for server %s; catalog cleared", server.get("name"))
+                return
             if upstream_sid:
                 # Store in a synthetic session so future catalog refreshes reuse it
                 from .sessions import create_session
@@ -220,7 +239,12 @@ class CatalogWorker:
                 except Exception:
                     pass  # Valkey may not be available
 
-        catalog = await fetch_catalog_fn(server, upstream_sid)
+        try:
+            catalog = await fetch_catalog_fn(server, upstream_sid)
+        except Exception as e:
+            clear_catalog(sid)
+            logger.warning("Failed to fetch catalog for server %s: %s; catalog cleared", server.get("name"), e)
+            return
         if catalog:
             store_catalog(sid, catalog)
             logger.debug("Refreshed catalog for server %s (%d tools, %d resources, %d prompts)",
@@ -228,7 +252,8 @@ class CatalogWorker:
                          len(catalog.get("resources", [])),
                          len(catalog.get("prompts", [])))
         else:
-            logger.warning("Failed to fetch catalog for server %s", server.get("name"))
+            clear_catalog(sid)
+            logger.warning("Failed to fetch catalog for server %s; catalog cleared", server.get("name"))
 
 
 # Singleton instance

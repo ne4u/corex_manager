@@ -211,7 +211,7 @@ def test_mcp_frontend_routing_dedicated_listener(db):
 
 
 def test_mcp_frontend_routing_shared_listener(db):
-    """A regular HTTP listener gets use_backend mcp_gateway for /mcp paths when flag is on."""
+    """An HTTP listener with options.mcp_route_enabled gets use_backend mcp_gateway for /mcp paths."""
     from app.services import haproxy
     from app.services.settings import set_setting
     from tests.factories import make_listener, make_backend, make_server
@@ -219,13 +219,80 @@ def test_mcp_frontend_routing_shared_listener(db):
     set_setting(db, "mcp_gateway_enabled", "true")
     backend = make_backend(db, name="web")
     make_server(db, backend.id)
-    make_listener(db, backend=backend, name="shared-in", bind_port=80, protocol="http")
+    make_listener(
+        db, backend=backend, name="shared-in", bind_port=80, protocol="http",
+        options={"mcp_route_enabled": True},
+    )
     db.commit()
 
     cfg = haproxy.generate_config(db)
     assert "use_backend mcp_gateway if { path_beg /mcp }" in cfg
     assert "path_beg /.well-known/oauth-protected-resource" in cfg
     assert "backend mcp_gateway" in cfg
+
+
+def test_mcp_frontend_routing_shared_listener_opt_out(db):
+    """An HTTP listener WITHOUT mcp_route_enabled gets no /mcp route (per-listener opt-in)."""
+    from app.services import haproxy
+    from app.services.settings import set_setting
+    from tests.factories import make_listener, make_backend, make_server
+
+    set_setting(db, "mcp_gateway_enabled", "true")
+    backend = make_backend(db, name="web")
+    make_server(db, backend.id)
+    make_listener(db, backend=backend, name="plain-in", bind_port=80, protocol="http")
+    db.commit()
+
+    cfg = haproxy.generate_config(db)
+    assert "use_backend mcp_gateway" not in cfg
+    # The backend section is still emitted (feature flag is on) — only the
+    # per-listener routing line is gated.
+    assert "backend mcp_gateway" in cfg
+
+
+def test_mcp_frontend_routing_shared_listener_explicit_false(db):
+    """mcp_route_enabled=False explicitly disables /mcp routing on the listener."""
+    from app.services import haproxy
+    from app.services.settings import set_setting
+    from tests.factories import make_listener, make_backend, make_server
+
+    set_setting(db, "mcp_gateway_enabled", "true")
+    backend = make_backend(db, name="web")
+    make_server(db, backend.id)
+    make_listener(
+        db, backend=backend, name="off-in", bind_port=80, protocol="http",
+        options={"mcp_route_enabled": False},
+    )
+    db.commit()
+
+    cfg = haproxy.generate_config(db)
+    assert "use_backend mcp_gateway" not in cfg
+
+
+def test_mcp_frontend_routing_opt_in_is_per_listener(db):
+    """With two HTTP listeners, only the opted-in one routes /mcp."""
+    from app.services import haproxy
+    from app.services.settings import set_setting
+    from tests.factories import make_listener, make_backend, make_server
+
+    set_setting(db, "mcp_gateway_enabled", "true")
+    backend = make_backend(db, name="web")
+    make_server(db, backend.id)
+    make_listener(db, backend=backend, name="in-no", bind_port=80, protocol="http")
+    make_listener(
+        db, backend=backend, name="in-yes", bind_port=443, protocol="http",
+        options={"mcp_route_enabled": True},
+    )
+    db.commit()
+
+    cfg = haproxy.generate_config(db)
+    # Exactly one use_backend mcp_gateway line, and it is not in the opted-out
+    # listener's frontend section.
+    assert cfg.count("use_backend mcp_gateway") == 1
+    no_section = cfg.split("frontend in-no", 1)[1].split("frontend in-yes", 1)[0]
+    assert "use_backend mcp_gateway" not in no_section
+    yes_section = cfg.split("frontend in-yes", 1)[1]
+    assert "use_backend mcp_gateway" in yes_section
 
 
 def test_mcp_frontend_routing_not_emitted_when_disabled(db):

@@ -28,6 +28,7 @@ export interface BuilderGroup {
 const TWO_CHAR_OPS = new Set(['!=', '!~', '>=', '<='])
 const ONE_CHAR_OPS = new Set(['=', '~', '>', '<'])
 const WORD_OPERATORS = new Set(['contains', 'starts_with', 'ends_with', 'exists', 'in'])
+const LITERALS = new Set(['true', 'false'])
 
 const KEYWORDS: Record<string, TokenType> = {
   'and': 'AND',
@@ -162,6 +163,12 @@ export function tokenize(input: string): Token[] {
         continue
       }
 
+      // Bare boolean literals are values, not fields
+      if (LITERALS.has(lowerWord)) {
+        tokens.push({ type: 'VALUE', value: lowerWord, pos: start })
+        continue
+      }
+
       // Distinguish between FIELD and VALUE:
       // If the preceding token is an OPERATOR, this is a VALUE
       if (lastTok && lastTok.type === 'OPERATOR') {
@@ -184,14 +191,16 @@ export function tokenize(input: string): Token[] {
 /**
  * Parse a tokenized expression into builder groups (DNF format).
  */
-export function parseToGroups(text: string): BuilderGroup[] {
+export function parseToGroups(text: string, defaultField: string = 'http.request.uri.path'): BuilderGroup[] {
+  const defaultCondition = { field: defaultField, op: '=', value: '', negated: false }
+
   if (!text || !text.trim()) {
-    return [{ conditions: [{ field: 'http.request.uri.path', op: '=', value: '', negated: false }] }]
+    return [{ conditions: [defaultCondition] }]
   }
 
   const tokens = tokenize(text)
   if (tokens.length === 0) {
-    return [{ conditions: [{ field: 'http.request.uri.path', op: '=', value: '', negated: false }] }]
+    return [{ conditions: [defaultCondition] }]
   }
 
   const groups: BuilderGroup[] = []
@@ -232,8 +241,12 @@ export function parseToGroups(text: string): BuilderGroup[] {
 
     let op = 'exists'
     let value = ''
+    const fieldLower = field.toLowerCase()
 
-    if (i < tokens.length && tokens[i].type === 'OPERATOR') {
+    // Bare boolean literals (true / false) are a special condition type
+    if (fieldLower === 'true' || fieldLower === 'false') {
+      op = 'literal'
+    } else if (i < tokens.length && tokens[i].type === 'OPERATOR') {
       op = tokens[i].value
       i++
 
@@ -279,6 +292,10 @@ export function parseToGroups(text: string): BuilderGroup[] {
 export function serializeCondition(c: BuilderCondition): string {
   const parts: string[] = []
   if (c.negated) parts.push('not')
+  if (c.op === 'literal') {
+    parts.push(c.field)
+    return parts.join(' ')
+  }
   parts.push(c.field)
   if (c.op === 'exists') {
     parts.push('exists')

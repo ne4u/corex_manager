@@ -633,6 +633,8 @@ export const mcp = {
     create: (data: Record<string, unknown>) => api.post('/mcp/servers', data),
     update: (id: number, data: Record<string, unknown>) => api.put(`/mcp/servers/${id}`, data),
     delete: (id: number) => api.delete(`/mcp/servers/${id}`),
+    test: (id: number) => api.post(`/mcp/servers/${id}/test`),
+    refreshCatalog: (id: number) => api.post(`/mcp/servers/${id}/catalog/refresh`),
     replicas: {
       list: (serverId: number) => api.get(`/mcp/servers/${serverId}/replicas`),
       create: (serverId: number, data: Record<string, unknown>) =>
@@ -655,6 +657,8 @@ export const mcp = {
     create: (data: Record<string, unknown>) => api.post('/mcp/policies', data),
     update: (id: number, data: Record<string, unknown>) => api.put(`/mcp/policies/${id}`, data),
     delete: (id: number) => api.delete(`/mcp/policies/${id}`),
+    validate: (expression: string) => api.post('/mcp/policies/validate', { expression }),
+    builderMetadata: () => api.get('/mcp/policies/builder-metadata'),
   },
   dlpRules: {
     list: () => api.get('/mcp/dlp-rules'),

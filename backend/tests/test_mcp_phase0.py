@@ -244,6 +244,7 @@ def test_policies_crud(client):
     })
     assert resp.status_code == 200
     pid = resp.json()["id"]
+    assert resp.json()["expression_ast"] is not None
 
     resp = client.put(f"/api/v1/mcp/policies/{pid}", json={"action": "deny"})
     assert resp.status_code == 200
@@ -251,6 +252,148 @@ def test_policies_crud(client):
 
     resp = client.delete(f"/api/v1/mcp/policies/{pid}")
     assert resp.status_code == 200
+
+
+def test_policy_create_rejects_invalid_expression(client):
+    client.post("/api/v1/mcp/teams", json={"name": "T7a", "slug": "t7a"})
+    tid = client.get("/api/v1/mcp/teams").json()[-1]["id"]
+
+    resp = client.post("/api/v1/mcp/policies", json={
+        "team_id": tid, "name": "bad-policy",
+        "expression": "tool == 'x' && method == 'y'",
+    })
+    assert resp.status_code == 400
+
+
+def test_policy_create_stores_expression_ast(client):
+    client.post("/api/v1/mcp/teams", json={"name": "T7b", "slug": "t7b"})
+    tid = client.get("/api/v1/mcp/teams").json()[-1]["id"]
+
+    resp = client.post("/api/v1/mcp/policies", json={
+        "team_id": tid, "name": "allow-grok",
+        "expression": 'mcp.identity = "grok-agent" and mcp.tool in ["corex-manager__create_security_rule"]',
+    })
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["expression_ast"] is not None
+    assert data["expression_ast"]["type"] == "and"
+
+
+def test_policy_update_replaces_expression_ast(client):
+    client.post("/api/v1/mcp/teams", json={"name": "T7c", "slug": "t7c"})
+    tid = client.get("/api/v1/mcp/teams").json()[-1]["id"]
+
+    resp = client.post("/api/v1/mcp/policies", json={
+        "team_id": tid, "name": "update-me", "expression": "true",
+    })
+    pid = resp.json()["id"]
+
+    resp = client.put(f"/api/v1/mcp/policies/{pid}", json={
+        "expression": 'mcp.tool = "corex-manager__create_security_rule"',
+    })
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["expression_ast"]["type"] == "compare"
+    assert data["expression_ast"]["field"] == "mcp.tool"
+
+
+def test_policy_validate_endpoint(client):
+    resp = client.post("/api/v1/mcp/policies/validate", json={
+        "expression": 'mcp.tool = "corex-manager__x"',
+    })
+    assert resp.status_code == 200
+    assert resp.json()["ok"] is True
+    assert resp.json()["ast"] is not None
+
+    resp = client.post("/api/v1/mcp/policies/validate", json={
+        "expression": "tool == 'x'",
+    })
+    assert resp.status_code == 200
+    assert resp.json()["ok"] is False
+    assert resp.json()["error"] is not None
+
+
+def test_policy_builder_metadata(client):
+    client.post("/api/v1/mcp/teams", json={"name": "T7d", "slug": "t7d"})
+
+    resp = client.get("/api/v1/mcp/policies/builder-metadata")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "methods" in data
+    assert "tools/call" in data["methods"]
+    assert "tools" in data
+    assert "identities" in data
+    assert "teams" in data
+    assert "stale_servers" in data
+    assert data["refreshing"] is False
+
+
+def test_policy_builder_metadata_triggers_background_refresh(client, monkeypatch):
+    client.post("/api/v1/mcp/teams", json={"name": "T7e", "slug": "t7e"})
+    tid = client.get("/api/v1/mcp/teams").json()[-1]["id"]
+
+    resp = client.post("/api/v1/mcp/servers", json={
+        "team_id": tid, "name": "test-catalog-server",
+        "namespace": "testns", "url": "http://example.com/mcp",
+        "enabled": True,
+    })
+    sid = resp.json()["id"]
+
+    triggered: list = []
+    monkeypatch.setattr("app.api.v1.mcp.trigger_background_catalog_refresh", lambda sids: triggered.extend(sids))
+
+    resp = client.get("/api/v1/mcp/policies/builder-metadata")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["refreshing"] is True
+    assert any(s["id"] == sid for s in data["stale_servers"])
+    assert sid in triggered
+
+
+def test_server_catalog_refresh(client, monkeypatch):
+    client.post("/api/v1/mcp/teams", json={"name": "T7f", "slug": "t7f"})
+    tid = client.get("/api/v1/mcp/teams").json()[-1]["id"]
+
+    resp = client.post("/api/v1/mcp/servers", json={
+        "team_id": tid, "name": "refreshable-server",
+        "namespace": "refreshns", "url": "http://example.com/mcp",
+        "enabled": True,
+    })
+    sid = resp.json()["id"]
+
+    def _fake_refresh(server, db):
+        return {
+            "tools": [{"name": "tool1"}],
+            "resources": [{"uri": "resource://x"}],
+            "prompts": [{"name": "prompt1"}],
+        }
+
+    monkeypatch.setattr("app.api.v1.mcp.refresh_server_catalog", _fake_refresh)
+
+    resp = client.post(f"/api/v1/mcp/servers/{sid}/catalog/refresh")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["server_id"] == sid
+    assert len(data["tools"]) == 1
+    assert len(data["resources"]) == 1
+    assert len(data["prompts"]) == 1
+
+
+def test_server_catalog_refresh_fails(client, monkeypatch):
+    client.post("/api/v1/mcp/teams", json={"name": "T7g", "slug": "t7g"})
+    tid = client.get("/api/v1/mcp/teams").json()[-1]["id"]
+
+    resp = client.post("/api/v1/mcp/servers", json={
+        "team_id": tid, "name": "unreachable-server",
+        "namespace": "badns", "url": "http://example.com/mcp",
+        "enabled": True,
+    })
+    sid = resp.json()["id"]
+
+    monkeypatch.setattr("app.api.v1.mcp.refresh_server_catalog", lambda server, db: None)
+
+    resp = client.post(f"/api/v1/mcp/servers/{sid}/catalog/refresh")
+    assert resp.status_code == 502
 
 
 def test_dlp_rule_custom_requires_regex(client):

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, Trash2, Pencil, Server, Package, KeyRound, Loader2, ExternalLink, BookOpen } from 'lucide-react'
+import { Plus, Trash2, Pencil, Server, Package, KeyRound, Loader2, ExternalLink, BookOpen, RefreshCw } from 'lucide-react'
 import { mcp } from '../../services/api'
 import Modal from '../Modal'
 import { IconButton, Badge, Button } from '../ui'
@@ -157,6 +157,9 @@ export default function McpServersTab() {
   const [replicaUrl, setReplicaUrl] = useState<Record<number, string>>({})
   const [installations, setInstallations] = useState<Record<number, any[]>>({})
   const [catalogs, setCatalogs] = useState<Record<number, any>>({})
+  const [refreshingCatalogs, setRefreshingCatalogs] = useState<Record<number, boolean>>({})
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<{ok: boolean; error?: string} | null>(null)
 
   const fetchServers = useCallback(async () => {
     try {
@@ -175,6 +178,14 @@ export default function McpServersTab() {
 
   useEffect(() => { fetchServers() }, [fetchServers])
 
+  // Poll while any enabled server is still waiting for its first catalog/health result.
+  useEffect(() => {
+    const pending = servers.some(s => s.enabled && !s.last_catalog_at && !s.last_error)
+    if (!pending) return
+    const timer = setInterval(fetchServers, 3000)
+    return () => clearInterval(timer)
+  }, [servers, fetchServers])
+
   const fetchReplicas = async (serverId: number) => {
     try {
       const resp = await mcp.servers.replicas.list(serverId)
@@ -188,6 +199,7 @@ export default function McpServersTab() {
     setEditing(null)
     setForm({ ...emptyForm, team_id: teams[0]?.id || 0 })
     setError('')
+    setTestResult(null)
     setModalOpen(true)
   }
 
@@ -210,6 +222,7 @@ export default function McpServersTab() {
       oauth_auth_server_metadata_url: '',
     })
     setError('')
+    setTestResult(null)
     setModalOpen(true)
   }
 
@@ -311,6 +324,36 @@ export default function McpServersTab() {
       const resp = await mcp.catalog.get(serverId)
       setCatalogs(prev => ({ ...prev, [serverId]: resp.data }))
     } catch { setCatalogs(prev => ({ ...prev, [serverId]: null })) }
+  }
+
+  const handleRefreshCatalog = async (serverId: number) => {
+    setRefreshingCatalogs(prev => ({ ...prev, [serverId]: true }))
+    try {
+      await mcp.servers.refreshCatalog(serverId)
+      await fetchCatalog(serverId)
+    } catch {
+      // leave existing catalog in place
+    } finally {
+      setRefreshingCatalogs(prev => ({ ...prev, [serverId]: false }))
+    }
+  }
+
+  const handleTest = async () => {
+    if (!editing) return
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const resp = await mcp.servers.test(editing.id)
+      setTestResult({ ok: resp.data.ok, error: resp.data.error })
+      if (resp.data.ok) {
+        fetchCatalog(editing.id)
+        fetchServers()
+      }
+    } catch (err: any) {
+      setTestResult({ ok: false, error: err?.response?.data?.detail || err?.message || t('pages:mcpGateway.servers.testFailed') })
+    } finally {
+      setTesting(false)
+    }
   }
 
   const toggleExpand = (id: number) => {
@@ -446,10 +489,21 @@ export default function McpServersTab() {
                   {/* Catalog Detail */}
                   {catalogs[s.id] && (
                     <div className="space-y-2">
-                      <h4 className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1">
-                        <BookOpen className="w-3 h-3" /> {t('pages:mcpGateway.servers.sections.catalog')}
-                        {catalogs[s.id].last_refresh && <span className="text-muted-foreground normal-case font-normal">· {t('pages:mcpGateway.servers.sections.lastRefresh')} {formatDateTime(catalogs[s.id].last_refresh)}</span>}
-                      </h4>
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-semibold text-muted-foreground uppercase flex items-center gap-1">
+                          <BookOpen className="w-3 h-3" /> {t('pages:mcpGateway.servers.sections.catalog')}
+                          {catalogs[s.id].last_refresh && <span className="text-muted-foreground normal-case font-normal">· {t('pages:mcpGateway.servers.sections.lastRefresh')} {formatDateTime(catalogs[s.id].last_refresh)}</span>}
+                        </h4>
+                        <button
+                          type="button"
+                          onClick={() => handleRefreshCatalog(s.id)}
+                          disabled={refreshingCatalogs[s.id]}
+                          title={t('common:actions.refresh')}
+                          className="text-muted-foreground hover:text-foreground disabled:opacity-50"
+                        >
+                          <RefreshCw className={`w-3 h-3 ${refreshingCatalogs[s.id] ? 'animate-spin' : ''}`} />
+                        </button>
+                      </div>
                       {catalogs[s.id].tools?.length > 0 && (
                         <div>
                           <span className="text-xs font-medium">{t('pages:mcpGateway.servers.sections.tools', { count: catalogs[s.id].tools.length })}</span>
@@ -634,7 +688,17 @@ export default function McpServersTab() {
             )}
           </div>
           {error && <p className="text-sm text-red-400">{error}</p>}
+          {testResult && (
+            <p className={`text-sm ${testResult.ok ? 'text-green-400' : 'text-red-400'}`}>
+              {testResult.ok ? t('pages:mcpGateway.servers.testSuccess') : `${t('pages:mcpGateway.servers.testFailed')}: ${testResult.error}`}
+            </p>
+          )}
           <div className="flex justify-end gap-2">
+            {editing && (
+              <button className="btn-secondary" onClick={handleTest} disabled={testing}>
+                {testing ? t('pages:mcpGateway.servers.testing') : t('pages:mcpGateway.servers.testConnection')}
+              </button>
+            )}
             <button className="btn-secondary" onClick={() => setModalOpen(false)}>{t('common:actions.cancel')}</button>
             <button className="btn-primary" onClick={save} disabled={saving}>{saving ? t('common:actions.saving') : t('common:actions.save')}</button>
           </div>

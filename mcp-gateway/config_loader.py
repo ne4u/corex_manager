@@ -47,6 +47,14 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+try:
+    from .ssrf import update_allowed_upstreams
+except ImportError:
+    try:
+        from ssrf import update_allowed_upstreams
+    except ImportError:
+        update_allowed_upstreams = None
+
 _config: dict = {}
 _config_mtime: float = 0.0
 _config_lock = threading.Lock()
@@ -111,6 +119,10 @@ def load_config() -> dict:
                         return _config if _config else {}
                     logger.info("MCP config bundle signature verified")
                 _config_mtime = mtime
+                if update_allowed_upstreams is not None:
+                    update_allowed_upstreams(
+                        s.get("url", "") for s in _config.get("servers", [])
+                    )
                 logger.info("Loaded MCP config: %d servers, %d identities",
                             len(_config.get("servers", [])),
                             len(_config.get("identities", [])))

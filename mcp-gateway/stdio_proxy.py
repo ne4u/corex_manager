@@ -24,6 +24,30 @@ _STDIO_TIMEOUT = int(os.environ.get("MCP_STDIO_TIMEOUT", "30"))
 # Idle timeout: stop process after this many seconds without requests (0 = never)
 _STDIO_IDLE_TIMEOUT = int(os.environ.get("MCP_STDIO_IDLE_TIMEOUT", "600"))
 
+# Allowlist of commands permitted for stdio MCP servers. Registration is
+# admin-only, but the command is executed directly by the gateway — restricting
+# it to package runners prevents a compromised/mistaken registration from
+# running arbitrary binaries. Override via MCP_STDIO_ALLOWED_COMMANDS
+# (comma-separated basenames); set to "*" to disable.
+_allowed_commands_env = os.environ.get(
+    "MCP_STDIO_ALLOWED_COMMANDS", "npx,uvx,node,python,python3,uv,docker"
+)
+_ALLOWED_COMMANDS: set[str] | None = (
+    None if _allowed_commands_env.strip() == "*"
+    else {c.strip() for c in _allowed_commands_env.split(",") if c.strip()}
+)
+
+
+def is_command_allowed(command: str) -> bool:
+    """Check if a stdio server command is permitted.
+
+    Compares the basename so paths like /usr/bin/npx still match. Returns
+    True for all commands when MCP_STDIO_ALLOWED_COMMANDS="*".
+    """
+    if _ALLOWED_COMMANDS is None:
+        return True
+    return os.path.basename(command) in _ALLOWED_COMMANDS
+
 
 class StdioProcess:
     """Wraps a single stdio MCP server subprocess."""
@@ -299,6 +323,12 @@ class ProcessManager:
             command = server.get("command")
             if not command:
                 logger.error("stdio server %d: no command specified", sid)
+                return None
+            if not is_command_allowed(command):
+                logger.error(
+                    "stdio server %d: command %r not in MCP_STDIO_ALLOWED_COMMANDS",
+                    sid, command,
+                )
                 return None
 
             args = server.get("args", [])

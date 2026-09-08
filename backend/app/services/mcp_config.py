@@ -40,6 +40,48 @@ def _serialize_datetime(dt) -> Optional[str]:
     return dt.isoformat()
 
 
+def _mask_secret(value: Optional[str]) -> Optional[str]:
+    """Mask a sensitive string with an opaque, stable token for diffing.
+
+    Returns the original value if it is None or empty. If the value is already
+    a mask token from a previous redaction, return it as-is so we don't
+    double-redact an .applied bundle.
+    """
+    if value is None or not isinstance(value, str):
+        return value
+    if not value:
+        return value
+    # Already masked, e.g. ***a1b2c3d4***
+    if value.startswith("***") and value.endswith("***") and len(value) >= 14:
+        inner = value[3:-3]
+        if len(inner) == 8 and all(c in "0123456789abcdef" for c in inner):
+            return value
+    digest = hashlib.sha256(value.encode("utf-8")).hexdigest()[:8]
+    return f"***{digest}***"
+
+
+def _redact_bundle(bundle: dict) -> dict:
+    """Redact secrets from a bundle in place so diffs/previews don't leak them.
+
+    The gateway still uses the unredacted bundle; this only affects generated
+    text returned for comparison, preview, and the .applied copy.
+    """
+    for server in bundle.get("servers", []):
+        for key in (
+            "auth_secret",
+            "oauth_client_secret",
+            "oauth_access_token",
+            "oauth_refresh_token",
+        ):
+            if key in server:
+                server[key] = _mask_secret(server.get(key))
+        env_vars = server.get("env_vars")
+        if isinstance(env_vars, dict):
+            for k, v in env_vars.items():
+                env_vars[k] = _mask_secret(v)
+    return bundle
+
+
 def _build_server_dict(server: McpServer, replicas: list[McpServerReplica]) -> dict:
     """Build a server dict for the config bundle, decrypting the auth secret."""
     auth_secret = None
@@ -240,13 +282,15 @@ def _build_skill_dict(skill: McpSkill, published_version: Optional[McpSkillVersi
 
 def build_config_bundle(db: Session) -> dict:
     """Build the full config bundle from the database."""
-    servers = db.query(McpServer).filter(McpServer.enabled == True).all()  # noqa: E712
-    identities = db.query(McpIdentity).filter(McpIdentity.enabled == True).all()  # noqa: E712
-    teams = db.query(Team).all()
-    policies = db.query(McpPolicy).filter(McpPolicy.enabled == True).all()  # noqa: E712
-    dlp_rules = db.query(McpDlpRule).filter(McpDlpRule.enabled == True).all()  # noqa: E712
-    guardrails = db.query(McpGuardrail).filter(McpGuardrail.enabled == True).all()  # noqa: E712
-    skills = db.query(McpSkill).filter(McpSkill.enabled == True).all()  # noqa: E712
+    # Order by stable IDs so the generated JSON is deterministic and the config
+    # diff does not flip the order of servers/identities/policies between runs.
+    servers = db.query(McpServer).filter(McpServer.enabled == True).order_by(McpServer.id).all()  # noqa: E712
+    identities = db.query(McpIdentity).filter(McpIdentity.enabled == True).order_by(McpIdentity.id).all()  # noqa: E712
+    teams = db.query(Team).order_by(Team.id).all()
+    policies = db.query(McpPolicy).filter(McpPolicy.enabled == True).order_by(McpPolicy.id).all()  # noqa: E712
+    dlp_rules = db.query(McpDlpRule).filter(McpDlpRule.enabled == True).order_by(McpDlpRule.id).all()  # noqa: E712
+    guardrails = db.query(McpGuardrail).filter(McpGuardrail.enabled == True).order_by(McpGuardrail.id).all()  # noqa: E712
+    skills = db.query(McpSkill).filter(McpSkill.enabled == True).order_by(McpSkill.id).all()  # noqa: E712
 
     # Build servers with replicas
     server_list = []
@@ -254,7 +298,7 @@ def build_config_bundle(db: Session) -> dict:
         replicas = db.query(McpServerReplica).filter(
             McpServerReplica.server_id == server.id,
             McpServerReplica.enabled == True,  # noqa: E712
-        ).all()
+        ).order_by(McpServerReplica.id).all()
         server_list.append(_build_server_dict(server, replicas))
 
     # Build identities
@@ -279,7 +323,7 @@ def build_config_bundle(db: Session) -> dict:
 
     # Global settings
     allowed_origins_str = get_setting(db, "mcp_allowed_origins", settings.MCP_ALLOWED_ORIGINS or "")
-    allowed_origins = [o.strip() for o in allowed_origins_str.split(",") if o.strip()] if allowed_origins_str else []
+    allowed_origins = sorted([o.strip() for o in allowed_origins_str.split(",") if o.strip()]) if allowed_origins_str else []
 
     bundle = {
         "servers": server_list,
@@ -351,8 +395,9 @@ def write_config_bundle(db: Session) -> str:
     if config_dir:
         os.makedirs(config_dir, exist_ok=True)
 
-    # Serialize and encrypt
-    plaintext = json.dumps(bundle, indent=2, default=str).encode("utf-8")
+    # Serialize and encrypt.  Use sort_keys so the bundle is byte-for-byte
+    # comparable with the .applied copy and so the on-disk file is stable.
+    plaintext = json.dumps(bundle, indent=2, sort_keys=True, default=str).encode("utf-8")
     encrypted = _encrypt_bundle_bytes(plaintext)
 
     # Write atomically (write to temp, then rename)
@@ -373,9 +418,13 @@ def generate_mcp_bundle_text(db: Session) -> str:
     the generated bundle against the .applied copy. Returns the decrypted
     plaintext JSON so comparison is stable (Fernet uses a random IV, so
     ciphertext comparison would always show a diff).
+
+    Secrets are redacted so the returned text is safe to show in UI previews
+    and diffs without leaking auth tokens.
     """
     bundle = build_config_bundle(db)
     bundle = _sign_bundle(bundle)
+    bundle = _redact_bundle(bundle)
     return json.dumps(bundle, indent=2, default=str, sort_keys=True)
 
 
@@ -393,9 +442,18 @@ def read_applied_mcp_bundle() -> str:
     # Try to decrypt; if decryption fails (no key, corrupted), return raw text
     try:
         f_obj = _get_fernet()
-        return f_obj.decrypt(raw).decode("utf-8")
+        text = f_obj.decrypt(raw).decode("utf-8")
     except Exception:
-        return raw.decode("utf-8", errors="replace")
+        text = raw.decode("utf-8", errors="replace")
+
+    # Normalize and redact secrets from an old .applied file that may have
+    # been written before redaction was added, or re-dumped without leaking.
+    try:
+        bundle = json.loads(text)
+        bundle = _redact_bundle(bundle)
+        return json.dumps(bundle, indent=2, default=str, sort_keys=True)
+    except Exception:
+        return text
 
 
 def write_applied_mcp_bundle(db: Session) -> None:

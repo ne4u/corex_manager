@@ -3280,8 +3280,9 @@ def generate_frontend(
 
     # MCP Gateway — route /mcp and the OAuth protected-resource well-known
     # path to the mcp_gateway backend. Emitted when the MCP feature flag is on
-    # and this listener is HTTP mode. A dedicated MCP listener (protocol=mcp)
-    # uses default_backend instead of a path-based use_backend rule.
+    # and this listener is HTTP mode. Regular listeners opt in per-listener via
+    # options.mcp_route_enabled; a dedicated MCP listener (protocol=mcp) uses
+    # default_backend instead of a path-based use_backend rule.
     if effective_mode == "http":
         from .settings import get_setting as _mcp_gs
         mcp_on = _mcp_gs(db, "mcp_gateway_enabled", str(settings.MCP_GATEWAY_ENABLED)).lower() in ("true", "1", "yes")
@@ -3289,7 +3290,7 @@ def generate_frontend(
             if getattr(listener, "protocol", None) == "mcp":
                 # Dedicated MCP listener — everything goes to the gateway
                 lines.append(f"    default_backend mcp_gateway")
-            else:
+            elif listener_options.get("mcp_route_enabled"):
                 lines.append(f"    use_backend mcp_gateway if {{ path_beg /mcp }} || {{ path_beg /.well-known/oauth-protected-resource }}")
 
     # Content switching rules (per listener) — use_backend lines only.

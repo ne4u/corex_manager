@@ -29,6 +29,7 @@ from .services.page_protect_sampler import start_page_protect_sampler
 from .services.page_protect_hasher import start_page_protect_hasher
 from .services.cache_metrics import start_sampler as start_cache_metrics_sampler
 from .services.mcp_metrics import start_mcp_sampler
+from .services.mcp_catalog_sync import start_mcp_catalog_sync
 from .services.beacon_trust_persist import start_beacon_trust_persist, seed_beacon_trust_table
 from .services import coraza_config
 
@@ -112,9 +113,25 @@ async def lifespan(app: FastAPI):
             _reg_db.close()
     except Exception as _exc:
         logging.getLogger(__name__).warning("MCP self-registration failed: %s", _exc)
+    # Trigger an initial catalog refresh for all enabled MCP servers.
+    # The mcp-gateway worker also refreshes on startup; this is a best-effort
+    # fallback to populate builder metadata when the worker is delayed or down.
+    try:
+        from .services.mcp_policies import trigger_background_catalog_refresh
+        from .core.database import SessionLocal as _McpSL
+        from .models.mcp import McpServer
+        _mcp_db = _McpSL()
+        try:
+            enabled_ids = [s.id for s in _mcp_db.query(McpServer).filter(McpServer.enabled == True).all()]  # noqa: E712
+            trigger_background_catalog_refresh(enabled_ids)
+        finally:
+            _mcp_db.close()
+    except Exception as _exc:
+        logging.getLogger(__name__).warning("MCP startup catalog refresh failed: %s", _exc)
     start_metrics_sampler()
     start_cache_metrics_sampler()
     start_mcp_sampler()
+    start_mcp_catalog_sync()
     if _settings.CORAZA_SPOA_ENABLED:
         start_waf_sampler()
     start_task_worker()

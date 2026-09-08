@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, Trash2, Pencil, Shield, Code2 } from 'lucide-react'
+import { Plus, Trash2, Pencil, Shield, RefreshCw } from 'lucide-react'
 import { mcp } from '../../services/api'
 import Modal from '../Modal'
 import { IconButton, Badge } from '../ui'
+import McpPolicyExpressionBuilder, { type BuilderMetadata } from './McpPolicyExpressionBuilder'
 
 interface McpPolicy {
   id: number
@@ -22,31 +23,16 @@ interface McpPolicy {
 
 interface Team { id: number; name: string; slug: string }
 
-const EXPRESSION_FIELDS = [
-  { label: 'method', insert: 'method', descKey: 'pages:mcpGateway.policies.expressionFields.method' },
-  { label: 'tool', insert: 'tool', descKey: 'pages:mcpGateway.policies.expressionFields.tool' },
-  { label: 'server', insert: 'server', descKey: 'pages:mcpGateway.policies.expressionFields.server' },
-  { label: 'identity_name', insert: 'identity_name', descKey: 'pages:mcpGateway.policies.expressionFields.identity_name' },
-  { label: 'identity_kind', insert: 'identity_kind', descKey: 'pages:mcpGateway.policies.expressionFields.identity_kind' },
-  { label: 'team_slug', insert: 'team_slug', descKey: 'pages:mcpGateway.policies.expressionFields.team_slug' },
-  { label: 'claims.sub', insert: 'claims["sub"]', descKey: 'pages:mcpGateway.policies.expressionFields.claimsSub' },
-  { label: 'claims.iss', insert: 'claims["iss"]', descKey: 'pages:mcpGateway.policies.expressionFields.claimsIss' },
-]
-
-const EXPRESSION_OPERATORS = [
-  { label: '==', insert: ' == ' },
-  { label: '!=', insert: ' != ' },
-  { label: 'matches', insert: ' matches ' },
-  { label: '&&', insert: ' && ' },
-  { label: '||', insert: ' || ' },
-]
-
 const EXPRESSION_TEMPLATES = [
-  { labelKey: 'pages:mcpGateway.policies.expressionTemplates.allowSpecificTool', expr: "method == 'tools/call' && tool == 'tool_name'" },
-  { labelKey: 'pages:mcpGateway.policies.expressionTemplates.allowToolPrefix', expr: "method == 'tools/call' && tool matches 'prefix__*'" },
-  { labelKey: 'pages:mcpGateway.policies.expressionTemplates.denyByIdentity', expr: "identity_name == 'name' && action == 'deny'" },
-  { labelKey: 'pages:mcpGateway.policies.expressionTemplates.jwtSubjectCheck', expr: 'claims["sub"] == "subject-value"' },
-  { labelKey: 'pages:mcpGateway.policies.expressionTemplates.serverMethod', expr: "server == 'namespace' && method == 'tools/call'" },
+  { labelKey: 'pages:mcpGateway.policies.expressionTemplates.allowAll', expr: 'true', action: 'allow' },
+  { labelKey: 'pages:mcpGateway.policies.expressionTemplates.denyAll', expr: 'true', action: 'deny' },
+  { labelKey: 'pages:mcpGateway.policies.expressionTemplates.allowSpecificTool', expr: 'mcp.method = "tools/call" and mcp.tool = "namespace__tool_name"', action: 'allow' },
+  { labelKey: 'pages:mcpGateway.policies.expressionTemplates.allowToolPrefix', expr: 'mcp.method = "tools/call" and mcp.tool ~ "^namespace__.*"', action: 'allow' },
+  { labelKey: 'pages:mcpGateway.policies.expressionTemplates.allowToolList', expr: 'mcp.identity = "grok-agent" and mcp.tool in ["corex-manager__create_security_rule", "corex-manager__validate_security_rule"]', action: 'allow' },
+  { labelKey: 'pages:mcpGateway.policies.expressionTemplates.denyByIdentity', expr: 'mcp.identity = "name"', action: 'deny' },
+  { labelKey: 'pages:mcpGateway.policies.expressionTemplates.jwtSubjectCheck', expr: 'auth.claim.sub = "subject-value"', action: 'allow' },
+  { labelKey: 'pages:mcpGateway.policies.expressionTemplates.serverMethod', expr: 'mcp.server = "namespace" and mcp.method = "tools/call"', action: 'allow' },
+  { labelKey: 'pages:mcpGateway.policies.expressionTemplates.pathTraversalGuard', expr: 'mcp.arg["path"] contains ".."', action: 'deny' },
 ]
 
 const emptyForm = {
@@ -57,12 +43,16 @@ export default function McpPoliciesTab() {
   const { t } = useTranslation(['pages', 'common'])
   const [policies, setPolicies] = useState<McpPolicy[]>([])
   const [teams, setTeams] = useState<Team[]>([])
+  const [metadata, setMetadata] = useState<BuilderMetadata | null>(null)
+  const [metadataLoading, setMetadataLoading] = useState(true)
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<McpPolicy | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [regenerateNeeded, setRegenerateNeeded] = useState(false)
+  const [regenerating, setRegenerating] = useState(false)
 
   const fetch = useCallback(async () => {
     try {
@@ -76,7 +66,20 @@ export default function McpPoliciesTab() {
     finally { setLoading(false) }
   }, [form.team_id])
 
+  const loadMetadata = useCallback(async () => {
+    setMetadataLoading(true)
+    try {
+      const resp = await mcp.policies.builderMetadata()
+      setMetadata(resp.data)
+    } catch {
+      setMetadata(null)
+    } finally {
+      setMetadataLoading(false)
+    }
+  }, [])
+
   useEffect(() => { fetch() }, [fetch])
+  useEffect(() => { loadMetadata() }, [loadMetadata])
 
   const openCreate = () => {
     setEditing(null)
@@ -95,6 +98,10 @@ export default function McpPoliciesTab() {
     setModalOpen(true)
   }
 
+  const applyTemplate = (tpl: typeof EXPRESSION_TEMPLATES[0]) => {
+    setForm(prev => ({ ...prev, expression: tpl.expr, action: tpl.action }))
+  }
+
   const save = async () => {
     setSaving(true)
     setError('')
@@ -105,15 +112,32 @@ export default function McpPoliciesTab() {
         await mcp.policies.create(form)
       }
       setModalOpen(false)
+      setRegenerateNeeded(true)
       fetch()
     } catch (err: any) {
       setError(err?.response?.data?.detail || t('pages:mcpGateway.policies.saveFailed'))
     } finally { setSaving(false) }
   }
 
+  const regenerate = async () => {
+    setRegenerating(true)
+    try {
+      await mcp.config.regenerate()
+      setRegenerateNeeded(false)
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || t('pages:mcpGateway.policies.regenerateFailed'))
+    } finally {
+      setRegenerating(false)
+    }
+  }
+
   const del = async (id: number) => {
     if (!confirm(t('pages:mcpGateway.policies.deleteConfirm'))) return
-    try { await mcp.policies.delete(id); fetch() } catch { /* ignore */ }
+    try {
+      await mcp.policies.delete(id)
+      setRegenerateNeeded(true)
+      fetch()
+    } catch { /* ignore */ }
   }
 
   const actionVariant = (action: string) => {
@@ -130,6 +154,19 @@ export default function McpPoliciesTab() {
 
   return (
     <div className="space-y-4">
+      {regenerateNeeded && (
+        <div className="rounded-md border border-warning/50 bg-warning/10 p-3 flex items-center justify-between">
+          <span className="text-sm">{t('pages:mcpGateway.policies.regenerateNotice')}</span>
+          <button
+            className="btn-secondary text-xs flex items-center gap-1"
+            onClick={regenerate}
+            disabled={regenerating}
+          >
+            <RefreshCw className={regenerating ? 'w-3 h-3 animate-spin' : 'w-3 h-3'} />
+            {regenerating ? t('common:actions.loading') : t('pages:mcpGateway.policies.regenerate')}
+          </button>
+        </div>
+      )}
       <div className="flex justify-between items-center">
         <p className="text-sm text-muted-foreground">{t('pages:mcpGateway.policies.count', { count: policies.length })}</p>
         <button className="btn-primary text-sm" onClick={openCreate}>
@@ -179,34 +216,38 @@ export default function McpPoliciesTab() {
               <input className="input w-full" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder={t('pages:mcpGateway.policies.modal.namePlaceholder')} />
             </div>
           </div>
+
           <div>
-            <label className="label flex items-center gap-1"><Code2 className="w-3.5 h-3.5" /> {t('pages:mcpGateway.policies.modal.expression')}</label>
-            <textarea className="input w-full font-mono text-sm" rows={3} value={form.expression} onChange={e => setForm({ ...form, expression: e.target.value })} placeholder={t('pages:mcpGateway.policies.modal.expressionPlaceholder')} />
-            <div className="mt-2 space-y-2">
-              <div className="flex flex-wrap gap-1">
-                {EXPRESSION_FIELDS.map(f => (
-                  <button key={f.label} type="button" className="btn-secondary text-xs py-0.5 px-2" title={t(f.descKey)} onClick={() => setForm(prev => ({ ...prev, expression: prev.expression + f.insert }))}>
-                    {f.label}
-                  </button>
-                ))}
-              </div>
-              <div className="flex flex-wrap gap-1">
-                {EXPRESSION_OPERATORS.map(op => (
-                  <button key={op.label} type="button" className="btn-secondary text-xs py-0.5 px-2 font-mono" onClick={() => setForm(prev => ({ ...prev, expression: prev.expression + op.insert }))}>
-                    {op.label}
-                  </button>
-                ))}
-              </div>
+            <label className="label">{t('pages:mcpGateway.policies.modal.expression')}</label>
+            {metadataLoading ? (
+              <p className="text-sm text-muted-foreground">{t('common:actions.loading')}</p>
+            ) : (
+              <McpPolicyExpressionBuilder
+                value={form.expression}
+                onChange={v => setForm(prev => ({ ...prev, expression: v }))}
+                metadata={metadata}
+                onRefreshMetadata={loadMetadata}
+              />
+            )}
+            <p className="text-xs text-muted-foreground mt-2">{t('pages:mcpGateway.policies.availableFields')}</p>
+
+            <div className="mt-3 space-y-2">
+              <p className="text-xs text-muted-foreground">{t('pages:mcpGateway.policies.expressionTemplates.label')}</p>
               <div className="flex flex-wrap gap-1">
                 {EXPRESSION_TEMPLATES.map(tpl => (
-                  <button key={tpl.labelKey} type="button" className="btn-secondary text-xs py-0.5 px-2" onClick={() => setForm(prev => ({ ...prev, expression: tpl.expr }))}>
+                  <button
+                    key={tpl.labelKey}
+                    type="button"
+                    className="btn-secondary text-xs py-0.5 px-2"
+                    onClick={() => applyTemplate(tpl)}
+                  >
                     {t(tpl.labelKey)}
                   </button>
                 ))}
               </div>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">{t('pages:mcpGateway.policies.availableFields')}</p>
           </div>
+
           <div>
             <label className="label">{t('pages:mcpGateway.policies.modal.action')}</label>
             <select className="input w-full" value={form.action} onChange={e => setForm({ ...form, action: e.target.value })}>
@@ -216,6 +257,7 @@ export default function McpPoliciesTab() {
               <option value="skip_ratelimit">{t('pages:mcpGateway.policies.actions.skipRatelimit')}</option>
             </select>
           </div>
+
           <div className="flex items-center gap-4">
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={form.enabled} onChange={e => setForm({ ...form, enabled: e.target.checked })} />
@@ -230,7 +272,9 @@ export default function McpPoliciesTab() {
               <span className="text-sm">{t('pages:mcpGateway.policies.noLogLabel')}</span>
             </label>
           </div>
+
           {error && <p className="text-sm text-red-400">{error}</p>}
+
           <div className="flex justify-end gap-2">
             <button className="btn-secondary" onClick={() => setModalOpen(false)}>{t('common:actions.cancel')}</button>
             <button className="btn-primary" onClick={save} disabled={saving}>{saving ? t('common:actions.saving') : t('common:actions.save')}</button>

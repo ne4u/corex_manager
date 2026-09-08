@@ -30,6 +30,7 @@ from ...schemas.mcp import (
     McpIdentityCreate, McpIdentityUpdate, McpIdentityResponse,
     PatCreateResponse,
     McpPolicyCreate, McpPolicyUpdate, McpPolicyResponse,
+    McpPolicyValidateRequest, McpPolicyValidateResponse,
     McpDlpRuleCreate, McpDlpRuleUpdate, McpDlpRuleResponse,
     McpSkillCreate, McpSkillUpdate, McpSkillResponse,
     McpSkillVersionCreate, McpSkillVersionResponse,
@@ -45,9 +46,18 @@ from ...schemas.mcp import (
     SessionInfo, SessionListResponse,
     ConfigStatusResponse,
     AlertConfigResponse, AlertConfigUpdate, AlertHistoryItem,
-    ServerCatalogResponse,
+    ServerCatalogResponse, McpServerTestResponse,
+    McpPolicyBuilderMetadataResponse,
 )
 from ...services.mcp_secrets import encrypt_secret, has_secrets_key
+from ...services.mcp_policies import (
+    parse_mcp_expression,
+    validate_mcp_expression,
+    build_policy_builder_metadata,
+    refresh_server_catalog,
+    trigger_background_catalog_refresh,
+)
+from ...services.mcp_config import write_config_bundle
 from ...core.valkey_client import _get_client as get_valkey_client
 
 router = APIRouter(prefix="/mcp", tags=["mcp"])
@@ -60,6 +70,9 @@ def _slugify(name: str) -> str:
 
 
 import json as _json
+import logging
+
+logger = logging.getLogger(__name__)
 
 def _server_to_response(obj: McpServer) -> McpServerResponse:
     args = []
@@ -367,6 +380,15 @@ def create_server(
     db.add(obj)
     db.commit()
     db.refresh(obj)
+
+    # Regenerate config so the gateway sees the new server, then fetch its catalog.
+    try:
+        write_config_bundle(db)
+    except Exception as e:
+        logger.error("Failed to write MCP config bundle after create: %s", e)
+    if obj.enabled:
+        trigger_background_catalog_refresh([obj.id])
+
     return _server_to_response(obj)
 
 
@@ -435,6 +457,15 @@ def update_server(
         setattr(obj, k, v)
     db.commit()
     db.refresh(obj)
+
+    # Regenerate config and refresh catalog if the server is enabled.
+    try:
+        write_config_bundle(db)
+    except Exception as e:
+        logger.error("Failed to write MCP config bundle after update: %s", e)
+    if obj.enabled:
+        trigger_background_catalog_refresh([obj.id])
+
     return _server_to_response(obj)
 
 
@@ -453,6 +484,10 @@ def delete_server(
         raise HTTPException(status_code=403, detail="Not a member of this team")
     db.delete(obj)
     db.commit()
+    try:
+        write_config_bundle(db)
+    except Exception as e:
+        logger.error("Failed to write MCP config bundle after delete: %s", e)
     return {"ok": True}
 
 
@@ -498,6 +533,12 @@ def create_replica(
     db.add(obj)
     db.commit()
     db.refresh(obj)
+    try:
+        write_config_bundle(db)
+    except Exception as e:
+        logger.error("Failed to write MCP config bundle after replica create: %s", e)
+    if server.enabled:
+        trigger_background_catalog_refresh([server.id])
     return obj
 
 
@@ -526,6 +567,12 @@ def update_replica(
         setattr(obj, k, v)
     db.commit()
     db.refresh(obj)
+    try:
+        write_config_bundle(db)
+    except Exception as e:
+        logger.error("Failed to write MCP config bundle after replica update: %s", e)
+    if server.enabled:
+        trigger_background_catalog_refresh([server.id])
     return obj
 
 
@@ -548,6 +595,12 @@ def delete_replica(
         raise HTTPException(status_code=404, detail="Replica not found")
     db.delete(obj)
     db.commit()
+    try:
+        write_config_bundle(db)
+    except Exception as e:
+        logger.error("Failed to write MCP config bundle after replica delete: %s", e)
+    if server.enabled:
+        trigger_background_catalog_refresh([server.id])
     return {"ok": True}
 
 
@@ -698,6 +751,10 @@ def create_policy(
     team_ids = get_user_team_ids(db, user)
     if p.team_id not in team_ids:
         raise HTTPException(status_code=403, detail="Not a member of this team")
+    try:
+        expression_ast = parse_mcp_expression(p.expression)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     max_priority = db.query(McpPolicy).order_by(McpPolicy.priority.desc()).first()
     priority = (max_priority.priority + 1) if max_priority else 0
     obj = McpPolicy(
@@ -706,6 +763,7 @@ def create_policy(
         enabled=p.enabled,
         priority=priority,
         expression=p.expression,
+        expression_ast=expression_ast,
         action=p.action,
         log=p.log,
         no_log=p.no_log,
@@ -730,7 +788,13 @@ def update_policy(
     team_ids = get_user_team_ids(db, user)
     if obj.team_id not in team_ids:
         raise HTTPException(status_code=403, detail="Not a member of this team")
-    for k, v in p_in.model_dump(exclude_unset=True).items():
+    data = p_in.model_dump(exclude_unset=True)
+    if "expression" in data and data["expression"] is not None:
+        try:
+            data["expression_ast"] = parse_mcp_expression(data["expression"])
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+    for k, v in data.items():
         setattr(obj, k, v)
     db.commit()
     db.refresh(obj)
@@ -753,6 +817,92 @@ def delete_policy(
     db.delete(obj)
     db.commit()
     return {"ok": True}
+
+
+@router.post("/policies/validate", response_model=McpPolicyValidateResponse)
+def validate_policy(
+    payload: McpPolicyValidateRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    _=Depends(rate_limit),
+):
+    """Validate an MCP policy expression without creating it."""
+    ok, ast, error = validate_mcp_expression(payload.expression)
+    return McpPolicyValidateResponse(ok=ok, ast=ast, error=error)
+
+
+@router.get("/policies/builder-metadata", response_model=McpPolicyBuilderMetadataResponse)
+def get_policy_builder_metadata(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    _=Depends(rate_limit),
+):
+    """Return dynamic values for the Add Policy builder (methods, servers, tools, etc.)."""
+    team_ids = get_user_team_ids(db, user)
+    data = build_policy_builder_metadata(db, team_ids or [])
+    if data.get("stale_servers"):
+        trigger_background_catalog_refresh([s["id"] for s in data["stale_servers"]])
+        data["refreshing"] = True
+    return data
+
+
+@router.post("/servers/{sid}/catalog/refresh", response_model=ServerCatalogResponse)
+def refresh_server_catalog_endpoint(
+    sid: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_write),
+    _=Depends(rate_limit),
+):
+    """Fetch a fresh catalog from an upstream MCP server and update the cache."""
+    server = db.get(McpServer, sid)
+    if not server:
+        raise HTTPException(status_code=404, detail="Server not found")
+    team_ids = get_user_team_ids(db, user)
+    if server.team_id not in team_ids:
+        raise HTTPException(status_code=403, detail="Not a member of this team")
+    if not server.enabled:
+        raise HTTPException(status_code=400, detail="Server is disabled")
+
+    catalog = refresh_server_catalog(server, db)
+    if not catalog:
+        raise HTTPException(status_code=502, detail=server.last_error or "Failed to refresh server catalog")
+
+    return ServerCatalogResponse(
+        server_id=server.id,
+        tools=catalog.get("tools", []),
+        resources=catalog.get("resources", []),
+        prompts=catalog.get("prompts", []),
+        last_refresh=server.last_catalog_at.isoformat() if server.last_catalog_at else None,
+    )
+
+
+@router.post("/servers/{sid}/test", response_model=McpServerTestResponse)
+def test_mcp_server(
+    sid: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_write),
+    _=Depends(rate_limit),
+):
+    """Test that an MCP server is reachable and can return a catalog."""
+    server = db.get(McpServer, sid)
+    if not server:
+        raise HTTPException(status_code=404, detail="Server not found")
+    team_ids = get_user_team_ids(db, user)
+    if server.team_id not in team_ids:
+        raise HTTPException(status_code=403, detail="Not a member of this team")
+    if not server.enabled:
+        raise HTTPException(status_code=400, detail="Server is disabled")
+
+    catalog = refresh_server_catalog(server, db)
+    if not catalog:
+        return McpServerTestResponse(ok=False, error=server.last_error or "Failed to fetch server catalog")
+
+    return McpServerTestResponse(
+        ok=True,
+        tools=catalog.get("tools", []),
+        resources=catalog.get("resources", []),
+        prompts=catalog.get("prompts", []),
+    )
 
 
 # ==================== DLP Rules ====================

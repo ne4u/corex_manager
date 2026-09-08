@@ -84,6 +84,7 @@ def make_listener(
     mode: str = "http",
     enabled: bool = True,
     ssl_enabled: bool = False,
+    options: Optional[dict] = None,
 ) -> Listener:
     listener = Listener(
         name=name,
@@ -94,6 +95,7 @@ def make_listener(
         default_backend_id=backend.id if backend else None,
         enabled=enabled,
         ssl_enabled=ssl_enabled,
+        options=options or {},
     )
     db.add(listener)
     db.flush()

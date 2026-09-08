@@ -68,7 +68,7 @@ export default function McpTrafficTab() {
     return row
   }) ?? []
 
-  const latencyData = data?.latency.map(l => ({
+  const latencyData = (Array.isArray(data?.latency) ? data.latency : []).map(l => ({
     time: formatTimeCompact(l.time),
     p50: l.p50,
     p99: l.p99,

@@ -434,6 +434,20 @@ def test_mcp_metrics_aggregation(db):
     assert result["latency"][0]["p50"] > 0
 
 
+def test_mcp_metrics_aggregation_empty(db):
+    """get_mcp_metrics returns empty arrays (not dicts) when there are no events."""
+    from app.services import mcp_metrics
+
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    result = mcp_metrics.get_mcp_metrics(
+        db, start=now - timedelta(hours=1), end=now, step=300, breakdown="action",
+    )
+    assert result["time"] == []
+    assert result["series"] == []
+    assert result["totals"] == {}
+    assert result["latency"] == []
+
+
 # ---- Metrics API test ----
 
 def test_mcp_metrics_api(client, db):

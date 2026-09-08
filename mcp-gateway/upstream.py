@@ -13,6 +13,7 @@ import json
 import logging
 import time
 from typing import Any, Optional
+from urllib.parse import urljoin, urlparse
 
 import httpx
 
@@ -109,6 +110,56 @@ def _is_stdio(server: dict) -> bool:
     return server.get("transport_type") == "stdio"
 
 
+def _parse_response_body(resp: httpx.Response) -> dict | str:
+    """Parse an upstream response body.
+
+    Streamable HTTP MCP servers may respond with text/event-stream (SSE)
+    framing — "data: {json}" lines — instead of application/json. Unwrap the
+    last JSON-RPC message in that case; progress notifications (if any) come
+    first and the final response is last.
+    """
+    content_type = resp.headers.get("content-type", "")
+    if "text/event-stream" in content_type:
+        data_lines = [
+            line[5:].strip()
+            for line in resp.text.splitlines()
+            if line.startswith("data:")
+        ]
+        for raw in reversed(data_lines):
+            try:
+                return json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+        return resp.text
+    if "application/json" in content_type:
+        return resp.json()
+    return resp.text
+
+
+async def _post_with_redirect(client: httpx.AsyncClient, url: str, json: dict, headers: dict, max_redirects: int = 1) -> httpx.Response:
+    """POST to url and follow a single same-origin 307/308 redirect.
+
+    Some MCP streamable HTTP servers (e.g. older opensearch-mcp-server-py)
+    register `/mcp` but Starlette redirects bare `/mcp` to `/mcp/`.  httpx is
+    configured with follow_redirects=False for SSRF safety, so we handle this
+    one common case manually: a 307/308 to a path on the same scheme+netloc.
+    """
+    resp = await client.post(url, json=json, headers=headers)
+    if max_redirects <= 0:
+        return resp
+    if resp.status_code in (307, 308):
+        location = resp.headers.get("location")
+        if location:
+            new_url = urljoin(url, location)
+            base = urlparse(url)
+            target = urlparse(new_url)
+            if base.scheme == target.scheme and base.netloc == target.netloc:
+                safe, reason = is_url_safe(new_url)
+                if safe:
+                    return await _post_with_redirect(client, new_url, json, headers, max_redirects - 1)
+    return resp
+
+
 async def initialize_upstream(server: dict) -> Optional[str]:
     """Send initialize to upstream, return the upstream session ID."""
     if _is_stdio(server):
@@ -141,15 +192,19 @@ async def initialize_upstream(server: dict) -> Optional[str]:
     }
     headers = _build_headers(server)
     try:
-        resp = await client.post(url, json=body, headers=headers)
+        resp = await _post_with_redirect(client, url, body, headers)
         # Extract session ID from response header
         upstream_sid = resp.headers.get("Mcp-Session-Id")
         if resp.status_code == 200:
             _record_upstream_success(server["id"])
-            return upstream_sid
+            # Some streamable HTTP servers (e.g. certain opensearch-mcp versions)
+            # do not return a session ID.  Return "" so callers can distinguish
+            # a successful stateless initialize (truthy empty string) from a
+            # failed one (None).
+            return upstream_sid or ""
         logger.warning("Upstream initialize returned %d for %s", resp.status_code, url)
         _record_upstream_failure(server["id"])
-        return upstream_sid  # Some servers may return session even on partial success
+        return None
     except Exception as e:
         logger.error("Upstream initialize failed for %s: %s", url, e)
         _record_upstream_failure(server["id"])
@@ -169,6 +224,11 @@ async def send_request(
     if _is_stdio(server):
         return await get_process_manager().send_request(server, message)
 
+    safe, reason = is_url_safe(server["url"])
+    if not safe:
+        logger.error("SSRF blocked upstream URL %s: %s", server["url"], reason)
+        return 403, {"jsonrpc": "2.0", "error": {"code": -32000, "message": f"Upstream blocked: {reason}"}}, {}
+
     sid = server["id"]
     if not _check_circuit(sid):
         return 503, {"jsonrpc": "2.0", "error": {"code": -32000, "message": "Upstream circuit breaker open"}}, {}
@@ -177,13 +237,9 @@ async def send_request(
     url = server["url"]
     headers = _build_headers(server, upstream_session_id)
     try:
-        resp = await client.post(url, json=message, headers=headers)
+        resp = await _post_with_redirect(client, url, message, headers)
         resp_headers = dict(resp.headers)
-        content_type = resp.headers.get("content-type", "")
-        if "application/json" in content_type:
-            body = resp.json()
-        else:
-            body = resp.text
+        body = _parse_response_body(resp)
         if resp.status_code < 500:
             _record_upstream_success(sid)
         else:
@@ -208,11 +264,16 @@ async def send_notification(
     if _is_stdio(server):
         return await get_process_manager().send_notification(server, message)
 
+    safe, reason = is_url_safe(server["url"])
+    if not safe:
+        logger.error("SSRF blocked upstream URL %s: %s", server["url"], reason)
+        return 403
+
     client = _get_client(server)
     url = server["url"]
     headers = _build_headers(server, upstream_session_id)
     try:
-        resp = await client.post(url, json=message, headers=headers)
+        resp = await _post_with_redirect(client, url, message, headers)
         return resp.status_code
     except Exception as e:
         logger.error("Upstream notification failed for %s: %s", url, e)
@@ -269,10 +330,14 @@ async def _fetch_list(
     method: str,
     upstream_session_id: Optional[str],
     key: str,
-) -> list[dict]:
-    """Fetch a paginated list method from upstream. Returns items list."""
+) -> Optional[list[dict]]:
+    """Fetch a paginated list method from upstream. Returns items list, or None on failure."""
     items: list[dict] = []
     cursor = None
+    safe, reason = is_url_safe(server["url"])
+    if not safe:
+        logger.error("SSRF blocked upstream URL %s: %s", server["url"], reason)
+        return None
     client = _get_client(server)
     url = server["url"]
     headers = _build_headers(server, upstream_session_id)
@@ -289,14 +354,17 @@ async def _fetch_list(
             "params": params,
         }
         try:
-            resp = await client.post(url, json=body, headers=headers)
+            resp = await _post_with_redirect(client, url, body, headers)
             if resp.status_code != 200:
                 logger.warning("Upstream %s returned %d for %s", url, resp.status_code, method)
-                break
-            data = resp.json()
+                return None
+            data = _parse_response_body(resp)
+            if not isinstance(data, dict):
+                logger.warning("Upstream %s returned non-JSON body for %s", url, method)
+                return None
             if "error" in data:
                 logger.warning("Upstream %s error on %s: %s", url, method, data["error"])
-                break
+                return None
             result = data.get("result", {})
             items.extend(result.get(key, []))
             cursor = result.get("nextCursor")
@@ -305,7 +373,7 @@ async def _fetch_list(
             req_id += 1
         except Exception as e:
             logger.error("Upstream %s failed on %s: %s", url, method, e)
-            break
+            return None
 
     return items
 
@@ -321,28 +389,35 @@ async def fetch_catalog(
     if _is_stdio(server):
         return await get_process_manager().fetch_catalog(server)
 
+    # A missing upstream_session_id is allowed for stateless streamable HTTP
+    # servers that do not issue an Mcp-Session-Id header.
+
     try:
         tools = await _fetch_list(server, "tools/list", upstream_session_id, "tools")
     except Exception as e:
         logger.error("Failed to fetch tools/list for %s: %s", server.get("name"), e)
-        tools = []
+        tools = None
 
     try:
         resources = await _fetch_list(server, "resources/list", upstream_session_id, "resources")
     except Exception as e:
         logger.error("Failed to fetch resources/list for %s: %s", server.get("name"), e)
-        resources = []
+        resources = None
 
     try:
         prompts = await _fetch_list(server, "prompts/list", upstream_session_id, "prompts")
     except Exception as e:
         logger.error("Failed to fetch prompts/list for %s: %s", server.get("name"), e)
-        prompts = []
+        prompts = None
+
+    if tools is None and resources is None and prompts is None:
+        logger.warning("All catalog lists failed for %s", server.get("name"))
+        return None
 
     return {
-        "tools": tools,
-        "resources": resources,
-        "prompts": prompts,
+        "tools": tools or [],
+        "resources": resources or [],
+        "prompts": prompts or [],
         "fetched_at": __import__("time").time(),
     }
 

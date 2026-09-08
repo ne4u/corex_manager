@@ -126,6 +126,40 @@ describe('expression-parser', () => {
         },
       ])
     })
+
+    it('uses the provided default field', () => {
+      const groups = parseToGroups('', 'mcp.method')
+      expect(groups).toEqual([
+        {
+          conditions: [
+            { field: 'mcp.method', op: '=', value: '', negated: false },
+          ],
+        },
+      ])
+    })
+
+    it('parses bare boolean literals', () => {
+      const groups = parseToGroups('not true')
+      expect(groups).toEqual([
+        {
+          conditions: [
+            { field: 'true', op: 'literal', value: '', negated: true },
+          ],
+        },
+      ])
+    })
+
+    it('parses mcp-style qualified fields and word operators', () => {
+      const groups = parseToGroups('mcp.identity = "grok-agent" and mcp.tool in ["corex-manager__create"]')
+      expect(groups).toEqual([
+        {
+          conditions: [
+            { field: 'mcp.identity', op: '=', value: 'grok-agent', negated: false },
+            { field: 'mcp.tool', op: 'in', value: '["corex-manager__create"]', negated: false },
+          ],
+        },
+      ])
+    })
   })
 
   describe('serializeCondition and serializeGroups', () => {
