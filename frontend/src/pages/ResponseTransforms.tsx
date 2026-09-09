@@ -128,12 +128,12 @@ export default function ResponseTransforms() {
         </h2>
         <button onClick={openAdd} className="btn-primary">{t('pages:responseTransforms.addTransform')}</button>
       </div>
-      <p className="text-sm text-slate-400">
+      <p className="text-sm text-muted-foreground">
         {t('pages:responseTransforms.description')}
       </p>
-      <div className="card overflow-x-auto">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
         <table className="w-full text-sm text-start">
-          <thead className="text-slate-400 border-b border-slate-800">
+          <thead className="text-muted-foreground border-b border-border">
             <tr>
               <th className="w-6"></th>
               <th>{t('pages:responseTransforms.tableHeaders.name')}</th>
@@ -151,27 +151,27 @@ export default function ResponseTransforms() {
                 onDragStart={(e: any) => { if (r._system) return; e.dataTransfer.setData('rt', String(r.id)); e.dataTransfer.effectAllowed = 'move' }}
                 onDragOver={(e: any) => e.preventDefault()}
                 onDrop={(e: any) => { e.preventDefault(); const fromId = Number(e.dataTransfer.getData('rt')); if (fromId && fromId !== r.id) handleDrop(fromId, r.id) }}
-                className="border-b border-slate-800 last:border-0"
+                className="border-b border-border last:border-0"
               >
                 <td className="py-2 pe-2">
-                  {r._system ? <Shield className="h-4 w-4 text-primary" /> : <GripVertical className="h-4 w-4 text-slate-500 cursor-grab" />}
+                  {r._system ? <Shield className="h-4 w-4 text-primary" /> : <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />}
                 </td>
                 <td className="py-2">
                   {r.name}
                   {r._system && <span className="ms-2 text-xs px-1.5 py-0.5 rounded bg-primary/20 text-primary">System</span>}
                 </td>
                 <td>{renderBackends(r)}</td>
-                <td><span className="px-2 py-0.5 rounded bg-slate-800 text-xs">{r.transform_type}</span></td>
-                <td className="max-w-md truncate text-slate-400">{renderSummary(r)}</td>
+                <td><span className="px-2 py-0.5 rounded bg-muted text-xs">{r.transform_type}</span></td>
+                <td className="max-w-md truncate text-muted-foreground">{renderSummary(r)}</td>
                 <td>
                   {r._system ? (
-                    <span className={r.enabled ? 'text-green-400' : 'text-slate-500'}>
+                    <span className={r.enabled ? 'text-green-400' : 'text-muted-foreground'}>
                       {r.enabled ? t('pages:responseTransforms.enabled') : t('pages:responseTransforms.disabled')}
                     </span>
                   ) : (
                     <button
                       onClick={() => responseTransforms.update(r.id, { enabled: !r.enabled }).then(reload)}
-                      className={r.enabled ? 'text-green-400' : 'text-slate-500'}
+                      className={r.enabled ? 'text-green-400' : 'text-muted-foreground'}
                     >
                       {r.enabled ? t('pages:responseTransforms.enabled') : t('pages:responseTransforms.disabled')}
                     </button>
@@ -200,10 +200,10 @@ export default function ResponseTransforms() {
             </div>
             <div>
               <LabelWithTooltip tooltip={t('pages:responseTransforms.tooltips.backends')} className="label">{t('pages:responseTransforms.modal.backendsNoneAll')}</LabelWithTooltip>
-              <div className="input h-auto max-h-32 overflow-y-auto p-2 space-y-1 text-sm text-slate-300">
+              <div className="input h-auto max-h-32 overflow-y-auto p-2 space-y-1 text-sm text-secondary-foreground">
                 {backendList.map((b: any) => (
                   <label key={b.id} className="flex items-center gap-2">
-                    <input type="checkbox" className="rounded border-slate-600 bg-slate-800 text-primary"
+                    <input type="checkbox" className="rounded border-subtle bg-muted text-primary"
                       checked={form.backend_ids.includes(b.id)}
                       onChange={(e: any) => setForm({ ...form, backend_ids: e.target.checked ? [...form.backend_ids, b.id] : form.backend_ids.filter((id: number) => id !== b.id) })}
                     /> {b.name}
@@ -317,7 +317,7 @@ export default function ResponseTransforms() {
                 )}
               </div>
               <label className="flex items-center gap-2 mt-1">
-                <input type="checkbox" className="rounded border-slate-600 bg-slate-800 text-primary"
+                <input type="checkbox" className="rounded border-subtle bg-muted text-primary"
                   checked={form.detokenize_query}
                   onChange={e => setForm({ ...form, detokenize_query: e.target.checked })}
                 />

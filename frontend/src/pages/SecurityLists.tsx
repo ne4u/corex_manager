@@ -197,46 +197,46 @@ function ListTab({ kind, lists, reload }: { kind: ListKind; lists: ListRow[]; re
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       {/* Lists panel */}
-      <div className="card overflow-x-auto">
-        <div className="flex items-center justify-between p-4 border-b border-slate-800">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
+        <div className="flex items-center justify-between p-4 border-b border-border">
           <h3 className="font-semibold">{kind === 'network' ? t('pages:securityLists.tabs.network') : kind === 'asn' ? t('pages:securityLists.tabs.asn') : kind === 'geo' ? t('pages:securityLists.tabs.geo') : kind === 'ja4' ? t('pages:securityLists.tabs.ja4') : t('pages:securityLists.tabs.pattern')} Lists</h3>
           <button onClick={openAddList} className="btn-primary">{t('pages:securityLists.addList')}</button>
         </div>
         <table className="w-full text-sm text-start">
-          <thead className="text-slate-400 border-b border-slate-800">
+          <thead className="text-muted-foreground border-b border-border">
             <tr><th className="p-2">{t('pages:securityLists.tableHeaders.name')}</th><th className="p-2">{t('pages:securityLists.tableHeaders.description')}</th><th className="p-2">{t('pages:securityLists.tableHeaders.entries')}</th><th className="p-2">{t('pages:securityLists.tableHeaders.lastUpdated')}</th><th className="p-2"></th></tr>
           </thead>
           <tbody>
             {lists.map(l => (
-              <tr key={l.id} className={`border-b border-slate-800 last:border-0 cursor-pointer hover:bg-slate-800/40 ${selected?.id === l.id ? 'bg-slate-800/60' : ''}`} onClick={() => openEntries(l)}>
+              <tr key={l.id} className={`border-b border-border last:border-0 cursor-pointer hover:bg-muted/40 ${selected?.id === l.id ? 'bg-muted/60' : ''}`} onClick={() => openEntries(l)}>
                 <td className="p-2">{l.name}</td>
-                <td className="p-2 text-slate-400">{l.description || '-'}</td>
+                <td className="p-2 text-muted-foreground">{l.description || '-'}</td>
                 <td className="p-2">{l.entry_count}</td>
-                <td className="p-2 text-xs text-slate-400">{l.updated_at ? formatDateTime(l.updated_at) : '-'}</td>
+                <td className="p-2 text-xs text-muted-foreground">{l.updated_at ? formatDateTime(l.updated_at) : '-'}</td>
                 <td className="p-2 space-x-1" onClick={e => e.stopPropagation()}>
                   <IconButton icon={Pencil} aria-label="Edit" onClick={() => openEditList(l)} />
                   <IconButton icon={Trash2} variant="danger" aria-label="Delete" onClick={() => deleteList(l)} />
                 </td>
               </tr>
             ))}
-            {lists.length === 0 && <tr><td className="p-4 text-slate-500" colSpan={5}>{t('pages:securityLists.noListsYet')}</td></tr>}
+            {lists.length === 0 && <tr><td className="p-4 text-muted-foreground" colSpan={5}>{t('pages:securityLists.noListsYet')}</td></tr>}
           </tbody>
         </table>
       </div>
 
       {/* Entries panel */}
-      <div className="card overflow-x-auto">
-        <div className="flex items-center justify-between p-4 border-b border-slate-800">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
+        <div className="flex items-center justify-between p-4 border-b border-border">
           <h3 className="font-semibold">{selected ? t('pages:securityLists.feeds.entriesTitle', { name: selected.name }) : t('pages:securityLists.selectList')}</h3>
           {selected && <button onClick={openAddEntry} className="btn-primary">{t('pages:securityLists.addEntry')}</button>}
         </div>
         {!selected ? (
-          <div className="p-4 text-slate-500">{t('pages:securityLists.selectListToView')}</div>
+          <div className="p-4 text-muted-foreground">{t('pages:securityLists.selectListToView')}</div>
         ) : entriesLoading ? (
-          <div className="p-4 text-slate-500">{t('pages:securityLists.loading')}</div>
+          <div className="p-4 text-muted-foreground">{t('pages:securityLists.loading')}</div>
         ) : (
           <table className="w-full text-sm text-start">
-            <thead className="text-slate-400 border-b border-slate-800">
+            <thead className="text-muted-foreground border-b border-border">
               <tr><th className="p-2">{t('pages:securityLists.valueLabels.' + kind)}</th><th className="p-2">{t('pages:securityLists.tableHeaders.note')}</th><th className="p-2"></th></tr>
             </thead>
             <tbody>
@@ -245,9 +245,9 @@ function ListTab({ kind, lists, reload }: { kind: ListKind; lists: ListRow[]; re
                   ? `${countryNameMap[en.value]} (${en.value})`
                   : en.value
                 return (
-                  <tr key={en.id} className="border-b border-slate-800 last:border-0">
+                  <tr key={en.id} className="border-b border-border last:border-0">
                     <td className="p-2 font-mono">{display}</td>
-                    <td className="p-2 text-slate-400">{en.note || '-'}</td>
+                    <td className="p-2 text-muted-foreground">{en.note || '-'}</td>
                     <td className="p-2 space-x-1">
                       <IconButton icon={Pencil} aria-label="Edit" onClick={() => openEditEntry(en)} />
                       <IconButton icon={Trash2} variant="danger" aria-label="Delete" onClick={() => deleteEntry(en)} />
@@ -255,7 +255,7 @@ function ListTab({ kind, lists, reload }: { kind: ListKind; lists: ListRow[]; re
                   </tr>
                 )
               })}
-              {entries.length === 0 && <tr><td className="p-4 text-slate-500" colSpan={3}>{t('pages:securityLists.noEntriesYet')}</td></tr>}
+              {entries.length === 0 && <tr><td className="p-4 text-muted-foreground" colSpan={3}>{t('pages:securityLists.noEntriesYet')}</td></tr>}
             </tbody>
           </table>
         )}
@@ -414,13 +414,13 @@ function FeedsTab({ feeds, reload, networkLists, asnLists, ja4Lists, reloadLists
   const targetLists = form.list_type === 'network' ? networkLists : form.list_type === 'asn' ? asnLists : ja4Lists
 
   return (
-    <div className="card overflow-x-auto">
-      <div className="flex items-center justify-between p-4 border-b border-slate-800">
+    <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
+      <div className="flex items-center justify-between p-4 border-b border-border">
         <h3 className="font-semibold">Threat Feeds</h3>
         <button onClick={openAdd} className="btn-primary">Add Feed</button>
       </div>
       <table className="w-full text-sm text-start">
-        <thead className="text-slate-400 border-b border-slate-800">
+        <thead className="text-muted-foreground border-b border-border">
           <tr>
             <th className="p-2">Name</th><th className="p-2">Type</th><th className="p-2">URL</th>
             <th className="p-2">Interval (h)</th><th className="p-2">Enabled</th>
@@ -429,13 +429,13 @@ function FeedsTab({ feeds, reload, networkLists, asnLists, ja4Lists, reloadLists
         </thead>
         <tbody>
           {feeds.map(f => (
-            <tr key={f.id} className="border-b border-slate-800 last:border-0">
+            <tr key={f.id} className="border-b border-border last:border-0">
               <td className="p-2">{f.name}</td>
               <td className="p-2">{f.list_type}</td>
               <td className="p-2 max-w-xs truncate font-mono text-xs" title={f.url}>{f.url}</td>
               <td className="p-2">{f.update_interval_hours}</td>
               <td className="p-2">{f.enabled ? 'yes' : 'no'}</td>
-              <td className="p-2 text-xs text-slate-400">{f.last_updated_at ? formatDateTime(f.last_updated_at) : '-'}</td>
+              <td className="p-2 text-xs text-muted-foreground">{f.last_updated_at ? formatDateTime(f.last_updated_at) : '-'}</td>
               <td className="p-2">{f.last_entry_count ?? '-'}</td>
               <td className="p-2 max-w-xs truncate text-xs text-red-400" title={f.last_error || ''}>{f.last_error || '-'}</td>
               <td className="p-2 space-x-1 whitespace-nowrap">
@@ -446,7 +446,7 @@ function FeedsTab({ feeds, reload, networkLists, asnLists, ja4Lists, reloadLists
               </td>
             </tr>
           ))}
-          {feeds.length === 0 && <tr><td className="p-4 text-slate-500" colSpan={9}>No threat feeds yet.</td></tr>}
+          {feeds.length === 0 && <tr><td className="p-4 text-muted-foreground" colSpan={9}>No threat feeds yet.</td></tr>}
         </tbody>
       </table>
 
@@ -484,19 +484,19 @@ function FeedsTab({ feeds, reload, networkLists, asnLists, ja4Lists, reloadLists
 
       <Modal open={!!viewFeed} onClose={() => setViewFeed(null)} title={viewFeed ? `Entries: ${viewFeed.name}` : 'Entries'}>
         {viewLoading ? (
-          <div className="text-slate-500">Loading...</div>
+          <div className="text-muted-foreground">Loading...</div>
         ) : viewEntries.length === 0 ? (
-          <div className="text-slate-500">No entries in this list.</div>
+          <div className="text-muted-foreground">No entries in this list.</div>
         ) : (
           <table className="w-full text-sm text-start">
-            <thead className="text-slate-400 border-b border-slate-800">
+            <thead className="text-muted-foreground border-b border-border">
               <tr><th className="p-2">{viewFeed ? t('pages:securityLists.valueLabels.' + (viewFeed.list_type as ListKind)) : t('pages:securityLists.tableHeaders.value')}</th><th className="p-2">{t('pages:securityLists.tableHeaders.note')}</th></tr>
             </thead>
             <tbody>
               {viewEntries.map(en => (
-                <tr key={en.id} className="border-b border-slate-800 last:border-0">
+                <tr key={en.id} className="border-b border-border last:border-0">
                   <td className="p-2 font-mono break-all">{en.value}</td>
-                  <td className="p-2 text-slate-400">{en.note || '-'}</td>
+                  <td className="p-2 text-muted-foreground">{en.note || '-'}</td>
                 </tr>
               ))}
             </tbody>

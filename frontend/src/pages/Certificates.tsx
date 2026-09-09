@@ -460,7 +460,7 @@ export default function Certificates() {
         {fields.map((field) => (
           <div key={field.name}>
             <LabelWithTooltip
-              textClassName="text-sm font-semibold text-slate-400"
+              textClassName="text-sm font-semibold text-muted-foreground"
               tooltip={field.help || certificateTooltips.dnsCredentialFallback}
             >
               {field.label}
@@ -488,7 +488,7 @@ export default function Certificates() {
                 placeholder={field.help || field.label}
               />
             )}
-            {field.help && field.type !== 'select' && <p className="text-xs text-slate-400 mt-1">{field.help}</p>}
+            {field.help && field.type !== 'select' && <p className="text-xs text-muted-foreground mt-1">{field.help}</p>}
           </div>
         ))}
       </div>
@@ -508,9 +508,9 @@ export default function Certificates() {
       {loading ? (
         <p>{t('pages:certificates.loading')}</p>
       ) : (
-        <div className="card overflow-x-auto">
+        <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
           <table className="w-full text-sm text-start">
-            <thead className="text-slate-400 border-b border-slate-800">
+            <thead className="text-muted-foreground border-b border-border">
               <tr>
                 <th>{t('pages:certificates.tableHeaders.name')}</th>
                 <th>{t('pages:certificates.tableHeaders.kind')}</th>
@@ -524,7 +524,7 @@ export default function Certificates() {
             </thead>
             <tbody>
               {items.map((c: any) => (
-                <tr key={c.id} className="border-b border-slate-800 last:border-0">
+                <tr key={c.id} className="border-b border-border last:border-0">
                   <td className="py-2">{c.name}</td>
                   <td>{c.kind || 'server'}</td>
                   <td>{c.not_after ? formatDateTime(c.not_after) : '-'}</td>
@@ -541,23 +541,23 @@ export default function Certificates() {
                         })()}
                       </button>
                     ) : (
-                      <span className="text-slate-500">-</span>
+                      <span className="text-muted-foreground">-</span>
                     )}
                   </td>
                   <td>{c.provider}</td>
                   <td className="text-xs">
                     {(() => {
                       const s = issueStatuses[c.id]
-                      if (!s) return <span className="text-slate-500">-</span>
-                      const color = s.status === 'success' ? 'text-green-400' : s.status === 'failed' ? 'text-red-400' : s.status === 'running' ? 'text-blue-400' : s.status === 'cancelled' ? 'text-slate-400' : 'text-amber-400'
+                      if (!s) return <span className="text-muted-foreground">-</span>
+                      const color = s.status === 'success' ? 'text-green-400' : s.status === 'failed' ? 'text-red-400' : s.status === 'running' ? 'text-blue-400' : s.status === 'cancelled' ? 'text-muted-foreground' : 'text-amber-400'
                       const label = s.status === 'success' ? t('pages:certificates.issueStatus.success') : s.status === 'failed' ? t('pages:certificates.issueStatus.failed') : s.status === 'running' ? t('pages:certificates.issueStatus.running') : s.status === 'pending' ? t('pages:certificates.issueStatus.pending') : s.status === 'cancelled' ? t('pages:certificates.issueStatus.cancelled') : s.status
                       const ts = s.updated_at || s.created_at
                       const errMsg = (s.status === 'failed' || s.status === 'cancelled') ? (s.message || s.error) : null
                       return (
                         <div title={errMsg || undefined}>
                           <span className={color}>{label}</span>
-                          {issuing[c.id] && s.status !== 'success' && s.status !== 'failed' && <span className="text-slate-400 ms-1">{t('pages:certificates.issueStatus.polling')}</span>}
-                          {ts && <div className="text-slate-500">{formatDateTime(ts)}</div>}
+                          {issuing[c.id] && s.status !== 'success' && s.status !== 'failed' && <span className="text-muted-foreground ms-1">{t('pages:certificates.issueStatus.polling')}</span>}
+                          {ts && <div className="text-muted-foreground">{formatDateTime(ts)}</div>}
                           {errMsg && <div className="text-red-400 truncate max-w-xs">{errMsg}</div>}
                         </div>
                       )
@@ -590,7 +590,7 @@ export default function Certificates() {
           </table>
         </div>
       )}
-      <p className="text-sm text-slate-400">
+      <p className="text-sm text-muted-foreground">
         {t('pages:certificates.bulkRenewDescription')}
       </p>
       <p className="text-sm text-amber-400">
@@ -631,7 +631,7 @@ export default function Certificates() {
               <div>
                 <LabelWithTooltip tooltip={certificateTooltips.acmeCa}>{t('pages:certificates.modal.acmeCa')}</LabelWithTooltip>
                 {acmeCasLoading ? (
-                  <p className="text-sm text-slate-400">{t('pages:certificates.loading')}</p>
+                  <p className="text-sm text-muted-foreground">{t('pages:certificates.loading')}</p>
                 ) : (
                   <select
                     className="input"
@@ -654,7 +654,7 @@ export default function Certificates() {
                 {form.acme_ca && form.acme_ca !== '__custom__' && (
                   (() => {
                     const ca = acmeCas.find((c) => c.id === form.acme_ca)
-                    return ca?.help ? <p className="text-xs text-slate-400 mt-1">{ca.help}</p> : null
+                    return ca?.help ? <p className="text-xs text-muted-foreground mt-1">{ca.help}</p> : null
                   })()
                 )}
                 {form.acme_ca === '__custom__' && (
@@ -666,7 +666,7 @@ export default function Certificates() {
                       onChange={(e) => setCustomCa(e.target.value)}
                       placeholder="https://acme.example.com/directory"
                     />
-                    <p className="text-xs text-slate-400 mt-1">{t('pages:certificates.modal.acmeCaCustomHelp')}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{t('pages:certificates.modal.acmeCaCustomHelp')}</p>
                   </>
                 )}
               </div>
@@ -724,7 +724,7 @@ export default function Certificates() {
               <div>
                 <LabelWithTooltip tooltip={certificateTooltips.dnsProvider}>{t('pages:certificates.modal.dnsProvider')}</LabelWithTooltip>
                 {dnsMetaLoading ? (
-                  <p className="text-sm text-slate-400">{t('pages:certificates.loading')}</p>
+                  <p className="text-sm text-muted-foreground">{t('pages:certificates.loading')}</p>
                 ) : (
                   <select
                     className="input"
@@ -779,7 +779,7 @@ export default function Certificates() {
                   value={form.fullchain}
                   onChange={(e) => setForm({ ...form, fullchain: e.target.value })}
                 />
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   {form.kind === 'ca'
                     ? t('pages:certificates.modal.caCertificatesHelp')
                     : t('pages:certificates.modal.fullchainHelp')}
@@ -806,7 +806,7 @@ export default function Certificates() {
                   value={form.chain}
                   onChange={(e) => setForm({ ...form, chain: e.target.value })}
                 />
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   {form.kind === 'ca'
                     ? t('pages:certificates.modal.additionalCaChainHelp')
                     : t('pages:certificates.modal.chainHelp')}
@@ -833,7 +833,7 @@ export default function Certificates() {
                   value={upload.fullchain}
                   onChange={(e) => setUpload({ ...upload, fullchain: e.target.value })}
                 />
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   {isCa
                     ? t('pages:certificates.modal.caCertificatesHelp')
                     : t('pages:certificates.modal.fullchainHelp')}
@@ -860,7 +860,7 @@ export default function Certificates() {
                   value={upload.chain}
                   onChange={(e) => setUpload({ ...upload, chain: e.target.value })}
                 />
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   {isCa
                     ? t('pages:certificates.modal.additionalCaChainHelp')
                     : t('pages:certificates.modal.chainHelp')}
@@ -877,7 +877,7 @@ export default function Certificates() {
         return (
           <Modal open={issueConfirm !== null} onClose={() => setIssueConfirm(null)} title={isReissue ? t('pages:certificates.issueModal.reissueTitle') : t('pages:certificates.issueModal.issueTitle')}>
             <div className="space-y-4">
-              <p className="text-sm text-slate-300">
+              <p className="text-sm text-secondary-foreground">
                 {isReissue
                   ? t('pages:certificates.issueModal.reissueDescription')
                   : t('pages:certificates.issueModal.issueDescription')}
@@ -893,7 +893,7 @@ export default function Certificates() {
       })()}
       <Modal open={renewConfirm} onClose={() => setRenewConfirm(false)} title={t('pages:certificates.renewModal.title')}>
         <div className="space-y-4">
-          <p className="text-sm text-slate-300">
+          <p className="text-sm text-secondary-foreground">
             {t('pages:certificates.renewModal.description')}
           </p>
           <div className="flex gap-2 justify-end">
@@ -910,7 +910,7 @@ export default function Certificates() {
               .map((s: string) => s.trim())
               .filter(Boolean)
               .map((san: string, i: number) => (
-                <li key={i} className="text-sm break-all text-slate-200">{san}</li>
+                <li key={i} className="text-sm break-all text-secondary-foreground">{san}</li>
               ))}
           </ul>
         )}

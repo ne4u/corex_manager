@@ -194,7 +194,7 @@ export function CustomThemeEditor({
         {/* Color pickers grouped by category */}
         {colorGroups.map(group => (
           <div key={group}>
-            <h4 className="text-sm font-semibold text-slate-300 mb-2">{group}</h4>
+            <h4 className="text-sm font-semibold text-secondary-foreground mb-2">{group}</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {colorMetadata.filter(m => m.group === group).map(meta => (
                 <ColorPickerRow
@@ -209,7 +209,7 @@ export function CustomThemeEditor({
         ))}
 
         {/* Actions */}
-        <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+        <div className="flex items-center justify-between pt-2 border-t border-border">
           <div>
             {editingTheme && onDelete && (
               <IconButton icon={Trash2} variant="danger" aria-label={t('profile:appearance.deleteTheme')} onClick={handleDelete} />
@@ -245,11 +245,11 @@ function ColorPickerRow({ label, hex, onChange }: ColorPickerRowProps) {
         type="color"
         value={hex}
         onChange={e => onChange(e.target.value)}
-        className="w-8 h-8 rounded cursor-pointer border border-slate-600 bg-transparent shrink-0"
+        className="w-8 h-8 rounded cursor-pointer border border-subtle bg-transparent shrink-0"
         title={label}
       />
       <div className="flex-1 min-w-0">
-        <div className="text-xs text-slate-400 truncate">{label}</div>
+        <div className="text-xs text-muted-foreground truncate">{label}</div>
         <input
           type="text"
           value={hex}

@@ -12,7 +12,7 @@ export function Badge({ children, variant = 'default', size = 'md', className }:
   const baseClasses = 'inline-flex items-center justify-center rounded-full font-medium'
 
   const variantClasses = {
-    default: 'bg-slate-800 text-slate-200',
+    default: 'bg-muted text-secondary-foreground',
     success: 'bg-green-500/20 text-green-400',
     warning: 'bg-amber-500/20 text-amber-400',
     error: 'bg-red-500/20 text-red-400',

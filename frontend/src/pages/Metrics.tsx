@@ -20,6 +20,7 @@ import { numericToAlpha2, alpha2ToName } from '../countryCodes'
 import { metrics, wafMetrics, cache } from '../services/api'
 import { Tabs } from '../components/ui'
 import { useDateTime } from '../contexts/DateTimeContext'
+import { chartTooltipContentStyle, chartTooltipLabelStyle } from '../lib/utils'
 
 interface MetricPoint {
   time: string
@@ -344,15 +345,15 @@ export default function Metrics() {
     const legendH = estimateLegendHeight(m.defs.map((d) => d.key), cardWidths[m.title] || 600)
     const chartHeight = 180 + legendH
     return (
-      <div key={m.title} className="card p-4 space-y-2" data-chart-title={m.title}>
-        <h3 className="text-sm font-semibold text-slate-200">{t(m.title)}</h3>
+      <div key={m.title} className="rounded-lg border border-border bg-card shadow-sm p-4 space-y-2" data-chart-title={m.title}>
+        <h3 className="text-sm font-semibold text-secondary-foreground">{t(m.title)}</h3>
         <ResponsiveContainer width="100%" height={chartHeight}>
           {isArea ? (
             <AreaChart data={series}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-              <XAxis dataKey="time" tick={{ fontSize: 10 }} stroke="#94a3b8" />
-              <YAxis tick={{ fontSize: 10 }} stroke="#94a3b8" unit={yAxisUnit} tickFormatter={tickFmt} domain={m.yDomain || ['auto', 'auto']} />
-              <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155' }} formatter={tooltipFmt} />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--color-border-subtle))" />
+              <XAxis dataKey="time" tick={{ fontSize: 10 }} stroke="rgb(var(--color-text-tertiary))" />
+              <YAxis tick={{ fontSize: 10 }} stroke="rgb(var(--color-text-tertiary))" unit={yAxisUnit} tickFormatter={tickFmt} domain={m.yDomain || ['auto', 'auto']} />
+              <Tooltip contentStyle={chartTooltipContentStyle} labelStyle={chartTooltipLabelStyle} formatter={tooltipFmt} />
               <Legend
                 height={legendH}
                 content={() => (
@@ -361,7 +362,7 @@ export default function Metrics() {
                       <span
                         key={d.key}
                         className={`cursor-pointer text-[11px] flex items-center gap-1 ${
-                          hasSelection && selection[d.key] !== true ? 'text-slate-600 line-through' : 'text-slate-300'
+                          hasSelection && selection[d.key] !== true ? 'text-subtle line-through' : 'text-secondary-foreground'
                         }`}
                         onClick={() => {
                           if (!['1xx', '2xx', '3xx', '4xx', '5xx', 'other'].includes(d.key)) return
@@ -400,10 +401,10 @@ export default function Metrics() {
             </AreaChart>
           ) : (
             <LineChart data={series}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-              <XAxis dataKey="time" tick={{ fontSize: 10 }} stroke="#94a3b8" />
-              <YAxis tick={{ fontSize: 10 }} stroke="#94a3b8" unit={yAxisUnit} tickFormatter={tickFmt} domain={m.yDomain || ['auto', 'auto']} />
-              <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155' }} formatter={tooltipFmt} />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--color-border-subtle))" />
+              <XAxis dataKey="time" tick={{ fontSize: 10 }} stroke="rgb(var(--color-text-tertiary))" />
+              <YAxis tick={{ fontSize: 10 }} stroke="rgb(var(--color-text-tertiary))" unit={yAxisUnit} tickFormatter={tickFmt} domain={m.yDomain || ['auto', 'auto']} />
+              <Tooltip contentStyle={chartTooltipContentStyle} labelStyle={chartTooltipLabelStyle} formatter={tooltipFmt} />
               <Legend
                 height={legendH}
                 content={() => (
@@ -412,7 +413,7 @@ export default function Metrics() {
                       <span
                         key={d.key}
                         className={`cursor-pointer text-[11px] flex items-center gap-1 ${
-                          hasSelection && selection[d.key] !== true ? 'text-slate-600 line-through' : 'text-slate-300'
+                          hasSelection && selection[d.key] !== true ? 'text-subtle line-through' : 'text-secondary-foreground'
                         }`}
                         onClick={() => {
                           if (!['1xx', '2xx', '3xx', '4xx', '5xx', 'other'].includes(d.key)) return
@@ -474,14 +475,14 @@ export default function Metrics() {
     const legendH = estimateLegendHeight(allNames, cardWidths[title] || 600)
     const chartHeight = 180 + legendH
     return (
-      <div key={title} className="card p-4 space-y-2" data-chart-title={title}>
-        <h3 className="text-sm font-semibold text-slate-200">{title}</h3>
+      <div key={title} className="rounded-lg border border-border bg-card shadow-sm p-4 space-y-2" data-chart-title={title}>
+        <h3 className="text-sm font-semibold text-secondary-foreground">{title}</h3>
         <ResponsiveContainer width="100%" height={chartHeight}>
           <LineChart data={series}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-            <XAxis dataKey="time" tick={{ fontSize: 10 }} stroke="#94a3b8" />
-            <YAxis tick={{ fontSize: 10 }} stroke="#94a3b8" unit={isBytes ? undefined : '/s'} tickFormatter={tickFmt} domain={['auto', 'auto']} />
-            <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155' }} formatter={tooltipFmt} />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--color-border-subtle))" />
+            <XAxis dataKey="time" tick={{ fontSize: 10 }} stroke="rgb(var(--color-text-tertiary))" />
+            <YAxis tick={{ fontSize: 10 }} stroke="rgb(var(--color-text-tertiary))" unit={isBytes ? undefined : '/s'} tickFormatter={tickFmt} domain={['auto', 'auto']} />
+            <Tooltip contentStyle={chartTooltipContentStyle} labelStyle={chartTooltipLabelStyle} formatter={tooltipFmt} />
             <Legend
               height={legendH}
               content={() => (
@@ -490,7 +491,7 @@ export default function Metrics() {
                     <span
                       key={name}
                       className={`cursor-pointer text-[11px] flex items-center gap-1 ${
-                        hasSelection && selection[name] !== true ? 'text-slate-600 line-through' : 'text-slate-300'
+                        hasSelection && selection[name] !== true ? 'text-subtle line-through' : 'text-secondary-foreground'
                       }`}
                       onClick={() => {
                         setVisibleCodes((prev: Record<string, Record<string, boolean>>) => {
@@ -552,14 +553,14 @@ export default function Metrics() {
     const legendH = estimateLegendHeight(allNames, cardWidths[title] || 600)
     const chartHeight = 180 + legendH
     return (
-      <div key={title} className="card p-4 space-y-2" data-chart-title={title}>
-        <h3 className="text-sm font-semibold text-slate-200">{title}</h3>
+      <div key={title} className="rounded-lg border border-border bg-card shadow-sm p-4 space-y-2" data-chart-title={title}>
+        <h3 className="text-sm font-semibold text-secondary-foreground">{title}</h3>
         <ResponsiveContainer width="100%" height={chartHeight}>
           <LineChart data={series}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-            <XAxis dataKey="time" tick={{ fontSize: 10 }} stroke="#94a3b8" />
-            <YAxis tick={{ fontSize: 10 }} stroke="#94a3b8" allowDecimals={false} domain={[0, 'auto']} />
-            <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155' }} />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--color-border-subtle))" />
+            <XAxis dataKey="time" tick={{ fontSize: 10 }} stroke="rgb(var(--color-text-tertiary))" />
+            <YAxis tick={{ fontSize: 10 }} stroke="rgb(var(--color-text-tertiary))" allowDecimals={false} domain={[0, 'auto']} />
+            <Tooltip contentStyle={chartTooltipContentStyle} labelStyle={chartTooltipLabelStyle} />
             <Legend
               height={legendH}
               content={() => (
@@ -568,7 +569,7 @@ export default function Metrics() {
                     <span
                       key={name}
                       className={`cursor-pointer text-[11px] flex items-center gap-1 ${
-                        hasSelection && selection[name] !== true ? 'text-slate-600 line-through' : 'text-slate-300'
+                        hasSelection && selection[name] !== true ? 'text-subtle line-through' : 'text-secondary-foreground'
                       }`}
                       onClick={() => {
                         setVisibleCodes((prev: Record<string, Record<string, boolean>>) => {
@@ -627,15 +628,15 @@ export default function Metrics() {
               className={`px-2 py-1 text-xs rounded ${
                 range === opt.seconds
                   ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-                  : 'bg-slate-800 text-slate-400 border border-slate-700 hover:bg-slate-700'
+                  : 'bg-muted text-muted-foreground border border-subtle hover:bg-subtle'
               }`}
             >
               {opt.label}
             </button>
           ))}
-          {loading && tab === 'haproxy' && <span className="text-xs text-slate-500">Loading…</span>}
-          {wafLoading && tab === 'waf' && <span className="text-xs text-slate-500">Loading…</span>}
-          {bandwidthLoading && tab === 'bandwidth' && <span className="text-xs text-slate-500">Loading…</span>}
+          {loading && tab === 'haproxy' && <span className="text-xs text-muted-foreground">Loading…</span>}
+          {wafLoading && tab === 'waf' && <span className="text-xs text-muted-foreground">Loading…</span>}
+          {bandwidthLoading && tab === 'bandwidth' && <span className="text-xs text-muted-foreground">Loading…</span>}
         </div>
       </div>
 
@@ -652,36 +653,36 @@ export default function Metrics() {
       {tab === 'haproxy' && (
         <>
           {error && (
-            <div className="card p-4 border border-red-500/30 bg-red-500/10 text-red-400 text-sm">
+            <div className="rounded-lg border shadow-sm p-4 border-red-500/30 bg-red-500/10 text-red-400 text-sm">
               <p className="font-semibold">Error loading metrics</p>
               <p>{error}</p>
             </div>
           )}
 
           {!loading && !error && data.length === 0 && (
-            <div className="card p-4 border border-amber-500/30 bg-amber-500/10 text-amber-400 text-sm">
+            <div className="rounded-lg border shadow-sm p-4 border-amber-500/30 bg-amber-500/10 text-amber-400 text-sm">
               <p>No metric data available for the selected time range. The metrics sampler may still be collecting initial data.</p>
             </div>
           )}
 
           {latest && (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              <div className="card p-3"><p className="text-xs text-slate-400">Frontend sessions</p><p className="text-xl font-semibold">{latest.frontend.sessions}</p></div>
-              <div className="card p-3"><p className="text-xs text-slate-400">Frontend sessions %</p><p className="text-xl font-semibold">{latest.frontend.sessions_pct.toFixed(2)}%</p></div>
-              <div className="card p-3"><p className="text-xs text-slate-400">Total RPS</p><p className="text-xl font-semibold">{latest.frontend.requests_rate.toFixed(1)}/s</p></div>
-              <div className="card p-3"><p className="text-xs text-slate-400">Total throughput</p><p className="text-xl font-semibold">{fmtBytesRate(latest.frontend.bytes_in_rate + latest.frontend.bytes_out_rate)}</p></div>
-              <div className="card p-3"><p className="text-xs text-slate-400">Backend queue</p><p className="text-xl font-semibold">{latest.backend.queue}</p></div>
-              <div className="card p-3"><p className="text-xs text-slate-400">Backend response time</p><p className="text-xl font-semibold">{latest.backend.avg_response_time_ms} ms</p></div>
+              <div className="rounded-lg border border-border bg-card shadow-sm p-3"><p className="text-xs text-muted-foreground">Frontend sessions</p><p className="text-xl font-semibold">{latest.frontend.sessions}</p></div>
+              <div className="rounded-lg border border-border bg-card shadow-sm p-3"><p className="text-xs text-muted-foreground">Frontend sessions %</p><p className="text-xl font-semibold">{latest.frontend.sessions_pct.toFixed(2)}%</p></div>
+              <div className="rounded-lg border border-border bg-card shadow-sm p-3"><p className="text-xs text-muted-foreground">Total RPS</p><p className="text-xl font-semibold">{latest.frontend.requests_rate.toFixed(1)}/s</p></div>
+              <div className="rounded-lg border border-border bg-card shadow-sm p-3"><p className="text-xs text-muted-foreground">Total throughput</p><p className="text-xl font-semibold">{fmtBytesRate(latest.frontend.bytes_in_rate + latest.frontend.bytes_out_rate)}</p></div>
+              <div className="rounded-lg border border-border bg-card shadow-sm p-3"><p className="text-xs text-muted-foreground">Backend queue</p><p className="text-xl font-semibold">{latest.backend.queue}</p></div>
+              <div className="rounded-lg border border-border bg-card shadow-sm p-3"><p className="text-xs text-muted-foreground">Backend response time</p><p className="text-xl font-semibold">{latest.backend.avg_response_time_ms} ms</p></div>
             </div>
           )}
 
-          <h3 className="text-lg font-semibold text-slate-200">{t('pages:metrics.systemMetrics')}</h3>
+          <h3 className="text-lg font-semibold text-secondary-foreground">{t('pages:metrics.systemMetrics')}</h3>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {PROCESS_METRICS.map(renderChart)}
             {renderStickTableChart()}
           </div>
 
-          <h3 className="text-lg font-semibold text-slate-200">Per-proxy metrics</h3>
+          <h3 className="text-lg font-semibold text-secondary-foreground">Per-proxy metrics</h3>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {renderMultiSeriesChart('Per-frontend requests/sec', 'frontends', 'responses_rate')}
             {renderMultiSeriesChart('Per-frontend throughput (in)', 'frontends', 'bytes_in_rate', 'bytes')}
@@ -689,10 +690,10 @@ export default function Metrics() {
             {renderMultiSeriesChart('Per-backend throughput (in)', 'backends', 'bytes_in_rate', 'bytes')}
           </div>
 
-          <h3 className="text-lg font-semibold text-slate-200">Frontend metrics</h3>
+          <h3 className="text-lg font-semibold text-secondary-foreground">Frontend metrics</h3>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">{FRONTEND_METRICS.map(renderChart)}</div>
 
-          <h3 className="text-lg font-semibold text-slate-200">Backend metrics</h3>
+          <h3 className="text-lg font-semibold text-secondary-foreground">Backend metrics</h3>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">{BACKEND_METRICS.map(renderChart)}</div>
         </>
       )}
@@ -701,17 +702,17 @@ export default function Metrics() {
         <>
           {wafData && wafData.time.length > 0 ? (
             <>
-              <div className="card p-4 space-y-4">
+              <div className="rounded-lg border border-border bg-card shadow-sm p-4 space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div className="flex items-center gap-2">
                     <Shield className="h-5 w-5 text-amber-400" />
-                    <h3 className="text-lg font-semibold text-slate-200">WAF events</h3>
+                    <h3 className="text-lg font-semibold text-secondary-foreground">WAF events</h3>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <select
                       value={wafBreakdown}
                       onChange={(e) => setWafBreakdown(e.target.value)}
-                      className="bg-slate-800 text-slate-200 text-xs rounded border border-slate-700 px-2 py-1"
+                      className="bg-muted text-secondary-foreground text-xs rounded border border-subtle px-2 py-1"
                     >
                       <option value="action">By action</option>
                       <option value="rule_id">By rule ID</option>
@@ -719,7 +720,7 @@ export default function Metrics() {
                       <option value="msg">By message</option>
                       <option value="country">By country</option>
                     </select>
-                    {wafLoading && <span className="text-xs text-slate-500">Loading…</span>}
+                    {wafLoading && <span className="text-xs text-muted-foreground">Loading…</span>}
                   </div>
                 </div>
 
@@ -732,10 +733,10 @@ export default function Metrics() {
                       }
                       return row
                     })}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                      <XAxis dataKey="time" tick={{ fontSize: 10 }} stroke="#94a3b8" />
-                      <YAxis tick={{ fontSize: 10 }} stroke="#94a3b8" />
-                      <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155' }} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--color-border-subtle))" />
+                      <XAxis dataKey="time" tick={{ fontSize: 10 }} stroke="rgb(var(--color-text-tertiary))" />
+                      <YAxis tick={{ fontSize: 10 }} stroke="rgb(var(--color-text-tertiary))" />
+                      <Tooltip contentStyle={chartTooltipContentStyle} labelStyle={chartTooltipLabelStyle} />
                       <Legend wrapperStyle={{ fontSize: 10 }} />
                       {wafData.series.map((s, i) => (
                         <Bar
@@ -752,7 +753,7 @@ export default function Metrics() {
 
                 <div className="overflow-x-auto max-h-64 overflow-y-auto">
                   <table className="w-full text-sm text-start">
-                    <thead className="text-slate-400 border-b border-slate-800 sticky top-0 bg-slate-900">
+                    <thead className="text-muted-foreground border-b border-border sticky top-0 bg-card">
                       <tr>
                         <th className="py-2">{wafData.breakdown}</th>
                         <th className="py-2">Count</th>
@@ -767,7 +768,7 @@ export default function Metrics() {
                           .map(([key, count]) => {
                             const ratio = (count as number) / max
                             return (
-                              <tr key={key} className="border-b border-slate-800 last:border-0">
+                              <tr key={key} className="border-b border-border last:border-0">
                                 <td className="py-1 break-all max-w-md">{key}</td>
                                 <td className="py-1">
                                   <div className="flex items-center gap-2">
@@ -784,11 +785,11 @@ export default function Metrics() {
                 </div>
               </div>
 
-              <div className="card p-4 space-y-4">
+              <div className="rounded-lg border border-border bg-card shadow-sm p-4 space-y-4">
                 <div className="flex items-center gap-2">
                   <Globe className="h-5 w-5 text-sky-400" />
-                  <h3 className="text-lg font-semibold text-slate-200">WAF events by country</h3>
-                  <div className="flex items-center gap-2 ms-auto text-xs text-slate-400">
+                  <h3 className="text-lg font-semibold text-secondary-foreground">WAF events by country</h3>
+                  <div className="flex items-center gap-2 ms-auto text-xs text-muted-foreground">
                     <span>Low</span>
                     <div className="flex h-3 w-32 rounded overflow-hidden">
                       {[0.2, 0.4, 0.6, 0.8, 1.0].map((o) => (
@@ -814,14 +815,14 @@ export default function Metrics() {
                           const code = numericToAlpha2(geo.id ?? geo.properties?.id)
                           const count = (code && totals[code]) || 0
                           const ratio = count / max
-                          const fill = count ? `rgba(239,68,68,${0.2 + ratio * 0.8})` : '#334155'
+                          const fill = count ? `rgba(239,68,68,${0.2 + ratio * 0.8})` : 'rgb(var(--color-border-subtle))'
                           const name = geo.properties?.name || code || ''
                           return (
                             <path
                               key={geo.rsmKey}
                               d={geo.svgPath}
                               fill={fill}
-                              stroke="#1e293b"
+                              stroke="rgb(var(--color-bg-tertiary))"
                               strokeWidth={0.5}
                             >
                               {count > 0 && <title>{`${name} (${code}): ${count}`}</title>}
@@ -834,7 +835,7 @@ export default function Metrics() {
                 </div>
                 <div className="overflow-x-auto max-h-48 overflow-y-auto">
                   <table className="w-full text-sm text-start">
-                    <thead className="text-slate-400 border-b border-slate-800 sticky top-0 bg-slate-900">
+                    <thead className="text-muted-foreground border-b border-border sticky top-0 bg-card">
                       <tr><th className="py-2">Country</th><th className="py-2">Code</th><th className="py-2">Count</th></tr>
                     </thead>
                     <tbody>
@@ -848,9 +849,9 @@ export default function Metrics() {
                           const ratio = Number(count) / max
                           const name = alpha2ToName(code) || code
                           return (
-                            <tr key={code} className="border-b border-slate-800 last:border-0">
+                            <tr key={code} className="border-b border-border last:border-0">
                               <td className="py-1">{name}</td>
-                              <td className="py-1 text-slate-500">{code}</td>
+                              <td className="py-1 text-muted-foreground">{code}</td>
                               <td className="py-1">
                                 <div className="flex items-center gap-2">
                                   <span className="w-12 text-end tabular-nums">{count}</span>
@@ -867,12 +868,12 @@ export default function Metrics() {
               </div>
             </>
           ) : (
-            <div className="card p-4">
+            <div className="rounded-lg border border-border bg-card shadow-sm p-4">
               <div className="flex items-center gap-2 mb-2">
                 <Shield className="h-5 w-5 text-amber-400" />
-                <h3 className="text-lg font-semibold text-slate-200">WAF events</h3>
+                <h3 className="text-lg font-semibold text-secondary-foreground">WAF events</h3>
               </div>
-              <p className="text-slate-400 text-sm">No WAF events captured in the selected time range.</p>
+              <p className="text-muted-foreground text-sm">No WAF events captured in the selected time range.</p>
             </div>
           )}
         </>
@@ -881,50 +882,50 @@ export default function Metrics() {
       {tab === 'bandwidth' && (
         <>
           {bandwidthLoading && !bandwidthData ? (
-            <div className="card p-4">
-              <p className="text-slate-400 text-sm">Loading bandwidth metrics…</p>
+            <div className="rounded-lg border border-border bg-card shadow-sm p-4">
+              <p className="text-muted-foreground text-sm">Loading bandwidth metrics…</p>
             </div>
           ) : !bandwidthData || bandwidthData.snapshots.length === 0 ? (
-            <div className="card p-4">
+            <div className="rounded-lg border border-border bg-card shadow-sm p-4">
               <div className="flex items-center gap-2 mb-2">
                 <Gauge className="h-5 w-5 text-emerald-400" />
-                <h3 className="text-lg font-semibold text-slate-200">{t('pages:metrics.bandwidthSaved')}</h3>
+                <h3 className="text-lg font-semibold text-secondary-foreground">{t('pages:metrics.bandwidthSaved')}</h3>
               </div>
-              <p className="text-slate-400 text-sm">{t('pages:metrics.noBandwidthMetrics')}</p>
+              <p className="text-muted-foreground text-sm">{t('pages:metrics.noBandwidthMetrics')}</p>
             </div>
           ) : (
             <div className="space-y-6">
               {/* Summary cards */}
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                <div className="card p-3">
-                  <p className="text-xs text-slate-400">{t('pages:metrics.bandwidth.totalSaved')}</p>
+                <div className="rounded-lg border border-border bg-card shadow-sm p-3">
+                  <p className="text-xs text-muted-foreground">{t('pages:metrics.bandwidth.totalSaved')}</p>
                   <p className="text-xl font-bold text-emerald-400">{fmtBytes(bandwidthData.summary.total_bandwidth_saved)}</p>
                 </div>
-                <div className="card p-3">
-                  <p className="text-xs text-slate-400">{t('pages:metrics.bandwidth.memoryCache')}</p>
+                <div className="rounded-lg border border-border bg-card shadow-sm p-3">
+                  <p className="text-xs text-muted-foreground">{t('pages:metrics.bandwidth.memoryCache')}</p>
                   <p className="text-xl font-semibold text-blue-400">{fmtBytes(bandwidthData.summary.total_memory_cache_bytes_saved)}</p>
                 </div>
-                <div className="card p-3">
-                  <p className="text-xs text-slate-400">{t('pages:metrics.bandwidth.diskCache')}</p>
+                <div className="rounded-lg border border-border bg-card shadow-sm p-3">
+                  <p className="text-xs text-muted-foreground">{t('pages:metrics.bandwidth.diskCache')}</p>
                   <p className="text-xl font-semibold text-green-400">{fmtBytes(bandwidthData.summary.total_disk_cache_bytes_saved)}</p>
                 </div>
-                <div className="card p-3">
-                  <p className="text-xs text-slate-400">{t('pages:metrics.bandwidth.nativeCompression')}</p>
+                <div className="rounded-lg border border-border bg-card shadow-sm p-3">
+                  <p className="text-xs text-muted-foreground">{t('pages:metrics.bandwidth.nativeCompression')}</p>
                   <p className="text-xl font-semibold text-purple-400">{fmtBytes(bandwidthData.summary.total_native_compression_bytes_saved)}</p>
                 </div>
-                <div className="card p-3">
-                  <p className="text-xs text-slate-400">{t('pages:metrics.bandwidth.brotliZstd')}</p>
+                <div className="rounded-lg border border-border bg-card shadow-sm p-3">
+                  <p className="text-xs text-muted-foreground">{t('pages:metrics.bandwidth.brotliZstd')}</p>
                   <p className="text-xl font-semibold text-cyan-400">{fmtBytes(bandwidthData.summary.total_brotli_zstd_bytes_saved)}</p>
                 </div>
-                <div className="card p-3">
-                  <p className="text-xs text-slate-400">{t('pages:metrics.bandwidth.webp')}</p>
+                <div className="rounded-lg border border-border bg-card shadow-sm p-3">
+                  <p className="text-xs text-muted-foreground">{t('pages:metrics.bandwidth.webp')}</p>
                   <p className="text-xl font-semibold text-amber-400">{fmtBytes(bandwidthData.summary.total_webp_bytes_saved)}</p>
                 </div>
               </div>
 
               {/* Stacked area chart: bandwidth saved over time by category */}
-              <div className="card p-4 space-y-2">
-                <h3 className="text-sm font-semibold text-slate-200">{t('pages:metrics.bandwidth.savedOverTime')}</h3>
+              <div className="rounded-lg border border-border bg-card shadow-sm p-4 space-y-2">
+                <h3 className="text-sm font-semibold text-secondary-foreground">{t('pages:metrics.bandwidth.savedOverTime')}</h3>
                 <ResponsiveContainer width="100%" height={300}>
                   <AreaChart data={bandwidthData.snapshots.map(s => ({
                     time: formatTimeCompact(s.timestamp),
@@ -934,11 +935,11 @@ export default function Metrics() {
                     brotli_zstd: s.brotli_zstd_bytes_saved,
                     webp: s.webp_bytes_saved,
                   }))}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                    <XAxis dataKey="time" tick={{ fontSize: 10 }} stroke="#94a3b8" />
-                    <YAxis tick={{ fontSize: 10 }} stroke="#94a3b8" tickFormatter={(v: number) => fmtBytesRate(v)} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--color-border-subtle))" />
+                    <XAxis dataKey="time" tick={{ fontSize: 10 }} stroke="rgb(var(--color-text-tertiary))" />
+                    <YAxis tick={{ fontSize: 10 }} stroke="rgb(var(--color-text-tertiary))" tickFormatter={(v: number) => fmtBytesRate(v)} />
                     <Tooltip
-                      contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155' }}
+                      contentStyle={chartTooltipContentStyle} labelStyle={chartTooltipLabelStyle}
                       formatter={(v: number) => fmtBytes(v)}
                     />
                     <Legend wrapperStyle={{ fontSize: 10 }} />
@@ -960,18 +961,18 @@ export default function Metrics() {
                   { key: 'brotli_zstd_bytes_saved', label: t('pages:metrics.bandwidth.brotliZstd'), color: '#06b6d4' },
                   { key: 'webp_bytes_saved', label: t('pages:metrics.bandwidth.webp'), color: '#f59e0b' },
                 ] as const).map(({ key, label, color }) => (
-                  <div key={key} className="card p-4 space-y-2">
-                    <h3 className="text-sm font-semibold text-slate-200">{label}</h3>
+                  <div key={key} className="rounded-lg border border-border bg-card shadow-sm p-4 space-y-2">
+                    <h3 className="text-sm font-semibold text-secondary-foreground">{label}</h3>
                     <ResponsiveContainer width="100%" height={180}>
                       <LineChart data={bandwidthData.snapshots.map(s => ({
                         time: formatTimeCompact(s.timestamp),
                         value: s[key],
                       }))}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                        <XAxis dataKey="time" tick={{ fontSize: 10 }} stroke="#94a3b8" />
-                        <YAxis tick={{ fontSize: 10 }} stroke="#94a3b8" tickFormatter={(v: number) => fmtBytesRate(v)} />
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--color-border-subtle))" />
+                        <XAxis dataKey="time" tick={{ fontSize: 10 }} stroke="rgb(var(--color-text-tertiary))" />
+                        <YAxis tick={{ fontSize: 10 }} stroke="rgb(var(--color-text-tertiary))" tickFormatter={(v: number) => fmtBytesRate(v)} />
                         <Tooltip
-                          contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155' }}
+                          contentStyle={chartTooltipContentStyle} labelStyle={chartTooltipLabelStyle}
                           formatter={(v: number) => fmtBytes(v)}
                         />
                         <Line type="monotone" dataKey="value" stroke={color} dot={false} strokeWidth={2} isAnimationActive={false} />

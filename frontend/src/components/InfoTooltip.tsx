@@ -34,14 +34,14 @@ export default function InfoTooltip({ content }: InfoTooltipProps) {
   return (
     <span ref={ref} className="relative inline-flex">
       <Info
-        className="w-3 h-3 text-slate-500 cursor-pointer"
+        className="w-3 h-3 text-muted-foreground cursor-pointer"
         aria-label={content}
         onClick={handleIconClick}
       />
       {open && (
         <div
           onClick={handleTooltipClick}
-          className="absolute start-0 top-full mt-1 z-50 w-max max-w-[14rem] p-2 rounded-md bg-slate-800 text-slate-200 text-xs border border-slate-700 shadow-md"
+          className="absolute start-0 top-full mt-1 z-50 w-max max-w-[14rem] p-2 rounded-md bg-muted text-secondary-foreground text-xs border border-subtle shadow-md"
         >
           {content}
         </div>

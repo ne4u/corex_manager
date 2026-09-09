@@ -37,9 +37,9 @@ export default function Headers() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between"><h2 className="text-2xl font-bold flex items-center gap-2"><AlignJustify className="h-5 w-5 text-primary" /> {t('pages:headers.responseHeaders')}</h2><button onClick={openAdd} className="btn-primary">{t('pages:headers.addHeader')}</button></div>
-      <div className="card overflow-x-auto">
-        <table className="w-full text-sm text-start"><thead className="text-slate-400 border-b border-slate-800"><tr><th>{t('pages:headers.tableHeaders.header')}</th><th>{t('pages:headers.tableHeaders.listener')}</th><th>{t('pages:headers.tableHeaders.value')}</th><th>{t('pages:headers.tableHeaders.action')}</th><th></th></tr></thead>
-          <tbody>{headers.map((h: any) => (<tr key={h.id} className="border-b border-slate-800 last:border-0"><td className="py-2">{h.header}</td><td>{renderListener(h)}</td><td>{h.value}</td><td>{h.action === 'set' || h.action === 'override' ? t('pages:headers.actionOverride') : h.action}</td>
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
+        <table className="w-full text-sm text-start"><thead className="text-muted-foreground border-b border-border"><tr><th>{t('pages:headers.tableHeaders.header')}</th><th>{t('pages:headers.tableHeaders.listener')}</th><th>{t('pages:headers.tableHeaders.value')}</th><th>{t('pages:headers.tableHeaders.action')}</th><th></th></tr></thead>
+          <tbody>{headers.map((h: any) => (<tr key={h.id} className="border-b border-border last:border-0"><td className="py-2">{h.header}</td><td>{renderListener(h)}</td><td>{h.value}</td><td>{h.action === 'set' || h.action === 'override' ? t('pages:headers.actionOverride') : h.action}</td>
             <td>
               <div className="flex gap-1">
                 <IconButton icon={Pencil} aria-label={t('common:actions.edit')} onClick={() => openEdit(h)} />
@@ -49,9 +49,9 @@ export default function Headers() {
         </table>
       </div>
       <div className="flex items-center justify-between"><h2 className="text-2xl font-bold flex items-center gap-2"><ArrowDownToLine className="h-5 w-5 text-primary" /> {t('pages:headers.requestHeaders')}</h2><button onClick={openRAdd} className="btn-primary">{t('pages:headers.addHeader')}</button></div>
-      <div className="card overflow-x-auto">
-        <table className="w-full text-sm text-start"><thead className="text-slate-400 border-b border-slate-800"><tr><th>{t('pages:headers.tableHeaders.header')}</th><th>{t('pages:headers.tableHeaders.backend')}</th><th>{t('pages:headers.tableHeaders.value')}</th><th>{t('pages:headers.tableHeaders.action')}</th><th></th></tr></thead>
-          <tbody>{reqHeaders.map((h: any) => (<tr key={h.id} className="border-b border-slate-800 last:border-0"><td className="py-2">{h.header}</td><td>{renderBackend(h)}</td><td>{h.value}</td><td>{h.action === 'set' || h.action === 'override' ? t('pages:headers.actionOverride') : h.action}</td>
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
+        <table className="w-full text-sm text-start"><thead className="text-muted-foreground border-b border-border"><tr><th>{t('pages:headers.tableHeaders.header')}</th><th>{t('pages:headers.tableHeaders.backend')}</th><th>{t('pages:headers.tableHeaders.value')}</th><th>{t('pages:headers.tableHeaders.action')}</th><th></th></tr></thead>
+          <tbody>{reqHeaders.map((h: any) => (<tr key={h.id} className="border-b border-border last:border-0"><td className="py-2">{h.header}</td><td>{renderBackend(h)}</td><td>{h.value}</td><td>{h.action === 'set' || h.action === 'override' ? t('pages:headers.actionOverride') : h.action}</td>
             <td>
               <div className="flex gap-1">
                 <IconButton icon={Pencil} aria-label={t('common:actions.edit')} onClick={() => openREdit(h)} />
@@ -63,7 +63,7 @@ export default function Headers() {
       <Modal open={open} onClose={() => setOpen(false)} title={editing ? t('pages:headers.modal.editResponseTitle') : t('pages:headers.modal.addResponseTitle')}>
         <form onSubmit={submit} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
-            <div><label className="label">{t('pages:headers.modal.listenersNoneAll')}</label><div className="input h-auto max-h-32 overflow-y-auto p-2 space-y-1 text-sm text-slate-300">{listenerList.map((l: any) => (<label key={l.id} className="flex items-center gap-2"><input type="checkbox" className="rounded border-slate-600 bg-slate-800 text-primary" checked={form.listener_ids.includes(l.id)} onChange={(e: any) => setForm({ ...form, listener_ids: e.target.checked ? [...form.listener_ids, l.id] : form.listener_ids.filter((id: number) => id !== l.id) })} /> {l.name}</label>))}</div></div>
+            <div><label className="label">{t('pages:headers.modal.listenersNoneAll')}</label><div className="input h-auto max-h-32 overflow-y-auto p-2 space-y-1 text-sm text-secondary-foreground">{listenerList.map((l: any) => (<label key={l.id} className="flex items-center gap-2"><input type="checkbox" className="rounded border-subtle bg-muted text-primary" checked={form.listener_ids.includes(l.id)} onChange={(e: any) => setForm({ ...form, listener_ids: e.target.checked ? [...form.listener_ids, l.id] : form.listener_ids.filter((id: number) => id !== l.id) })} /> {l.name}</label>))}</div></div>
             <div><label className="label">{t('pages:headers.modal.action')}</label><select className="input" value={form.action} onChange={e => setForm({ ...form, action: e.target.value })}><option value="override">{t('pages:headers.actionOverride')}</option><option value="add">{t('pages:headers.actionAdd')}</option><option value="del">{t('pages:headers.actionDelete')}</option></select></div>
           </div>
           <div className="grid grid-cols-2 gap-3"><div><label className="label">{t('pages:headers.modal.header')}</label><input className="input" value={form.header} onChange={e => setForm({ ...form, header: e.target.value })} /></div><div><label className="label">{t('pages:headers.modal.value')}</label><input className="input" value={form.value} onChange={e => setForm({ ...form, value: e.target.value })} /></div></div>
@@ -74,7 +74,7 @@ export default function Headers() {
       <Modal open={ropen} onClose={() => setRopen(false)} title={rEditing ? t('pages:headers.modal.editRequestTitle') : t('pages:headers.modal.addRequestTitle')}>
         <form onSubmit={rsubmit} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
-            <div><label className="label">{t('pages:headers.modal.backendsNoneAll')}</label><div className="input h-auto max-h-32 overflow-y-auto p-2 space-y-1 text-sm text-slate-300">{backendList.map((b: any) => (<label key={b.id} className="flex items-center gap-2"><input type="checkbox" className="rounded border-slate-600 bg-slate-800 text-primary" checked={rform.backend_ids.includes(b.id)} onChange={(e: any) => setRform({ ...rform, backend_ids: e.target.checked ? [...rform.backend_ids, b.id] : rform.backend_ids.filter((id: number) => id !== b.id) })} /> {b.name}</label>))}</div></div>
+            <div><label className="label">{t('pages:headers.modal.backendsNoneAll')}</label><div className="input h-auto max-h-32 overflow-y-auto p-2 space-y-1 text-sm text-secondary-foreground">{backendList.map((b: any) => (<label key={b.id} className="flex items-center gap-2"><input type="checkbox" className="rounded border-subtle bg-muted text-primary" checked={rform.backend_ids.includes(b.id)} onChange={(e: any) => setRform({ ...rform, backend_ids: e.target.checked ? [...rform.backend_ids, b.id] : rform.backend_ids.filter((id: number) => id !== b.id) })} /> {b.name}</label>))}</div></div>
             <div><label className="label">{t('pages:headers.modal.action')}</label><select className="input" value={rform.action} onChange={e => setRform({ ...rform, action: e.target.value })}><option value="override">{t('pages:headers.actionOverride')}</option><option value="add">{t('pages:headers.actionAdd')}</option><option value="del">{t('pages:headers.actionDelete')}</option></select></div>
           </div>
           <div className="grid grid-cols-2 gap-3"><div><label className="label">{t('pages:headers.modal.header')}</label><input className="input" value={rform.header} onChange={e => setRform({ ...rform, header: e.target.value })} /></div><div><label className="label">{t('pages:headers.modal.value')}</label><input className="input" value={rform.value} onChange={e => setRform({ ...rform, value: e.target.value })} /></div></div>

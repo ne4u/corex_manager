@@ -79,12 +79,12 @@ export default function FastCGI() {
         <button onClick={openAdd} className="btn-primary">{t('pages:fastcgi.addFcgiApp')}</button>
       </div>
       {loading ? <p>{t('pages:fastcgi.loading')}</p> : (
-        <div className="card overflow-x-auto">
+        <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
           <table className="w-full text-sm text-start">
-            <thead className="text-slate-400 border-b border-slate-800"><tr><th>{t('pages:fastcgi.tableHeaders.name')}</th><th>{t('pages:fastcgi.tableHeaders.docroot')}</th><th>{t('pages:fastcgi.tableHeaders.index')}</th><th>{t('pages:fastcgi.tableHeaders.keepConn')}</th><th>{t('pages:fastcgi.tableHeaders.multiplex')}</th><th>{t('pages:fastcgi.tableHeaders.maxReqs')}</th><th></th></tr></thead>
+            <thead className="text-muted-foreground border-b border-border"><tr><th>{t('pages:fastcgi.tableHeaders.name')}</th><th>{t('pages:fastcgi.tableHeaders.docroot')}</th><th>{t('pages:fastcgi.tableHeaders.index')}</th><th>{t('pages:fastcgi.tableHeaders.keepConn')}</th><th>{t('pages:fastcgi.tableHeaders.multiplex')}</th><th>{t('pages:fastcgi.tableHeaders.maxReqs')}</th><th></th></tr></thead>
             <tbody>
               {items.map((f: any) => (
-                <tr key={f.id} className="border-b border-slate-800 last:border-0">
+                <tr key={f.id} className="border-b border-border last:border-0">
                   <td className="py-2">{f.name}</td>
                   <td>{f.docroot || '-'}</td>
                   <td>{f.index || '-'}</td>
@@ -113,7 +113,7 @@ export default function FastCGI() {
             <div className="col-span-2">
               <LabelWithTooltip tooltip={t('pages:fastcgi.tooltips.maxConcurrentRequests')} className="label">{t('pages:fastcgi.modal.maxConcurrentRequests')}</LabelWithTooltip>
               <input type="number" min={1} className="input disabled:opacity-50" disabled={!form.mpxs_conns} value={form.max_reqs} onChange={e => setForm({ ...form, max_reqs: Number(e.target.value) })} />
-              {!form.mpxs_conns && <p className="text-xs text-slate-500 mt-1">{t('pages:fastcgi.modal.maxReqsHint')}</p>}
+              {!form.mpxs_conns && <p className="text-xs text-muted-foreground mt-1">{t('pages:fastcgi.modal.maxReqsHint')}</p>}
             </div>
             <div className="col-span-2"><LabelWithTooltip tooltip={t('pages:fastcgi.tooltips.stderrLogTarget')} className="label">{t('pages:fastcgi.modal.stderrLogTarget')}</LabelWithTooltip><input className="input" placeholder={t('pages:fastcgi.modal.stderrLogTargetPlaceholder')} value={form.log_stderr_target} onChange={e => setForm({ ...form, log_stderr_target: e.target.value })} /></div>
           </div>
@@ -127,7 +127,7 @@ export default function FastCGI() {
             <div className="flex items-center justify-between mb-2"><h4 className="font-semibold">{t('pages:fastcgi.params.title')}</h4><button type="button" onClick={addParam} className="text-sm text-primary hover:underline">{t('pages:fastcgi.params.addParam')}</button></div>
             <div className="space-y-2">
               {form.params.map((p: any, i: number) => (
-                <div key={i} className="grid grid-cols-12 gap-2 items-center bg-slate-900 p-2 rounded border border-slate-800">
+                <div key={i} className="grid grid-cols-12 gap-2 items-center bg-card p-2 rounded border border-border">
                   <div className="col-span-3">
                     <LabelWithTooltip tooltip={t('pages:fastcgi.tooltips.paramName')}>{t('pages:fastcgi.params.name')}</LabelWithTooltip>
                     <input className="input text-xs" placeholder={t('pages:fastcgi.params.name')} value={p.name} onChange={e => updateParam(i, 'name', e.target.value)} />
@@ -144,7 +144,7 @@ export default function FastCGI() {
                 </div>
               ))}
             </div>
-            <p className="text-xs text-slate-500 mt-1">{t('pages:fastcgi.params.hint')}</p>
+            <p className="text-xs text-muted-foreground mt-1">{t('pages:fastcgi.params.hint')}</p>
           </div>
 
           <button className="btn-primary w-full">{t('pages:fastcgi.modal.save')}</button>

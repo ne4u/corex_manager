@@ -17,7 +17,7 @@ export interface TabsProps {
 
 export function Tabs({ tabs, active, onChange, className }: TabsProps) {
   return (
-    <div className={cn('flex flex-wrap gap-1 border-b border-slate-800', className)}>
+    <div className={cn('flex flex-wrap gap-1 border-b border-border', className)}>
       {tabs.map((tab) => (
         <button
           type="button"
@@ -27,13 +27,13 @@ export function Tabs({ tabs, active, onChange, className }: TabsProps) {
             'px-3 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap',
             active === tab.id
               ? 'border-primary text-primary'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
+              : 'border-transparent text-muted-foreground hover:text-secondary-foreground'
           )}
         >
           {tab.icon && <tab.icon className="w-4 h-4 shrink-0" />}
           {tab.label}
           {tab.badge !== undefined && (
-            <span className="px-1.5 py-0.5 rounded-full bg-slate-800 text-xs">
+            <span className="px-1.5 py-0.5 rounded-full bg-muted text-xs">
               {tab.badge}
             </span>
           )}

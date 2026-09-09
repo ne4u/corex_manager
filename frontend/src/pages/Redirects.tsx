@@ -82,7 +82,7 @@ export default function Redirects() {
       return (
         <span className="text-amber-400" title={t('pages:redirects.responsePageLabel', { code: ep?.code })}>
           {t('pages:redirects.responsePageLabel', { code: ep ? ep.code : r.error_page_id })}
-          {r.error_page_query ? <span className="text-slate-500 text-xs ms-1">?{r.error_page_query}</span> : null}
+          {r.error_page_query ? <span className="text-muted-foreground text-xs ms-1">?{r.error_page_query}</span> : null}
         </span>
       )
     }
@@ -100,9 +100,9 @@ export default function Redirects() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between"><h2 className="text-2xl font-bold flex items-center gap-2"><ArrowLeftRight className="h-5 w-5 text-primary" /> {t('pages:redirects.redirects')}</h2><button onClick={openAdd} className="btn-primary">{t('pages:redirects.addRedirect')}</button></div>
-      <div className="card overflow-x-auto">
-        <table className="w-full text-sm text-start"><thead className="text-slate-400 border-b border-slate-800"><tr><th className="w-6"></th><th>{t('pages:redirects.tableHeaders.name')}</th><th>{t('pages:redirects.tableHeaders.listener')}</th><th>{t('pages:redirects.tableHeaders.source')}</th><th>{t('pages:redirects.tableHeaders.target')}</th><th>{t('pages:redirects.tableHeaders.type')}</th><th>{t('pages:redirects.tableHeaders.code')}</th><th></th></tr></thead>
-          <tbody>{reds.map((r: any) => (<tr key={r.id} draggable onDragStart={(e: any) => { e.dataTransfer.setData('redirect', String(r.id)); e.dataTransfer.effectAllowed = 'move' }} onDragOver={(e: any) => e.preventDefault()} onDrop={(e: any) => { e.preventDefault(); const fromId = Number(e.dataTransfer.getData('redirect')); if (fromId && fromId !== r.id) handleDrop('redirect', fromId, r.id) }} className="border-b border-slate-800 last:border-0"><td className="py-2 pe-2 cursor-grab"><GripVertical className="h-4 w-4 text-slate-500" /></td><td className="py-2">{r.name}</td><td>{r.listener_ids?.length ? r.listener_ids.map((id: number) => listenerList.find((l: any) => l.id === id)?.name).filter(Boolean).join(', ') : (r.listener_id ? listenerList.find((l: any) => l.id === r.listener_id)?.name : t('pages:redirects.all'))}</td><td>{r.source}</td><td>{renderRedirectTarget(r)}</td><td>{r.type}</td><td>{renderRedirectCode(r)}</td>
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
+        <table className="w-full text-sm text-start"><thead className="text-muted-foreground border-b border-border"><tr><th className="w-6"></th><th>{t('pages:redirects.tableHeaders.name')}</th><th>{t('pages:redirects.tableHeaders.listener')}</th><th>{t('pages:redirects.tableHeaders.source')}</th><th>{t('pages:redirects.tableHeaders.target')}</th><th>{t('pages:redirects.tableHeaders.type')}</th><th>{t('pages:redirects.tableHeaders.code')}</th><th></th></tr></thead>
+          <tbody>{reds.map((r: any) => (<tr key={r.id} draggable onDragStart={(e: any) => { e.dataTransfer.setData('redirect', String(r.id)); e.dataTransfer.effectAllowed = 'move' }} onDragOver={(e: any) => e.preventDefault()} onDrop={(e: any) => { e.preventDefault(); const fromId = Number(e.dataTransfer.getData('redirect')); if (fromId && fromId !== r.id) handleDrop('redirect', fromId, r.id) }} className="border-b border-border last:border-0"><td className="py-2 pe-2 cursor-grab"><GripVertical className="h-4 w-4 text-muted-foreground" /></td><td className="py-2">{r.name}</td><td>{r.listener_ids?.length ? r.listener_ids.map((id: number) => listenerList.find((l: any) => l.id === id)?.name).filter(Boolean).join(', ') : (r.listener_id ? listenerList.find((l: any) => l.id === r.listener_id)?.name : t('pages:redirects.all'))}</td><td>{r.source}</td><td>{renderRedirectTarget(r)}</td><td>{r.type}</td><td>{renderRedirectCode(r)}</td>
             <td>
               <div className="flex gap-1">
                 <IconButton icon={Pencil} aria-label={t('common:actions.edit')} onClick={() => openEdit(r)} />
@@ -112,9 +112,9 @@ export default function Redirects() {
         </table>
       </div>
       <div className="flex items-center justify-between"><h2 className="text-2xl font-bold flex items-center gap-2"><Pencil className="h-5 w-5 text-primary" /> {t('pages:redirects.rewrites')}</h2><button onClick={openWAdd} className="btn-primary">{t('pages:redirects.addRewrite')}</button></div>
-      <div className="card overflow-x-auto">
-        <table className="w-full text-sm text-start"><thead className="text-slate-400 border-b border-slate-800"><tr><th className="w-6"></th><th>{t('pages:redirects.tableHeaders.name')}</th><th>{t('pages:redirects.tableHeaders.listener')}</th><th>{t('pages:redirects.tableHeaders.host')}</th><th>{t('pages:redirects.tableHeaders.regex')}</th><th>{t('pages:redirects.tableHeaders.target')}</th><th>{t('pages:redirects.tableHeaders.type')}</th><th></th></tr></thead>
-          <tbody>{rews.map((r: any) => (<tr key={r.id} draggable onDragStart={(e: any) => { e.dataTransfer.setData('rewrite', String(r.id)); e.dataTransfer.effectAllowed = 'move' }} onDragOver={(e: any) => e.preventDefault()} onDrop={(e: any) => { e.preventDefault(); const fromId = Number(e.dataTransfer.getData('rewrite')); if (fromId && fromId !== r.id) handleDrop('rewrite', fromId, r.id) }} className="border-b border-slate-800 last:border-0"><td className="py-2 pe-2 cursor-grab"><GripVertical className="h-4 w-4 text-slate-500" /></td><td className="py-2">{r.name}</td><td>{r.listener_ids?.length ? r.listener_ids.map((id: number) => listenerList.find((l: any) => l.id === id)?.name).filter(Boolean).join(', ') : (r.listener_id ? listenerList.find((l: any) => l.id === r.listener_id)?.name : t('pages:redirects.all'))}</td><td>{r.host_match || '-'}</td><td>{r.source_regex}</td><td>{r.target}</td><td>{r.type}</td>
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
+        <table className="w-full text-sm text-start"><thead className="text-muted-foreground border-b border-border"><tr><th className="w-6"></th><th>{t('pages:redirects.tableHeaders.name')}</th><th>{t('pages:redirects.tableHeaders.listener')}</th><th>{t('pages:redirects.tableHeaders.host')}</th><th>{t('pages:redirects.tableHeaders.regex')}</th><th>{t('pages:redirects.tableHeaders.target')}</th><th>{t('pages:redirects.tableHeaders.type')}</th><th></th></tr></thead>
+          <tbody>{rews.map((r: any) => (<tr key={r.id} draggable onDragStart={(e: any) => { e.dataTransfer.setData('rewrite', String(r.id)); e.dataTransfer.effectAllowed = 'move' }} onDragOver={(e: any) => e.preventDefault()} onDrop={(e: any) => { e.preventDefault(); const fromId = Number(e.dataTransfer.getData('rewrite')); if (fromId && fromId !== r.id) handleDrop('rewrite', fromId, r.id) }} className="border-b border-border last:border-0"><td className="py-2 pe-2 cursor-grab"><GripVertical className="h-4 w-4 text-muted-foreground" /></td><td className="py-2">{r.name}</td><td>{r.listener_ids?.length ? r.listener_ids.map((id: number) => listenerList.find((l: any) => l.id === id)?.name).filter(Boolean).join(', ') : (r.listener_id ? listenerList.find((l: any) => l.id === r.listener_id)?.name : t('pages:redirects.all'))}</td><td>{r.host_match || '-'}</td><td>{r.source_regex}</td><td>{r.target}</td><td>{r.type}</td>
             <td>
               <div className="flex gap-1">
                 <IconButton icon={Pencil} aria-label={t('common:actions.edit')} onClick={() => openWEdit(r)} />
@@ -127,7 +127,7 @@ export default function Redirects() {
         <form onSubmit={submit} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div><LabelWithTooltip tooltip={redirectTooltips.name} className="label">{t('pages:redirects.modal.name')}</LabelWithTooltip><input className="input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
-            <div><LabelWithTooltip tooltip={redirectTooltips.listeners} className="label">{t('pages:redirects.modal.listenersNoneAll')}</LabelWithTooltip><div className="input h-auto max-h-32 overflow-y-auto p-2 space-y-1 text-sm text-slate-300">{listenerList.map((l: any) => (<label key={l.id} className="flex items-center gap-2"><input type="checkbox" className="rounded border-slate-600 bg-slate-800 text-primary" checked={form.listener_ids.includes(l.id)} onChange={(e: any) => setForm({ ...form, listener_ids: e.target.checked ? [...form.listener_ids, l.id] : form.listener_ids.filter((id: number) => id !== l.id) })} /> {l.name}</label>))}</div></div>
+            <div><LabelWithTooltip tooltip={redirectTooltips.listeners} className="label">{t('pages:redirects.modal.listenersNoneAll')}</LabelWithTooltip><div className="input h-auto max-h-32 overflow-y-auto p-2 space-y-1 text-sm text-secondary-foreground">{listenerList.map((l: any) => (<label key={l.id} className="flex items-center gap-2"><input type="checkbox" className="rounded border-subtle bg-muted text-primary" checked={form.listener_ids.includes(l.id)} onChange={(e: any) => setForm({ ...form, listener_ids: e.target.checked ? [...form.listener_ids, l.id] : form.listener_ids.filter((id: number) => id !== l.id) })} /> {l.name}</label>))}</div></div>
             <div><LabelWithTooltip tooltip={redirectTooltips.source} className="label">{t('pages:redirects.modal.source')}</LabelWithTooltip><input className="input" value={form.source} onChange={e => setForm({ ...form, source: e.target.value })} /></div>
             <div>
               <LabelWithTooltip tooltip={redirectTooltips.customResponsePage} className="label">{t('pages:redirects.modal.customResponsePage')}</LabelWithTooltip>
@@ -156,11 +156,11 @@ export default function Redirects() {
                     value={form.error_page_query}
                     onChange={e => setForm({ ...form, error_page_query: e.target.value })}
                   />
-                  <p className="text-xs text-slate-500 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     {t('pages:redirects.modal.responsePageQueryHelp')}
                   </p>
                 </div>
-                <p className="p-2 rounded bg-slate-800/50 text-sm text-slate-400">
+                <p className="p-2 rounded bg-muted/50 text-sm text-muted-foreground">
                   {t('pages:redirects.modal.responsePageNote')}
                 </p>
               </div>
@@ -174,7 +174,7 @@ export default function Redirects() {
         <form onSubmit={wsubmit} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div><LabelWithTooltip tooltip={rewriteTooltips.name} className="label">{t('pages:redirects.modal.name')}</LabelWithTooltip><input className="input" value={wform.name} onChange={e => setWform({ ...wform, name: e.target.value })} /></div>
-            <div><LabelWithTooltip tooltip={rewriteTooltips.listeners} className="label">{t('pages:redirects.modal.listenersNoneAll')}</LabelWithTooltip><div className="input h-auto max-h-32 overflow-y-auto p-2 space-y-1 text-sm text-slate-300">{listenerList.map((l: any) => (<label key={l.id} className="flex items-center gap-2"><input type="checkbox" className="rounded border-slate-600 bg-slate-800 text-primary" checked={wform.listener_ids.includes(l.id)} onChange={(e: any) => setWform({ ...wform, listener_ids: e.target.checked ? [...wform.listener_ids, l.id] : wform.listener_ids.filter((id: number) => id !== l.id) })} /> {l.name}</label>))}</div></div>
+            <div><LabelWithTooltip tooltip={rewriteTooltips.listeners} className="label">{t('pages:redirects.modal.listenersNoneAll')}</LabelWithTooltip><div className="input h-auto max-h-32 overflow-y-auto p-2 space-y-1 text-sm text-secondary-foreground">{listenerList.map((l: any) => (<label key={l.id} className="flex items-center gap-2"><input type="checkbox" className="rounded border-subtle bg-muted text-primary" checked={wform.listener_ids.includes(l.id)} onChange={(e: any) => setWform({ ...wform, listener_ids: e.target.checked ? [...wform.listener_ids, l.id] : wform.listener_ids.filter((id: number) => id !== l.id) })} /> {l.name}</label>))}</div></div>
             <div><LabelWithTooltip tooltip={rewriteTooltips.hostMatch} className="label">{t('pages:redirects.modal.hostMatch')}</LabelWithTooltip><input className="input" placeholder={t('pages:redirects.modal.hostMatchPlaceholder')} value={wform.host_match} onChange={e => setWform({ ...wform, host_match: e.target.value })} /></div>
             <div><LabelWithTooltip tooltip={rewriteTooltips.regex} className="label">{t('pages:redirects.modal.regex')}</LabelWithTooltip><input className="input" value={wform.source_regex} onChange={e => setWform({ ...wform, source_regex: e.target.value })} /></div>
             <div><LabelWithTooltip tooltip={rewriteTooltips.target} className="label">{t('pages:redirects.modal.target')}</LabelWithTooltip><input className="input" value={wform.target} onChange={e => setWform({ ...wform, target: e.target.value })} /></div>

@@ -55,12 +55,14 @@ export default {
           700: 'rgb(var(--color-accent-primary) / <alpha-value>)',
         },
 
-        // Aliases used in a few places
+        // Semantic aliases — the preferred way to reference theme colors
         surface: 'rgb(var(--color-bg-primary) / <alpha-value>)',
         background: 'rgb(var(--color-bg-primary) / <alpha-value>)',
         card: 'rgb(var(--color-bg-secondary) / <alpha-value>)',
         muted: 'rgb(var(--color-bg-tertiary) / <alpha-value>)',
+        subtle: 'rgb(var(--color-border-subtle) / <alpha-value>)',
         'muted-foreground': 'rgb(var(--color-text-tertiary) / <alpha-value>)',
+        'secondary-foreground': 'rgb(var(--color-text-secondary) / <alpha-value>)',
         foreground: 'rgb(var(--color-text-primary) / <alpha-value>)',
         border: 'rgb(var(--color-border-default) / <alpha-value>)',
       },

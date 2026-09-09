@@ -100,9 +100,9 @@ export default function SystemSnapshots() {
 
   return (
     <div className="space-y-6">
-      <form onSubmit={saveMaxSnapshots} className="card space-y-4 max-w-2xl">
+      <form onSubmit={saveMaxSnapshots} className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4 max-w-2xl">
         <h2 className="text-lg font-semibold flex items-center gap-2"><History className="h-5 w-5 text-primary" /> {t('settings:snapshots.title')}</h2>
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-muted-foreground">
           {t('settings:snapshots.description')}
         </p>
         <div className="flex items-center gap-3">
@@ -135,11 +135,11 @@ export default function SystemSnapshots() {
         {loading ? (
           <p>{t('common:actions.loading')}</p>
         ) : items.length === 0 ? (
-          <p className="text-slate-400">{t('pages:snapshots.noSnapshots')}</p>
+          <p className="text-muted-foreground">{t('pages:snapshots.noSnapshots')}</p>
         ) : (
-          <div className="card overflow-x-auto">
+          <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
             <table className="w-full text-sm text-start">
-              <thead className="text-slate-400 border-b border-slate-800">
+              <thead className="text-muted-foreground border-b border-border">
                 <tr>
                   <th className="pb-2">{t('pages:snapshots.tableHeaders.createdAt')}</th>
                   <th className="pb-2">{t('pages:snapshots.tableHeaders.createdBy')}</th>
@@ -149,7 +149,7 @@ export default function SystemSnapshots() {
               </thead>
               <tbody>
                 {items.map((s) => (
-                  <tr key={s.id} className="border-b border-slate-800 last:border-0">
+                  <tr key={s.id} className="border-b border-border last:border-0">
                     <td className="py-2">{formatDateTime(s.created_at)}</td>
                     <td>{s.created_by || '-'}</td>
                     <td>{s.comment || '-'}</td>
@@ -158,7 +158,7 @@ export default function SystemSnapshots() {
                       <button
                         onClick={() => handleRollback(s)}
                         disabled={!s.snapshot_path}
-                        className="text-amber-400 hover:underline flex items-center gap-1 inline-flex disabled:text-slate-600 disabled:cursor-not-allowed disabled:no-underline"
+                        className="text-amber-400 hover:underline flex items-center gap-1 inline-flex disabled:text-subtle disabled:cursor-not-allowed disabled:no-underline"
                         title={!s.snapshot_path ? t('pages:snapshots.snapshotPruned') : ''}
                       >
                         <RotateCcw className="w-3 h-3" /> {t('pages:snapshots.revert')}
@@ -175,11 +175,11 @@ export default function SystemSnapshots() {
       <Modal open={!!selected} onClose={() => setSelected(null)} title={t('pages:snapshots.modalTitle', { date: selected ? formatDateTime(selected.created_at) : '' })}>
         {selected && (
           <div className="space-y-4">
-            <div className="text-sm text-slate-400">
-              <p><span className="font-medium text-slate-200">{t('pages:snapshots.tableHeaders.createdBy')}:</span> {selected.created_by || '-'}</p>
-              {selected.comment && <p><span className="font-medium text-slate-200">{t('pages:snapshots.tableHeaders.comment')}:</span> {selected.comment}</p>}
+            <div className="text-sm text-muted-foreground">
+              <p><span className="font-medium text-secondary-foreground">{t('pages:snapshots.tableHeaders.createdBy')}:</span> {selected.created_by || '-'}</p>
+              {selected.comment && <p><span className="font-medium text-secondary-foreground">{t('pages:snapshots.tableHeaders.comment')}:</span> {selected.comment}</p>}
             </div>
-            <pre className="bg-slate-950 p-4 rounded-lg overflow-auto text-xs text-slate-300 max-h-96 whitespace-pre font-mono">{selected.diff || t('pages:snapshots.noDiff')}</pre>
+            <pre className="bg-background p-4 rounded-lg overflow-auto text-xs text-secondary-foreground max-h-96 whitespace-pre font-mono">{selected.diff || t('pages:snapshots.noDiff')}</pre>
             <div className="flex justify-end">
               <button onClick={() => { handleRollback(selected); setSelected(null) }} className="btn-primary">{t('pages:snapshots.revertToThis')}</button>
             </div>

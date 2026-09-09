@@ -350,36 +350,36 @@ export default function SecurityRules() {
       </div>
 
       {/* Execution order banner */}
-      <div className="card p-3">
-        <div className="flex items-center gap-3 text-sm text-slate-400">
-          <span className="text-slate-300 font-medium">{t('securityRules.executionOrder')}</span>
+      <div className="rounded-lg border border-border bg-card shadow-sm p-3">
+        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+          <span className="text-secondary-foreground font-medium">{t('securityRules.executionOrder')}</span>
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-primary/20 text-primary font-medium">
               <span className="w-5 h-5 rounded-full bg-primary text-white text-xs flex items-center justify-center">1</span>
               {t('securityRules.securityRulesPhase')}
             </span>
-            <span className="text-slate-600">→</span>
-            <Link to="/rate-limits" className="inline-flex items-center gap-1 px-2 py-0.5 rounded hover:bg-slate-800">
-              <span className="w-5 h-5 rounded-full bg-slate-700 text-slate-300 text-xs flex items-center justify-center">2</span>
+            <span className="text-subtle">→</span>
+            <Link to="/rate-limits" className="inline-flex items-center gap-1 px-2 py-0.5 rounded hover:bg-muted">
+              <span className="w-5 h-5 rounded-full bg-subtle text-secondary-foreground text-xs flex items-center justify-center">2</span>
               <Clock className="h-3 w-3" /> {t('securityRules.rateLimitingPhase')}
             </Link>
-            <span className="text-slate-600">→</span>
-            <Link to="/waf" className="inline-flex items-center gap-1 px-2 py-0.5 rounded hover:bg-slate-800">
-              <span className="w-5 h-5 rounded-full bg-slate-700 text-slate-300 text-xs flex items-center justify-center">3</span>
+            <span className="text-subtle">→</span>
+            <Link to="/waf" className="inline-flex items-center gap-1 px-2 py-0.5 rounded hover:bg-muted">
+              <span className="w-5 h-5 rounded-full bg-subtle text-secondary-foreground text-xs flex items-center justify-center">3</span>
               <Shield className="h-3 w-3" /> {t('securityRules.wafSignaturesPhase')}
             </Link>
           </div>
-          <span className="text-xs text-slate-500 ms-2">{t('securityRules.skipActionsNote')}</span>
+          <span className="text-xs text-muted-foreground ms-2">{t('securityRules.skipActionsNote')}</span>
         </div>
       </div>
 
       {/* Rules grouped by listener — single table so columns align across groups */}
       {rules.length === 0 ? (
-        <div className="card p-4 text-slate-500">{t('securityRules.noRulesYet')}</div>
+        <div className="rounded-lg border border-border bg-card shadow-sm p-4 text-muted-foreground">{t('securityRules.noRulesYet')}</div>
       ) : (
-        <div className="card overflow-x-auto">
+        <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
           <table className="w-full text-sm text-start">
-            <thead className="text-slate-400 border-b border-slate-800">
+            <thead className="text-muted-foreground border-b border-border">
               <tr>
                 <th className="p-2 w-8"></th>
                 <th className="p-2 w-16">{t('securityRules.tableHeaders.order')}</th>
@@ -394,34 +394,34 @@ export default function SecurityRules() {
             <tbody>
               {groupedRules.map(group => (
                 <React.Fragment key={group.key}>
-                  <tr className="border-b border-slate-800 bg-slate-900/60">
+                  <tr className="border-b border-border bg-card/60">
                     <td colSpan={8} className="p-3">
                       <span className="font-semibold text-sm">{group.label}</span>
-                      <span className="text-xs text-slate-500 ms-2">({group.rules.length === 1 ? t('securityRules.ruleCount', { count: group.rules.length }) : t('securityRules.rulesCount', { count: group.rules.length })})</span>
+                      <span className="text-xs text-muted-foreground ms-2">({group.rules.length === 1 ? t('securityRules.ruleCount', { count: group.rules.length }) : t('securityRules.rulesCount', { count: group.rules.length })})</span>
                     </td>
                   </tr>
                   {group.rules.length === 0 ? (
-                    <tr className="border-b border-slate-800">
-                      <td colSpan={8} className="p-4 text-sm text-slate-500">{t('securityRules.noRulesForAllListeners')}</td>
+                    <tr className="border-b border-border">
+                      <td colSpan={8} className="p-4 text-sm text-muted-foreground">{t('securityRules.noRulesForAllListeners')}</td>
                     </tr>
                   ) : (
                     group.rules.map((r, gi) => (
                       <tr
                         key={r.id}
-                        className={`border-b border-slate-800 ${dragOverId === r.id ? 'bg-slate-800' : ''}`}
+                        className={`border-b border-border ${dragOverId === r.id ? 'bg-muted' : ''}`}
                         draggable
                         onDragStart={(e) => { e.dataTransfer.setData('text/plain', String(r.id)); e.dataTransfer.effectAllowed = 'move' }}
                         onDragOver={(e) => { e.preventDefault(); setDragOverId(r.id) }}
                         onDrop={(e) => { e.preventDefault(); const dragged = Number(e.dataTransfer.getData('text/plain')); if (dragged !== r.id) { setDragOverId(null); reorder(dragged, r.id) } }}
                         onDragEnd={() => setDragOverId(null)}
                       >
-                        <td className="p-2 cursor-grab"><GripVertical className="h-4 w-4 text-slate-500" /></td>
-                        <td className="p-2 text-slate-500">{gi + 1}</td>
+                        <td className="p-2 cursor-grab"><GripVertical className="h-4 w-4 text-muted-foreground" /></td>
+                        <td className="p-2 text-muted-foreground">{gi + 1}</td>
                         <td className="p-2 font-medium">{r.name}</td>
                         <td className="p-2">
                           <button
                             onClick={() => toggleEnabled(r)}
-                            className={`px-2 py-0.5 rounded text-xs font-medium ${r.enabled ? 'bg-green-500/20 text-green-400' : 'bg-slate-700 text-slate-400'}`}
+                            className={`px-2 py-0.5 rounded text-xs font-medium ${r.enabled ? 'bg-green-500/20 text-green-400' : 'bg-subtle text-muted-foreground'}`}
                           >
                             {r.enabled ? t('common:status.enabled') : t('common:status.disabled')}
                           </button>
@@ -436,10 +436,10 @@ export default function SecurityRules() {
                             'bg-blue-500/20 text-blue-400'
                           }`}>{actionLabel(r.action)}</span>
                         </td>
-                        <td className="p-2 text-xs text-slate-400 max-w-xs truncate" title={r.expression}>
-                          <code className="text-slate-300">{r.expression}</code>
+                        <td className="p-2 text-xs text-muted-foreground max-w-xs truncate" title={r.expression}>
+                          <code className="text-secondary-foreground">{r.expression}</code>
                         </td>
-                        <td className="p-2 text-xs text-slate-400 whitespace-nowrap">{formatDateTime(r.updated_at)}</td>
+                        <td className="p-2 text-xs text-muted-foreground whitespace-nowrap">{formatDateTime(r.updated_at)}</td>
                         <td className="p-2 whitespace-nowrap">
                           <div className="flex gap-1">
                             <IconButton icon={Pencil} aria-label={t('common:actions.edit')} onClick={() => openEdit(r)} />
@@ -463,7 +463,7 @@ export default function SecurityRules() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-slate-400 mb-1">{t('securityRules.modal.name')}</label>
+              <label className="block text-sm text-muted-foreground mb-1">{t('securityRules.modal.name')}</label>
               <input
                 className="input w-full"
                 value={form.name}
@@ -473,7 +473,7 @@ export default function SecurityRules() {
               />
             </div>
             <div>
-              <label className="block text-sm text-slate-400 mb-1">{t('securityRules.modal.action')}</label>
+              <label className="block text-sm text-muted-foreground mb-1">{t('securityRules.modal.action')}</label>
               <select
                 className="input w-full"
                 value={form.action}
@@ -486,7 +486,7 @@ export default function SecurityRules() {
 
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm text-slate-400 mb-1">{t('securityRules.modal.enabled')}</label>
+              <label className="block text-sm text-muted-foreground mb-1">{t('securityRules.modal.enabled')}</label>
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -497,7 +497,7 @@ export default function SecurityRules() {
               </label>
             </div>
             <div>
-              <label className="block text-sm text-slate-400 mb-1">{t('securityRules.modal.logAction')}</label>
+              <label className="block text-sm text-muted-foreground mb-1">{t('securityRules.modal.logAction')}</label>
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -508,7 +508,7 @@ export default function SecurityRules() {
               </label>
             </div>
             <div>
-              <label className="block text-sm text-slate-400 mb-1">{t('securityRules.modal.suppressRequestLog')}</label>
+              <label className="block text-sm text-muted-foreground mb-1">{t('securityRules.modal.suppressRequestLog')}</label>
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -520,7 +520,7 @@ export default function SecurityRules() {
             </div>
             {form.action === 'block' && (
               <div>
-                <label className="block text-sm text-slate-400 mb-1">{t('securityRules.modal.statusCode')}</label>
+                <label className="block text-sm text-muted-foreground mb-1">{t('securityRules.modal.statusCode')}</label>
                 <input
                   type="number"
                   className="input w-full"
@@ -534,7 +534,7 @@ export default function SecurityRules() {
             )}
             {form.action === 'custom_response' && (
               <div>
-                <label className="block text-sm text-slate-400 mb-1">{t('securityRules.modal.statusCode')}</label>
+                <label className="block text-sm text-muted-foreground mb-1">{t('securityRules.modal.statusCode')}</label>
                 <input
                   type="number"
                   className="input w-full"
@@ -552,7 +552,7 @@ export default function SecurityRules() {
           {form.action === 'redirect' && (
             <div className="grid grid-cols-3 gap-4">
               <div className="col-span-2">
-                <label className="block text-sm text-slate-400 mb-1">{t('securityRules.modal.redirectUrl')}</label>
+                <label className="block text-sm text-muted-foreground mb-1">{t('securityRules.modal.redirectUrl')}</label>
                 <input
                   className="input w-full"
                   value={form.redirect_url}
@@ -561,7 +561,7 @@ export default function SecurityRules() {
                 />
               </div>
               <div>
-                <label className="block text-sm text-slate-400 mb-1">{t('securityRules.modal.redirectCode')}</label>
+                <label className="block text-sm text-muted-foreground mb-1">{t('securityRules.modal.redirectCode')}</label>
                 <input
                   type="number"
                   className="input w-full"
@@ -577,7 +577,7 @@ export default function SecurityRules() {
 
           {/* Challenge action note */}
           {form.action === 'challenge' && (
-            <div className="text-xs text-slate-500">
+            <div className="text-xs text-muted-foreground">
               <span dangerouslySetInnerHTML={{ __html: t('securityRules.challengeNote') }} />
               {form.redirect_url && <span className="block mt-1">{t('securityRules.challengeCustomUrl', { url: form.redirect_url })}</span>}
             </div>
@@ -586,7 +586,7 @@ export default function SecurityRules() {
           {/* Custom response page selector */}
           {form.action === 'custom_response' && (
             <div>
-              <label className="block text-sm text-slate-400 mb-1">{t('securityRules.modal.customResponsePage')}</label>
+              <label className="block text-sm text-muted-foreground mb-1">{t('securityRules.modal.customResponsePage')}</label>
               <select
                 className="input w-full"
                 value={form.error_page_id ?? ''}
@@ -602,7 +602,7 @@ export default function SecurityRules() {
 
           {/* Listener scope */}
           <div>
-            <label className="block text-sm text-slate-400 mb-1">{t('securityRules.modal.listenerScope')}</label>
+            <label className="block text-sm text-muted-foreground mb-1">{t('securityRules.modal.listenerScope')}</label>
             <div className="flex items-center gap-4 mb-2">
               <label className="flex items-center gap-1">
                 <input
@@ -624,7 +624,7 @@ export default function SecurityRules() {
             {form.listener_ids.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {listenerList.map(l => (
-                  <label key={l.id} className="flex items-center gap-1 px-2 py-1 rounded bg-slate-800 text-sm">
+                  <label key={l.id} className="flex items-center gap-1 px-2 py-1 rounded bg-muted text-sm">
                     <input
                       type="checkbox"
                       checked={form.listener_ids.includes(l.id)}
@@ -686,7 +686,7 @@ function ExpressionEditor({ value, onChange }: { value: string; onChange: (v: st
 
   return (
     <div>
-      <label className="block text-sm text-slate-400 mb-1">{t('securityRules.expression.label')}</label>
+      <label className="block text-sm text-muted-foreground mb-1">{t('securityRules.expression.label')}</label>
       <Tabs
         tabs={[
           { id: 'text', label: t('securityRules.expression.textTab'), icon: Code2 },
@@ -819,13 +819,13 @@ function ExpressionBuilder({ value, onChange }: { value: string; onChange: (v: s
   }
 
   return (
-    <div className="space-y-3 border border-slate-800 rounded-lg p-3 bg-slate-900/50">
+    <div className="space-y-3 border border-border rounded-lg p-3 bg-card/50">
       {groups.map((group, gi) => (
         <div key={gi} className="space-y-2">
-          {gi > 0 && <div className="text-xs text-slate-500 font-medium uppercase">{t('securityRules.expression.or')}</div>}
+          {gi > 0 && <div className="text-xs text-muted-foreground font-medium uppercase">{t('securityRules.expression.or')}</div>}
           {group.conditions.map((cond, ci) => (
             <div key={ci} className="flex items-center gap-2 flex-wrap">
-              {ci > 0 && <span className="text-xs text-slate-500">{t('securityRules.expression.and')}</span>}
+              {ci > 0 && <span className="text-xs text-muted-foreground">{t('securityRules.expression.and')}</span>}
               <label className="flex items-center gap-1 text-xs">
                 <input
                   type="checkbox"

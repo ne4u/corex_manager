@@ -39,7 +39,7 @@ export default function McpGateway() {
       <h1 className="text-2xl font-bold flex items-center gap-2">
         <Network className="h-5 w-5 text-primary" /> {t('pages:mcpGateway.title')}
       </h1>
-      <p className="text-sm text-slate-400 max-w-3xl">
+      <p className="text-sm text-muted-foreground max-w-3xl">
         {t('pages:mcpGateway.description')}
       </p>
 

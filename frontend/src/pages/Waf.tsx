@@ -402,12 +402,12 @@ export default function Waf() {
             <h3 className="text-xl font-bold">{t('waf.rules.title')}</h3>
             <button onClick={openAdd} className="btn-primary">{t('waf.rules.addRule')}</button>
           </div>
-          <div className="card overflow-x-auto">
+          <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
             <table className="w-full text-sm text-start">
-              <thead className="text-slate-400 border-b border-slate-800"><tr><th>{t('waf.rules.tableHeaders.name')}</th><th>{t('waf.rules.tableHeaders.listener')}</th><th>{t('waf.rules.tableHeaders.backend')}</th><th>{t('waf.rules.tableHeaders.ruleSet')}</th><th>{t('waf.rules.tableHeaders.engine')}</th><th>{t('waf.rules.tableHeaders.paranoia')}</th><th>{t('waf.rules.tableHeaders.action')}</th><th>{t('waf.rules.tableHeaders.enabled')}</th><th className="w-40 whitespace-nowrap">{t('waf.rules.tableHeaders.updated')}</th><th></th></tr></thead>
+              <thead className="text-muted-foreground border-b border-border"><tr><th>{t('waf.rules.tableHeaders.name')}</th><th>{t('waf.rules.tableHeaders.listener')}</th><th>{t('waf.rules.tableHeaders.backend')}</th><th>{t('waf.rules.tableHeaders.ruleSet')}</th><th>{t('waf.rules.tableHeaders.engine')}</th><th>{t('waf.rules.tableHeaders.paranoia')}</th><th>{t('waf.rules.tableHeaders.action')}</th><th>{t('waf.rules.tableHeaders.enabled')}</th><th className="w-40 whitespace-nowrap">{t('waf.rules.tableHeaders.updated')}</th><th></th></tr></thead>
               <tbody>
                 {rules.map((r: any) => (
-                  <tr key={r.id} className="border-b border-slate-800 last:border-0">
+                  <tr key={r.id} className="border-b border-border last:border-0">
                     <td className="py-2">{r.name}</td>
                     <td>{r.listener_id ? listenerList.find((l: any) => l.id === r.listener_id)?.name : t('waf.rules.all')}</td>
                     <td>{r.backend_id ? backendList.find((b: any) => b.id === r.backend_id)?.name : t('waf.rules.any')}</td>
@@ -416,7 +416,7 @@ export default function Waf() {
                     <td>{r.paranoia_level}</td>
                     <td>{r.action}</td>
                     <td>{r.enabled ? t('waf.rules.yes') : t('waf.rules.no')}</td>
-                    <td className="py-2 text-xs text-slate-400 whitespace-nowrap">{r.updated_at ? formatDateTime(r.updated_at) : '-'}</td>
+                    <td className="py-2 text-xs text-muted-foreground whitespace-nowrap">{r.updated_at ? formatDateTime(r.updated_at) : '-'}</td>
                     <td>
                       <div className="flex gap-1">
                         <IconButton icon={Pencil} aria-label={t('common:actions.edit')} onClick={() => openEdit(r)} />
@@ -436,13 +436,13 @@ export default function Waf() {
       {tab === 'exceptions' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between"><h3 className="text-xl font-bold">{t('waf.exceptions.title')}</h3><button onClick={openExAdd} className="btn-primary">{t('waf.exceptions.addException')}</button></div>
-          <div className="card overflow-x-auto">
+          <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
             <table className="w-full text-sm text-start">
-              <thead className="text-slate-400 border-b border-slate-800"><tr><th>{t('waf.exceptions.tableHeaders.name')}</th><th>{t('waf.exceptions.fields.conditionVariable')}</th><th>{t('waf.exceptions.fields.conditionOperator')}</th><th>{t('waf.exceptions.fields.conditionValue')}</th><th>{t('waf.exceptions.tableHeaders.action')}</th><th className="w-40 whitespace-nowrap">{t('waf.exceptions.tableHeaders.updated')}</th><th></th></tr></thead>
+              <thead className="text-muted-foreground border-b border-border"><tr><th>{t('waf.exceptions.tableHeaders.name')}</th><th>{t('waf.exceptions.fields.conditionVariable')}</th><th>{t('waf.exceptions.fields.conditionOperator')}</th><th>{t('waf.exceptions.fields.conditionValue')}</th><th>{t('waf.exceptions.tableHeaders.action')}</th><th className="w-40 whitespace-nowrap">{t('waf.exceptions.tableHeaders.updated')}</th><th></th></tr></thead>
               <tbody>
                 {exceptions.map((e: any) => (
-                  <tr key={e.id} className="border-b border-slate-800 last:border-0">
-                    <td className="py-2">{e.name}</td><td className="font-mono text-xs">{e.condition_variable || '-'}</td><td>{e.condition_variable ? e.condition_operator : '-'}</td><td className="max-w-xs truncate" title={e.condition_value || undefined}>{e.condition_value || '-'}</td><td>{e.action}</td><td className="py-2 text-xs text-slate-400 whitespace-nowrap">{e.updated_at ? formatDateTime(e.updated_at) : '-'}</td>
+                  <tr key={e.id} className="border-b border-border last:border-0">
+                    <td className="py-2">{e.name}</td><td className="font-mono text-xs">{e.condition_variable || '-'}</td><td>{e.condition_variable ? e.condition_operator : '-'}</td><td className="max-w-xs truncate" title={e.condition_value || undefined}>{e.condition_value || '-'}</td><td>{e.action}</td><td className="py-2 text-xs text-muted-foreground whitespace-nowrap">{e.updated_at ? formatDateTime(e.updated_at) : '-'}</td>
                     <td>
                       <div className="flex gap-1">
                         <IconButton icon={Pencil} aria-label={t('common:actions.edit')} onClick={() => openExEdit(e)} />
@@ -462,12 +462,12 @@ export default function Waf() {
           <div className="flex items-center justify-between"><h3 className="text-xl font-bold">{t('waf.siem.title')}</h3>
             <button onClick={() => { setSiemEditing(null); setSiemForm({ name: '', integration_type: 'webhook', target: '', format: 'json', auth_header: '', enabled: true }); setSiemOpen(true) }} className="btn-primary">{t('waf.siem.addSiem')}</button>
           </div>
-          <div className="card overflow-x-auto">
+          <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
             <table className="w-full text-sm text-start">
-              <thead className="text-slate-400 border-b border-slate-800"><tr><th>{t('waf.siem.tableHeaders.name')}</th><th>{t('waf.siem.tableHeaders.type')}</th><th>{t('waf.siem.tableHeaders.target')}</th><th>{t('waf.siem.tableHeaders.format')}</th><th>{t('waf.siem.tableHeaders.enabled')}</th><th></th></tr></thead>
+              <thead className="text-muted-foreground border-b border-border"><tr><th>{t('waf.siem.tableHeaders.name')}</th><th>{t('waf.siem.tableHeaders.type')}</th><th>{t('waf.siem.tableHeaders.target')}</th><th>{t('waf.siem.tableHeaders.format')}</th><th>{t('waf.siem.tableHeaders.enabled')}</th><th></th></tr></thead>
               <tbody>
                 {siemIntegrations.map((s: any) => (
-                  <tr key={s.id} className="border-b border-slate-800 last:border-0">
+                  <tr key={s.id} className="border-b border-border last:border-0">
                     <td className="py-2">{s.name}</td><td>{s.integration_type}</td><td>{s.target}</td><td>{s.format}</td><td>{s.enabled ? t('waf.rules.yes') : t('waf.rules.no')}</td>
                     <td>
                       <div className="flex gap-1">
@@ -488,7 +488,7 @@ export default function Waf() {
           <div className="flex items-center justify-between">
             <h3 className="text-xl font-bold">{t('waf.versions.title')}</h3>
             <div className="flex items-center gap-2 text-sm">
-              <label className="text-slate-400">{t('waf.versions.maxPerRule')}</label>
+              <label className="text-muted-foreground">{t('waf.versions.maxPerRule')}</label>
               <input
                 type="number"
                 min={0}
@@ -497,16 +497,16 @@ export default function Waf() {
                 onChange={e => setVersionMaxInput(e.target.value)}
                 placeholder="10"
               />
-              <span className="text-xs text-slate-500">{t('waf.versions.unlimitedHint')}{versionMax !== null ? ` ${t('waf.versions.savedHint', { value: versionMax === 0 ? t('waf.versions.unlimited') : versionMax })}` : ''}</span>
+              <span className="text-xs text-muted-foreground">{t('waf.versions.unlimitedHint')}{versionMax !== null ? ` ${t('waf.versions.savedHint', { value: versionMax === 0 ? t('waf.versions.unlimited') : versionMax })}` : ''}</span>
               <button onClick={saveVersionMax} className="btn-primary">{t('waf.versions.save')}</button>
             </div>
           </div>
-          <div className="card overflow-x-auto">
+          <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
             <table className="w-full text-sm text-start">
-              <thead className="text-slate-400 border-b border-slate-800"><tr><th>{t('waf.versions.tableHeaders.rule')}</th><th>{t('waf.versions.tableHeaders.version')}</th><th>{t('waf.versions.tableHeaders.created')}</th><th>{t('waf.versions.tableHeaders.by')}</th><th></th></tr></thead>
+              <thead className="text-muted-foreground border-b border-border"><tr><th>{t('waf.versions.tableHeaders.rule')}</th><th>{t('waf.versions.tableHeaders.version')}</th><th>{t('waf.versions.tableHeaders.created')}</th><th>{t('waf.versions.tableHeaders.by')}</th><th></th></tr></thead>
               <tbody>
                 {ruleVersions.map((v: any) => (
-                  <tr key={v.id} className="border-b border-slate-800 last:border-0">
+                  <tr key={v.id} className="border-b border-border last:border-0">
                     <td className="py-2">{rules.find((r: any) => r.id === v.waf_rule_id)?.name}</td>
                     <td>{v.version}</td>
                     <td>{formatDateTime(v.created_at)}</td>
@@ -530,21 +530,21 @@ export default function Waf() {
           <h3 className="text-xl font-bold">{t('waf.crs.title')}</h3>
 
           {/* Status section */}
-          <div className="card space-y-2">
+          <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-2">
             <h4 className="font-semibold">{t('waf.crs.currentStatus')}</h4>
             {crsStatus ? (
               <div className="grid grid-cols-2 gap-2 text-sm">
-                <div><span className="text-slate-400">{t('waf.crs.mode')}</span> <span className={crsStatus.mode === 'filesystem' ? 'text-green-400' : 'text-amber-400'}>{crsStatus.mode === 'filesystem' ? t('waf.crs.modeFilesystem') : t('waf.crs.modeEmbedded')}</span></div>
-                <div><span className="text-slate-400">{t('waf.crs.activeVersion')}</span> {crsStatus.active_version || <span className="text-slate-500">—</span>}</div>
-                <div><span className="text-slate-400">{t('waf.crs.pinnedVersion')}</span> {crsStatus.pinned_version || <span className="text-slate-500">{t('waf.crs.pinnedLatest')}</span>}</div>
-                <div><span className="text-slate-400">{t('waf.crs.filesPresent')}</span> {crsStatus.files_present ? '✓' : '✗'}</div>
-                {crsStatus.path && <div className="col-span-2"><span className="text-slate-400">{t('waf.crs.includePath')}</span> <code className="text-xs">{crsStatus.path}</code></div>}
+                <div><span className="text-muted-foreground">{t('waf.crs.mode')}</span> <span className={crsStatus.mode === 'filesystem' ? 'text-green-400' : 'text-amber-400'}>{crsStatus.mode === 'filesystem' ? t('waf.crs.modeFilesystem') : t('waf.crs.modeEmbedded')}</span></div>
+                <div><span className="text-muted-foreground">{t('waf.crs.activeVersion')}</span> {crsStatus.active_version || <span className="text-muted-foreground">—</span>}</div>
+                <div><span className="text-muted-foreground">{t('waf.crs.pinnedVersion')}</span> {crsStatus.pinned_version || <span className="text-muted-foreground">{t('waf.crs.pinnedLatest')}</span>}</div>
+                <div><span className="text-muted-foreground">{t('waf.crs.filesPresent')}</span> {crsStatus.files_present ? '✓' : '✗'}</div>
+                {crsStatus.path && <div className="col-span-2"><span className="text-muted-foreground">{t('waf.crs.includePath')}</span> <code className="text-xs">{crsStatus.path}</code></div>}
               </div>
-            ) : <div className="text-slate-500 text-sm">{t('waf.crs.loadingStatus')}</div>}
+            ) : <div className="text-muted-foreground text-sm">{t('waf.crs.loadingStatus')}</div>}
           </div>
 
           {/* Download + pin section */}
-          <div className="card space-y-3">
+          <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-3">
             <h4 className="font-semibold">{t('waf.crs.downloadUpdate')}</h4>
             <div className="flex items-center gap-2">
               <button
@@ -559,10 +559,10 @@ export default function Waf() {
               >
                 {crsStatus?.pinned_version ? t('waf.crs.downloadVersion', { version: crsStatus.pinned_version }) : t('waf.crs.downloadLatest')}
               </button>
-              <span className="text-xs text-slate-500">{t('waf.crs.downloadHint')}</span>
+              <span className="text-xs text-muted-foreground">{t('waf.crs.downloadHint')}</span>
             </div>
             <div className="flex items-center gap-2 text-sm">
-              <label className="text-slate-400">{t('waf.crs.pinVersion')}</label>
+              <label className="text-muted-foreground">{t('waf.crs.pinVersion')}</label>
               <input
                 className="input w-32"
                 value={crsPinnedInput}
@@ -581,26 +581,26 @@ export default function Waf() {
               >
                 {t('waf.crs.pinSave')}
               </button>
-              <span className="text-xs text-slate-500">{t('waf.crs.pinEmptyHint')}</span>
+              <span className="text-xs text-muted-foreground">{t('waf.crs.pinEmptyHint')}</span>
             </div>
           </div>
 
           {/* Snapshots table */}
-          <div className="card overflow-x-auto">
+          <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
             <h4 className="font-semibold mb-2">{t('waf.crs.snapshotsTitle')}</h4>
             <table className="w-full text-sm text-start">
-              <thead className="text-slate-400 border-b border-slate-800"><tr><th>{t('waf.crs.tableHeaders.version')}</th><th>{t('waf.crs.tableHeaders.hash')}</th><th>{t('waf.crs.tableHeaders.created')}</th><th>{t('waf.crs.tableHeaders.by')}</th><th></th></tr></thead>
+              <thead className="text-muted-foreground border-b border-border"><tr><th>{t('waf.crs.tableHeaders.version')}</th><th>{t('waf.crs.tableHeaders.hash')}</th><th>{t('waf.crs.tableHeaders.created')}</th><th>{t('waf.crs.tableHeaders.by')}</th><th></th></tr></thead>
               <tbody>
                 {crsSnapshots.length === 0 && (
-                  <tr><td colSpan={5} className="py-4 text-center text-slate-500">{t('waf.crs.noSnapshots')}</td></tr>
+                  <tr><td colSpan={5} className="py-4 text-center text-muted-foreground">{t('waf.crs.noSnapshots')}</td></tr>
                 )}
                 {crsSnapshots.map((s: any) => (
-                  <tr key={s.id} className="border-b border-slate-800 last:border-0">
+                  <tr key={s.id} className="border-b border-border last:border-0">
                     <td className="py-2">
                       {s.version}
                       {crsStatus?.active_version === s.dir_version && <span className="ms-2 text-xs text-green-400">{t('waf.crs.active')}</span>}
                     </td>
-                    <td className="text-xs text-slate-500 font-mono">{(s.file_hash || '').slice(0, 12)}…</td>
+                    <td className="text-xs text-muted-foreground font-mono">{(s.file_hash || '').slice(0, 12)}…</td>
                     <td>{s.created_at ? formatDateTime(s.created_at) : '—'}</td>
                     <td>{s.created_by || '—'}</td>
                     <td>
@@ -647,7 +647,7 @@ export default function Waf() {
       {tab === 'health' && (
         <div className="space-y-4">
           <h3 className="text-xl font-bold">{t('waf.health.title')}</h3>
-          <div className="card">
+          <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
             {health ? (
               <div className="space-y-4 text-sm">
                 <div className="grid grid-cols-2 gap-4">
@@ -660,14 +660,14 @@ export default function Waf() {
                   <div><strong>{t('waf.health.spoaTargets')}</strong> {health.spoa_targets}</div>
                 </div>
                 {health.counts && (
-                  <div className="grid grid-cols-3 gap-4 border-t border-slate-800 pt-4">
+                  <div className="grid grid-cols-3 gap-4 border-t border-border pt-4">
                     {Object.entries(health.counts).map(([k, v]) => (
                       <div key={k}><strong>{k.replace(/_/g, ' ')}:</strong> {String(v)}</div>
                     ))}
                   </div>
                 )}
                 {health.last_error && <div className="text-red-400"><strong>{t('waf.health.lastError')}</strong> {health.last_error}</div>}
-                {health.last_log_line && <div className="text-slate-400 break-all"><strong>{t('waf.health.lastLogLine')}</strong> {health.last_log_line}</div>}
+                {health.last_log_line && <div className="text-muted-foreground break-all"><strong>{t('waf.health.lastLogLine')}</strong> {health.last_log_line}</div>}
               </div>
             ) : <p>{t('waf.health.unableToLoad')}</p>}
           </div>
@@ -679,9 +679,9 @@ export default function Waf() {
           <div className="grid grid-cols-2 gap-3">
             <div><LabelWithTooltip tooltip={t(wafRuleTooltips.name)} className="label">{t('waf.rules.fields.name')}</LabelWithTooltip><input className="input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
             <div><LabelWithTooltip tooltip={t(wafRuleTooltips.listener)} className="label">{t('waf.rules.fields.listener')}</LabelWithTooltip><select className="input" value={form.listener_id || ''} onChange={e => setForm({ ...form, listener_id: e.target.value ? Number(e.target.value) : null })}><option value="">{t('waf.rules.fields.allListeners')}</option>{listenerList.map((l: any) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></div>
-            <div className="col-span-2 text-xs text-slate-500 -mt-1">{t('waf.rules.fields.listenerHint')}</div>
+            <div className="col-span-2 text-xs text-muted-foreground -mt-1">{t('waf.rules.fields.listenerHint')}</div>
             <div><LabelWithTooltip tooltip={t(wafRuleTooltips.backendScope)} className="label">{t('waf.rules.fields.backendScope')}</LabelWithTooltip><select className="input" value={form.backend_id || ''} onChange={e => setForm({ ...form, backend_id: e.target.value ? Number(e.target.value) : null })}><option value="">{t('waf.rules.fields.anyBackend')}</option>{backendList.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}</select></div>
-            <div className="col-span-2 text-xs text-slate-500 -mt-1">{t('waf.rules.fields.backendScopeHint')}</div>
+            <div className="col-span-2 text-xs text-muted-foreground -mt-1">{t('waf.rules.fields.backendScopeHint')}</div>
             <div><LabelWithTooltip tooltip={t(wafRuleTooltips.ruleSet)} className="label">{t('waf.rules.fields.ruleSet')}</LabelWithTooltip><select className="input" value={form.rule_set} onChange={e => setForm({ ...form, rule_set: e.target.value })}><option value="crs">{t('waf.rules.ruleSet.crs')}</option><option value="custom">{t('waf.rules.ruleSet.custom')}</option><option value="remote">{t('waf.rules.ruleSet.remote')}</option>{(form.rule_set === 'coraza' || form.rule_set === 'owasp-crs' || form.rule_set === 'commercial') && <option value={form.rule_set}>{form.rule_set}</option>}</select></div>
             {form.rule_set === 'remote' && (
               <>
@@ -689,7 +689,7 @@ export default function Waf() {
                 <div><LabelWithTooltip tooltip={t(wafRuleTooltips.ruleSetSha256)} className="label">{t('waf.rules.fields.ruleSetSha256')}</LabelWithTooltip><input className="input" value={form.rule_set_sha256 || ''} onChange={e => setForm({ ...form, rule_set_sha256: e.target.value })} placeholder="abc123..." /></div>
                 <div><LabelWithTooltip tooltip={t(wafRuleTooltips.ruleSetUpdateIntervalHours)} className="label">{t('waf.rules.fields.autoUpdateHours')}</LabelWithTooltip><input type="number" className="input" value={form.rule_set_update_interval_hours} onChange={e => setForm({ ...form, rule_set_update_interval_hours: Number(e.target.value), rule_set_auto_update: true })} disabled={!form.rule_set_auto_update} /></div>
                 <div><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.rule_set_auto_update} onChange={e => setForm({ ...form, rule_set_auto_update: e.target.checked })} /> <span>{t('waf.rules.fields.enableAutoUpdate')}</span><InfoTooltip content={t(wafRuleTooltips.ruleSetAutoUpdate)} /></label></div>
-                {form.rule_set_last_updated_at && <div className="col-span-2 text-xs text-slate-400">{t('waf.rules.fields.lastUpdated')} {formatDateTime(form.rule_set_last_updated_at)}</div>}
+                {form.rule_set_last_updated_at && <div className="col-span-2 text-xs text-muted-foreground">{t('waf.rules.fields.lastUpdated')} {formatDateTime(form.rule_set_last_updated_at)}</div>}
                 {form.rule_set_last_error && <div className="col-span-2 text-xs text-red-400">{t('waf.rules.fields.lastError')} {form.rule_set_last_error}</div>}
               </>
             )}
@@ -708,11 +708,11 @@ export default function Waf() {
             <div><LabelWithTooltip tooltip={t(wafRuleTooltips.redirectUrl)} className="label">{t('waf.rules.fields.redirectUrl')}</LabelWithTooltip><input className="input" value={form.redirect_url || ''} onChange={e => setForm({ ...form, redirect_url: e.target.value })} /></div>
           )}
           {form.action === 'challenge' && (
-            <div className="text-xs text-slate-500"><span dangerouslySetInnerHTML={{ __html: t('waf.rules.challengeNote') }} /></div>
+            <div className="text-xs text-muted-foreground"><span dangerouslySetInnerHTML={{ __html: t('waf.rules.challengeNote') }} /></div>
           )}
           <div><LabelWithTooltip tooltip={t(wafRuleTooltips.statusCode)} className="label">{t('waf.rules.fields.statusCode')}</LabelWithTooltip><input type="number" className="input" min={100} max={599} value={form.status_code} onChange={e => setForm({ ...form, status_code: Number(e.target.value) })} /></div>
 
-          <div className="border-t border-slate-800 pt-3 space-y-3">
+          <div className="border-t border-border pt-3 space-y-3">
             <h4 className="font-semibold">{t('waf.rules.fields.scopeContext')}</h4>
             <div className="grid grid-cols-3 gap-3">
               <div><LabelWithTooltip tooltip={t(wafRuleTooltips.pathPattern)} className="label">{t('waf.rules.fields.pathPattern')}</LabelWithTooltip><input className="input" value={form.path_pattern || ''} onChange={e => setForm({ ...form, path_pattern: e.target.value })} placeholder="/api/" /></div>
@@ -751,10 +751,10 @@ export default function Waf() {
           </div>
 
           {/* Rule selection: which rules this exception modifies */}
-          <div className="border-t border-slate-800 pt-3 space-y-3">
+          <div className="border-t border-border pt-3 space-y-3">
             <div>
               <h4 className="font-semibold">{t('waf.exceptions.sections.selection')}</h4>
-              <p className="text-xs text-slate-500">{t('waf.exceptions.sections.selectionHint')}</p>
+              <p className="text-xs text-muted-foreground">{t('waf.exceptions.sections.selectionHint')}</p>
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div><LabelWithTooltip tooltip={t(wafExceptionTooltips.ruleId)} className="label">{t('waf.exceptions.fields.ruleId')}</LabelWithTooltip><MultiValueInput value={exForm.rule_id} onChange={v => setExForm({ ...exForm, rule_id: v })} options={exRuleIdOptions} placeholder="942100" loading={exOpen && !exOptions} /></div>
@@ -771,10 +771,10 @@ export default function Waf() {
 
           {/* Variable exclusion: only relevant for the "allow" action */}
           {exForm.action === 'allow' && (
-            <div className="border-t border-slate-800 pt-3 space-y-3">
+            <div className="border-t border-border pt-3 space-y-3">
               <div>
                 <h4 className="font-semibold">{t('waf.exceptions.sections.exclusion')}</h4>
-                <p className="text-xs text-slate-500">{t('waf.exceptions.sections.exclusionHint')}</p>
+                <p className="text-xs text-muted-foreground">{t('waf.exceptions.sections.exclusionHint')}</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div><LabelWithTooltip tooltip={t(wafExceptionTooltips.zone)} className="label">{t('waf.exceptions.fields.zone')}</LabelWithTooltip><MultiValueInput value={exForm.zone} onChange={v => setExForm({ ...exForm, zone: v })} options={exZoneOptions} placeholder="ARGS" /></div>
@@ -788,10 +788,10 @@ export default function Waf() {
           )}
 
           {/* Condition: gate the whole exception on a request attribute */}
-          <div className="border-t border-slate-800 pt-3 space-y-3">
+          <div className="border-t border-border pt-3 space-y-3">
             <div>
               <h4 className="font-semibold">{t('waf.exceptions.sections.condition')}</h4>
-              <p className="text-xs text-slate-500">{t('waf.exceptions.sections.conditionHint')}</p>
+              <p className="text-xs text-muted-foreground">{t('waf.exceptions.sections.conditionHint')}</p>
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div><LabelWithTooltip tooltip={t(wafExceptionTooltips.conditionVariable)} className="label">{t('waf.exceptions.fields.conditionVariable')}</LabelWithTooltip><MultiValueInput value={exForm.condition_variable || ''} onChange={v => setExForm({ ...exForm, condition_variable: v })} options={exCondVarOptions} placeholder="REQUEST_URI" max={1} /></div>
@@ -803,12 +803,12 @@ export default function Waf() {
           <div><LabelWithTooltip tooltip={t(wafExceptionTooltips.description)} className="label">{t('waf.exceptions.fields.description')}</LabelWithTooltip><input className="input" value={exForm.description || ''} onChange={e => setExForm({ ...exForm, description: e.target.value })} /></div>
 
           {/* Live preview of the generated directives */}
-          <div className="border-t border-slate-800 pt-3 space-y-2">
+          <div className="border-t border-border pt-3 space-y-2">
             <h4 className="font-semibold">{t('waf.exceptions.sections.preview')}</h4>
             {exPreviewLines.length > 0 ? (
-              <pre className="text-xs bg-slate-950 border border-slate-800 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap font-mono text-slate-300">{exPreviewLines.join('\n')}</pre>
+              <pre className="text-xs bg-background border border-border rounded-lg p-3 overflow-x-auto whitespace-pre-wrap font-mono text-secondary-foreground">{exPreviewLines.join('\n')}</pre>
             ) : (
-              <p className="text-xs text-slate-500">{t('waf.exceptions.previewEmpty')}</p>
+              <p className="text-xs text-muted-foreground">{t('waf.exceptions.previewEmpty')}</p>
             )}
           </div>
 

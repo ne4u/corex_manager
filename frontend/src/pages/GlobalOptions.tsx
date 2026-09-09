@@ -108,7 +108,7 @@ export default function GlobalOptions() {
 
       {tab === 'advanced' && (
       <>
-      <div className="card space-y-4 max-w-3xl">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4 max-w-3xl">
         <HaproxyOptionsEditor
           scope="global"
           value={options}
@@ -128,9 +128,9 @@ export default function GlobalOptions() {
         )}
       </div>
 
-      <div className="card space-y-4 max-w-3xl">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4 max-w-3xl">
         <h2 className="text-lg font-semibold flex items-center gap-2"><Timer className="h-5 w-5 text-primary" /> {t('pages:globalOptions.serverTimingMetrics.title')}</h2>
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-muted-foreground">
           {t('pages:globalOptions.serverTimingMetrics.description')}
         </p>
         <label className="flex items-center gap-2">

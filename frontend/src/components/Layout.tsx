@@ -251,16 +251,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen bg-slate-950 text-slate-100">
-      <aside className={`${open ? 'translate-x-0' : '-translate-x-full rtl:translate-x-full'} fixed inset-y-0 start-0 rtl:end-0 rtl:left-auto z-50 w-64 transform bg-slate-900 border-r rtl:border-r-0 rtl:border-l border-slate-800 transition-transform lg:translate-x-0 rtl:lg:translate-x-0 lg:static flex flex-col`}>
-        <div className="relative flex items-center justify-center px-6 py-4 border-b border-slate-800 shrink-0">
+    <div className="flex h-screen bg-background text-foreground">
+      <aside className={`${open ? 'translate-x-0' : '-translate-x-full rtl:translate-x-full'} fixed inset-y-0 start-0 rtl:end-0 rtl:left-auto z-50 w-64 transform bg-card border-r rtl:border-r-0 rtl:border-l border-border transition-transform lg:translate-x-0 rtl:lg:translate-x-0 lg:static flex flex-col`}>
+        <div className="relative flex items-center justify-center px-6 py-4 border-b border-border shrink-0">
           <Logo className="h-[150px] w-auto" />
           <button onClick={() => setOpen(false)} className="absolute end-6 rtl:right-auto rtl:start-6 lg:hidden"><X /></button>
         </div>
         <nav className="p-4 space-y-1 overflow-y-auto flex-1">
           {/* Search input */}
           <div className="relative mb-3">
-            <Search className="absolute start-2 rtl:left-auto rtl:end-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <Search className="absolute start-2 rtl:left-auto rtl:end-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               type="search"
               className="input !ps-8 rtl:!ps-3 rtl:!pe-8 py-1.5 text-sm w-full"
@@ -281,7 +281,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 onClick={() => setOpen(false)}
                 className={({ isActive }) =>
                   `flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    isActive ? 'bg-primary/10 text-primary' : 'text-slate-300 hover:bg-slate-800'
+                    isActive ? 'bg-primary/10 text-primary' : 'text-secondary-foreground hover:bg-muted'
                   }`
                 }
               >
@@ -290,7 +290,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </NavLink>
             ))}
         </nav>
-        <div className="p-4 border-t border-slate-800 shrink-0">
+        <div className="p-4 border-t border-border shrink-0">
           <button onClick={logout} className="btn-secondary w-full">
             <LogOut className="w-4 h-4 me-2 rtl:me-0 rtl:ms-2" /> {t('nav:logout')}
           </button>
@@ -300,7 +300,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <ProfileDrawer />
       <main className="flex-1 overflow-y-auto p-6 pe-12 lg:ms-0">
         <div className="lg:hidden flex items-center gap-3 mb-4">
-          <button onClick={() => setOpen(true)} className="p-2 rounded-lg bg-slate-900 border border-slate-800">
+          <button onClick={() => setOpen(true)} className="p-2 rounded-lg bg-card border border-border">
             <Menu className="w-5 h-5" />
           </button>
           <span className="font-semibold">{t('nav:brand')}</span>
@@ -336,7 +336,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         )}
         {children}
         <Modal open={showDiff} onClose={() => setShowDiff(false)} title={t('nav:diff.title')}>
-          <pre className="bg-slate-950 p-4 rounded-lg overflow-auto text-xs text-slate-300 max-h-96 whitespace-pre font-mono">{maskConfig(diff) || t('nav:diff.noChanges')}</pre>
+          <pre className="bg-background p-4 rounded-lg overflow-auto text-xs text-secondary-foreground max-h-96 whitespace-pre font-mono">{maskConfig(diff) || t('nav:diff.noChanges')}</pre>
         </Modal>
       </main>
     </div>

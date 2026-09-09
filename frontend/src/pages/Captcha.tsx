@@ -4,6 +4,7 @@ import { Bot, Settings as SettingsIcon, BarChart3, KeyRound, Plus, Trash2, Save,
 import { captcha, getErrorDetail } from '../services/api'
 import { Tabs } from '../components/ui'
 import { useDateTime } from '../contexts/DateTimeContext'
+import { chartTooltipContentStyle, chartTooltipLabelStyle } from '../lib/utils'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
@@ -208,10 +209,10 @@ function SettingsTab({ settings, onChange, onError, onSuccess }: {
   return (
     <div className="space-y-6 max-w-2xl">
       {/* Provider selector */}
-      <div className="card p-5 space-y-4">
+      <div className="rounded-lg border border-border bg-card shadow-sm p-5 space-y-4">
         <h2 className="text-lg font-semibold">{t('pages:captcha.settings.providerTitle')}</h2>
         <div>
-          <label className="block text-sm text-slate-400 mb-1">{t('pages:captcha.settings.provider')}</label>
+          <label className="block text-sm text-muted-foreground mb-1">{t('pages:captcha.settings.provider')}</label>
           <select
             className="input w-full"
             value={provider}
@@ -221,12 +222,12 @@ function SettingsTab({ settings, onChange, onError, onSuccess }: {
               <option key={p.value} value={p.value}>{t(p.label)}</option>
             ))}
           </select>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             {t('pages:captcha.settings.providerHelp')}
           </p>
         </div>
         <div>
-          <label className="block text-sm text-slate-400 mb-1">{t('pages:captcha.settings.challengeValidDuration')}</label>
+          <label className="block text-sm text-muted-foreground mb-1">{t('pages:captcha.settings.challengeValidDuration')}</label>
           <input
             type="number"
             className="input w-full"
@@ -234,7 +235,7 @@ function SettingsTab({ settings, onChange, onError, onSuccess }: {
             value={ttl}
             onChange={e => setTtl(Number(e.target.value))}
           />
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             {t('pages:captcha.settings.challengeValidDurationHelp')}
           </p>
         </div>
@@ -242,42 +243,42 @@ function SettingsTab({ settings, onChange, onError, onSuccess }: {
 
       {/* Provider-specific config */}
       {provider === 'cap' && (
-        <div className="card p-5 space-y-4">
+        <div className="rounded-lg border border-border bg-card shadow-sm p-5 space-y-4">
           <h2 className="text-lg font-semibold">{t('pages:captcha.settings.nativeConfig')}</h2>
           <div>
-            <label className="block text-sm text-slate-400 mb-1">{t('pages:captcha.settings.siteKey')}</label>
+            <label className="block text-sm text-muted-foreground mb-1">{t('pages:captcha.settings.siteKey')}</label>
             <input className="input w-full" value={capSiteKey} onChange={e => setCapSiteKey(e.target.value)} placeholder={t('pages:captcha.settings.siteKeyPlaceholderCap')} />
           </div>
           <div>
-            <label className="block text-sm text-slate-400 mb-1">{t('pages:captcha.settings.secret')} {settings.cap_secret_configured && <span className="text-green-400 text-xs">{t('pages:captcha.settings.secretConfigured')}</span>}</label>
+            <label className="block text-sm text-muted-foreground mb-1">{t('pages:captcha.settings.secret')} {settings.cap_secret_configured && <span className="text-green-400 text-xs">{t('pages:captcha.settings.secretConfigured')}</span>}</label>
             <input className="input w-full" type="password" value={capSecret} onChange={e => setCapSecret(e.target.value)} placeholder={t('pages:captcha.settings.secretPlaceholder')} />
           </div>
-          <div className="grid grid-cols-2 gap-3 text-sm pt-2 border-t border-slate-800">
-            <div className="text-slate-400">{t('pages:captcha.settings.serviceUrl')}</div>
-            <div className="font-mono text-slate-200 text-xs">{settings.cap_service_url}</div>
-            <div className="text-slate-400">{t('pages:captcha.settings.widgetCdn')}</div>
-            <div className="font-mono text-slate-200 text-xs break-all">{settings.cap_widget_cdn_url}</div>
-            <div className="text-slate-400">{t('pages:captcha.settings.challengeUrl')}</div>
-            <div className="font-mono text-slate-200 text-xs">{settings.challenge_url}</div>
-            <div className="text-slate-400">{t('pages:captcha.settings.proxyPath')}</div>
-            <div className="font-mono text-slate-200 text-xs">{settings.proxy_path}</div>
+          <div className="grid grid-cols-2 gap-3 text-sm pt-2 border-t border-border">
+            <div className="text-muted-foreground">{t('pages:captcha.settings.serviceUrl')}</div>
+            <div className="font-mono text-secondary-foreground text-xs">{settings.cap_service_url}</div>
+            <div className="text-muted-foreground">{t('pages:captcha.settings.widgetCdn')}</div>
+            <div className="font-mono text-secondary-foreground text-xs break-all">{settings.cap_widget_cdn_url}</div>
+            <div className="text-muted-foreground">{t('pages:captcha.settings.challengeUrl')}</div>
+            <div className="font-mono text-secondary-foreground text-xs">{settings.challenge_url}</div>
+            <div className="text-muted-foreground">{t('pages:captcha.settings.proxyPath')}</div>
+            <div className="font-mono text-secondary-foreground text-xs">{settings.proxy_path}</div>
           </div>
         </div>
       )}
 
       {provider === 'recaptcha' && (
-        <div className="card p-5 space-y-4">
+        <div className="rounded-lg border border-border bg-card shadow-sm p-5 space-y-4">
           <h2 className="text-lg font-semibold">{t('pages:captcha.settings.recaptchaConfig')}</h2>
           <div>
-            <label className="block text-sm text-slate-400 mb-1">{t('pages:captcha.settings.siteKey')}</label>
+            <label className="block text-sm text-muted-foreground mb-1">{t('pages:captcha.settings.siteKey')}</label>
             <input className="input w-full" value={recaptchaSiteKey} onChange={e => setRecaptchaSiteKey(e.target.value)} placeholder={t('pages:captcha.settings.siteKeyPlaceholderRecaptcha')} />
           </div>
           <div>
-            <label className="block text-sm text-slate-400 mb-1">{t('pages:captcha.settings.secret')} {settings.recaptcha_secret_configured && <span className="text-green-400 text-xs">{t('pages:captcha.settings.secretConfigured')}</span>}</label>
+            <label className="block text-sm text-muted-foreground mb-1">{t('pages:captcha.settings.secret')} {settings.recaptcha_secret_configured && <span className="text-green-400 text-xs">{t('pages:captcha.settings.secretConfigured')}</span>}</label>
             <input className="input w-full" type="password" value={recaptchaSecret} onChange={e => setRecaptchaSecret(e.target.value)} placeholder={t('pages:captcha.settings.secretPlaceholder')} />
           </div>
           <div>
-            <label className="block text-sm text-slate-400 mb-1">{t('pages:captcha.settings.version')}</label>
+            <label className="block text-sm text-muted-foreground mb-1">{t('pages:captcha.settings.version')}</label>
             <select className="input w-full" value={recaptchaVersion} onChange={e => setRecaptchaVersion(e.target.value)}>
               <option value="v2">{t('pages:captcha.settings.versionV2')}</option>
               <option value="v3">{t('pages:captcha.settings.versionV3')}</option>
@@ -285,7 +286,7 @@ function SettingsTab({ settings, onChange, onError, onSuccess }: {
           </div>
           {recaptchaVersion === 'v3' && (
             <div>
-              <label className="block text-sm text-slate-400 mb-1">{t('pages:captcha.settings.minimumScore')}</label>
+              <label className="block text-sm text-muted-foreground mb-1">{t('pages:captcha.settings.minimumScore')}</label>
               <input
                 type="number"
                 className="input w-full"
@@ -295,7 +296,7 @@ function SettingsTab({ settings, onChange, onError, onSuccess }: {
                 value={recaptchaMinScore}
                 onChange={e => setRecaptchaMinScore(Number(e.target.value))}
               />
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 {t('pages:captcha.settings.minimumScoreHelp')}
               </p>
             </div>
@@ -304,14 +305,14 @@ function SettingsTab({ settings, onChange, onError, onSuccess }: {
       )}
 
       {provider === 'turnstile' && (
-        <div className="card p-5 space-y-4">
+        <div className="rounded-lg border border-border bg-card shadow-sm p-5 space-y-4">
           <h2 className="text-lg font-semibold">{t('pages:captcha.settings.turnstileConfig')}</h2>
           <div>
-            <label className="block text-sm text-slate-400 mb-1">{t('pages:captcha.settings.siteKey')}</label>
+            <label className="block text-sm text-muted-foreground mb-1">{t('pages:captcha.settings.siteKey')}</label>
             <input className="input w-full" value={turnstileSiteKey} onChange={e => setTurnstileSiteKey(e.target.value)} placeholder={t('pages:captcha.settings.siteKeyPlaceholderTurnstile')} />
           </div>
           <div>
-            <label className="block text-sm text-slate-400 mb-1">{t('pages:captcha.settings.secret')} {settings.turnstile_secret_configured && <span className="text-green-400 text-xs">{t('pages:captcha.settings.secretConfigured')}</span>}</label>
+            <label className="block text-sm text-muted-foreground mb-1">{t('pages:captcha.settings.secret')} {settings.turnstile_secret_configured && <span className="text-green-400 text-xs">{t('pages:captcha.settings.secretConfigured')}</span>}</label>
             <input className="input w-full" type="password" value={turnstileSecret} onChange={e => setTurnstileSecret(e.target.value)} placeholder={t('pages:captcha.settings.secretPlaceholder')} />
           </div>
         </div>
@@ -375,7 +376,7 @@ function StatsTab() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold">{t('pages:captcha.stats.perRuleSolveRate')}</h2>
-          <p className="text-xs text-slate-500 mt-0.5">{t('pages:captcha.stats.last7Days')}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{t('pages:captcha.stats.last7Days')}</p>
         </div>
         <div className="flex gap-2">
           <button onClick={() => setShowEvents(!showEvents)} className="btn-secondary px-3 py-1.5 text-sm">
@@ -391,14 +392,14 @@ function StatsTab() {
       {!showEvents ? (
         <>
           {loading ? (
-            <div className="text-slate-500 text-sm">{t('pages:captcha.stats.loading')}</div>
+            <div className="text-muted-foreground text-sm">{t('pages:captcha.stats.loading')}</div>
           ) : stats.length === 0 ? (
-            <div className="text-slate-500 text-sm">{t('pages:captcha.stats.noEvents')}</div>
+            <div className="text-muted-foreground text-sm">{t('pages:captcha.stats.noEvents')}</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-start text-slate-400 border-b border-slate-800">
+                  <tr className="text-start text-muted-foreground border-b border-border">
                     <th className="py-2 px-3">{t('pages:captcha.stats.tableHeaders.ruleType')}</th>
                     <th className="py-2 px-3">{t('pages:captcha.stats.tableHeaders.ruleName')}</th>
                     <th className="py-2 px-3 text-end">{t('pages:captcha.stats.tableHeaders.issued')}</th>
@@ -411,7 +412,7 @@ function StatsTab() {
                 </thead>
                 <tbody>
                   {stats.map((s, i) => (
-                    <tr key={i} className="border-b border-slate-800/50 hover:bg-slate-800/30">
+                    <tr key={i} className="border-b border-border/50 hover:bg-muted/30">
                       <td className="py-2 px-3">
                         <span className={`px-2 py-0.5 rounded text-xs ${
                           s.rule_type === 'waf' ? 'bg-orange-500/20 text-orange-400' :
@@ -424,7 +425,7 @@ function StatsTab() {
                       <td className="py-2 px-3 text-end text-green-400">{s.solved}</td>
                       <td className="py-2 px-3 text-end text-red-400">{s.failed}</td>
                       <td className="py-2 px-3 text-end">{s.solve_rate}%</td>
-                      <td className="py-2 px-3 text-xs text-slate-400 whitespace-nowrap">{s.last_issued ? formatDateTime(s.last_issued) : '—'}</td>
+                      <td className="py-2 px-3 text-xs text-muted-foreground whitespace-nowrap">{s.last_issued ? formatDateTime(s.last_issued) : '—'}</td>
                       <td className="py-2 px-3">
                         {s.rule_id != null && (
                           <button
@@ -448,14 +449,14 @@ function StatsTab() {
       ) : (
         <>
           {loading ? (
-            <div className="text-slate-500 text-sm">{t('pages:captcha.stats.loading')}</div>
+            <div className="text-muted-foreground text-sm">{t('pages:captcha.stats.loading')}</div>
           ) : events.length === 0 ? (
-            <div className="text-slate-500 text-sm">{t('pages:captcha.stats.noEvents')}</div>
+            <div className="text-muted-foreground text-sm">{t('pages:captcha.stats.noEvents')}</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-start text-slate-400 border-b border-slate-800">
+                  <tr className="text-start text-muted-foreground border-b border-border">
                     <th className="py-2 px-3">{t('pages:captcha.stats.eventTableHeaders.time')}</th>
                     <th className="py-2 px-3">{t('pages:captcha.stats.eventTableHeaders.type')}</th>
                     <th className="py-2 px-3">{t('pages:captcha.stats.eventTableHeaders.rule')}</th>
@@ -465,8 +466,8 @@ function StatsTab() {
                 </thead>
                 <tbody>
                   {events.map((e) => (
-                    <tr key={e.id} className="border-b border-slate-800/50 hover:bg-slate-800/30">
-                      <td className="py-2 px-3 text-xs text-slate-400">{formatDateTime(e.created_at)}</td>
+                    <tr key={e.id} className="border-b border-border/50 hover:bg-muted/30">
+                      <td className="py-2 px-3 text-xs text-muted-foreground">{formatDateTime(e.created_at)}</td>
                       <td className="py-2 px-3">
                         <span className={`px-2 py-0.5 rounded text-xs ${
                           e.rule_type === 'waf' ? 'bg-orange-500/20 text-orange-400' :
@@ -482,7 +483,7 @@ function StatsTab() {
                           'text-blue-400'
                         }`}>{e.event_type}</span>
                       </td>
-                      <td className="py-2 px-3 font-mono text-xs text-slate-400">{e.request_id || '—'}</td>
+                      <td className="py-2 px-3 font-mono text-xs text-muted-foreground">{e.request_id || '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -526,20 +527,20 @@ function RuleChart({ ruleType, ruleId, ruleName, onClose }: {
   }))
 
   return (
-    <div className="card p-5 space-y-3">
+    <div className="rounded-lg border border-border bg-card shadow-sm p-5 space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="font-semibold">{t('pages:captcha.stats.chartTitle', { name: ruleName })}</h3>
-        <button onClick={onClose} className="text-slate-400 hover:text-slate-200 text-sm">{t('pages:captcha.stats.close')}</button>
+        <button onClick={onClose} className="text-muted-foreground hover:text-secondary-foreground text-sm">{t('pages:captcha.stats.close')}</button>
       </div>
       {loading ? (
-        <div className="text-slate-500 text-sm">{t('pages:captcha.stats.loading')}</div>
+        <div className="text-muted-foreground text-sm">{t('pages:captcha.stats.loading')}</div>
       ) : (
         <ResponsiveContainer width="100%" height={250}>
           <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-            <XAxis dataKey="time" stroke="#64748b" fontSize={11} interval={23} />
-            <YAxis stroke="#64748b" fontSize={11} allowDecimals={false} />
-            <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155' }} />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--color-border-subtle))" />
+            <XAxis dataKey="time" stroke="rgb(var(--color-text-tertiary))" fontSize={11} interval={23} />
+            <YAxis stroke="rgb(var(--color-text-tertiary))" fontSize={11} allowDecimals={false} />
+            <Tooltip contentStyle={chartTooltipContentStyle} labelStyle={chartTooltipLabelStyle} />
             <Legend />
             <Line type="monotone" dataKey="issued" stroke="#3b82f6" strokeWidth={2} dot={false} />
             <Line type="monotone" dataKey="solved" stroke="#22c55e" strokeWidth={2} dot={false} />
@@ -643,27 +644,27 @@ function KeysTab({ siteKey }: { siteKey?: string | null }) {
   }
 
   const SecretBanner = ({ data, onClose }: { data: { siteKey: string; secretKey: string }; onClose: () => void }) => (
-    <div className="card p-4 space-y-3 border-amber-500/40">
+    <div className="rounded-lg border bg-card shadow-sm p-4 space-y-3 border-amber-500/40">
       <div className="flex items-center justify-between">
         <h3 className="font-semibold text-amber-400">{t('pages:captcha.keys.secretCreatedTitle')}</h3>
-        <button onClick={onClose} className="text-slate-400 hover:text-slate-200 text-sm">{t('pages:captcha.stats.close')}</button>
+        <button onClick={onClose} className="text-muted-foreground hover:text-secondary-foreground text-sm">{t('pages:captcha.stats.close')}</button>
       </div>
       <p className="text-sm text-amber-300/80">{t('pages:captcha.keys.secretWarning')}</p>
       <div className="space-y-2">
         <div>
-          <span className="text-xs text-slate-400">{t('pages:captcha.keys.tableHeaders.key')}</span>
+          <span className="text-xs text-muted-foreground">{t('pages:captcha.keys.tableHeaders.key')}</span>
           <div className="flex items-center gap-2 mt-0.5">
-            <code className="text-slate-200 text-xs flex-1 break-all">{data.siteKey}</code>
-            <button onClick={() => copyToClipboard(data.siteKey)} className="text-slate-400 hover:text-slate-200">
+            <code className="text-secondary-foreground text-xs flex-1 break-all">{data.siteKey}</code>
+            <button onClick={() => copyToClipboard(data.siteKey)} className="text-muted-foreground hover:text-secondary-foreground">
               <Copy className="w-4 h-4" />
             </button>
           </div>
         </div>
         <div>
-          <span className="text-xs text-slate-400">{t('pages:captcha.keys.secretKey')}</span>
+          <span className="text-xs text-muted-foreground">{t('pages:captcha.keys.secretKey')}</span>
           <div className="flex items-center gap-2 mt-0.5">
             <code className="text-amber-200 text-xs flex-1 break-all">{data.secretKey}</code>
-            <button onClick={() => copyToClipboard(data.secretKey)} className="text-slate-400 hover:text-slate-200">
+            <button onClick={() => copyToClipboard(data.secretKey)} className="text-muted-foreground hover:text-secondary-foreground">
               <Copy className="w-4 h-4" />
             </button>
           </div>
@@ -689,17 +690,17 @@ function KeysTab({ siteKey }: { siteKey?: string | null }) {
       {createdSecret && <SecretBanner data={createdSecret} onClose={() => setCreatedSecret(null)} />}
       {rotatedSecret && <SecretBanner data={rotatedSecret} onClose={() => setRotatedSecret(null)} />}
       {loading ? (
-        <div className="text-slate-500 text-sm">{t('pages:captcha.keys.loading')}</div>
+        <div className="text-muted-foreground text-sm">{t('pages:captcha.keys.loading')}</div>
       ) : keys.length === 0 ? (
-        <div className="text-slate-500 text-sm">
+        <div className="text-muted-foreground text-sm">
           {t('pages:captcha.keys.noKeys')}
-          {siteKey && <div className="mt-2">{t('pages:captcha.keys.currentSiteKey')} <code className="text-slate-300">{siteKey}</code></div>}
+          {siteKey && <div className="mt-2">{t('pages:captcha.keys.currentSiteKey')} <code className="text-secondary-foreground">{siteKey}</code></div>}
         </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-start text-slate-400 border-b border-slate-800">
+              <tr className="text-start text-muted-foreground border-b border-border">
                 <th className="py-2 px-3">{t('pages:captcha.keys.tableHeaders.key')}</th>
                 <th className="py-2 px-3">{t('pages:captcha.keys.tableHeaders.name')}</th>
                 <th className="py-2 px-3 text-end">{t('pages:captcha.keys.tableHeaders.challenges')}</th>
@@ -710,7 +711,7 @@ function KeysTab({ siteKey }: { siteKey?: string | null }) {
             </thead>
             <tbody>
               {keys.map((k, i) => (
-                <tr key={i} className="border-b border-slate-800/50 hover:bg-slate-800/30">
+                <tr key={i} className="border-b border-border/50 hover:bg-muted/30">
                   <td className="py-2 px-3 font-mono text-xs">{k.siteKey}</td>
                   <td className="py-2 px-3">{k.name || '-'}</td>
                   <td className="py-2 px-3 text-end">{k.challenges ?? '-'}</td>
@@ -742,10 +743,10 @@ function KeysTab({ siteKey }: { siteKey?: string | null }) {
         </div>
       )}
       {showCreate && (
-        <div className="card p-5 space-y-3 max-w-md">
+        <div className="rounded-lg border border-border bg-card shadow-sm p-5 space-y-3 max-w-md">
           <h3 className="font-semibold">{t('pages:captcha.keys.createNewSiteKey')}</h3>
           <div>
-            <label className="block text-sm text-slate-400 mb-1">{t('pages:captcha.keys.nameOptional')}</label>
+            <label className="block text-sm text-muted-foreground mb-1">{t('pages:captcha.keys.nameOptional')}</label>
             <input className="input w-full" value={newKeyName} onChange={e => setNewKeyName(e.target.value)} placeholder={t('pages:captcha.keys.namePlaceholder')} />
           </div>
           <div className="flex gap-2">

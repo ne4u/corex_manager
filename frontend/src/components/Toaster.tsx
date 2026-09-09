@@ -6,7 +6,7 @@ import { X, CheckCircle, AlertCircle, Info, AlertTriangle, ChevronDown, ChevronU
 const SUCCESS_AUTO_DISMISS_MS = 15000
 
 const typeStyles: Record<Notification['type'], string> = {
-  info: 'bg-slate-800 border-slate-700 text-slate-100',
+  info: 'bg-muted border-subtle text-foreground',
   success: 'bg-green-900/40 border-green-700/50 text-green-100',
   error: 'bg-red-900/40 border-red-700/50 text-red-100',
   warning: 'bg-amber-900/40 border-amber-700/50 text-amber-100',

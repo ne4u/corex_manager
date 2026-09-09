@@ -24,7 +24,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
     const baseClasses = 'inline-flex items-center justify-center rounded transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed'
 
     const variantClasses = {
-      default: 'text-slate-400 hover:text-slate-200 hover:bg-slate-800 focus:ring-slate-700',
+      default: 'text-muted-foreground hover:text-secondary-foreground hover:bg-muted focus:ring-subtle',
       danger: 'text-red-400 hover:text-red-300 hover:bg-red-500/10 focus:ring-red-500',
       primary: 'text-primary hover:text-primary-hover hover:bg-primary/10 focus:ring-primary',
     }

@@ -131,9 +131,9 @@ export default function Users() {
       {loading ? (
         <p>{t('common:actions.loading')}</p>
       ) : (
-        <div className="card overflow-x-auto">
+        <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
           <table className="w-full text-sm text-start">
-            <thead className="text-slate-400 border-b border-slate-800">
+            <thead className="text-muted-foreground border-b border-border">
               <tr>
                 <th>{t('pages:users.tableHeaders.username')}</th>
                 <th>{t('pages:users.tableHeaders.role')}</th>
@@ -145,12 +145,12 @@ export default function Users() {
             </thead>
             <tbody>
               {items.map((u: User) => (
-                <tr key={u.id} className="border-b border-slate-800 last:border-0">
+                <tr key={u.id} className="border-b border-border last:border-0">
                   <td className="py-2">{u.username}</td>
                   <td className="capitalize">{u.role}</td>
-                  <td className="text-slate-400">{u.email || '-'}</td>
-                  <td className="text-slate-400">{u.organization || '-'}</td>
-                  <td className="text-slate-400">{u.last_login_at ? formatDateTime(u.last_login_at) : '-'}</td>
+                  <td className="text-muted-foreground">{u.email || '-'}</td>
+                  <td className="text-muted-foreground">{u.organization || '-'}</td>
+                  <td className="text-muted-foreground">{u.last_login_at ? formatDateTime(u.last_login_at) : '-'}</td>
                   <td className="space-x-1">
                     <IconButton icon={Pencil} aria-label="Edit" onClick={() => openEdit(u)} />
                     <IconButton icon={Trash2} variant="danger" aria-label="Delete" onClick={() => users.remove(u.id).then(reload)} />

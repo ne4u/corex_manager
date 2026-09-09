@@ -155,17 +155,17 @@ export default function Dashboard() {
       </div>
 
       {configTabs.length > 0 && (
-        <div className="card space-y-3">
+        <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold flex items-center gap-2"><FileText className="h-4 w-4 text-primary" /> {t('pages:dashboard.configPreview')}</h3>
-            <button onClick={() => setPreviewConfigs({})} className="text-slate-400 hover:text-slate-200" aria-label={t('pages:dashboard.closePreview')}><X className="w-4 h-4" /></button>
+            <button onClick={() => setPreviewConfigs({})} className="text-muted-foreground hover:text-secondary-foreground" aria-label={t('pages:dashboard.closePreview')}><X className="w-4 h-4" /></button>
           </div>
           <Tabs
             tabs={configTabs.map((key) => ({ id: key, label: key }))}
             active={activeConfigTab}
             onChange={setActiveConfigTab}
           />
-          <pre className="bg-slate-950 p-4 rounded-lg overflow-auto text-xs text-slate-300 max-h-96">{maskConfig(previewConfigs[activeConfigTab] || '')}</pre>
+          <pre className="bg-background p-4 rounded-lg overflow-auto text-xs text-secondary-foreground max-h-96">{maskConfig(previewConfigs[activeConfigTab] || '')}</pre>
         </div>
       )}
 
@@ -181,10 +181,10 @@ export default function Dashboard() {
         </div>
 
         {/* System Health */}
-        <div className="card lg:col-span-2">
+        <div className="rounded-lg border border-border bg-card p-6 shadow-sm lg:col-span-2">
           <h3 className="font-semibold mb-4">{t('pages:dashboard.systemHealth')}</h3>
           {!health ? (
-            <p className="text-slate-400 text-sm">N/A</p>
+            <p className="text-muted-foreground text-sm">N/A</p>
           ) : (
             <div className="space-y-3">
               <HealthRow
@@ -211,8 +211,8 @@ export default function Dashboard() {
                 okText={t('pages:dashboard.healthChecks.enabled')}
                 failText={t('pages:dashboard.healthChecks.disabled')}
               />
-              <div className="pt-2 border-t border-slate-800">
-                <p className="text-xs text-slate-400 mb-2">{t('pages:dashboard.healthChecks.geoipDatabases')}</p>
+              <div className="pt-2 border-t border-border">
+                <p className="text-xs text-muted-foreground mb-2">{t('pages:dashboard.healthChecks.geoipDatabases')}</p>
                 <div className="grid grid-cols-3 gap-2">
                   <HealthRow
                     label={t('pages:dashboard.healthChecks.countryDb')}
@@ -243,17 +243,17 @@ export default function Dashboard() {
       </div>
 
       {/* HAProxy servers by status */}
-      <div className="card p-4 space-y-2">
+      <div className="rounded-lg border border-border bg-card shadow-sm p-4 space-y-2">
         <div className="flex items-center gap-2">
-          <Server className="h-4 w-4 text-slate-400" />
-          <h3 className="text-sm font-semibold text-slate-200">{t('pages:dashboard.serverStatus')}</h3>
+          <Server className="h-4 w-4 text-muted-foreground" />
+          <h3 className="text-sm font-semibold text-secondary-foreground">{t('pages:dashboard.serverStatus')}</h3>
         </div>
         {serverRows.length === 0 ? (
-          <p className="text-slate-400 text-sm">{t('pages:dashboard.noServerData')}</p>
+          <p className="text-muted-foreground text-sm">{t('pages:dashboard.noServerData')}</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-start">
-              <thead className="text-slate-400 border-b border-slate-800">
+              <thead className="text-muted-foreground border-b border-border">
                 <tr>
                   <th>{t('pages:dashboard.serverTableHeaders.backend')}</th>
                   <th>{t('pages:dashboard.serverTableHeaders.server')}</th>
@@ -267,7 +267,7 @@ export default function Dashboard() {
               </thead>
               <tbody>
                 {serverRows.map((row, idx) => (
-                  <tr key={idx} className="border-b border-slate-800 last:border-0">
+                  <tr key={idx} className="border-b border-border last:border-0">
                     <td>{row.backend}</td>
                     <td>{row.server}</td>
                     <td>
@@ -309,10 +309,10 @@ function maskConfig(config: string): string {
 
 function StatCard({ icon: Icon, label, value }: { icon: any, label: string, value: any }) {
   return (
-    <div className="card flex items-center gap-4">
+    <div className="rounded-lg border border-border bg-card p-6 shadow-sm flex items-center gap-4">
       <div className="p-3 rounded-lg bg-primary/10 text-primary"><Icon className="w-6 h-6" /></div>
       <div>
-        <p className="text-xs text-slate-400">{label}</p>
+        <p className="text-xs text-muted-foreground">{label}</p>
         <p className="text-xl font-bold">{value}</p>
       </div>
     </div>
@@ -331,7 +331,7 @@ function HealthRow({
   const isOk = !!ok
   return (
     <div className={`flex items-center justify-between ${compact ? '' : 'py-1'}`}>
-      <span className="text-sm text-slate-300">{label}</span>
+      <span className="text-sm text-secondary-foreground">{label}</span>
       <span className={`flex items-center gap-1.5 text-xs font-medium ${isOk ? 'text-emerald-400' : 'text-red-400'}`}>
         {isOk ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
         {isOk ? okText : failText}

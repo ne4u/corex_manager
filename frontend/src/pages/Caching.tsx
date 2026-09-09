@@ -17,6 +17,7 @@ import {
 import { Database, Trash2, Settings, HardDrive, X, AlertTriangle, GripVertical, Plus, Pencil } from 'lucide-react'
 import { cache, backends, getErrorDetail } from '../services/api'
 import { useDateTime } from '../contexts/DateTimeContext'
+import { chartTooltipContentStyle, chartTooltipLabelStyle } from '../lib/utils'
 
 interface CacheConfig {
   id: number
@@ -210,11 +211,11 @@ export default function Caching() {
       </h1>
 
       {message && (
-        <div className="card p-3 text-sm text-amber-400">{message}</div>
+        <div className="rounded-lg border border-border bg-card shadow-sm p-3 text-sm text-amber-400">{message}</div>
       )}
 
       {/* Cache Configuration Table */}
-      <div className="card space-y-4">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">{t('pages:caching.cacheConfiguration')}</h2>
           <div className="flex gap-2">
@@ -236,14 +237,14 @@ export default function Caching() {
         </div>
 
         {loading ? (
-          <p className="text-sm text-slate-400">{t('pages:caching.loading')}</p>
+          <p className="text-sm text-muted-foreground">{t('pages:caching.loading')}</p>
         ) : configs.length === 0 ? (
-          <p className="text-sm text-slate-400">{t('pages:caching.noCacheConfigs')}</p>
+          <p className="text-sm text-muted-foreground">{t('pages:caching.noCacheConfigs')}</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-start text-slate-400 border-b border-slate-700">
+                <tr className="text-start text-muted-foreground border-b border-subtle">
                   <th className="py-2 pe-4">{t('pages:caching.tableHeaders.backend')}</th>
                   <th className="py-2 pe-4">{t('pages:caching.tableHeaders.memoryCache')}</th>
                   <th className="py-2 pe-4">{t('pages:caching.tableHeaders.diskCache')}</th>
@@ -254,20 +255,20 @@ export default function Caching() {
               </thead>
               <tbody>
                 {configs.map((cc) => (
-                  <tr key={cc.id} className="border-b border-slate-800">
+                  <tr key={cc.id} className="border-b border-border">
                     <td className="py-2 pe-4 font-medium">{cc.backend_name}</td>
                     <td className="py-2 pe-4">
                       {cc.haproxy_enabled ? (
                         <span className="badge badge-blue">{t('pages:caching.enabled')}</span>
                       ) : (
-                        <span className="text-slate-500">-</span>
+                        <span className="text-muted-foreground">-</span>
                       )}
                     </td>
                     <td className="py-2 pe-4">
                       {cc.disk_cache_enabled ? (
                         <span className="badge badge-green">{t('pages:caching.enabled')}</span>
                       ) : (
-                        <span className="text-slate-500">-</span>
+                        <span className="text-muted-foreground">-</span>
                       )}
                     </td>
                     <td className="py-2 pe-4">
@@ -279,12 +280,12 @@ export default function Caching() {
                           <AlertTriangle size={13} /> {t('pages:caching.noRules')}
                         </span>
                       ) : (
-                        <span className="text-xs text-slate-400">
+                        <span className="text-xs text-muted-foreground">
                           {t('pages:caching.ruleCount', { count: cc.rule_count })}
                         </span>
                       )}
                     </td>
-                    <td className="py-2 pe-4 text-xs text-slate-400">
+                    <td className="py-2 pe-4 text-xs text-muted-foreground">
                       {cc.haproxy_enabled && <span>{t('pages:caching.memoryDetails', { size: cc.haproxy_total_max_size, age: cc.haproxy_max_age })}</span>}
                       {cc.haproxy_enabled && cc.disk_cache_enabled && <br />}
                       {cc.disk_cache_enabled && <span>{t('pages:caching.diskDetails', { ttl: cc.disk_cache_ttl, grace: cc.disk_cache_grace })}</span>}
@@ -326,7 +327,7 @@ export default function Caching() {
       </div>
 
       {/* Cache Metrics Charts */}
-      <div className="card space-y-4">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">{t('pages:caching.cacheMetrics')}</h2>
           <div className="flex gap-1">
@@ -343,27 +344,27 @@ export default function Caching() {
         </div>
 
         {metricsLoading ? (
-          <p className="text-sm text-slate-400">{t('pages:caching.loadingMetrics')}</p>
+          <p className="text-sm text-muted-foreground">{t('pages:caching.loadingMetrics')}</p>
         ) : !metricsData || metricsData.snapshots.length === 0 ? (
-          <p className="text-sm text-slate-400">{t('pages:caching.noCacheMetrics')}</p>
+          <p className="text-sm text-muted-foreground">{t('pages:caching.noCacheMetrics')}</p>
         ) : (
           <div className="space-y-6">
             {/* Summary cards — counts are deltas within the selected range, not cumulative since startup */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="card p-3">
-                <p className="text-xs text-slate-400">{t('pages:caching.memoryHitRate')}</p>
+              <div className="rounded-lg border border-border bg-card shadow-sm p-3">
+                <p className="text-xs text-muted-foreground">{t('pages:caching.memoryHitRate')}</p>
                 <p className="text-xl font-bold text-blue-400">{metricsData.summary.haproxy_hit_rate.toFixed(1)}%</p>
               </div>
-              <div className="card p-3">
-                <p className="text-xs text-slate-400">{t('pages:caching.diskHitRate')}</p>
+              <div className="rounded-lg border border-border bg-card shadow-sm p-3">
+                <p className="text-xs text-muted-foreground">{t('pages:caching.diskHitRate')}</p>
                 <p className="text-xl font-bold text-green-400">{metricsData.summary.disk_hit_rate.toFixed(1)}%</p>
               </div>
-              <div className="card p-3">
-                <p className="text-xs text-slate-400">{t('pages:caching.memoryHits')}</p>
+              <div className="rounded-lg border border-border bg-card shadow-sm p-3">
+                <p className="text-xs text-muted-foreground">{t('pages:caching.memoryHits')}</p>
                 <p className="text-xl font-bold">{metricsData.summary.total_haproxy_hits.toLocaleString()}</p>
               </div>
-              <div className="card p-3">
-                <p className="text-xs text-slate-400">{t('pages:caching.diskHits')}</p>
+              <div className="rounded-lg border border-border bg-card shadow-sm p-3">
+                <p className="text-xs text-muted-foreground">{t('pages:caching.diskHits')}</p>
                 <p className="text-xl font-bold">{metricsData.summary.total_disk_hits.toLocaleString()}</p>
               </div>
             </div>
@@ -373,10 +374,10 @@ export default function Caching() {
               <h3 className="text-sm font-semibold mb-2">{t('pages:caching.cacheHitRateOverTime')}</h3>
               <ResponsiveContainer width="100%" height={250}>
                 <LineChart data={metricsData.snapshots}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                  <XAxis dataKey="timestamp" tickFormatter={formatTimeCompact} stroke="#64748b" fontSize={11} />
-                  <YAxis stroke="#64748b" fontSize={11} domain={[0, 100]} unit="%" />
-                  <Tooltip labelFormatter={formatTimeCompact} formatter={(v: number) => `${v.toFixed(1)}%`} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--color-border-subtle))" />
+                  <XAxis dataKey="timestamp" tickFormatter={formatTimeCompact} stroke="rgb(var(--color-text-tertiary))" fontSize={11} />
+                  <YAxis stroke="rgb(var(--color-text-tertiary))" fontSize={11} domain={[0, 100]} unit="%" />
+                  <Tooltip labelFormatter={formatTimeCompact} formatter={(v: number) => `${v.toFixed(1)}%`} contentStyle={chartTooltipContentStyle} labelStyle={chartTooltipLabelStyle} />
                   <Legend />
                   <Line type="monotone" dataKey="haproxy_hit_rate" name="Memory Hit Rate" stroke="#3b82f6" dot={false} strokeWidth={2} />
                   <Line type="monotone" dataKey="disk_hit_rate" name="Disk Hit Rate" stroke="#22c55e" dot={false} strokeWidth={2} />
@@ -389,10 +390,10 @@ export default function Caching() {
               <h3 className="text-sm font-semibold mb-2">{t('pages:caching.cacheHitsOverTime')}</h3>
               <ResponsiveContainer width="100%" height={250}>
                 <AreaChart data={metricsData.snapshots}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                  <XAxis dataKey="timestamp" tickFormatter={formatTimeCompact} stroke="#64748b" fontSize={11} />
-                  <YAxis stroke="#64748b" fontSize={11} />
-                  <Tooltip labelFormatter={formatTimeCompact} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--color-border-subtle))" />
+                  <XAxis dataKey="timestamp" tickFormatter={formatTimeCompact} stroke="rgb(var(--color-text-tertiary))" fontSize={11} />
+                  <YAxis stroke="rgb(var(--color-text-tertiary))" fontSize={11} />
+                  <Tooltip labelFormatter={formatTimeCompact} contentStyle={chartTooltipContentStyle} labelStyle={chartTooltipLabelStyle} />
                   <Legend />
                   <Area type="monotone" dataKey="haproxy_cache_hit" name="Memory Hits" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.3} />
                   <Area type="monotone" dataKey="disk_cache_hit" name="Disk Hits" stroke="#22c55e" fill="#22c55e" fillOpacity={0.3} />
@@ -405,10 +406,10 @@ export default function Caching() {
               <h3 className="text-sm font-semibold mb-2">{t('pages:caching.cacheMissesOverTime')}</h3>
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={metricsData.snapshots}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                  <XAxis dataKey="timestamp" tickFormatter={formatTimeCompact} stroke="#64748b" fontSize={11} />
-                  <YAxis stroke="#64748b" fontSize={11} />
-                  <Tooltip labelFormatter={formatTimeCompact} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--color-border-subtle))" />
+                  <XAxis dataKey="timestamp" tickFormatter={formatTimeCompact} stroke="rgb(var(--color-text-tertiary))" fontSize={11} />
+                  <YAxis stroke="rgb(var(--color-text-tertiary))" fontSize={11} />
+                  <Tooltip labelFormatter={formatTimeCompact} contentStyle={chartTooltipContentStyle} labelStyle={chartTooltipLabelStyle} />
                   <Legend />
                   <Line type="monotone" dataKey="haproxy_cache_miss" name="Memory Misses" stroke="#ef4444" dot={false} />
                   <Line type="monotone" dataKey="disk_cache_miss" name="Disk Misses" stroke="#f97316" dot={false} />
@@ -422,10 +423,10 @@ export default function Caching() {
                 <h3 className="text-sm font-semibold mb-2">{t('pages:caching.diskCacheObjects')}</h3>
                 <ResponsiveContainer width="100%" height={150}>
                   <LineChart data={metricsData.snapshots}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                    <XAxis dataKey="timestamp" tickFormatter={formatTimeCompact} stroke="#64748b" fontSize={11} />
-                    <YAxis stroke="#64748b" fontSize={11} />
-                    <Tooltip labelFormatter={formatTimeCompact} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--color-border-subtle))" />
+                    <XAxis dataKey="timestamp" tickFormatter={formatTimeCompact} stroke="rgb(var(--color-text-tertiary))" fontSize={11} />
+                    <YAxis stroke="rgb(var(--color-text-tertiary))" fontSize={11} />
+                    <Tooltip labelFormatter={formatTimeCompact} contentStyle={chartTooltipContentStyle} labelStyle={chartTooltipLabelStyle} />
                     <Line type="monotone" dataKey="disk_cache_objects" name="Objects" stroke="#22c55e" dot={false} />
                   </LineChart>
                 </ResponsiveContainer>
@@ -437,21 +438,21 @@ export default function Caching() {
 
       {/* Disk Cache Status Panel (only if globally enabled) */}
       {status.disk_cache_globally_enabled && (
-        <div className="card space-y-4">
+        <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4">
           <h2 className="text-lg font-semibold flex items-center gap-2">
             <HardDrive className="h-5 w-5 text-primary" /> {t('pages:caching.diskCacheStatus')}
           </h2>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <div className="card p-3">
-              <p className="text-xs text-slate-400">{t('common:table.status')}</p>
+            <div className="rounded-lg border border-border bg-card shadow-sm p-3">
+              <p className="text-xs text-muted-foreground">{t('common:table.status')}</p>
               <p className="text-sm font-semibold text-green-400">{t('pages:caching.diskCacheStatusAvailable')}</p>
             </div>
-            <div className="card p-3">
-              <p className="text-xs text-slate-400">{t('pages:caching.backendsUsingDiskCache')}</p>
+            <div className="rounded-lg border border-border bg-card shadow-sm p-3">
+              <p className="text-xs text-muted-foreground">{t('pages:caching.backendsUsingDiskCache')}</p>
               <p className="text-sm font-semibold">{configs.filter(c => c.disk_cache_enabled).length}</p>
             </div>
-            <div className="card p-3">
-              <p className="text-xs text-slate-400">{t('pages:caching.storage')}</p>
+            <div className="rounded-lg border border-border bg-card shadow-sm p-3">
+              <p className="text-xs text-muted-foreground">{t('pages:caching.storage')}</p>
               <p className="text-sm font-semibold">{t('pages:caching.storageFileBacked')}</p>
             </div>
           </div>
@@ -546,12 +547,12 @@ function CacheConfigModal({ config, backends, diskCacheGloballyEnabled, onClose,
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="card max-w-2xl w-full max-h-[90vh] overflow-y-auto space-y-4">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm max-w-2xl w-full max-h-[90vh] overflow-y-auto space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">
             {isEdit ? t('pages:caching.modal.editTitle', { name: config!.backend_name }) : t('pages:caching.modal.addTitle')}
           </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-white">
+          <button onClick={onClose} className="text-muted-foreground hover:text-white">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -561,7 +562,7 @@ function CacheConfigModal({ config, backends, diskCacheGloballyEnabled, onClose,
         {/* Backend selector (only for create) */}
         {!isEdit && (
           <div>
-            <LabelWithTooltip tooltip={t('pages:caching.tooltips.backend')} textClassName="text-sm text-slate-400">{t('pages:caching.modal.backend')}</LabelWithTooltip>
+            <LabelWithTooltip tooltip={t('pages:caching.tooltips.backend')} textClassName="text-sm text-muted-foreground">{t('pages:caching.modal.backend')}</LabelWithTooltip>
             <select
               className="input w-full"
               value={selectedBackendId}
@@ -575,7 +576,7 @@ function CacheConfigModal({ config, backends, diskCacheGloballyEnabled, onClose,
         )}
 
         {/* Memory Cache Section */}
-        <div className="border border-slate-700 rounded p-4 space-y-3">
+        <div className="border border-subtle rounded p-4 space-y-3">
           <label className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -583,14 +584,14 @@ function CacheConfigModal({ config, backends, diskCacheGloballyEnabled, onClose,
               onChange={(e) => setHaproxyEnabled(e.target.checked)}
             />
             <span className="text-sm font-semibold">{t('pages:caching.modal.memory.title')}</span>
-            <span className="text-xs text-slate-500">{t('pages:caching.modal.memory.subtitle')}</span>
+            <span className="text-xs text-muted-foreground">{t('pages:caching.modal.memory.subtitle')}</span>
             <InfoTooltip content={t('pages:caching.tooltips.memoryCache')} />
           </label>
 
           {haproxyEnabled && (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <LabelWithTooltip tooltip={t('pages:caching.tooltips.totalMaxSize')} textClassName="text-xs text-slate-400">{t('pages:caching.modal.memory.totalMaxSize')}</LabelWithTooltip>
+                <LabelWithTooltip tooltip={t('pages:caching.tooltips.totalMaxSize')} textClassName="text-xs text-muted-foreground">{t('pages:caching.modal.memory.totalMaxSize')}</LabelWithTooltip>
                 <input
                   type="number"
                   className="input w-full"
@@ -601,7 +602,7 @@ function CacheConfigModal({ config, backends, diskCacheGloballyEnabled, onClose,
                 />
               </div>
               <div>
-                <LabelWithTooltip tooltip={t('pages:caching.tooltips.maxObjectSize')} textClassName="text-xs text-slate-400">{t('pages:caching.modal.memory.maxObjectSize')}</LabelWithTooltip>
+                <LabelWithTooltip tooltip={t('pages:caching.tooltips.maxObjectSize')} textClassName="text-xs text-muted-foreground">{t('pages:caching.modal.memory.maxObjectSize')}</LabelWithTooltip>
                 <input
                   type="number"
                   className="input w-full"
@@ -611,7 +612,7 @@ function CacheConfigModal({ config, backends, diskCacheGloballyEnabled, onClose,
                 />
               </div>
               <div>
-                <LabelWithTooltip tooltip={t('pages:caching.tooltips.maxAge')} textClassName="text-xs text-slate-400">{t('pages:caching.modal.memory.maxAge')}</LabelWithTooltip>
+                <LabelWithTooltip tooltip={t('pages:caching.tooltips.maxAge')} textClassName="text-xs text-muted-foreground">{t('pages:caching.modal.memory.maxAge')}</LabelWithTooltip>
                 <input
                   type="number"
                   className="input w-full"
@@ -621,7 +622,7 @@ function CacheConfigModal({ config, backends, diskCacheGloballyEnabled, onClose,
                 />
               </div>
               <div>
-                <LabelWithTooltip tooltip={t('pages:caching.tooltips.maxSecondaryEntries')} textClassName="text-xs text-slate-400">{t('pages:caching.modal.memory.maxSecondaryEntries')}</LabelWithTooltip>
+                <LabelWithTooltip tooltip={t('pages:caching.tooltips.maxSecondaryEntries')} textClassName="text-xs text-muted-foreground">{t('pages:caching.modal.memory.maxSecondaryEntries')}</LabelWithTooltip>
                 <input
                   type="number"
                   className="input w-full"
@@ -657,7 +658,7 @@ function CacheConfigModal({ config, backends, diskCacheGloballyEnabled, onClose,
         </div>
 
         {/* Disk Cache Section */}
-        <div className="border border-slate-700 rounded p-4 space-y-3">
+        <div className="border border-subtle rounded p-4 space-y-3">
           <label className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -666,7 +667,7 @@ function CacheConfigModal({ config, backends, diskCacheGloballyEnabled, onClose,
               disabled={!diskCacheGloballyEnabled}
             />
             <span className="text-sm font-semibold">{t('pages:caching.modal.disk.title')}</span>
-            <span className="text-xs text-slate-500">{t('pages:caching.modal.disk.subtitle')}</span>
+            <span className="text-xs text-muted-foreground">{t('pages:caching.modal.disk.subtitle')}</span>
             <InfoTooltip content={t('pages:caching.tooltips.diskCache')} />
           </label>
 
@@ -679,7 +680,7 @@ function CacheConfigModal({ config, backends, diskCacheGloballyEnabled, onClose,
           {diskCacheEnabled && diskCacheGloballyEnabled && (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <LabelWithTooltip tooltip={t('pages:caching.tooltips.ttl')} textClassName="text-xs text-slate-400">{t('pages:caching.modal.disk.ttl')}</LabelWithTooltip>
+                <LabelWithTooltip tooltip={t('pages:caching.tooltips.ttl')} textClassName="text-xs text-muted-foreground">{t('pages:caching.modal.disk.ttl')}</LabelWithTooltip>
                 <input
                   type="number"
                   className="input w-full"
@@ -689,7 +690,7 @@ function CacheConfigModal({ config, backends, diskCacheGloballyEnabled, onClose,
                 />
               </div>
               <div>
-                <LabelWithTooltip tooltip={t('pages:caching.tooltips.grace')} textClassName="text-xs text-slate-400">{t('pages:caching.modal.disk.grace')}</LabelWithTooltip>
+                <LabelWithTooltip tooltip={t('pages:caching.tooltips.grace')} textClassName="text-xs text-muted-foreground">{t('pages:caching.modal.disk.grace')}</LabelWithTooltip>
                 <input
                   type="number"
                   className="input w-full"
@@ -714,11 +715,11 @@ function CacheConfigModal({ config, backends, diskCacheGloballyEnabled, onClose,
         </div>
 
         {/* Advanced Options Section */}
-        <div className="border border-slate-700 rounded p-4 space-y-3">
+        <div className="border border-subtle rounded p-4 space-y-3">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-sm font-semibold">{t('pages:caching.modal.advanced.title')}</h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-muted-foreground">
                 {t('pages:caching.modal.advanced.description')}
               </p>
             </div>
@@ -734,7 +735,7 @@ function CacheConfigModal({ config, backends, diskCacheGloballyEnabled, onClose,
           {advancedOpen && (
             <div className="space-y-2">
               <div>
-                <LabelWithTooltip tooltip={t('pages:caching.tooltips.memoryCacheCondition')} textClassName="text-xs text-slate-400">{t('pages:caching.modal.advanced.memoryCacheCondition')}</LabelWithTooltip>
+                <LabelWithTooltip tooltip={t('pages:caching.tooltips.memoryCacheCondition')} textClassName="text-xs text-muted-foreground">{t('pages:caching.modal.advanced.memoryCacheCondition')}</LabelWithTooltip>
                 <input
                   type="text"
                   className="input w-full"
@@ -743,7 +744,7 @@ function CacheConfigModal({ config, backends, diskCacheGloballyEnabled, onClose,
                   onChange={(e) => setHaproxyCacheCondition(e.target.value)}
                 />
               </div>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-muted-foreground">
                 {t('pages:caching.modal.advanced.memoryCacheConditionHelp')}
               </p>
             </div>
@@ -860,15 +861,15 @@ function CacheRulesModal({ config, onClose }: CacheRulesModalProps) {
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="card max-w-3xl w-full max-h-[90vh] overflow-y-auto space-y-4">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm max-w-3xl w-full max-h-[90vh] overflow-y-auto space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">{t('pages:caching.rules.title', { name: config.backend_name })}</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-white">
+          <button onClick={onClose} className="text-muted-foreground hover:text-white">
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-muted-foreground">
           {t('pages:caching.rules.description')}
         </p>
 
@@ -884,14 +885,14 @@ function CacheRulesModal({ config, onClose }: CacheRulesModalProps) {
         {error && <div className="text-sm text-red-400">{error}</div>}
 
         {loading ? (
-          <p className="text-sm text-slate-400">{t('pages:caching.rules.loading')}</p>
+          <p className="text-sm text-muted-foreground">{t('pages:caching.rules.loading')}</p>
         ) : rules.length === 0 ? (
-          <p className="text-sm text-slate-400">{t('pages:caching.rules.noRules')}</p>
+          <p className="text-sm text-muted-foreground">{t('pages:caching.rules.noRules')}</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-start text-slate-400 border-b border-slate-700">
+                <tr className="text-start text-muted-foreground border-b border-subtle">
                   <th className="py-2 pe-2 w-16">{t('pages:caching.rules.tableHeaders.order')}</th>
                   <th className="py-2 pe-4">{t('pages:caching.rules.tableHeaders.match')}</th>
                   <th className="py-2 pe-4">{t('pages:caching.rules.tableHeaders.phase')}</th>
@@ -906,7 +907,7 @@ function CacheRulesModal({ config, onClose }: CacheRulesModalProps) {
                 {rules.map((rule, i) => (
                   <tr
                     key={rule.id}
-                    className={`border-b border-slate-800 ${rule.enabled ? '' : 'opacity-50'} ${editingRuleId === rule.id ? 'bg-primary/10' : ''} ${dragOverId === rule.id ? 'bg-slate-800' : ''}`}
+                    className={`border-b border-border ${rule.enabled ? '' : 'opacity-50'} ${editingRuleId === rule.id ? 'bg-primary/10' : ''} ${dragOverId === rule.id ? 'bg-muted' : ''}`}
                     draggable
                     onDragStart={(e) => { e.dataTransfer.setData('text/plain', String(rule.id)); e.dataTransfer.effectAllowed = 'move' }}
                     onDragOver={(e) => { e.preventDefault(); setDragOverId(rule.id) }}
@@ -916,12 +917,12 @@ function CacheRulesModal({ config, onClose }: CacheRulesModalProps) {
                     <td className="py-2 pe-2">
                       <div className="flex items-center gap-1">
                         <span className="cursor-grab" title={t('pages:caching.rules.dragToReorder')}>
-                          <GripVertical size={14} className="text-slate-500" />
+                          <GripVertical size={14} className="text-muted-foreground" />
                         </span>
-                        <span className="text-slate-500 text-xs">{i + 1}</span>
+                        <span className="text-muted-foreground text-xs">{i + 1}</span>
                       </div>
                     </td>
-                    <td className="py-2 pe-4 text-slate-300">{t(`pages:caching.matchTypes.${rule.match_type}`)}</td>
+                    <td className="py-2 pe-4 text-secondary-foreground">{t(`pages:caching.matchTypes.${rule.match_type}`)}</td>
                     <td className="py-2 pe-4">
                       <span className={`badge ${MATCH_TYPE_PHASES[rule.match_type] === 'request' ? 'badge-neutral' : 'badge-amber'}`}
                             title={MATCH_TYPE_PHASES[rule.match_type] === 'request' ? t('pages:caching.rules.phaseRequest') : t('pages:caching.rules.phaseResponse')}>
@@ -972,13 +973,13 @@ function CacheRulesModal({ config, onClose }: CacheRulesModalProps) {
                 ))}
               </tbody>
             </table>
-            <p className="text-xs text-slate-500 mt-2">
+            <p className="text-xs text-muted-foreground mt-2">
               {t('pages:caching.rules.enabledCount', { enabled: enabledCount, total: rules.length })}
             </p>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="border-t border-slate-700 pt-4 space-y-2">
+        <form onSubmit={handleSubmit} className="border-t border-subtle pt-4 space-y-2">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold">{editingRuleId !== null ? t('pages:caching.rules.editTitle') : t('pages:caching.rules.addTitle')}</h3>
             {editingRuleId !== null && (
@@ -1043,10 +1044,10 @@ function CacheRulesModal({ config, onClose }: CacheRulesModalProps) {
               }
             </button>
           </div>
-          <p className="text-xs text-slate-500">{MATCH_TYPE_HINTS[matchType]}</p>
+          <p className="text-xs text-muted-foreground">{MATCH_TYPE_HINTS[matchType]}</p>
         </form>
 
-        <div className="flex justify-end border-t border-slate-700 pt-4">
+        <div className="flex justify-end border-t border-subtle pt-4">
           <button className="btn-secondary" onClick={onClose}>{t('pages:caching.rules.done')}</button>
         </div>
       </div>

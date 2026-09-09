@@ -104,7 +104,7 @@ export default function ForcePasswordChange({ open, policy, onSuccess }: Props) 
             <button
               type="button"
               onClick={() => setShowCurrent((s) => !s)}
-              className="absolute inset-y-0 end-0 px-3 text-slate-400 hover:text-slate-200"
+              className="absolute inset-y-0 end-0 px-3 text-muted-foreground hover:text-secondary-foreground"
               aria-label="toggle"
             >
               {showCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -124,7 +124,7 @@ export default function ForcePasswordChange({ open, policy, onSuccess }: Props) 
             <button
               type="button"
               onClick={() => setShowNew((s) => !s)}
-              className="absolute inset-y-0 end-0 px-3 text-slate-400 hover:text-slate-200"
+              className="absolute inset-y-0 end-0 px-3 text-muted-foreground hover:text-secondary-foreground"
               aria-label="toggle"
             >
               {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -142,17 +142,17 @@ export default function ForcePasswordChange({ open, policy, onSuccess }: Props) 
           />
         </div>
         {policy && (
-          <div className="border-t border-slate-800 pt-3">
-            <p className="text-xs text-slate-500 mb-2">{t('forceChange.requirements')}</p>
+          <div className="border-t border-border pt-3">
+            <p className="text-xs text-muted-foreground mb-2">{t('forceChange.requirements')}</p>
             <ul className="space-y-1">
               {reqs.map((r, i) => (
                 <li key={i} className="flex items-center gap-2 text-xs">
                   {r.met ? (
                     <Check className="h-3.5 w-3.5 text-green-400" />
                   ) : (
-                    <X className="h-3.5 w-3.5 text-slate-500" />
+                    <X className="h-3.5 w-3.5 text-muted-foreground" />
                   )}
-                  <span className={r.met ? 'text-slate-300' : 'text-slate-500'}>{r.key}</span>
+                  <span className={r.met ? 'text-secondary-foreground' : 'text-muted-foreground'}>{r.key}</span>
                 </li>
               ))}
             </ul>

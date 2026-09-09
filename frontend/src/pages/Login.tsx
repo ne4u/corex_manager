@@ -23,12 +23,12 @@ export default function Login({ onLogin }: { onLogin: (t: string, passwordExpire
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4">
-      <form onSubmit={submit} className="card w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <form onSubmit={submit} className="rounded-lg border border-border bg-card p-6 shadow-sm w-full max-w-md">
         <div className="flex justify-center mb-4">
           <Logo className="h-[225px] w-auto" />
         </div>
-        <p className="text-slate-400 text-sm mb-6 text-center">{t('login.subtitle')}</p>
+        <p className="text-muted-foreground text-sm mb-6 text-center">{t('login.subtitle')}</p>
         {error && <div className="mb-4 p-3 rounded bg-red-500/10 text-red-400 text-sm">{error}</div>}
         <div className="mb-4">
           <label className="label">{t('login.username')}</label>
@@ -46,7 +46,7 @@ export default function Login({ onLogin }: { onLogin: (t: string, passwordExpire
             <button
               type="button"
               onClick={() => setShowPassword((s) => !s)}
-              className="absolute inset-y-0 end-0 rtl:right-auto rtl:start-0 px-3 text-slate-400 hover:text-slate-200 focus:outline-none"
+              className="absolute inset-y-0 end-0 rtl:right-auto rtl:start-0 px-3 text-muted-foreground hover:text-secondary-foreground focus:outline-none"
               aria-label={showPassword ? t('login.hidePassword') : t('login.showPassword')}
             >
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -54,7 +54,7 @@ export default function Login({ onLogin }: { onLogin: (t: string, passwordExpire
           </div>
         </div>
         <div className="mb-6">
-          <label className="label">{t('login.totpCode')} <span className="text-slate-500">{t('login.totpHint')}</span></label>
+          <label className="label">{t('login.totpCode')} <span className="text-muted-foreground">{t('login.totpHint')}</span></label>
           <input
             className="input"
             value={totpCode}

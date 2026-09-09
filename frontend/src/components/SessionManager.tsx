@@ -148,7 +148,7 @@ export default function SessionManager({ onLogout }: { onLogout: () => void }) {
   return (
     <Modal open={warningOpen} onClose={() => {}} title={t('session.timeoutTitle')} showClose={false}>
       <div className="space-y-4">
-        <p className="text-slate-300">
+        <p className="text-secondary-foreground">
           {t('session.expiringMessage')}
         </p>
         {remaining !== null && (
@@ -156,7 +156,7 @@ export default function SessionManager({ onLogout }: { onLogout: () => void }) {
             {formatDuration(Math.ceil(remaining))}
           </div>
         )}
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-muted-foreground">
           {t('session.extendHint')}
         </p>
         <button

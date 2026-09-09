@@ -133,7 +133,7 @@ export default function Logs() {
   }, [tab, logLimit])
 
   const actionColor = (action: string | undefined): string => {
-    if (!action) return 'text-slate-400'
+    if (!action) return 'text-muted-foreground'
     if (action === 'block' || action === 'blocked') return 'text-red-400'
     if (action === 'allow') return 'text-green-400'
     if (action.startsWith('skip')) return 'text-blue-400'
@@ -264,9 +264,9 @@ export default function Logs() {
       {tab === 'config' && (
         <>
           <div className="flex items-center justify-between"><h2 className="text-2xl font-bold flex items-center gap-2"><FileCode className="h-5 w-5 text-primary" /> {t('pages:logs.logDestinations')}</h2><button onClick={openAdd} className="btn-primary">{t('pages:logs.addDestination')}</button></div>
-          <div className="card overflow-x-auto">
-            <table className="w-full text-sm text-start"><thead className="text-slate-400 border-b border-slate-800"><tr><th>{t('pages:logs.modal.name')}</th><th>{t('pages:logs.modal.listener')}</th><th>{t('pages:logs.modal.target')}</th><th>{t('pages:logs.modal.facility')}</th><th>{t('pages:logs.modal.level')}</th><th>{t('pages:logs.modal.enabled')}</th><th></th></tr></thead>
-              <tbody>{dests.map((d: any) => (<tr key={d.id} className="border-b border-slate-800 last:border-0"><td className="py-2">{d.name}</td><td>{d.listener_id ? listenerList.find((l: any) => l.id === d.listener_id)?.name : t('pages:logs.all')}</td><td>{d.target}</td><td>{d.facility}</td><td>{d.level}</td><td>{d.enabled ? t('common:actions.yes') : t('common:actions.no')}</td>
+          <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
+            <table className="w-full text-sm text-start"><thead className="text-muted-foreground border-b border-border"><tr><th>{t('pages:logs.modal.name')}</th><th>{t('pages:logs.modal.listener')}</th><th>{t('pages:logs.modal.target')}</th><th>{t('pages:logs.modal.facility')}</th><th>{t('pages:logs.modal.level')}</th><th>{t('pages:logs.modal.enabled')}</th><th></th></tr></thead>
+              <tbody>{dests.map((d: any) => (<tr key={d.id} className="border-b border-border last:border-0"><td className="py-2">{d.name}</td><td>{d.listener_id ? listenerList.find((l: any) => l.id === d.listener_id)?.name : t('pages:logs.all')}</td><td>{d.target}</td><td>{d.facility}</td><td>{d.level}</td><td>{d.enabled ? t('common:actions.yes') : t('common:actions.no')}</td>
                 <td className="space-x-2">
                   <button onClick={() => openEdit(d)} className="text-primary hover:underline">{t('common:actions.edit')}</button>
                   <button onClick={() => logDestinations.remove(d.id).then(rd)} className="text-red-400 hover:underline">{t('common:actions.delete')}</button>
@@ -274,9 +274,9 @@ export default function Logs() {
             </table>
           </div>
           <div className="flex items-center justify-between"><h2 className="text-2xl font-bold flex items-center gap-2"><List className="h-5 w-5 text-primary" /> {t('pages:logs.loggedFields')}</h2><button onClick={openFAdd} className="btn-primary">{t('pages:logs.addField')}</button></div>
-          <div className="card overflow-x-auto">
-            <table className="w-full text-sm text-start"><thead className="text-slate-400 border-b border-slate-800"><tr><th>{t('pages:logs.modal.name')}</th><th>{t('pages:logs.modal.listener')}</th><th>{t('pages:logs.modal.field')}</th><th>{t('pages:logs.modal.enabled')}</th><th></th></tr></thead>
-              <tbody>{fields.map((f: any) => (<tr key={f.id} className="border-b border-slate-800 last:border-0"><td className="py-2">{f.name}</td><td>{f.listener_id ? listenerList.find((l: any) => l.id === f.listener_id)?.name : t('pages:logs.all')}</td><td className="font-mono">{f.field}</td><td>{f.enabled ? t('common:actions.yes') : t('common:actions.no')}</td>
+          <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
+            <table className="w-full text-sm text-start"><thead className="text-muted-foreground border-b border-border"><tr><th>{t('pages:logs.modal.name')}</th><th>{t('pages:logs.modal.listener')}</th><th>{t('pages:logs.modal.field')}</th><th>{t('pages:logs.modal.enabled')}</th><th></th></tr></thead>
+              <tbody>{fields.map((f: any) => (<tr key={f.id} className="border-b border-border last:border-0"><td className="py-2">{f.name}</td><td>{f.listener_id ? listenerList.find((l: any) => l.id === f.listener_id)?.name : t('pages:logs.all')}</td><td className="font-mono">{f.field}</td><td>{f.enabled ? t('common:actions.yes') : t('common:actions.no')}</td>
                 <td className="space-x-2">
                   <button onClick={() => openFEdit(f)} className="text-primary hover:underline">{t('common:actions.edit')}</button>
                   <button onClick={() => loggedFields.remove(f.id).then(rf)} className="text-red-400 hover:underline">{t('common:actions.delete')}</button>
@@ -327,15 +327,15 @@ export default function Logs() {
           </div>
 
           {logError && (
-            <div className="card text-sm">
-              <span className="text-slate-400">{t('pages:logs.error')}</span>
+            <div className="rounded-lg border border-border bg-card p-6 shadow-sm text-sm">
+              <span className="text-muted-foreground">{t('pages:logs.error')}</span>
               <p className="text-red-400 break-words">{logError}</p>
             </div>
           )}
 
           <div className="flex items-center gap-2">
             <div className="relative flex-1 max-w-md">
-              <Search className="absolute start-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <Search className="absolute start-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input
                 type="search"
                 className="input !ps-8 py-1 text-sm"
@@ -344,7 +344,7 @@ export default function Logs() {
                 onChange={e => setLogSearch(e.target.value)}
               />
             </div>
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-muted-foreground">
               {t('pages:logs.linesCount', { filtered: filteredLogLines.length, total: logLines.length })}
               {(skippedNonJson > 0 || skippedControl > 0) && (
                 <span className="ms-2 text-amber-500" title="Lines filtered out of the last fetch">
@@ -354,9 +354,9 @@ export default function Logs() {
             </span>
           </div>
 
-          <div className="card overflow-auto flex-1 min-h-0 !p-0">
+          <div className="rounded-lg border border-border bg-card shadow-sm overflow-auto flex-1 min-h-0 !p-0">
             <table className="w-full text-sm text-start">
-              <thead className="text-slate-400 border-b border-slate-800 sticky top-0 bg-slate-900 z-10">
+              <thead className="text-muted-foreground border-b border-border sticky top-0 bg-card z-10">
                 <tr>
                   <th className="px-2 py-2 w-8"></th>
                   <th className="px-3 py-2">{t('pages:logs.tableHeaders.timestamp')}</th>
@@ -376,9 +376,9 @@ export default function Logs() {
                   const p = line.parsed
                   if (!p) {
                     return (
-                      <tr key={i} className="border-b border-slate-800 last:border-0">
+                      <tr key={i} className="border-b border-border last:border-0">
                         <td className="px-2 py-2"></td>
-                        <td colSpan={10} className="px-3 py-2 font-mono text-xs text-slate-400 break-all">{line.raw}</td>
+                        <td colSpan={10} className="px-3 py-2 font-mono text-xs text-muted-foreground break-all">{line.raw}</td>
                       </tr>
                     )
                   }
@@ -386,11 +386,11 @@ export default function Logs() {
                   return (
                     <React.Fragment key={i}>
                       <tr
-                        className={`border-b border-slate-800 last:border-0 cursor-pointer hover:bg-slate-800/30 ${isExpanded ? 'bg-slate-800/40' : ''}`}
+                        className={`border-b border-border last:border-0 cursor-pointer hover:bg-muted/30 ${isExpanded ? 'bg-muted/40' : ''}`}
                         onClick={() => setExpandedLogRow(isExpanded ? null : i)}
                       >
                         <td className="px-2 py-2 w-8">
-                          <ChevronRight className={`w-4 h-4 text-slate-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                          <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap text-xs">{formatLogTimestamp(p.ts || line.docker_ts)}</td>
                         <td className="px-3 py-2 whitespace-nowrap">
@@ -432,125 +432,125 @@ export default function Logs() {
                         <td className="px-3 py-2">{p.bytes_out || '-'}</td>
                       </tr>
                       {isExpanded && (
-                        <tr className="bg-slate-900/60">
+                        <tr className="bg-card/60">
                           <td colSpan={11} className="px-6 py-4">
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                               <div>
-                                <span className="text-slate-400 text-xs">{t('pages:logs.expandedFields.fullPath')}</span>
+                                <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.fullPath')}</span>
                                 <code className="block text-xs mt-1 font-mono break-all">{p.path || '-'}</code>
                               </div>
                               <div>
-                                <span className="text-slate-400 text-xs">{t('pages:logs.expandedFields.queryString')}</span>
+                                <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.queryString')}</span>
                                 <code className="block text-xs mt-1 font-mono break-all">{p.query || '-'}</code>
                               </div>
                               <div className="col-span-2 md:col-span-3">
-                                <span className="text-slate-400 text-xs">{t('pages:logs.expandedFields.userAgent')}</span>
+                                <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.userAgent')}</span>
                                 <code className="block text-xs mt-1 font-mono break-all">{p.user_agent || '-'}</code>
                               </div>
                               <div>
-                                <span className="text-slate-400 text-xs">{t('pages:logs.expandedFields.ja4Fingerprint')}</span>
+                                <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.ja4Fingerprint')}</span>
                                 {p.ja4 && p.ja4 !== '-' ? (
                                   <button onClick={(e) => handleJa4Click(e, i, p.ja4)} className="block text-xs mt-1 font-mono break-all text-primary hover:underline cursor-pointer text-start">{p.ja4}</button>
                                 ) : <code className="block text-xs mt-1 font-mono break-all">-</code>}
                               </div>
                               <div>
-                                <span className="text-slate-400 text-xs">{t('pages:logs.expandedFields.requestFingerprint')}</span>
+                                <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.requestFingerprint')}</span>
                                 {p.req_fp && p.req_fp !== '-' ? (
                                   <button onClick={(e) => handleReqFpClick(e, i, p.req_fp)} className="block text-xs mt-1 font-mono break-all text-primary hover:underline cursor-pointer text-start">{p.req_fp}</button>
                                 ) : <code className="block text-xs mt-1 font-mono break-all">-</code>}
                               </div>
                               <div>
-                                <span className="text-slate-400 text-xs">{t('pages:logs.expandedFields.frontend')}</span>
+                                <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.frontend')}</span>
                                 <code className="block text-xs mt-1 font-mono break-all">{p.frontend || '-'}</code>
                               </div>
                               <div>
-                                <span className="text-slate-400 text-xs">{t('pages:logs.expandedFields.backend')}</span>
+                                <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.backend')}</span>
                                 <code className="block text-xs mt-1 font-mono break-all">{p.backend || '-'}</code>
                               </div>
                               <div>
-                                <span className="text-slate-400 text-xs">{t('pages:logs.expandedFields.server')}</span>
+                                <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.server')}</span>
                                 <code className="block text-xs mt-1 font-mono break-all">{p.server || '-'}</code>
                               </div>
                               <div>
-                                <span className="text-slate-400 text-xs">{t('pages:logs.expandedFields.uniqueId')}</span>
+                                <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.uniqueId')}</span>
                                 {p.unique_id && p.unique_id !== '-' ? (
                                   <button onClick={(e) => handleUniqueIdClick(e, i, p.unique_id)} className="block text-xs mt-1 font-mono break-all text-primary hover:underline cursor-pointer text-start">{p.unique_id}</button>
                                 ) : <code className="block text-xs mt-1 font-mono break-all">-</code>}
                               </div>
                               <div>
-                                <span className="text-slate-400 text-xs">{t('pages:logs.expandedFields.responseTime')}</span>
+                                <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.responseTime')}</span>
                                 <code className="block text-xs mt-1 font-mono break-all">{p.rt || '-'}</code>
                               </div>
                               <div>
-                                <span className="text-slate-400 text-xs">{t('pages:logs.expandedFields.connectTime')}</span>
+                                <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.connectTime')}</span>
                                 <code className="block text-xs mt-1 font-mono break-all">{p.ct || '-'}</code>
                               </div>
                               <div>
-                                <span className="text-slate-400 text-xs">{t('pages:logs.expandedFields.totalTime')}</span>
+                                <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.totalTime')}</span>
                                 <code className="block text-xs mt-1 font-mono break-all">{p.tt || '-'}</code>
                               </div>
                               <div>
-                                <span className="text-slate-400 text-xs">{t('pages:logs.expandedFields.termination')}</span>
+                                <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.termination')}</span>
                                 <code className="block text-xs mt-1 font-mono break-all">{formatTermination(p.termination)}</code>
                               </div>
                               <div>
-                                <span className="text-slate-400 text-xs">{t('pages:logs.expandedFields.statusSource')}</span>
+                                <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.statusSource')}</span>
                                 <code className={`block text-xs mt-1 font-mono break-all ${p.status_source === 'haproxy' ? 'text-amber-400' : p.status_source === 'backend' ? 'text-blue-400' : ''}`}>
                                   {p.status_source && p.status_source !== '-' ? t(`pages:logs.statusSource.${p.status_source}`) : '-'}
                                 </code>
                               </div>
                               <div>
-                                <span className="text-slate-400 text-xs">{t('pages:logs.expandedFields.action')}</span>
+                                <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.action')}</span>
                                 <code className={`block text-xs mt-1 font-mono break-all ${actionColor(p.action || p.sec_action || p.waf_action || p.rl_action)}`}>{p.action || p.sec_action || p.waf_action || p.rl_action || '-'}</code>
                               </div>
                               <div>
-                                <span className="text-slate-400 text-xs">{t('pages:logs.expandedFields.secRule')}</span>
+                                <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.secRule')}</span>
                                 <code className="block text-xs mt-1 font-mono break-all">{p.sec_rule || '-'}</code>
                               </div>
                               <div>
-                                <span className="text-slate-400 text-xs">{t('pages:logs.expandedFields.riskScore')}</span>
+                                <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.riskScore')}</span>
                                 <code className={`block text-xs mt-1 font-mono break-all ${Number(p.risk_score) > 60 ? 'text-red-400' : Number(p.risk_score) > 35 ? 'text-orange-400' : Number(p.risk_score) > 15 ? 'text-amber-400' : Number(p.risk_score) > 0 ? 'text-green-400' : ''}`}>{p.risk_score && p.risk_score !== '-' ? p.risk_score : '-'}</code>
                               </div>
                               <div>
-                                <span className="text-slate-400 text-xs">{t('pages:logs.expandedFields.riskRulesHitCount')}</span>
+                                <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.riskRulesHitCount')}</span>
                                 <code className="block text-xs mt-1 font-mono break-all">{p.risk_rules_hit_count && p.risk_rules_hit_count !== '-' ? p.risk_rules_hit_count : '-'}</code>
                               </div>
                               <div>
-                                <span className="text-slate-400 text-xs">{t('pages:logs.expandedFields.riskHitDensity')}</span>
+                                <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.riskHitDensity')}</span>
                                 <code className={`block text-xs mt-1 font-mono break-all ${Number(p.risk_hit_density) > 50 ? 'text-red-400' : Number(p.risk_hit_density) > 25 ? 'text-orange-400' : Number(p.risk_hit_density) > 10 ? 'text-amber-400' : ''}`}>{p.risk_hit_density && p.risk_hit_density !== '-' ? `${p.risk_hit_density}%` : '-'}</code>
                               </div>
                               <div className="col-span-2 md:col-span-3">
-                                <span className="text-slate-400 text-xs">{t('pages:logs.expandedFields.riskRulesHit')}</span>
+                                <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.riskRulesHit')}</span>
                                 <code className="block text-xs mt-1 font-mono break-all">{p.risk_rules_hit && p.risk_rules_hit !== '-' ? p.risk_rules_hit : '-'}</code>
                               </div>
                               <div>
-                                <span className="text-slate-400 text-xs">{t('pages:logs.expandedFields.rlName')}</span>
+                                <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.rlName')}</span>
                                 <code className="block text-xs mt-1 font-mono break-all">{p.rl_name || '-'}</code>
                               </div>
                               <div>
-                                <span className="text-slate-400 text-xs">{t('pages:logs.expandedFields.clientPort')}</span>
+                                <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.clientPort')}</span>
                                 <code className="block text-xs mt-1 font-mono break-all">{p.client_port || '-'}</code>
                               </div>
                               <div>
-                                <span className="text-slate-400 text-xs">{t('pages:logs.expandedFields.wafStatus')}</span>
+                                <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.wafStatus')}</span>
                                 <code className="block text-xs mt-1 font-mono break-all">{p.waf_status || '-'}</code>
                               </div>
                               <div>
-                                <span className="text-slate-400 text-xs">{t('pages:logs.expandedFields.wafAnomalyScore')}</span>
+                                <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.wafAnomalyScore')}</span>
                                 <code className="block text-xs mt-1 font-mono break-all">{p.waf_anomaly_score || '-'}</code>
                               </div>
                               <div>
-                                <span className="text-slate-400 text-xs">{t('pages:logs.expandedFields.wafRulesHit')}</span>
+                                <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.wafRulesHit')}</span>
                                 <code className="block text-xs mt-1 font-mono break-all">{p.waf_rules_hit || '-'}</code>
                               </div>
                               <div>
-                                <span className="text-slate-400 text-xs">{t('pages:logs.expandedFields.wafRuleIds')}</span>
+                                <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.wafRuleIds')}</span>
                                 <code className="block text-xs mt-1 font-mono break-all">{p.waf_rule_ids || '-'}</code>
                               </div>
                             </div>
                             <div className="mt-3">
-                              <span className="text-slate-400 text-xs">{t('pages:logs.expandedFields.rawLogLine')}</span>
-                              <pre className="text-xs mt-1 bg-slate-950 p-2 rounded overflow-auto max-h-40 break-all whitespace-pre-wrap">{line.raw}</pre>
+                              <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.rawLogLine')}</span>
+                              <pre className="text-xs mt-1 bg-background p-2 rounded overflow-auto max-h-40 break-all whitespace-pre-wrap">{line.raw}</pre>
                             </div>
                           </td>
                         </tr>
@@ -560,7 +560,7 @@ export default function Logs() {
                 })}
                 {filteredLogLines.length === 0 && !logError && (
                   <tr>
-                    <td colSpan={11} className="px-3 py-6 text-slate-500">{logLines.length === 0 ? t('pages:logs.noLogsCaptured') : t('pages:logs.noLogsMatchFilter')}</td>
+                    <td colSpan={11} className="px-3 py-6 text-muted-foreground">{logLines.length === 0 ? t('pages:logs.noLogsCaptured') : t('pages:logs.noLogsMatchFilter')}</td>
                   </tr>
                 )}
               </tbody>
@@ -573,30 +573,30 @@ export default function Logs() {
       {asnPopover && (
         <div
           ref={asnPopoverRef}
-          className="fixed z-50 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-3 text-sm"
+          className="fixed z-50 w-64 bg-muted border border-subtle rounded-lg shadow-xl p-3 text-sm"
           style={computePopoverPosition(asnPopover.rect, 256, 200)}
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="font-semibold text-slate-200">
+            <span className="font-semibold text-secondary-foreground">
               {asnPopover.asn && asnPopover.asn !== '-' ? formatAsn(asnPopover.asn) : t('pages:logs.asnLookup')}
             </span>
             <button
               onClick={() => { setAsnPopover(null); setAsnResult(null) }}
-              className="text-slate-400 hover:text-slate-200"
+              className="text-muted-foreground hover:text-secondary-foreground"
             >&times;</button>
           </div>
           {asnLoading ? (
-            <p className="text-slate-400">{t('pages:logs.lookingUp')}</p>
+            <p className="text-muted-foreground">{t('pages:logs.lookingUp')}</p>
           ) : asnResult ? (
             <div className="space-y-1">
-              <div><span className="text-slate-500">{t('pages:logs.asnFields.country')}</span> <span className="text-slate-200">{asnResult.country || t('common:status.unknown')}</span></div>
-              <div><span className="text-slate-500">{t('pages:logs.asnFields.city')}</span> <span className="text-slate-200">{asnResult.city || t('common:status.unknown')}</span></div>
-              <div><span className="text-slate-500">{t('pages:logs.asnFields.organization')}</span> <span className="text-slate-200">{asnResult.organization || t('common:status.unknown')}</span></div>
-              <div><span className="text-slate-500">{t('pages:logs.asnFields.network')}</span> <span className="text-slate-200 font-mono text-xs">{asnResult.network || t('common:status.unknown')}</span></div>
-              <div><span className="text-slate-500">{t('pages:logs.asnFields.ip')}</span> <span className="text-slate-200 font-mono text-xs">{asnPopover.ip}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:logs.asnFields.country')}</span> <span className="text-secondary-foreground">{asnResult.country || t('common:status.unknown')}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:logs.asnFields.city')}</span> <span className="text-secondary-foreground">{asnResult.city || t('common:status.unknown')}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:logs.asnFields.organization')}</span> <span className="text-secondary-foreground">{asnResult.organization || t('common:status.unknown')}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:logs.asnFields.network')}</span> <span className="text-secondary-foreground font-mono text-xs">{asnResult.network || t('common:status.unknown')}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:logs.asnFields.ip')}</span> <span className="text-secondary-foreground font-mono text-xs">{asnPopover.ip}</span></div>
             </div>
           ) : (
-            <p className="text-slate-400">{t('common:table.empty')}</p>
+            <p className="text-muted-foreground">{t('common:table.empty')}</p>
           )}
         </div>
       )}
@@ -605,25 +605,25 @@ export default function Logs() {
       {uidPopover && (
         <div
           ref={uidPopoverRef}
-          className="fixed z-50 w-80 bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-3 text-sm"
+          className="fixed z-50 w-80 bg-muted border border-subtle rounded-lg shadow-xl p-3 text-sm"
           style={computePopoverPosition(uidPopover.rect, 320, 220)}
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="font-semibold text-slate-200">{t('pages:uniqueIdDecoder.title')}</span>
-            <button onClick={() => { setUidPopover(null); setUidDecoded(null) }} className="text-slate-400 hover:text-slate-200">&times;</button>
+            <span className="font-semibold text-secondary-foreground">{t('pages:uniqueIdDecoder.title')}</span>
+            <button onClick={() => { setUidPopover(null); setUidDecoded(null) }} className="text-muted-foreground hover:text-secondary-foreground">&times;</button>
           </div>
-          <div className="mb-2"><code className="text-xs font-mono text-slate-400 break-all">{uidPopover.uid}</code></div>
+          <div className="mb-2"><code className="text-xs font-mono text-muted-foreground break-all">{uidPopover.uid}</code></div>
           {uidDecoded?.error ? (
             <p className="text-red-400 text-xs">{uidDecoded.error}</p>
           ) : uidDecoded?.decoded ? (
             <div className="space-y-1">
-              <div><span className="text-slate-500">{t('pages:uniqueIdDecoder.fields.clientIp')}:</span> <span className="text-slate-200 font-mono text-xs">{uidDecoded.decoded.clientIp}</span></div>
-              <div><span className="text-slate-500">{t('pages:uniqueIdDecoder.fields.clientPort')}:</span> <span className="text-slate-200 font-mono text-xs">{uidDecoded.decoded.clientPort}</span></div>
-              <div><span className="text-slate-500">{t('pages:uniqueIdDecoder.fields.timestamp')}:</span> <span className="text-slate-200 font-mono text-xs">{uidDecoded.decoded.timestampFormatted}</span></div>
-              <div><span className="text-slate-500">{t('pages:uniqueIdDecoder.fields.requestCounter')}:</span> <span className="text-slate-200 font-mono text-xs">{uidDecoded.decoded.requestCounter}</span></div>
-              <div><span className="text-slate-500">{t('pages:uniqueIdDecoder.fields.processId')}:</span> <span className="text-slate-200 font-mono text-xs">{uidDecoded.decoded.pid}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:uniqueIdDecoder.fields.clientIp')}:</span> <span className="text-secondary-foreground font-mono text-xs">{uidDecoded.decoded.clientIp}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:uniqueIdDecoder.fields.clientPort')}:</span> <span className="text-secondary-foreground font-mono text-xs">{uidDecoded.decoded.clientPort}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:uniqueIdDecoder.fields.timestamp')}:</span> <span className="text-secondary-foreground font-mono text-xs">{uidDecoded.decoded.timestampFormatted}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:uniqueIdDecoder.fields.requestCounter')}:</span> <span className="text-secondary-foreground font-mono text-xs">{uidDecoded.decoded.requestCounter}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:uniqueIdDecoder.fields.processId')}:</span> <span className="text-secondary-foreground font-mono text-xs">{uidDecoded.decoded.pid}</span></div>
             </div>
-          ) : <p className="text-slate-400">{t('common:table.empty')}</p>}
+          ) : <p className="text-muted-foreground">{t('common:table.empty')}</p>}
         </div>
       )}
 
@@ -631,38 +631,38 @@ export default function Logs() {
       {reqFpPopover && (
         <div
           ref={reqFpPopoverRef}
-          className="fixed z-50 w-96 bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-3 text-sm max-h-[70vh] overflow-y-auto"
+          className="fixed z-50 w-96 bg-muted border border-subtle rounded-lg shadow-xl p-3 text-sm max-h-[70vh] overflow-y-auto"
           style={computePopoverPosition(reqFpPopover.rect, 384, 400)}
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="font-semibold text-slate-200">{t('pages:reqFpDecoder.title')}</span>
-            <button onClick={() => { setReqFpPopover(null); setReqFpDecoded(null) }} className="text-slate-400 hover:text-slate-200">&times;</button>
+            <span className="font-semibold text-secondary-foreground">{t('pages:reqFpDecoder.title')}</span>
+            <button onClick={() => { setReqFpPopover(null); setReqFpDecoded(null) }} className="text-muted-foreground hover:text-secondary-foreground">&times;</button>
           </div>
-          <div className="mb-2"><code className="text-xs font-mono text-slate-400 break-all">{reqFpPopover.fp}</code></div>
+          <div className="mb-2"><code className="text-xs font-mono text-muted-foreground break-all">{reqFpPopover.fp}</code></div>
           {reqFpDecoded?.error ? (
             <p className="text-red-400 text-xs">{reqFpDecoded.error}</p>
           ) : reqFpDecoded?.decoded ? (
             <div className="space-y-1">
-              <div><span className="text-slate-500">{t('pages:reqFpDecoder.fields.pathBase62')}:</span> <span className="text-slate-200 font-mono text-xs break-all">{reqFpDecoded.decoded.pathB62}</span></div>
-              {reqFpDecoded.decoded.pathDecoded && <div><span className="text-slate-500">{t('pages:reqFpDecoder.decodedPrefix', { value: reqFpDecoded.decoded.pathDecoded })}</span></div>}
-              <div><span className="text-slate-500">{t('pages:reqFpDecoder.fields.method')}:</span> <span className="text-slate-200 font-mono text-xs">{reqFpDecoded.decoded.method}</span></div>
-              <div><span className="text-slate-500">{t('pages:reqFpDecoder.fields.httpVersion')}:</span> <span className="text-slate-200 font-mono text-xs">{reqFpDecoded.decoded.httpVersion}</span></div>
-              <div><span className="text-slate-500">{t('pages:reqFpDecoder.fields.pathDepth')}:</span> <span className="text-slate-200 font-mono text-xs">{reqFpDecoded.decoded.pathDepth}</span></div>
-              <div><span className="text-slate-500">{t('pages:reqFpDecoder.fields.paramKeys')}:</span> <span className="text-slate-200 font-mono text-xs">{reqFpDecoded.decoded.paramKeys}</span></div>
-              <div><span className="text-slate-500">{t('pages:reqFpDecoder.fields.paramTypes')}:</span> <span className="text-slate-200 font-mono text-xs">{reqFpDecoded.decoded.paramTypes}</span></div>
-              <div><span className="text-slate-500">{t('pages:reqFpDecoder.fields.paramLengths')}:</span> <span className="text-slate-200 font-mono text-xs">{reqFpDecoded.decoded.paramLens}</span></div>
-              <div><span className="text-slate-500">{t('pages:reqFpDecoder.fields.reqContentType')}:</span> <span className="text-slate-200 font-mono text-xs">{reqFpDecoded.decoded.reqContentType}</span></div>
-              <div><span className="text-slate-500">{t('pages:reqFpDecoder.fields.headerCount')}:</span> <span className="text-slate-200 font-mono text-xs">{reqFpDecoded.decoded.headerCount}</span></div>
-              <div><span className="text-slate-500">{t('pages:reqFpDecoder.fields.headerList')}:</span> <span className="text-slate-200 font-mono text-xs">{reqFpDecoded.decoded.headerList}</span></div>
-              <div><span className="text-slate-500">{t('pages:reqFpDecoder.fields.acceptLanguage')}:</span> <span className="text-slate-200 font-mono text-xs">{reqFpDecoded.decoded.acceptLanguage}</span></div>
-              <div><span className="text-slate-500">{t('pages:reqFpDecoder.fields.authType')}:</span> <span className="text-slate-200 font-mono text-xs">{reqFpDecoded.decoded.authType}</span></div>
-              <div><span className="text-slate-500">{t('pages:reqFpDecoder.fields.cookie')}:</span> <span className="text-slate-200 font-mono text-xs">{reqFpDecoded.decoded.cookie}</span></div>
-              <div><span className="text-slate-500">{t('pages:reqFpDecoder.fields.cookieFields')}:</span> <span className="text-slate-200 font-mono text-xs">{reqFpDecoded.decoded.cookieFields}</span></div>
-              <div><span className="text-slate-500">{t('pages:reqFpDecoder.fields.referer')}:</span> <span className="text-slate-200 font-mono text-xs">{reqFpDecoded.decoded.referer}</span></div>
-              <div><span className="text-slate-500">{t('pages:reqFpDecoder.fields.responseStatus')}:</span> <span className="text-slate-200 font-mono text-xs">{reqFpDecoded.decoded.status}</span></div>
-              <div><span className="text-slate-500">{t('pages:reqFpDecoder.fields.responseBodyBytes')}:</span> <span className="text-slate-200 font-mono text-xs">{reqFpDecoded.decoded.bodyBytes}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:reqFpDecoder.fields.pathBase62')}:</span> <span className="text-secondary-foreground font-mono text-xs break-all">{reqFpDecoded.decoded.pathB62}</span></div>
+              {reqFpDecoded.decoded.pathDecoded && <div><span className="text-muted-foreground">{t('pages:reqFpDecoder.decodedPrefix', { value: reqFpDecoded.decoded.pathDecoded })}</span></div>}
+              <div><span className="text-muted-foreground">{t('pages:reqFpDecoder.fields.method')}:</span> <span className="text-secondary-foreground font-mono text-xs">{reqFpDecoded.decoded.method}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:reqFpDecoder.fields.httpVersion')}:</span> <span className="text-secondary-foreground font-mono text-xs">{reqFpDecoded.decoded.httpVersion}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:reqFpDecoder.fields.pathDepth')}:</span> <span className="text-secondary-foreground font-mono text-xs">{reqFpDecoded.decoded.pathDepth}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:reqFpDecoder.fields.paramKeys')}:</span> <span className="text-secondary-foreground font-mono text-xs">{reqFpDecoded.decoded.paramKeys}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:reqFpDecoder.fields.paramTypes')}:</span> <span className="text-secondary-foreground font-mono text-xs">{reqFpDecoded.decoded.paramTypes}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:reqFpDecoder.fields.paramLengths')}:</span> <span className="text-secondary-foreground font-mono text-xs">{reqFpDecoded.decoded.paramLens}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:reqFpDecoder.fields.reqContentType')}:</span> <span className="text-secondary-foreground font-mono text-xs">{reqFpDecoded.decoded.reqContentType}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:reqFpDecoder.fields.headerCount')}:</span> <span className="text-secondary-foreground font-mono text-xs">{reqFpDecoded.decoded.headerCount}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:reqFpDecoder.fields.headerList')}:</span> <span className="text-secondary-foreground font-mono text-xs">{reqFpDecoded.decoded.headerList}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:reqFpDecoder.fields.acceptLanguage')}:</span> <span className="text-secondary-foreground font-mono text-xs">{reqFpDecoded.decoded.acceptLanguage}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:reqFpDecoder.fields.authType')}:</span> <span className="text-secondary-foreground font-mono text-xs">{reqFpDecoded.decoded.authType}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:reqFpDecoder.fields.cookie')}:</span> <span className="text-secondary-foreground font-mono text-xs">{reqFpDecoded.decoded.cookie}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:reqFpDecoder.fields.cookieFields')}:</span> <span className="text-secondary-foreground font-mono text-xs">{reqFpDecoded.decoded.cookieFields}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:reqFpDecoder.fields.referer')}:</span> <span className="text-secondary-foreground font-mono text-xs">{reqFpDecoded.decoded.referer}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:reqFpDecoder.fields.responseStatus')}:</span> <span className="text-secondary-foreground font-mono text-xs">{reqFpDecoded.decoded.status}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:reqFpDecoder.fields.responseBodyBytes')}:</span> <span className="text-secondary-foreground font-mono text-xs">{reqFpDecoded.decoded.bodyBytes}</span></div>
             </div>
-          ) : <p className="text-slate-400">{t('common:table.empty')}</p>}
+          ) : <p className="text-muted-foreground">{t('common:table.empty')}</p>}
         </div>
       )}
 
@@ -670,28 +670,28 @@ export default function Logs() {
       {ja4Popover && (
         <div
           ref={ja4PopoverRef}
-          className="fixed z-50 w-72 bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-3 text-sm"
+          className="fixed z-50 w-72 bg-muted border border-subtle rounded-lg shadow-xl p-3 text-sm"
           style={computePopoverPosition(ja4Popover.rect, 288, 280)}
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="font-semibold text-slate-200">{t('pages:ja4Decoder.title')}</span>
-            <button onClick={() => { setJa4Popover(null); setJa4Decoded(null) }} className="text-slate-400 hover:text-slate-200">&times;</button>
+            <span className="font-semibold text-secondary-foreground">{t('pages:ja4Decoder.title')}</span>
+            <button onClick={() => { setJa4Popover(null); setJa4Decoded(null) }} className="text-muted-foreground hover:text-secondary-foreground">&times;</button>
           </div>
-          <div className="mb-2"><code className="text-xs font-mono text-slate-400 break-all">{ja4Popover.ja4}</code></div>
+          <div className="mb-2"><code className="text-xs font-mono text-muted-foreground break-all">{ja4Popover.ja4}</code></div>
           {ja4Decoded?.error ? (
             <p className="text-red-400 text-xs">{ja4Decoded.error}</p>
           ) : ja4Decoded?.decoded ? (
             <div className="space-y-1">
-              <div><span className="text-slate-500">{t('pages:ja4Decoder.fields.protocol')}:</span> <span className="text-slate-200 font-mono text-xs">{ja4Decoded.decoded.protocol}</span></div>
-              <div><span className="text-slate-500">{t('pages:ja4Decoder.fields.tlsVersion')}:</span> <span className="text-slate-200 font-mono text-xs">{ja4Decoded.decoded.tlsVersion}</span></div>
-              <div><span className="text-slate-500">{t('pages:ja4Decoder.fields.sni')}:</span> <span className="text-slate-200 font-mono text-xs">{ja4Decoded.decoded.sni}</span></div>
-              <div><span className="text-slate-500">{t('pages:ja4Decoder.fields.alpn')}:</span> <span className="text-slate-200 font-mono text-xs">{ja4Decoded.decoded.alpn}</span></div>
-              <div><span className="text-slate-500">{t('pages:ja4Decoder.fields.cipherCount')}:</span> <span className="text-slate-200 font-mono text-xs">{ja4Decoded.decoded.cipherCount}</span></div>
-              <div><span className="text-slate-500">{t('pages:ja4Decoder.fields.extensionCount')}:</span> <span className="text-slate-200 font-mono text-xs">{ja4Decoded.decoded.extensionCount}</span></div>
-              <div><span className="text-slate-500">{t('pages:ja4Decoder.fields.cipherHash')}:</span> <span className="text-slate-200 font-mono text-xs break-all">{ja4Decoded.decoded.cipherHash}</span></div>
-              <div><span className="text-slate-500">{t('pages:ja4Decoder.fields.extensionHash')}:</span> <span className="text-slate-200 font-mono text-xs break-all">{ja4Decoded.decoded.extensionHash}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:ja4Decoder.fields.protocol')}:</span> <span className="text-secondary-foreground font-mono text-xs">{ja4Decoded.decoded.protocol}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:ja4Decoder.fields.tlsVersion')}:</span> <span className="text-secondary-foreground font-mono text-xs">{ja4Decoded.decoded.tlsVersion}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:ja4Decoder.fields.sni')}:</span> <span className="text-secondary-foreground font-mono text-xs">{ja4Decoded.decoded.sni}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:ja4Decoder.fields.alpn')}:</span> <span className="text-secondary-foreground font-mono text-xs">{ja4Decoded.decoded.alpn}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:ja4Decoder.fields.cipherCount')}:</span> <span className="text-secondary-foreground font-mono text-xs">{ja4Decoded.decoded.cipherCount}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:ja4Decoder.fields.extensionCount')}:</span> <span className="text-secondary-foreground font-mono text-xs">{ja4Decoded.decoded.extensionCount}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:ja4Decoder.fields.cipherHash')}:</span> <span className="text-secondary-foreground font-mono text-xs break-all">{ja4Decoded.decoded.cipherHash}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:ja4Decoder.fields.extensionHash')}:</span> <span className="text-secondary-foreground font-mono text-xs break-all">{ja4Decoded.decoded.extensionHash}</span></div>
             </div>
-          ) : <p className="text-slate-400">{t('common:table.empty')}</p>}
+          ) : <p className="text-muted-foreground">{t('common:table.empty')}</p>}
         </div>
       )}
     </div>

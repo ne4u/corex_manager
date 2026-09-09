@@ -162,7 +162,7 @@ export default function PageProtect() {
           <ScanEye className="h-5 w-5 text-primary" /> {t('pages:pageProtect.title')}
         </h2>
       </div>
-      <p className="text-sm text-slate-400">
+      <p className="text-sm text-muted-foreground">
         {t('pages:pageProtect.description')}
       </p>
       <Tabs
@@ -195,7 +195,7 @@ function DashboardTab({ stats, reload }: { stats: PageProtectStats | null; reloa
     return () => clearInterval(iv)
   }, [reload])
 
-  if (!stats) return <div className="text-slate-400">{t('pages:pageProtect.dashboard.loading')}</div>
+  if (!stats) return <div className="text-muted-foreground">{t('pages:pageProtect.dashboard.loading')}</div>
 
   const cards = [
     { label: t('pages:pageProtect.dashboard.totalScripts'), value: stats.total_scripts, color: 'text-blue-400' },
@@ -208,41 +208,41 @@ function DashboardTab({ stats, reload }: { stats: PageProtectStats | null; reloa
     <div className="space-y-6">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {cards.map(c => (
-          <div key={c.label} className="card p-4">
-            <div className="text-sm text-slate-400">{c.label}</div>
+          <div key={c.label} className="rounded-lg border border-border bg-card shadow-sm p-4">
+            <div className="text-sm text-muted-foreground">{c.label}</div>
             <div className={`text-3xl font-bold ${c.color}`}>{c.value}</div>
           </div>
         ))}
       </div>
       <div className="grid md:grid-cols-2 gap-4">
-        <div className="card p-4">
+        <div className="rounded-lg border border-border bg-card shadow-sm p-4">
           <h3 className="font-semibold mb-3">{t('pages:pageProtect.dashboard.topViolatedDirectives')}</h3>
           {stats.top_violated_directives.length === 0 ? (
-            <div className="text-sm text-slate-500">{t('pages:pageProtect.dashboard.noData')}</div>
+            <div className="text-sm text-muted-foreground">{t('pages:pageProtect.dashboard.noData')}</div>
           ) : (
             <table className="w-full text-sm">
               <tbody>
                 {stats.top_violated_directives.map((d, i) => (
-                  <tr key={i} className="border-b border-slate-800 last:border-0">
-                    <td className="py-2 font-mono text-slate-300">{d.directive}</td>
-                    <td className="py-2 text-end text-slate-400">{d.count}</td>
+                  <tr key={i} className="border-b border-border last:border-0">
+                    <td className="py-2 font-mono text-secondary-foreground">{d.directive}</td>
+                    <td className="py-2 text-end text-muted-foreground">{d.count}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           )}
         </div>
-        <div className="card p-4">
+        <div className="rounded-lg border border-border bg-card shadow-sm p-4">
           <h3 className="font-semibold mb-3">{t('pages:pageProtect.dashboard.topBlockedUris')}</h3>
           {stats.top_blocked_uris.length === 0 ? (
-            <div className="text-sm text-slate-500">{t('pages:pageProtect.dashboard.noData')}</div>
+            <div className="text-sm text-muted-foreground">{t('pages:pageProtect.dashboard.noData')}</div>
           ) : (
             <table className="w-full text-sm">
               <tbody>
                 {stats.top_blocked_uris.map((u, i) => (
-                  <tr key={i} className="border-b border-slate-800 last:border-0">
-                    <td className="py-2 font-mono text-slate-300 truncate max-w-xs">{u.uri}</td>
-                    <td className="py-2 text-end text-slate-400">{u.count}</td>
+                  <tr key={i} className="border-b border-border last:border-0">
+                    <td className="py-2 font-mono text-secondary-foreground truncate max-w-xs">{u.uri}</td>
+                    <td className="py-2 text-end text-muted-foreground">{u.count}</td>
                   </tr>
                 ))}
               </tbody>
@@ -307,7 +307,7 @@ function BaselineTab() {
     finally { setLoading(false) }
   }
 
-  if (!baseline) return <div className="text-slate-400">{t('pages:pageProtect.dashboard.loading')}</div>
+  if (!baseline) return <div className="text-muted-foreground">{t('pages:pageProtect.dashboard.loading')}</div>
 
   const status = baseline.status
   const elapsed = baseline.elapsed_seconds || 0
@@ -321,7 +321,7 @@ function BaselineTab() {
 
   return (
     <div className="space-y-4">
-      <div className="card p-6 space-y-4">
+      <div className="rounded-lg border border-border bg-card shadow-sm p-6 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold flex items-center gap-2">
             <ScanEye className="h-5 w-5 text-primary" /> {t('pages:pageProtect.baseline.title')}
@@ -339,12 +339,12 @@ function BaselineTab() {
               </span>
             )}
             {status === 'idle' && (
-              <span className="text-sm text-slate-500">{t('pages:pageProtect.baseline.noBaselineWindow')}</span>
+              <span className="text-sm text-muted-foreground">{t('pages:pageProtect.baseline.noBaselineWindow')}</span>
             )}
           </div>
         </div>
 
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-muted-foreground">
           {t('pages:pageProtect.baseline.description')}
         </p>
 
@@ -363,7 +363,7 @@ function BaselineTab() {
           </div>
           <div>
             <label className="label">{t('pages:pageProtect.baseline.window')}</label>
-            <div className="input text-sm text-slate-400">
+            <div className="input text-sm text-muted-foreground">
               {baseline.start ? (
                 <>
                   {formatDateTime(baseline.start)}
@@ -376,21 +376,21 @@ function BaselineTab() {
 
         {(baseline.scripts_count !== undefined || baseline.reports_count !== undefined) && (
           <div className="grid grid-cols-4 gap-3">
-            <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+            <div className="bg-muted/50 rounded-lg p-3 text-center">
               <div className="text-2xl font-bold text-blue-400">{baseline.scripts_count ?? 0}</div>
-              <div className="text-xs text-slate-400">{t('pages:pageProtect.baseline.scripts')}</div>
+              <div className="text-xs text-muted-foreground">{t('pages:pageProtect.baseline.scripts')}</div>
             </div>
-            <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+            <div className="bg-muted/50 rounded-lg p-3 text-center">
               <div className="text-2xl font-bold text-amber-400">{baseline.reports_count ?? 0}</div>
-              <div className="text-xs text-slate-400">{t('pages:pageProtect.baseline.reports')}</div>
+              <div className="text-xs text-muted-foreground">{t('pages:pageProtect.baseline.reports')}</div>
             </div>
-            <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+            <div className="bg-muted/50 rounded-lg p-3 text-center">
               <div className="text-2xl font-bold text-purple-400">{baseline.distinct_ips ?? 0}</div>
-              <div className="text-xs text-slate-400">{t('pages:pageProtect.baseline.distinctIps')}</div>
+              <div className="text-xs text-muted-foreground">{t('pages:pageProtect.baseline.distinctIps')}</div>
             </div>
-            <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+            <div className="bg-muted/50 rounded-lg p-3 text-center">
               <div className="text-2xl font-bold text-green-400">{baseline.distinct_pages ?? 0}</div>
-              <div className="text-xs text-slate-400">{t('pages:pageProtect.baseline.pagesObserved')}</div>
+              <div className="text-xs text-muted-foreground">{t('pages:pageProtect.baseline.pagesObserved')}</div>
             </div>
           </div>
         )}
@@ -419,7 +419,7 @@ function BaselineTab() {
         </div>
 
         {status === 'baselining' && (
-          <div className="text-xs text-slate-500">
+          <div className="text-xs text-muted-foreground">
             Tip: Crawl your site (or have users browse all pages) during the window to ensure
             complete resource coverage. The counts above update every 5 seconds.
           </div>
@@ -558,23 +558,23 @@ function PoliciesTab({ backendList }: { backendList: any[] }) {
         <h3 className="text-lg font-semibold">CSP Policies</h3>
         <button onClick={openAdd} className="btn-primary"><Plus className="w-4 h-4 inline me-1" /> Add Policy</button>
       </div>
-      <div className="card overflow-x-auto">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
         <table className="w-full text-sm text-start">
-          <thead className="text-slate-400 border-b border-slate-800">
+          <thead className="text-muted-foreground border-b border-border">
             <tr><th>Name</th><th>Backends</th><th>Mode</th><th>Sample</th><th>Enabled</th><th></th></tr>
           </thead>
           <tbody>
             {policies.map(p => (
-              <tr key={p.id} className="border-b border-slate-800 last:border-0">
+              <tr key={p.id} className="border-b border-border last:border-0">
                 <td className="py-2 font-medium">{p.name}</td>
-                <td className="text-slate-400">{renderBackend(p)}</td>
+                <td className="text-muted-foreground">{renderBackend(p)}</td>
                 <td>
                   <span className={`px-2 py-0.5 rounded text-xs ${p.mode === 'enforce' ? 'bg-red-500/20 text-red-300' : 'bg-amber-500/20 text-amber-300'}`}>
                     {p.mode === 'enforce' ? 'Enforce' : 'Monitor'}
                   </span>
                 </td>
-                <td className="text-slate-400">{p.sample_rate_percent}%</td>
-                <td>{p.enabled ? <CheckCircle2 className="w-4 h-4 text-green-400" /> : <span className="text-slate-500">off</span>}</td>
+                <td className="text-muted-foreground">{p.sample_rate_percent}%</td>
+                <td>{p.enabled ? <CheckCircle2 className="w-4 h-4 text-green-400" /> : <span className="text-muted-foreground">off</span>}</td>
                 <td>
                   <div className="flex gap-1">
                     <IconButton icon={Pencil} aria-label="Edit" onClick={() => openEdit(p)} />
@@ -583,7 +583,7 @@ function PoliciesTab({ backendList }: { backendList: any[] }) {
                 </td>
               </tr>
             ))}
-            {policies.length === 0 && <tr><td colSpan={6} className="py-4 text-center text-slate-500">No policies yet</td></tr>}
+            {policies.length === 0 && <tr><td colSpan={6} className="py-4 text-center text-muted-foreground">No policies yet</td></tr>}
           </tbody>
         </table>
       </div>
@@ -600,22 +600,22 @@ function PoliciesTab({ backendList }: { backendList: any[] }) {
           </div>
           <div>
             <label className="label">Backends (none = all)</label>
-            <div className="input h-auto max-h-32 overflow-y-auto p-2 space-y-1 text-sm text-slate-300">
+            <div className="input h-auto max-h-32 overflow-y-auto p-2 space-y-1 text-sm text-secondary-foreground">
               {backendList.map(b => (
                 <label key={b.id} className="flex items-center gap-2">
-                  <input type="checkbox" className="rounded border-slate-600 bg-slate-800 text-primary" checked={form.backend_ids.includes(b.id)} onChange={e => setForm({ ...form, backend_ids: e.target.checked ? [...form.backend_ids, b.id] : form.backend_ids.filter((id: number) => id !== b.id) })} />
+                  <input type="checkbox" className="rounded border-subtle bg-muted text-primary" checked={form.backend_ids.includes(b.id)} onChange={e => setForm({ ...form, backend_ids: e.target.checked ? [...form.backend_ids, b.id] : form.backend_ids.filter((id: number) => id !== b.id) })} />
                   {b.name}
                 </label>
               ))}
-              {backendList.length === 0 && <span className="text-slate-500">No backends configured</span>}
+              {backendList.length === 0 && <span className="text-muted-foreground">No backends configured</span>}
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <input type="checkbox" id="pp-enabled" className="rounded border-slate-600 bg-slate-800 text-primary" checked={form.enabled} onChange={e => setForm({ ...form, enabled: e.target.checked })} />
-            <label htmlFor="pp-enabled" className="text-sm text-slate-300">Enabled</label>
+            <input type="checkbox" id="pp-enabled" className="rounded border-subtle bg-muted text-primary" checked={form.enabled} onChange={e => setForm({ ...form, enabled: e.target.checked })} />
+            <label htmlFor="pp-enabled" className="text-sm text-secondary-foreground">Enabled</label>
           </div>
 
-          <div className="border-t border-slate-800 pt-4">
+          <div className="border-t border-border pt-4">
             <div className="flex items-center justify-between mb-2">
               <h4 className="font-semibold">CSP Directives</h4>
               <div className="flex gap-2">
@@ -633,7 +633,7 @@ function PoliciesTab({ backendList }: { backendList: any[] }) {
             </div>
             {recommendError && <div className="text-xs text-red-400 mb-2">{recommendError}</div>}
             {Object.entries(form.directives).map(([key, sources]) => (
-              <div key={key} className="mb-3 p-3 bg-slate-800/50 rounded-lg">
+              <div key={key} className="mb-3 p-3 bg-muted/50 rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
                   <select className="input flex-1" value={key} onChange={e => updateDirectiveName(key, e.target.value)}>
                     {CSP_DIRECTIVES.map(d => <option key={d} value={d}>{d}</option>)}
@@ -642,25 +642,25 @@ function PoliciesTab({ backendList }: { backendList: any[] }) {
                 </div>
                 <div className="flex flex-wrap gap-1 mb-2">
                   {(sources as string[]).map((s, i) => (
-                    <span key={i} className="px-2 py-0.5 bg-slate-700 rounded text-xs flex items-center gap-1">
+                    <span key={i} className="px-2 py-0.5 bg-subtle rounded text-xs flex items-center gap-1">
                       <span className="font-mono">{s}</span>
                       <button type="button" onClick={() => removeSource(key, i)} className="text-red-400">&times;</button>
                     </span>
                   ))}
-                  {(sources as string[]).length === 0 && <span className="text-xs text-slate-500">No sources (flag-only directive)</span>}
+                  {(sources as string[]).length === 0 && <span className="text-xs text-muted-foreground">No sources (flag-only directive)</span>}
                 </div>
                 <SourceInput onAdd={(src) => addSource(key, src)} />
               </div>
             ))}
-            {Object.keys(form.directives).length === 0 && <div className="text-sm text-slate-500">No directives added yet</div>}
+            {Object.keys(form.directives).length === 0 && <div className="text-sm text-muted-foreground">No directives added yet</div>}
           </div>
 
           {(suggestScripts.length > 0 || suggestConnections.length > 0) && (
-            <div className="border-t border-slate-800 pt-4">
+            <div className="border-t border-border pt-4">
               <h4 className="font-semibold mb-2">Auto-Suggest from Inventory</h4>
               {suggestScripts.length > 0 && (
                 <div className="mb-2">
-                  <div className="text-xs text-slate-400 mb-1">Detected scripts (add to script-src):</div>
+                  <div className="text-xs text-muted-foreground mb-1">Detected scripts (add to script-src):</div>
                   <div className="flex flex-wrap gap-1">
                     {suggestScripts.slice(0, 20).map(s => (
                       <button key={s.id} type="button" onClick={() => {
@@ -677,7 +677,7 @@ function PoliciesTab({ backendList }: { backendList: any[] }) {
               )}
               {suggestConnections.length > 0 && (
                 <div>
-                  <div className="text-xs text-slate-400 mb-1">Detected connections (add to connect-src):</div>
+                  <div className="text-xs text-muted-foreground mb-1">Detected connections (add to connect-src):</div>
                   <div className="flex flex-wrap gap-1">
                     {suggestConnections.slice(0, 20).map(s => (
                       <button key={s.id} type="button" onClick={() => {
@@ -695,9 +695,9 @@ function PoliciesTab({ backendList }: { backendList: any[] }) {
             </div>
           )}
 
-          <div className="border-t border-slate-800 pt-4">
+          <div className="border-t border-border pt-4">
             <label className="label">CSP Header Preview</label>
-            <pre className="bg-slate-800 p-3 rounded text-xs font-mono text-slate-300 overflow-x-auto">{previewCsp() || '(empty)'}</pre>
+            <pre className="bg-muted p-3 rounded text-xs font-mono text-secondary-foreground overflow-x-auto">{previewCsp() || '(empty)'}</pre>
           </div>
 
           <button className="btn-primary w-full">Save</button>
@@ -708,10 +708,10 @@ function PoliciesTab({ backendList }: { backendList: any[] }) {
       <Modal open={recommendOpen} onClose={() => setRecommendOpen(false)} title="Recommended CSP Policy">
         {recommendData && (
           <div className="space-y-4">
-            <div className="text-sm text-slate-400">
-              Based on <span className="text-slate-200 font-medium">{recommendData.summary.scripts_analyzed}</span> scripts
+            <div className="text-sm text-muted-foreground">
+              Based on <span className="text-secondary-foreground font-medium">{recommendData.summary.scripts_analyzed}</span> scripts
               {' and '}
-              <span className="text-slate-200 font-medium">{recommendData.summary.reports_analyzed}</span> violation reports
+              <span className="text-secondary-foreground font-medium">{recommendData.summary.reports_analyzed}</span> violation reports
               {recommendData.summary.baseline_start && (
                 <> within the baseline window ({recommendData.summary.baseline_start
                   ? formatDateTime(recommendData.summary.baseline_start)
@@ -738,7 +738,7 @@ function PoliciesTab({ backendList }: { backendList: any[] }) {
 
             <div>
               <label className="label">Recommended Directives</label>
-              <pre className="bg-slate-800 p-3 rounded text-xs font-mono text-slate-300 overflow-x-auto max-h-60 overflow-y-auto">
+              <pre className="bg-muted p-3 rounded text-xs font-mono text-secondary-foreground overflow-x-auto max-h-60 overflow-y-auto">
                 {Object.entries(recommendData.directives)
                   .map(([d, srcs]) => srcs.length > 0 ? `${d} ${srcs.join(' ')}` : d)
                   .join('; ')}
@@ -752,17 +752,17 @@ function PoliciesTab({ backendList }: { backendList: any[] }) {
                 <div className="space-y-2 max-h-48 overflow-y-auto">
                   {Object.entries(recommendData.sources).map(([directive, origins]) => (
                     <div key={directive}>
-                      <div className="text-xs text-slate-400 mb-1">{directive}</div>
+                      <div className="text-xs text-muted-foreground mb-1">{directive}</div>
                       <table className="w-full text-xs">
-                        <thead className="text-slate-500">
+                        <thead className="text-muted-foreground">
                           <tr><th className="text-start py-1">Origin</th><th className="text-end py-1">Occurrences</th><th className="text-end py-1">Distinct IPs</th></tr>
                         </thead>
                         <tbody>
                           {origins.map((o, i) => (
-                            <tr key={i} className="border-t border-slate-800">
-                              <td className="py-1 font-mono text-slate-300">{o.origin}</td>
-                              <td className="py-1 text-end text-slate-400">{o.occurrence_count}</td>
-                              <td className={`py-1 text-end ${o.distinct_ips < 2 ? 'text-amber-400' : 'text-slate-400'}`}>{o.distinct_ips}</td>
+                            <tr key={i} className="border-t border-border">
+                              <td className="py-1 font-mono text-secondary-foreground">{o.origin}</td>
+                              <td className="py-1 text-end text-muted-foreground">{o.occurrence_count}</td>
+                              <td className={`py-1 text-end ${o.distinct_ips < 2 ? 'text-amber-400' : 'text-muted-foreground'}`}>{o.distinct_ips}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -773,7 +773,7 @@ function PoliciesTab({ backendList }: { backendList: any[] }) {
               </div>
             )}
 
-            <div className="text-xs text-slate-500">
+            <div className="text-xs text-muted-foreground">
               Review the recommendations above. Click Apply to populate the policy form — you can
               edit further before saving. Origins seen from fewer than 2 distinct IPs are highlighted
               in amber and may be attacker probes.
@@ -827,7 +827,7 @@ function SortTh({ label, sortKey, activeKey, dir, onSort }: {
     <th>
       <button
         onClick={() => onSort(sortKey)}
-        className="inline-flex items-center gap-1 hover:text-slate-200 cursor-pointer select-none"
+        className="inline-flex items-center gap-1 hover:text-secondary-foreground cursor-pointer select-none"
       >
         {label}
         {isActive ? (
@@ -991,7 +991,7 @@ function ScriptsTab() {
   const sourceBadge = (source: string | null) => {
     if (source === 'manual') return <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">Manual</span>
     if (source === 'beacon') return <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400">Beacon</span>
-    return <span className="text-xs px-1.5 py-0.5 rounded bg-slate-500/20 text-slate-400">CSP</span>
+    return <span className="text-xs px-1.5 py-0.5 rounded bg-muted-foreground/20 text-muted-foreground">CSP</span>
   }
 
   return (
@@ -1025,7 +1025,7 @@ function ScriptsTab() {
         </div>
       </div>
       {showAddForm && (
-        <div className="card flex flex-wrap gap-2 items-end">
+        <div className="rounded-lg border border-border bg-card p-6 shadow-sm flex flex-wrap gap-2 items-end">
           <div className="flex-1 min-w-[200px]">
             <label className="label">URL</label>
             <input
@@ -1064,9 +1064,9 @@ function ScriptsTab() {
           <button onClick={() => setShowAddForm(false)} className="btn-secondary text-sm">Cancel</button>
         </div>
       )}
-      <div className="card overflow-x-auto">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
         <table className="w-full text-sm text-start">
-          <thead className="text-slate-400 border-b border-slate-800">
+          <thead className="text-muted-foreground border-b border-border">
             <tr>
               <SortTh label="URL" sortKey="url" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />
               <SortTh label="Type" sortKey="resource_type" activeKey={sortKey} dir={sortDir} onSort={toggleSort} />
@@ -1082,25 +1082,25 @@ function ScriptsTab() {
           </thead>
           <tbody>
             {sorted.map(s => (
-              <tr key={s.id} className="border-b border-slate-800 last:border-0">
+              <tr key={s.id} className="border-b border-border last:border-0">
                 <td className="py-2 font-mono text-xs truncate max-w-xs" title={s.url}>{s.url}</td>
-                <td className="text-slate-400">{s.resource_type}</td>
-                <td className="text-slate-400">{s.domain}</td>
+                <td className="text-muted-foreground">{s.resource_type}</td>
+                <td className="text-muted-foreground">{s.domain}</td>
                 <td>{sourceBadge(s.source)}</td>
-                <td className="text-slate-400 text-xs">
+                <td className="text-muted-foreground text-xs">
                   {s.ignored
                     ? ''
                     : s.fetch_method?.toUpperCase() === 'AUTO' || !s.fetch_method
                       ? <span>Auto{s.last_fetch_method ? ` (${s.last_fetch_method})` : ''}</span>
                       : s.fetch_method.toUpperCase()}
                 </td>
-                <td className="text-slate-400">{s.occurrence_count}</td>
-                <td className="text-slate-400 text-xs">{s.last_seen ? formatDateTime(s.last_seen) : ''}</td>
-                <td className="text-slate-400 text-xs">{s.ignored ? '' : (s.last_hash_at ? formatDateTime(s.last_hash_at) : '')}</td>
+                <td className="text-muted-foreground">{s.occurrence_count}</td>
+                <td className="text-muted-foreground text-xs">{s.last_seen ? formatDateTime(s.last_seen) : ''}</td>
+                <td className="text-muted-foreground text-xs">{s.ignored ? '' : (s.last_hash_at ? formatDateTime(s.last_hash_at) : '')}</td>
                 <td>
                   {(() => {
                     if (s.ignored) {
-                      return <span className="flex items-center gap-1 text-slate-400 text-xs"><EyeOff className="w-3 h-3" /> Ignored</span>
+                      return <span className="flex items-center gap-1 text-muted-foreground text-xs"><EyeOff className="w-3 h-3" /> Ignored</span>
                     }
                     // A check was attempted but failed if hash_checked_at is set
                     // and last_hash_at is None or older than hash_checked_at.
@@ -1114,7 +1114,7 @@ function ScriptsTab() {
                     if (s.last_hash) {
                       return <span className="flex items-center gap-1 text-green-400 text-xs"><CheckCircle2 className="w-3 h-3" /> OK</span>
                     }
-                    return <span className="text-slate-500 text-xs">Unchecked</span>
+                    return <span className="text-muted-foreground text-xs">Unchecked</span>
                   })()}
                 </td>
                 <td>
@@ -1141,7 +1141,7 @@ function ScriptsTab() {
                 </td>
               </tr>
             ))}
-            {sorted.length === 0 && <tr><td colSpan={10} className="py-4 text-center text-slate-500">No scripts detected yet</td></tr>}
+            {sorted.length === 0 && <tr><td colSpan={10} className="py-4 text-center text-muted-foreground">No scripts detected yet</td></tr>}
           </tbody>
         </table>
       </div>
@@ -1214,33 +1214,33 @@ function ReportsTab() {
         <input className="input text-sm flex-1" placeholder="Filter by violated directive..." value={filters.violated_directive} onChange={e => setFilters({ ...filters, violated_directive: e.target.value })} />
         <input className="input text-sm flex-1" placeholder="Filter by hostname..." value={filters.host} onChange={e => setFilters({ ...filters, host: e.target.value })} />
       </div>
-      <div className="card overflow-x-auto">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
         <table className="w-full text-sm text-start">
-          <thead className="text-slate-400 border-b border-slate-800">
+          <thead className="text-muted-foreground border-b border-border">
             <tr><th>Time</th><th>Client IP</th><th>Document URI</th><th>Directive</th><th>Blocked URI</th><th>Hostname</th></tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} className="py-4 text-center text-slate-500">Loading...</td></tr>
+              <tr><td colSpan={6} className="py-4 text-center text-muted-foreground">Loading...</td></tr>
             ) : reports.length === 0 ? (
-              <tr><td colSpan={6} className="py-4 text-center text-slate-500">No reports</td></tr>
+              <tr><td colSpan={6} className="py-4 text-center text-muted-foreground">No reports</td></tr>
             ) : reports.filter(r => !filters.host || extractHostname(r.document_uri).includes(filters.host)).map(r => (
               <React.Fragment key={r.id}>
                 <tr
-                  className="border-b border-slate-800 last:border-0 cursor-pointer hover:bg-slate-800/50"
+                  className="border-b border-border last:border-0 cursor-pointer hover:bg-muted/50"
                   onClick={() => setExpanded(expanded === r.id ? null : r.id)}
                 >
-                  <td className="py-2 text-xs text-slate-400">{formatDateTime(r.captured_at)}</td>
-                  <td className="text-slate-300 font-mono text-xs">{r.client_ip}</td>
+                  <td className="py-2 text-xs text-muted-foreground">{formatDateTime(r.captured_at)}</td>
+                  <td className="text-secondary-foreground font-mono text-xs">{r.client_ip}</td>
                   <td className="font-mono text-xs truncate max-w-xs" title={r.document_uri || ''}>{r.document_uri}</td>
                   <td className="font-mono text-xs text-amber-300">{r.violated_directive}</td>
                   <td className="font-mono text-xs truncate max-w-xs" title={r.blocked_uri || ''}>{r.blocked_uri}</td>
-                  <td className="text-slate-400 text-xs">{extractHostname(r.document_uri)}</td>
+                  <td className="text-muted-foreground text-xs">{extractHostname(r.document_uri)}</td>
                 </tr>
                 {expanded === r.id && (
-                  <tr className="bg-slate-800/30">
+                  <tr className="bg-muted/30">
                     <td colSpan={6} className="p-4">
-                      <pre className="text-xs font-mono text-slate-300 overflow-x-auto whitespace-pre-wrap">
+                      <pre className="text-xs font-mono text-secondary-foreground overflow-x-auto whitespace-pre-wrap">
                         {JSON.stringify(r, null, 2)}
                       </pre>
                     </td>
@@ -1307,24 +1307,24 @@ function SettingsTab({ reloadStats }: { reloadStats: () => void }) {
     }
   }
 
-  if (!settings) return <div className="text-slate-400">Loading...</div>
+  if (!settings) return <div className="text-muted-foreground">Loading...</div>
 
   return (
     <div className="space-y-4 max-w-2xl">
       <h3 className="text-lg font-semibold">Page Protect Settings</h3>
-      <form onSubmit={save} className="card p-6 space-y-4">
+      <form onSubmit={save} className="rounded-lg border border-border bg-card shadow-sm p-6 space-y-4">
         <div className="flex items-center gap-2">
-          <input type="checkbox" id="pp-mon" className="rounded border-slate-600 bg-slate-800 text-primary" checked={settings.monitoring_enabled} onChange={e => setSettings({ ...settings, monitoring_enabled: e.target.checked })} />
+          <input type="checkbox" id="pp-mon" className="rounded border-subtle bg-muted text-primary" checked={settings.monitoring_enabled} onChange={e => setSettings({ ...settings, monitoring_enabled: e.target.checked })} />
           <label htmlFor="pp-mon" className="text-sm">
             <span className="font-medium">Monitoring Enabled</span>
-            <p className="text-xs text-slate-500">Enables CSP report capture in coreX and the background sampler.</p>
+            <p className="text-xs text-muted-foreground">Enables CSP report capture in coreX and the background sampler.</p>
           </label>
         </div>
         <div className="flex items-center gap-2">
-          <input type="checkbox" id="pp-hash" className="rounded border-slate-600 bg-slate-800 text-primary" checked={settings.change_detection_enabled} onChange={e => setSettings({ ...settings, change_detection_enabled: e.target.checked })} />
+          <input type="checkbox" id="pp-hash" className="rounded border-subtle bg-muted text-primary" checked={settings.change_detection_enabled} onChange={e => setSettings({ ...settings, change_detection_enabled: e.target.checked })} />
           <label htmlFor="pp-hash" className="text-sm">
             <span className="font-medium">Code Change Detection</span>
-            <p className="text-xs text-slate-500">Periodically fetches detected scripts and hashes their content to detect supply-chain changes.</p>
+            <p className="text-xs text-muted-foreground">Periodically fetches detected scripts and hashes their content to detect supply-chain changes.</p>
           </label>
         </div>
         <div className="grid grid-cols-2 gap-4">
@@ -1339,64 +1339,64 @@ function SettingsTab({ reloadStats }: { reloadStats: () => void }) {
           <div>
             <label className="label">Auto-Prune Stale (days)</label>
             <input type="number" min={0} className="input" value={settings.auto_prune_stale_days} onChange={e => setSettings({ ...settings, auto_prune_stale_days: parseInt(e.target.value) || 0 })} />
-            <p className="text-xs text-slate-500 mt-1">Assets not seen in traffic or successfully hashed within this many days are automatically removed. 0 = disabled. Changed assets are preserved.</p>
+            <p className="text-xs text-muted-foreground mt-1">Assets not seen in traffic or successfully hashed within this many days are automatically removed. 0 = disabled. Changed assets are preserved.</p>
           </div>
         </div>
         <div>
           <label className="label">Report Path</label>
           <input className="input" value={settings.report_path} onChange={e => setSettings({ ...settings, report_path: e.target.value })} />
-          <p className="text-xs text-slate-500 mt-1">The URL path browsers POST CSP violation reports to. Must match the report-uri in your CSP policies.</p>
+          <p className="text-xs text-muted-foreground mt-1">The URL path browsers POST CSP violation reports to. Must match the report-uri in your CSP policies.</p>
         </div>
-        <div className="border-t border-slate-800 pt-4">
+        <div className="border-t border-border pt-4">
           {!respTransformEnabled && (
             <div className="mb-3 p-3 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs">
               {t('pageProtect.settings.beaconRequiresRespTransform')}
             </div>
           )}
           <div className={`flex items-center gap-2 mb-3 ${!respTransformEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
-            <input type="checkbox" id="pp-beacon" className="rounded border-slate-600 bg-slate-800 text-primary" checked={settings.beacon_injection_enabled} onChange={e => setSettings({ ...settings, beacon_injection_enabled: e.target.checked })} disabled={!respTransformEnabled} />
+            <input type="checkbox" id="pp-beacon" className="rounded border-subtle bg-muted text-primary" checked={settings.beacon_injection_enabled} onChange={e => setSettings({ ...settings, beacon_injection_enabled: e.target.checked })} disabled={!respTransformEnabled} />
             <label htmlFor="pp-beacon" className="text-sm">
               <span className="font-medium">{t('pageProtect.settings.inventoryBeacon')}</span>
-              <p className="text-xs text-slate-500">{t('pageProtect.settings.inventoryBeaconHelp')}</p>
+              <p className="text-xs text-muted-foreground">{t('pageProtect.settings.inventoryBeaconHelp')}</p>
             </label>
           </div>
           <div className={`flex items-center gap-2 mb-3 ${!respTransformEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
-            <input type="checkbox" id="pp-beacon-trust" className="rounded border-slate-600 bg-slate-800 text-primary" checked={settings.beacon_trust_enabled} onChange={e => setSettings({ ...settings, beacon_trust_enabled: e.target.checked })} disabled={!respTransformEnabled} />
+            <input type="checkbox" id="pp-beacon-trust" className="rounded border-subtle bg-muted text-primary" checked={settings.beacon_trust_enabled} onChange={e => setSettings({ ...settings, beacon_trust_enabled: e.target.checked })} disabled={!respTransformEnabled} />
             <label htmlFor="pp-beacon-trust" className="text-sm">
               <span className="font-medium">{t('pageProtect.settings.beaconTrust')}</span>
-              <p className="text-xs text-slate-500">{t('pageProtect.settings.beaconTrustHelp')}</p>
+              <p className="text-xs text-muted-foreground">{t('pageProtect.settings.beaconTrustHelp')}</p>
             </label>
           </div>
           <div className={`grid grid-cols-2 gap-4 ${!respTransformEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
             <div>
               <label className="label">{t('pageProtect.settings.beaconEndpointPath')}</label>
               <input className="input" value={settings.beacon_path} onChange={e => setSettings({ ...settings, beacon_path: e.target.value })} disabled={!respTransformEnabled} />
-              <p className="text-xs text-slate-500 mt-1">{t('pageProtect.settings.beaconEndpointPathHelp')}</p>
+              <p className="text-xs text-muted-foreground mt-1">{t('pageProtect.settings.beaconEndpointPathHelp')}</p>
             </div>
             <div>
               <label className="label">{t('pageProtect.settings.beaconScriptPath')}</label>
               <input className="input" value={settings.beacon_script_path} onChange={e => setSettings({ ...settings, beacon_script_path: e.target.value })} disabled={!respTransformEnabled} />
-              <p className="text-xs text-slate-500 mt-1">{t('pageProtect.settings.beaconScriptPathHelp')}</p>
+              <p className="text-xs text-muted-foreground mt-1">{t('pageProtect.settings.beaconScriptPathHelp')}</p>
             </div>
           </div>
           <div className={`grid grid-cols-2 gap-4 mt-3 ${!respTransformEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
             <div>
               <label className="label">{t('pageProtect.settings.beaconContentTypes')}</label>
               <input className="input" value={settings.beacon_content_types} onChange={e => setSettings({ ...settings, beacon_content_types: e.target.value })} disabled={!respTransformEnabled} />
-              <p className="text-xs text-slate-500 mt-1">{t('pageProtect.settings.beaconContentTypesHelp')}</p>
+              <p className="text-xs text-muted-foreground mt-1">{t('pageProtect.settings.beaconContentTypesHelp')}</p>
             </div>
             <div>
               <label className="label">{t('pageProtect.settings.beaconPathPatterns')}</label>
               <input className="input" value={settings.beacon_path_patterns} onChange={e => setSettings({ ...settings, beacon_path_patterns: e.target.value })} disabled={!respTransformEnabled} />
-              <p className="text-xs text-slate-500 mt-1">{t('pageProtect.settings.beaconPathPatternsHelp')}</p>
+              <p className="text-xs text-muted-foreground mt-1">{t('pageProtect.settings.beaconPathPatternsHelp')}</p>
             </div>
           </div>
         </div>
         <button type="submit" disabled={saving} className="btn-primary w-full">{saving ? 'Saving...' : 'Save Settings'}</button>
 
-        <div className="border-t border-slate-800 pt-4 mt-4">
+        <div className="border-t border-border pt-4 mt-4">
           <h4 className="font-semibold mb-1">Manual Report Collection</h4>
-          <p className="text-xs text-slate-500 mb-2">Trigger an immediate CSP report sample from coreX logs.</p>
+          <p className="text-xs text-muted-foreground mb-2">Trigger an immediate CSP report sample from coreX logs.</p>
           <button
             type="button"
             onClick={sampleNow}
@@ -1408,7 +1408,7 @@ function SettingsTab({ reloadStats }: { reloadStats: () => void }) {
           </button>
         </div>
 
-        <p className="text-xs text-slate-500">After enabling monitoring, apply the coreX config to start capturing CSP reports.</p>
+        <p className="text-xs text-muted-foreground">After enabling monitoring, apply the coreX config to start capturing CSP reports.</p>
       </form>
     </div>
   )

@@ -162,7 +162,7 @@ export default function AuditLogs() {
           {isExpanded ? 'Hide' : 'Show'} payload{isTruncated ? ' (truncated)' : ''}
         </button>
         {isExpanded && (
-          <pre className="mt-1 p-2 bg-slate-900 rounded text-xs overflow-x-auto max-h-64 overflow-y-auto">
+          <pre className="mt-1 p-2 bg-card rounded text-xs overflow-x-auto max-h-64 overflow-y-auto">
             {payloadStr}
           </pre>
         )}
@@ -171,22 +171,22 @@ export default function AuditLogs() {
   }
 
   const renderEventRow = (event: AuditEvent) => (
-    <div key={event.id} className="border-b border-slate-800 last:border-0 py-2 px-3">
+    <div key={event.id} className="border-b border-border last:border-0 py-2 px-3">
       <div className="flex items-center gap-3 text-sm flex-wrap">
-        <span className="text-slate-400 whitespace-nowrap">{formatDateTime(event.created_at)}</span>
-        <span className="font-mono text-xs px-1.5 py-0.5 rounded bg-slate-700 text-slate-200">{event.method}</span>
+        <span className="text-muted-foreground whitespace-nowrap">{formatDateTime(event.created_at)}</span>
+        <span className="font-mono text-xs px-1.5 py-0.5 rounded bg-subtle text-secondary-foreground">{event.method}</span>
         <span className="font-medium text-primary">{event.action}</span>
         {event.resource_type && (
-          <span className="text-slate-300">
+          <span className="text-secondary-foreground">
             {event.resource_type}{event.resource_id ? ` #${event.resource_id}` : ''}
           </span>
         )}
-        <span className="text-slate-500 font-mono text-xs flex-1 truncate">{event.path}</span>
+        <span className="text-muted-foreground font-mono text-xs flex-1 truncate">{event.path}</span>
         <span className={`text-xs font-mono ${event.status_code && event.status_code < 400 ? 'text-green-400' : 'text-red-400'}`}>
           {event.status_code}
         </span>
-        <span className="text-slate-400 text-xs">{event.ip_address || '-'}</span>
-        <span className="text-slate-300 text-xs">{event.username || 'anonymous'}</span>
+        <span className="text-muted-foreground text-xs">{event.ip_address || '-'}</span>
+        <span className="text-secondary-foreground text-xs">{event.username || 'anonymous'}</span>
       </div>
       {renderPayload(event)}
     </div>
@@ -197,10 +197,10 @@ export default function AuditLogs() {
       <h2 className="text-2xl font-bold flex items-center gap-2"><ClipboardList className="h-5 w-5 text-primary" /> {t('pages:auditLogs.title')}</h2>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
         {/* Filter form */}
-        <div className="card space-y-3">
-          <h3 className="text-sm font-semibold text-slate-300">{t('pages:auditLogs.filters.title')}</h3>
+        <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-3">
+          <h3 className="text-sm font-semibold text-secondary-foreground">{t('pages:auditLogs.filters.title')}</h3>
           <div className="flex flex-wrap items-center gap-2">
-            <label className="text-sm text-slate-400">{t('pages:auditLogs.filters.username')}</label>
+            <label className="text-sm text-muted-foreground">{t('pages:auditLogs.filters.username')}</label>
             <select
               className="input py-1 w-36"
               value={filterInputs.username || ''}
@@ -209,7 +209,7 @@ export default function AuditLogs() {
               <option value="">{t('pages:auditLogs.filters.any')}</option>
               {filterOptions.usernames.map(u => <option key={u} value={u}>{u}</option>)}
             </select>
-            <label className="text-sm text-slate-400">{t('pages:auditLogs.filters.action')}</label>
+            <label className="text-sm text-muted-foreground">{t('pages:auditLogs.filters.action')}</label>
             <select
               className="input py-1 w-44"
               value={filterInputs.action || ''}
@@ -220,7 +220,7 @@ export default function AuditLogs() {
             </select>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <label className="text-sm text-slate-400">{t('pages:auditLogs.filters.resource')}</label>
+            <label className="text-sm text-muted-foreground">{t('pages:auditLogs.filters.resource')}</label>
             <select
               className="input py-1 w-36"
               value={filterInputs.resource || ''}
@@ -229,7 +229,7 @@ export default function AuditLogs() {
               <option value="">{t('pages:auditLogs.filters.any')}</option>
               {filterOptions.resource_types.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
-            <label className="text-sm text-slate-400">{t('pages:auditLogs.filters.ipAddress')}</label>
+            <label className="text-sm text-muted-foreground">{t('pages:auditLogs.filters.ipAddress')}</label>
             <select
               className="input py-1 w-36"
               value={filterInputs.ip || ''}
@@ -240,7 +240,7 @@ export default function AuditLogs() {
             </select>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <label className="text-sm text-slate-400">{t('pages:auditLogs.filters.status')}</label>
+            <label className="text-sm text-muted-foreground">{t('pages:auditLogs.filters.status')}</label>
             <select
               className="input py-1"
               value={snapshotFilter}
@@ -255,10 +255,10 @@ export default function AuditLogs() {
           </div>
         </div>
         {/* Export form */}
-        <div className="card space-y-3">
-          <h3 className="text-sm font-semibold text-slate-300">{t('pages:auditLogs.exportCsv')}</h3>
+        <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-3">
+          <h3 className="text-sm font-semibold text-secondary-foreground">{t('pages:auditLogs.exportCsv')}</h3>
           <div className="flex flex-wrap items-center gap-2">
-            <label className="text-sm text-slate-400">{t('pages:auditLogs.filters.limit')}</label>
+            <label className="text-sm text-muted-foreground">{t('pages:auditLogs.filters.limit')}</label>
             <select className="input py-1 w-24" value={limit} onChange={e => setLimit(Number(e.target.value))}>
               <option value={50}>50</option>
               <option value={100}>100</option>
@@ -267,14 +267,14 @@ export default function AuditLogs() {
             </select>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <label className="text-sm text-slate-400">{t('pages:auditLogs.filters.from')}</label>
+            <label className="text-sm text-muted-foreground">{t('pages:auditLogs.filters.from')}</label>
             <input
               type="datetime-local"
               className="input py-1"
               value={start}
               onChange={e => setStart(e.target.value)}
             />
-            <label className="text-sm text-slate-400">{t('pages:auditLogs.filters.to')}</label>
+            <label className="text-sm text-muted-foreground">{t('pages:auditLogs.filters.to')}</label>
             <input
               type="datetime-local"
               className="input py-1"
@@ -291,17 +291,17 @@ export default function AuditLogs() {
       {loading ? (
         <p>{t('pages:auditLogs.loading')}</p>
       ) : items.length === 0 ? (
-        <p className="text-slate-400">{t('pages:auditLogs.noEvents')}</p>
+        <p className="text-muted-foreground">{t('pages:auditLogs.noEvents')}</p>
       ) : (
         <div className="space-y-4">
           {/* Pending changes (not yet applied) */}
           {(snapshotFilter === 'all' || snapshotFilter === 'pending') && pendingEvents.length > 0 && (
-            <div className="card">
-              <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-800 bg-amber-900/20">
+            <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
+              <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-amber-900/20">
                 <Clock className="h-4 w-4 text-amber-400" />
                 <h3 className="font-semibold text-amber-300">{t('pages:auditLogs.pendingChanges')}</h3>
                 <span className="text-xs text-amber-400/70">{t('pages:auditLogs.pendingChanges')}</span>
-                <span className="ms-auto text-sm text-slate-400">{pendingEvents.length} event{pendingEvents.length !== 1 ? 's' : ''}</span>
+                <span className="ms-auto text-sm text-muted-foreground">{pendingEvents.length} event{pendingEvents.length !== 1 ? 's' : ''}</span>
               </div>
               <div>
                 {pendingEvents.map(renderEventRow)}
@@ -311,11 +311,11 @@ export default function AuditLogs() {
 
           {/* Other activity (non-config, no snapshot) */}
           {snapshotFilter === 'all' && otherEvents.length > 0 && (
-            <div className="card">
-              <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-800 bg-slate-800/40">
-                <Activity className="h-4 w-4 text-slate-400" />
-                <h3 className="font-semibold text-slate-300">{t('pages:auditLogs.otherActivity')}</h3>
-                <span className="ms-auto text-sm text-slate-400">{otherEvents.length} event{otherEvents.length !== 1 ? 's' : ''}</span>
+            <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
+              <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-muted/40">
+                <Activity className="h-4 w-4 text-muted-foreground" />
+                <h3 className="font-semibold text-secondary-foreground">{t('pages:auditLogs.otherActivity')}</h3>
+                <span className="ms-auto text-sm text-muted-foreground">{otherEvents.length} event{otherEvents.length !== 1 ? 's' : ''}</span>
               </div>
               <div>
                 {otherEvents.map(renderEventRow)}
@@ -326,7 +326,7 @@ export default function AuditLogs() {
           {/* Applied changes grouped by snapshot */}
           {(snapshotFilter === 'all' || snapshotFilter === 'applied') && snapshotGroups.length > 0 && (
             <div className="space-y-3">
-              <div className="flex items-center gap-2 text-slate-400 text-sm">
+              <div className="flex items-center gap-2 text-muted-foreground text-sm">
                 <CheckCircle className="h-4 w-4 text-green-400" />
                 {t('pages:auditLogs.appliedChanges')}
               </div>
@@ -335,22 +335,22 @@ export default function AuditLogs() {
                 const isExpanded = expandedGroups.has(groupKey)
                 const isEarlier = group.snapshotId == null
                 return (
-                  <div key={groupKey} className="card">
+                  <div key={groupKey} className="rounded-lg border border-border bg-card p-6 shadow-sm">
                     <button
                       onClick={() => toggleGroup(group.snapshotId)}
-                      className="flex items-center gap-2 w-full px-4 py-3 border-b border-slate-800 hover:bg-slate-800/50"
+                      className="flex items-center gap-2 w-full px-4 py-3 border-b border-border hover:bg-muted/50"
                     >
-                      {isExpanded ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
+                      {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
                       <Package className="h-4 w-4 text-primary" />
-                      <span className="font-semibold text-slate-200">
+                      <span className="font-semibold text-secondary-foreground">
                         {isEarlier
                           ? t('pages:auditLogs.earlierApplies')
                           : t('pages:auditLogs.snapshotGroup', { id: group.snapshotId, comment: group.comment || t('pages:auditLogs.noComment') })}
                       </span>
-                      <span className="ms-auto text-sm text-slate-400">
+                      <span className="ms-auto text-sm text-muted-foreground">
                         {group.createdAt ? formatDateTime(group.createdAt) : ''}
                       </span>
-                      <span className="text-xs text-slate-500 ms-3">{group.events.length} event{group.events.length !== 1 ? 's' : ''}</span>
+                      <span className="text-xs text-muted-foreground ms-3">{group.events.length} event{group.events.length !== 1 ? 's' : ''}</span>
                     </button>
                     {isExpanded && (
                       <div>

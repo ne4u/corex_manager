@@ -132,13 +132,13 @@ export default function MultiValueInput({
       {selected.map((v, i) => (
         <span
           key={`${v}-${i}`}
-          className="inline-flex items-center gap-1 rounded bg-slate-700/60 border border-slate-600 px-1.5 py-0.5 text-xs font-mono text-slate-200"
+          className="inline-flex items-center gap-1 rounded bg-subtle/60 border border-subtle px-1.5 py-0.5 text-xs font-mono text-secondary-foreground"
         >
           {v}
           <button
             type="button"
             aria-label={`Remove ${v}`}
-            className="text-slate-400 hover:text-slate-100"
+            className="text-muted-foreground hover:text-foreground"
             onMouseDown={e => {
               e.preventDefault()
               removeAt(i)
@@ -152,7 +152,7 @@ export default function MultiValueInput({
         ref={inputRef}
         id={id}
         type="text"
-        className="flex-1 min-w-[8ch] bg-transparent border-0 outline-none text-sm py-0.5 px-1 placeholder:text-slate-500"
+        className="flex-1 min-w-[8ch] bg-transparent border-0 outline-none text-sm py-0.5 px-1 placeholder:text-muted-foreground"
         value={query}
         placeholder={selected.length === 0 ? placeholder : undefined}
         disabled={loading}
@@ -174,9 +174,9 @@ export default function MultiValueInput({
         aria-autocomplete="list"
       />
       {isOpen && !full && (
-        <div className="absolute z-50 start-0 end-0 top-full mt-1 max-h-60 overflow-auto rounded-lg border border-slate-700 bg-slate-900 shadow-lg">
+        <div className="absolute z-50 start-0 end-0 top-full mt-1 max-h-60 overflow-auto rounded-lg border border-subtle bg-card shadow-lg">
           {filtered.length === 0 ? (
-            <div className="p-2 text-sm text-slate-500">
+            <div className="p-2 text-sm text-muted-foreground">
               {loading
                 ? t('pages:multiValue.loading')
                 : allowCustom && query.trim()
@@ -194,11 +194,11 @@ export default function MultiValueInput({
                 }}
                 onMouseEnter={() => setHighlighted(i)}
                 className={`w-full px-3 py-2 text-start text-sm ${
-                  i === highlighted ? 'bg-slate-800 text-white' : 'text-slate-200'
+                  i === highlighted ? 'bg-muted text-white' : 'text-secondary-foreground'
                 }`}
               >
                 <span className="font-mono">{o.label ?? o.value}</span>
-                {o.hint && <span className="ms-2 text-xs text-slate-400">{o.hint}</span>}
+                {o.hint && <span className="ms-2 text-xs text-muted-foreground">{o.hint}</span>}
               </button>
             ))
           )}

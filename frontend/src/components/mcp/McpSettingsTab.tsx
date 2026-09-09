@@ -147,7 +147,7 @@ export default function McpSettingsTab() {
   return (
     <div className="space-y-6">
       {/* General Settings */}
-      <div className="card space-y-4 max-w-3xl">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4 max-w-3xl">
         <h2 className="text-lg font-semibold flex items-center gap-2"><SettingsIcon className="h-5 w-5 text-primary" /> {t('pages:mcpGateway.settings.generalTitle')}</h2>
 
         <div>
@@ -236,7 +236,7 @@ export default function McpSettingsTab() {
       </div>
 
       {/* Config Bundle Status */}
-      <div className="card space-y-4 max-w-3xl">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4 max-w-3xl">
         <h2 className="text-lg font-semibold flex items-center gap-2"><RefreshCw className="h-5 w-5 text-primary" /> {t('pages:mcpGateway.settings.configBundle')}</h2>
         <div className="flex items-center gap-4 text-sm">
           {configStatus?.last_generated ? (
@@ -257,7 +257,7 @@ export default function McpSettingsTab() {
       </div>
 
       {/* Alerting Configuration */}
-      <div className="card space-y-4 max-w-3xl">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4 max-w-3xl">
         <h2 className="text-lg font-semibold flex items-center gap-2"><Bell className="h-5 w-5 text-primary" /> {t('pages:mcpGateway.settings.alerting')}</h2>
         <div>
           <label className="label">{t('pages:mcpGateway.settings.alertWebhookUrl')}</label>

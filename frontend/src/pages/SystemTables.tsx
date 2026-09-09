@@ -90,16 +90,16 @@ export default function SystemTables() {
         </button>
       </div>
 
-      <p className="text-sm text-slate-400">{t('pages:systemTables.description')}</p>
+      <p className="text-sm text-muted-foreground">{t('pages:systemTables.description')}</p>
 
       {loadingTables ? (
         <p>{t('common:actions.loading')}</p>
       ) : tables.length === 0 ? (
-        <p className="text-slate-400">{t('pages:systemTables.noTables')}</p>
+        <p className="text-muted-foreground">{t('pages:systemTables.noTables')}</p>
       ) : (
-        <div className="card overflow-x-auto">
+        <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
           <table className="w-full text-sm text-start">
-            <thead className="text-slate-400 border-b border-slate-800">
+            <thead className="text-muted-foreground border-b border-border">
               <tr>
                 <th className="pb-2 w-8"></th>
                 <th className="pb-2">{t('pages:systemTables.tableName')}</th>
@@ -139,22 +139,22 @@ function TableRow({
 
   return (
     <>
-      <tr className="border-b border-slate-800 last:border-0 hover:bg-slate-800/30">
+      <tr className="border-b border-border last:border-0 hover:bg-muted/30">
         <td className="py-2">
-          <button onClick={onToggle} className="text-slate-400 hover:text-slate-200" aria-label={expanded ? t('common:actions.collapse') : t('common:actions.expand')}>
+          <button onClick={onToggle} className="text-muted-foreground hover:text-secondary-foreground" aria-label={expanded ? t('common:actions.collapse') : t('common:actions.expand')}>
             {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
           </button>
         </td>
         <td className="py-2 font-mono">{table.name}</td>
-        <td className="font-mono text-slate-300">{table.type}</td>
-        <td className="text-end font-mono text-slate-300">{table.size.toLocaleString()}</td>
+        <td className="font-mono text-secondary-foreground">{table.type}</td>
+        <td className="text-end font-mono text-secondary-foreground">{table.size.toLocaleString()}</td>
         <td className="text-end font-mono">
-          <span className="px-2 py-0.5 rounded-full bg-slate-800 text-xs">{table.used.toLocaleString()}</span>
+          <span className="px-2 py-0.5 rounded-full bg-muted text-xs">{table.used.toLocaleString()}</span>
         </td>
       </tr>
       {expanded && (
-        <tr className="border-b border-slate-800">
-          <td colSpan={5} className="p-4 bg-slate-900/40">
+        <tr className="border-b border-border">
+          <td colSpan={5} className="p-4 bg-card/40">
             <TableEntries table={table} addNotification={addNotification} />
           </td>
         </tr>
@@ -272,7 +272,7 @@ function TableEntries({
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative">
-          <Search className="absolute start-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+          <Search className="absolute start-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
           <input
             type="text"
             placeholder={t('pages:systemTables.searchPlaceholder')}
@@ -283,7 +283,7 @@ function TableEntries({
           {searchInput && (
             <button
               onClick={() => { setSearchInput(''); setPage(0); setSearch('') }}
-              className="absolute end-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+              className="absolute end-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-secondary-foreground"
               aria-label={t('pages:systemTables.clearSearch')}
             >
               <X className="w-4 h-4" />
@@ -301,7 +301,7 @@ function TableEntries({
           ))}
         </select>
 
-        <label className="flex items-center gap-2 text-sm text-slate-300">
+        <label className="flex items-center gap-2 text-sm text-secondary-foreground">
           <input
             type="checkbox"
             checked={autoRefresh}
@@ -336,11 +336,11 @@ function TableEntries({
       {loading ? (
         <p>{t('common:actions.loading')}</p>
       ) : !detail || detail.entries.length === 0 ? (
-        <p className="text-slate-400">{t('pages:systemTables.noEntries')}</p>
+        <p className="text-muted-foreground">{t('pages:systemTables.noEntries')}</p>
       ) : (
-        <div className="overflow-x-auto border border-slate-800 rounded-lg">
+        <div className="overflow-x-auto border border-border rounded-lg">
           <table className="w-full text-xs text-start">
-            <thead className="text-slate-400 bg-slate-900/60 border-b border-slate-800">
+            <thead className="text-muted-foreground bg-card/60 border-b border-border">
               <tr>
                 <th className="px-2 py-1.5 text-start">{t('pages:systemTables.key')}</th>
                 <th className="px-2 py-1.5 text-end">{t('pages:systemTables.use')}</th>
@@ -354,13 +354,13 @@ function TableEntries({
             </thead>
             <tbody>
               {detail.entries.map((e) => (
-                <tr key={e.key} className="border-b border-slate-800 last:border-0 hover:bg-slate-800/30">
-                  <td className="px-2 py-1.5 font-mono text-slate-200 break-all">{e.key}</td>
-                  <td className="px-2 py-1.5 text-end font-mono text-slate-300">{String(e.use)}</td>
-                  <td className="px-2 py-1.5 text-end font-mono text-slate-300">{String(e.exp)}</td>
-                  <td className="px-2 py-1.5 text-end text-slate-300">{formatExpireTime(e.exp, formatTime)}</td>
+                <tr key={e.key} className="border-b border-border last:border-0 hover:bg-muted/30">
+                  <td className="px-2 py-1.5 font-mono text-secondary-foreground break-all">{e.key}</td>
+                  <td className="px-2 py-1.5 text-end font-mono text-secondary-foreground">{String(e.use)}</td>
+                  <td className="px-2 py-1.5 text-end font-mono text-secondary-foreground">{String(e.exp)}</td>
+                  <td className="px-2 py-1.5 text-end text-secondary-foreground">{formatExpireTime(e.exp, formatTime)}</td>
                   {storeKeys.map((k) => (
-                    <td key={k} className="px-2 py-1.5 text-end font-mono text-slate-300">{e.stores[k] ?? '-'}</td>
+                    <td key={k} className="px-2 py-1.5 text-end font-mono text-secondary-foreground">{e.stores[k] ?? '-'}</td>
                   ))}
                   <td className="px-2 py-1.5 text-end">
                     <IconButton icon={Trash2} variant="danger" aria-label={t('pages:systemTables.clearEntry')} onClick={() => handleClearEntry(e.key)} />
@@ -375,7 +375,7 @@ function TableEntries({
       {/* Pagination */}
       {detail && (
         <div className="flex items-center justify-between text-sm">
-          <span className="text-slate-400">
+          <span className="text-muted-foreground">
             {t('pages:systemTables.showing', { from: detail.total === 0 ? 0 : offset + 1, to: Math.min(offset + pageSize, detail.total), total: detail.total })}
           </span>
           <div className="flex items-center gap-2">
@@ -386,7 +386,7 @@ function TableEntries({
             >
               {t('common:actions.previous')}
             </button>
-            <span className="text-slate-300">
+            <span className="text-secondary-foreground">
               {t('pages:systemTables.pageOf', { page: page + 1, total: totalPages })}
             </span>
             <button

@@ -140,12 +140,12 @@ export default function CountrySelect({
       {isOpen && (
         <div
           id="country-listbox"
-          className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-slate-700 bg-slate-900 shadow-lg"
+          className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-subtle bg-card shadow-lg"
         >
           {loading ? (
-            <div className="p-2 text-sm text-slate-400">{t('pages:countrySelect.loading')}</div>
+            <div className="p-2 text-sm text-muted-foreground">{t('pages:countrySelect.loading')}</div>
           ) : filtered.length === 0 ? (
-            <div className="p-2 text-sm text-slate-500">{t('pages:countrySelect.noCountriesFound')}</div>
+            <div className="p-2 text-sm text-muted-foreground">{t('pages:countrySelect.noCountriesFound')}</div>
           ) : (
             filtered.map((o, i) => (
               <button
@@ -154,11 +154,11 @@ export default function CountrySelect({
                 onMouseDown={() => select(o)}
                 onMouseEnter={() => setHighlighted(i)}
                 className={`w-full px-3 py-2 text-start text-sm ${
-                  i === highlighted ? 'bg-slate-800 text-white' : 'text-slate-200'
+                  i === highlighted ? 'bg-muted text-white' : 'text-secondary-foreground'
                 }`}
               >
                 <span className="font-medium">{o.name}</span>
-                <span className="ms-2 text-xs text-slate-400 font-mono">{o.code}</span>
+                <span className="ms-2 text-xs text-muted-foreground font-mono">{o.code}</span>
               </button>
             ))
           )}

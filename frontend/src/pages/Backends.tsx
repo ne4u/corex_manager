@@ -133,9 +133,9 @@ export default function Backends() {
           <button onClick={openAdd} className="btn-primary">{t('pages:backends.addBackend')}</button>
         </div>
       {loading ? <p>{t('pages:backends.loading')}</p> : (
-        <div className="card overflow-x-auto">
+        <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
           <table className="w-full text-sm text-start">
-            <thead className="text-slate-400 border-b border-slate-800"><tr><th>{t('pages:backends.tableHeaders.name')}</th><th>{t('pages:backends.tableHeaders.mode')}</th><th>{t('pages:backends.tableHeaders.algorithm')}</th><th>{t('pages:backends.tableHeaders.fcgiApp')}</th><th>{t('pages:backends.tableHeaders.sticky')}</th><th>{t('pages:backends.tableHeaders.servers')}</th><th>{t('pages:backends.tableHeaders.cache')}</th><th></th></tr></thead>
+            <thead className="text-muted-foreground border-b border-border"><tr><th>{t('pages:backends.tableHeaders.name')}</th><th>{t('pages:backends.tableHeaders.mode')}</th><th>{t('pages:backends.tableHeaders.algorithm')}</th><th>{t('pages:backends.tableHeaders.fcgiApp')}</th><th>{t('pages:backends.tableHeaders.sticky')}</th><th>{t('pages:backends.tableHeaders.servers')}</th><th>{t('pages:backends.tableHeaders.cache')}</th><th></th></tr></thead>
             <tbody>
               {[...items].sort((a: any, b: any) => (a.name || '').localeCompare(b.name || '')).map((b: any) => {
                 const cc = cacheConfigs[b.id]
@@ -146,10 +146,10 @@ export default function Backends() {
                     ? <span className="text-xs px-1.5 py-0.5 rounded bg-blue-900/50 text-blue-300">Memory</span>
                     : cc.disk_cache_enabled
                     ? <span className="text-xs px-1.5 py-0.5 rounded bg-green-900/50 text-green-300">Disk</span>
-                    : <span className="text-slate-500">-</span>
-                ) : <span className="text-slate-500">-</span>
+                    : <span className="text-muted-foreground">-</span>
+                ) : <span className="text-muted-foreground">-</span>
                 return (
-                <tr key={b.id} className="border-b border-slate-800 last:border-0">
+                <tr key={b.id} className="border-b border-border last:border-0">
                   <td className="py-2">{b.name}</td><td>{b.mode}</td><td>{b.algorithm}</td><td>{fcgiAppList.find((f: any) => f.id === b.fcgi_app_id)?.name || '-'}</td><td>{b.sticky_sessions ? 'Yes' : 'No'}</td><td>{(b.servers || []).length}</td><td>{cacheBadge}</td>
                   <td>
                     <div className="flex gap-1">
@@ -172,15 +172,15 @@ export default function Backends() {
           <h3 className="text-xl font-bold">{t('pages:loadBalancing.sections.backendServers')}</h3>
           {items.length > 0 && <button onClick={openAddServerGlobal} className="btn-primary">{t('pages:backends.serverManager.addServer')}</button>}
         </div>
-        <div className="card overflow-x-auto">
+        <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
           <table className="w-full text-sm text-start">
-            <thead className="text-slate-400 border-b border-slate-800"><tr><th>{t('pages:backends.serverTableHeaders.pool')}</th><th>{t('pages:backends.serverTableHeaders.name')}</th><th>{t('pages:backends.serverTableHeaders.address')}</th><th>{t('pages:backends.serverTableHeaders.port')}</th><th>{t('pages:backends.serverTableHeaders.protocol')}</th><th>{t('pages:backends.serverTableHeaders.weight')}</th><th>{t('pages:backends.serverTableHeaders.maxconn')}</th><th>{t('pages:backends.serverTableHeaders.check')}</th><th>{t('pages:backends.serverTableHeaders.backup')}</th><th>{t('pages:backends.serverTableHeaders.ssl')}</th><th>{t('pages:backends.serverTableHeaders.proxy')}</th><th></th></tr></thead>
+            <thead className="text-muted-foreground border-b border-border"><tr><th>{t('pages:backends.serverTableHeaders.pool')}</th><th>{t('pages:backends.serverTableHeaders.name')}</th><th>{t('pages:backends.serverTableHeaders.address')}</th><th>{t('pages:backends.serverTableHeaders.port')}</th><th>{t('pages:backends.serverTableHeaders.protocol')}</th><th>{t('pages:backends.serverTableHeaders.weight')}</th><th>{t('pages:backends.serverTableHeaders.maxconn')}</th><th>{t('pages:backends.serverTableHeaders.check')}</th><th>{t('pages:backends.serverTableHeaders.backup')}</th><th>{t('pages:backends.serverTableHeaders.ssl')}</th><th>{t('pages:backends.serverTableHeaders.proxy')}</th><th></th></tr></thead>
             <tbody>
               {items.flatMap((b: any) => (b.servers || []).map((s: any) => ({ ...s, poolName: b.name }))).sort((a: any, b: any) => {
                 const pc = (a.poolName || '').localeCompare(b.poolName || '')
                 return pc !== 0 ? pc : (a.name || '').localeCompare(b.name || '')
               }).map((s: any) => (
-                <tr key={s.id} className="border-b border-slate-800 last:border-0">
+                <tr key={s.id} className="border-b border-border last:border-0">
                   <td className="py-2">{s.poolName}</td>
                   <td>{s.name}</td><td>{s.address}</td><td>{s.port}</td><td>{s.protocol}</td><td>{s.weight}</td><td>{s.maxconn}</td><td>{s.check ? t('common:actions.yes') : t('common:actions.no')}</td><td>{s.backup ? t('common:actions.yes') : t('common:actions.no')}</td><td>{s.ssl ? t('common:actions.yes') : t('common:actions.no')}</td><td>{s.send_proxy ? 'v1' : s.send_proxy_v2 ? 'v2' : '-'}</td>
                   <td>
@@ -192,7 +192,7 @@ export default function Backends() {
                 </tr>
               ))}
               {items.flatMap((b: any) => b.servers || []).length === 0 && (
-                <tr><td colSpan={12} className="py-4 text-center text-slate-500">{t('pages:backends.noServers')}</td></tr>
+                <tr><td colSpan={12} className="py-4 text-center text-muted-foreground">{t('pages:backends.noServers')}</td></tr>
               )}
             </tbody>
           </table>
@@ -237,7 +237,7 @@ export default function Backends() {
             )}
           </div>
           <div className="flex gap-4 flex-wrap">
-            <label className={`flex items-center gap-2 ${isTcp && !form.sticky_sessions ? 'text-slate-500' : ''}`}><input type="checkbox" disabled={isTcp && !form.sticky_sessions} checked={form.sticky_sessions} onChange={e => setForm({ ...form, sticky_sessions: e.target.checked })} /> {t('pages:backends.modal.stickySessions')}<InfoTooltip content={t('pages:backends.tooltips.stickySessions')} /></label>
+            <label className={`flex items-center gap-2 ${isTcp && !form.sticky_sessions ? 'text-muted-foreground' : ''}`}><input type="checkbox" disabled={isTcp && !form.sticky_sessions} checked={form.sticky_sessions} onChange={e => setForm({ ...form, sticky_sessions: e.target.checked })} /> {t('pages:backends.modal.stickySessions')}<InfoTooltip content={t('pages:backends.tooltips.stickySessions')} /></label>
             <label className="flex items-center gap-2"><input type="checkbox" checked={form.redispatch} onChange={e => setForm({ ...form, redispatch: e.target.checked })} /> {t('pages:backends.modal.redispatch')}<InfoTooltip content={t('pages:backends.tooltips.redispatch')} /></label>
             <label className="flex items-center gap-2"><input type="checkbox" checked={form.stick_table} onChange={e => setForm({ ...form, stick_table: e.target.checked })} /> {t('pages:backends.modal.stickTable')}<InfoTooltip content={t('pages:backends.tooltips.stickTable')} /></label>
             {!isTcp && (
@@ -254,8 +254,8 @@ export default function Backends() {
             <p className="text-xs text-amber-400">{t('pages:backends.modal.stickyCookieRedundant')}</p>
           )}
           {form.protocol === 'http' && (
-            <div className="border-t border-slate-800 pt-3 space-y-3">
-              <h3 className="text-sm font-semibold text-slate-300">{t('pages:backends.compression.title')}</h3>
+            <div className="border-t border-border pt-3 space-y-3">
+              <h3 className="text-sm font-semibold text-secondary-foreground">{t('pages:backends.compression.title')}</h3>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <LabelWithTooltip tooltip={t('pages:backends.tooltips.compressionAlgorithm')}>{t('pages:backends.compression.algorithm')}</LabelWithTooltip>
@@ -331,8 +331,8 @@ export default function Backends() {
             </div>
           )}
           {form.protocol === 'http' && img2WebpEnabled && (
-            <div className="border-t border-slate-800 pt-3 space-y-3">
-              <h3 className="text-sm font-semibold text-slate-300">{t('pages:backends.imageConversion.title')}</h3>
+            <div className="border-t border-border pt-3 space-y-3">
+              <h3 className="text-sm font-semibold text-secondary-foreground">{t('pages:backends.imageConversion.title')}</h3>
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -400,12 +400,12 @@ export default function Backends() {
         <Modal open={managerOpen} onClose={() => setManagerOpen(false)} title={t('pages:backends.serverManager.title', { name: activeBackend.name })}>
           <div className="space-y-4">
             <button onClick={openAddServer} className="btn-primary">{t('pages:backends.serverManager.addServer')}</button>
-            <div className="card overflow-x-auto">
+            <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
               <table className="w-full text-sm text-start">
-                <thead className="text-slate-400 border-b border-slate-800"><tr><th>{t('pages:backends.serverManager.tableHeaders.name')}</th><th>{t('pages:backends.serverManager.tableHeaders.address')}</th><th>{t('pages:backends.serverManager.tableHeaders.port')}</th><th>{t('pages:backends.serverManager.tableHeaders.protocol')}</th><th>{t('pages:backends.serverManager.tableHeaders.weight')}</th><th>{t('pages:backends.serverManager.tableHeaders.maxconn')}</th><th>{t('pages:backends.serverManager.tableHeaders.check')}</th><th>{t('pages:backends.serverManager.tableHeaders.backup')}</th><th>{t('pages:backends.serverManager.tableHeaders.inter')}</th><th>{t('pages:backends.serverManager.tableHeaders.rise')}</th><th>{t('pages:backends.serverManager.tableHeaders.fall')}</th><th>{t('pages:backends.serverManager.tableHeaders.ssl')}</th><th>{t('pages:backends.serverManager.tableHeaders.proxy')}</th><th></th></tr></thead>
+                <thead className="text-muted-foreground border-b border-border"><tr><th>{t('pages:backends.serverManager.tableHeaders.name')}</th><th>{t('pages:backends.serverManager.tableHeaders.address')}</th><th>{t('pages:backends.serverManager.tableHeaders.port')}</th><th>{t('pages:backends.serverManager.tableHeaders.protocol')}</th><th>{t('pages:backends.serverManager.tableHeaders.weight')}</th><th>{t('pages:backends.serverManager.tableHeaders.maxconn')}</th><th>{t('pages:backends.serverManager.tableHeaders.check')}</th><th>{t('pages:backends.serverManager.tableHeaders.backup')}</th><th>{t('pages:backends.serverManager.tableHeaders.inter')}</th><th>{t('pages:backends.serverManager.tableHeaders.rise')}</th><th>{t('pages:backends.serverManager.tableHeaders.fall')}</th><th>{t('pages:backends.serverManager.tableHeaders.ssl')}</th><th>{t('pages:backends.serverManager.tableHeaders.proxy')}</th><th></th></tr></thead>
                 <tbody>
                   {(activeBackend.servers || []).map((s: any) => (
-                    <tr key={s.id} className="border-b border-slate-800 last:border-0">
+                    <tr key={s.id} className="border-b border-border last:border-0">
                       <td className="py-2">{s.name}</td><td>{s.address}</td><td>{s.port}</td><td>{s.protocol}</td><td>{s.weight}</td><td>{s.maxconn}</td><td>{s.check ? t('common:actions.yes') : t('common:actions.no')}</td><td>{s.backup ? t('common:actions.yes') : t('common:actions.no')}</td><td>{s.inter}</td><td>{s.rise}</td><td>{s.fall}</td><td>{s.ssl ? t('common:actions.yes') : t('common:actions.no')}</td><td>{s.send_proxy ? 'v1' : s.send_proxy_v2 ? 'v2' : '-'}</td>
                       <td>
                         <div className="flex gap-1">
@@ -483,11 +483,11 @@ export default function Backends() {
             </label>
           </div>
 
-          <div className="border border-slate-700 rounded p-4 space-y-3">
+          <div className="border border-subtle rounded p-4 space-y-3">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold">{t('pages:backends.serverManager.advanced')}</h3>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-muted-foreground">
                   {t('pages:backends.serverManager.advancedDescription')}
                 </p>
               </div>

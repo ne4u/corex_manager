@@ -43,11 +43,11 @@ export default function Ciphers() {
         <button onClick={openAdd} className="btn-primary">{t('pages:ciphers.addCipherSuite')}</button>
       </div>
       {loading ? <p>{t('pages:ciphers.loading')}</p> : (
-        <div className="card overflow-x-auto">
-          <table className="w-full text-sm text-start"><thead className="text-slate-400 border-b border-slate-800"><tr><th>{t('pages:ciphers.tableHeaders.name')}</th><th>{t('pages:ciphers.tableHeaders.baseline')}</th><th>{t('pages:ciphers.tableHeaders.minTls')}</th><th>{t('pages:ciphers.tableHeaders.quantumSafe')}</th><th>{t('pages:ciphers.tableHeaders.hsts')}</th><th></th></tr></thead>
+        <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
+          <table className="w-full text-sm text-start"><thead className="text-muted-foreground border-b border-border"><tr><th>{t('pages:ciphers.tableHeaders.name')}</th><th>{t('pages:ciphers.tableHeaders.baseline')}</th><th>{t('pages:ciphers.tableHeaders.minTls')}</th><th>{t('pages:ciphers.tableHeaders.quantumSafe')}</th><th>{t('pages:ciphers.tableHeaders.hsts')}</th><th></th></tr></thead>
             <tbody>
               {items.map((c: any) => (
-                <tr key={c.id} className="border-b border-slate-800 last:border-0"><td className="py-2">{c.name}</td><td>{c.baseline}</td><td>{c.min_tls_version}</td><td>{c.quantum_safe ? t('common:actions.yes') : t('common:actions.no')}</td><td>{c.hsts_enabled ? t('common:actions.yes') : t('common:actions.no')}</td>
+                <tr key={c.id} className="border-b border-border last:border-0"><td className="py-2">{c.name}</td><td>{c.baseline}</td><td>{c.min_tls_version}</td><td>{c.quantum_safe ? t('common:actions.yes') : t('common:actions.no')}</td><td>{c.hsts_enabled ? t('common:actions.yes') : t('common:actions.no')}</td>
                   <td className="space-x-1">
                     <IconButton icon={Pencil} aria-label={t('common:actions.edit')} onClick={() => openEdit(c)} />
                     <IconButton icon={Trash2} variant="danger" aria-label={t('common:actions.delete')} onClick={() => ciphers.remove(c.id).then(reload)} />

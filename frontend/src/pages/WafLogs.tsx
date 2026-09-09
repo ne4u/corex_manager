@@ -152,15 +152,15 @@ export default function WafLogs({ onCreateException }: WafLogsProps = {}) {
       </div>
 
       {error && (
-        <div className="card text-sm">
-          <span className="text-slate-400">{t('pages:wafLogs.error')}</span>
+        <div className="rounded-lg border border-border bg-card p-6 shadow-sm text-sm">
+          <span className="text-muted-foreground">{t('pages:wafLogs.error')}</span>
           <p className="text-red-400 break-words">{error}</p>
         </div>
       )}
 
       <div className="flex items-center gap-2">
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute start-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+          <Search className="absolute start-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input
             type="search"
             className="input !ps-8 py-1 text-sm"
@@ -169,12 +169,12 @@ export default function WafLogs({ onCreateException }: WafLogsProps = {}) {
             onChange={e => setSearch(e.target.value)}
           />
         </div>
-        <span className="text-xs text-slate-500">{t('pages:wafLogs.eventsCount', { filtered: parsed.length, total: events.length })}</span>
+        <span className="text-xs text-muted-foreground">{t('pages:wafLogs.eventsCount', { filtered: parsed.length, total: events.length })}</span>
       </div>
 
-      <div className="card overflow-auto flex-1 min-h-0 !p-0">
+      <div className="rounded-lg border border-border bg-card shadow-sm overflow-auto flex-1 min-h-0 !p-0">
         <table className="w-full text-sm text-start">
-          <thead className="text-slate-400 border-b border-slate-800 sticky top-0 bg-slate-900 z-10">
+          <thead className="text-muted-foreground border-b border-border sticky top-0 bg-card z-10">
             <tr>
               <th className="px-2 py-3 w-8"></th>
               <th className="px-4 py-3">{t('pages:wafLogs.tableHeaders.time')}</th>
@@ -192,11 +192,11 @@ export default function WafLogs({ onCreateException }: WafLogsProps = {}) {
               return (
                 <React.Fragment key={i}>
                   <tr
-                    className={`border-b border-slate-800 last:border-0 cursor-pointer hover:bg-slate-800/30 ${isExpanded ? 'bg-slate-800/40' : ''}`}
+                    className={`border-b border-border last:border-0 cursor-pointer hover:bg-muted/30 ${isExpanded ? 'bg-muted/40' : ''}`}
                     onClick={() => setExpandedRow(isExpanded ? null : i)}
                   >
                     <td className="px-2 py-2 w-8">
-                      <ChevronRight className={`w-4 h-4 text-slate-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                      <ChevronRight className={`w-4 h-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap">{formatLogTimestamp(row.time || row.timestamp)}</td>
                     <td className="px-4 py-2 max-w-xs truncate font-mono text-xs" title={row.unique_id}>
@@ -221,46 +221,46 @@ export default function WafLogs({ onCreateException }: WafLogsProps = {}) {
                     </td>
                   </tr>
                   {isExpanded && (
-                    <tr className="bg-slate-900/60">
+                    <tr className="bg-card/60">
                       <td colSpan={8} className="px-6 py-4">
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                           <div>
-                            <span className="text-slate-400 text-xs">{t('pages:wafLogs.expandedFields.fullTime')}</span>
+                            <span className="text-muted-foreground text-xs">{t('pages:wafLogs.expandedFields.fullTime')}</span>
                             <code className="block text-xs mt-1 font-mono break-all">{formatLogTimestamp(row.time || row.timestamp)}</code>
                           </div>
                           <div>
-                            <span className="text-slate-400 text-xs">{t('pages:wafLogs.expandedFields.uniqueId')}</span>
+                            <span className="text-muted-foreground text-xs">{t('pages:wafLogs.expandedFields.uniqueId')}</span>
                             <code className="block text-xs mt-1 font-mono break-all">{row.unique_id || '-'}</code>
                           </div>
                           <div>
-                            <span className="text-slate-400 text-xs">{t('pages:wafLogs.expandedFields.action')}</span>
+                            <span className="text-muted-foreground text-xs">{t('pages:wafLogs.expandedFields.action')}</span>
                             <code className="block text-xs mt-1 font-mono break-all">{row.action || '-'}</code>
                           </div>
                           <div>
-                            <span className="text-slate-400 text-xs">{t('pages:wafLogs.expandedFields.ruleId')}</span>
+                            <span className="text-muted-foreground text-xs">{t('pages:wafLogs.expandedFields.ruleId')}</span>
                             <code className="block text-xs mt-1 font-mono break-all">{row.rule_id || row.id || '-'}</code>
                           </div>
                           <div>
-                            <span className="text-slate-400 text-xs">{t('pages:wafLogs.expandedFields.severity')}</span>
+                            <span className="text-muted-foreground text-xs">{t('pages:wafLogs.expandedFields.severity')}</span>
                             <code className="block text-xs mt-1 font-mono break-all">{row.severity || '-'}</code>
                           </div>
                           <div>
-                            <span className="text-slate-400 text-xs">{t('pages:wafLogs.expandedFields.clientIp')}</span>
+                            <span className="text-muted-foreground text-xs">{t('pages:wafLogs.expandedFields.clientIp')}</span>
                             <code className="block text-xs mt-1 font-mono break-all">{row.client || row.client_ip || '-'}</code>
                           </div>
                           <div className="col-span-2 md:col-span-3">
-                            <span className="text-slate-400 text-xs">{t('pages:wafLogs.expandedFields.fullUri')}</span>
+                            <span className="text-muted-foreground text-xs">{t('pages:wafLogs.expandedFields.fullUri')}</span>
                             <code className="block text-xs mt-1 font-mono break-all">{row.uri || row.path || '-'}</code>
                           </div>
                           <div className="col-span-2 md:col-span-3">
-                            <span className="text-slate-400 text-xs">{t('pages:wafLogs.expandedFields.fullMessage')}</span>
+                            <span className="text-muted-foreground text-xs">{t('pages:wafLogs.expandedFields.fullMessage')}</span>
                             <p className="text-xs mt-1 break-all">{row.msg || row.message || '-'}</p>
                           </div>
                         </div>
                         {row.raw && (
                           <div className="mt-3">
-                            <span className="text-slate-400 text-xs">{t('pages:wafLogs.expandedFields.rawLogLine')}</span>
-                            <pre className="text-xs mt-1 bg-slate-950 p-2 rounded overflow-auto max-h-40 break-all whitespace-pre-wrap">{row.raw}</pre>
+                            <span className="text-muted-foreground text-xs">{t('pages:wafLogs.expandedFields.rawLogLine')}</span>
+                            <pre className="text-xs mt-1 bg-background p-2 rounded overflow-auto max-h-40 break-all whitespace-pre-wrap">{row.raw}</pre>
                           </div>
                         )}
                         {onCreateException && (row.rule_id || row.id) && (
@@ -282,7 +282,7 @@ export default function WafLogs({ onCreateException }: WafLogsProps = {}) {
             })}
             {parsed.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-6 text-slate-500">{events.length === 0 ? t('pages:wafLogs.noWafEvents') : t('pages:wafLogs.noEventsMatchFilter')}</td>
+                <td colSpan={8} className="px-4 py-6 text-muted-foreground">{events.length === 0 ? t('pages:wafLogs.noWafEvents') : t('pages:wafLogs.noEventsMatchFilter')}</td>
               </tr>
             )}
           </tbody>
@@ -293,28 +293,28 @@ export default function WafLogs({ onCreateException }: WafLogsProps = {}) {
       {asnPopover && (
         <div
           ref={asnPopoverRef}
-          className="fixed z-50 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-3 text-sm"
+          className="fixed z-50 w-64 bg-muted border border-subtle rounded-lg shadow-xl p-3 text-sm"
           style={computePopoverPosition(asnPopover.rect, 256, 200)}
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="font-semibold text-slate-200">ASN Lookup</span>
+            <span className="font-semibold text-secondary-foreground">ASN Lookup</span>
             <button
               onClick={() => { setAsnPopover(null); setAsnResult(null) }}
-              className="text-slate-400 hover:text-slate-200"
+              className="text-muted-foreground hover:text-secondary-foreground"
             >&times;</button>
           </div>
           {asnLoading ? (
-            <p className="text-slate-400">Looking up...</p>
+            <p className="text-muted-foreground">Looking up...</p>
           ) : asnResult ? (
             <div className="space-y-1">
-              <div><span className="text-slate-500">Country:</span> <span className="text-slate-200">{asnResult.country || 'Unknown'}</span></div>
-              <div><span className="text-slate-500">City:</span> <span className="text-slate-200">{asnResult.city || 'Unknown'}</span></div>
-              <div><span className="text-slate-500">Organization:</span> <span className="text-slate-200">{asnResult.organization || 'Unknown'}</span></div>
-              <div><span className="text-slate-500">Network:</span> <span className="text-slate-200 font-mono text-xs">{asnResult.network || 'Unknown'}</span></div>
-              <div><span className="text-slate-500">IP:</span> <span className="text-slate-200 font-mono text-xs">{asnPopover.ip}</span></div>
+              <div><span className="text-muted-foreground">Country:</span> <span className="text-secondary-foreground">{asnResult.country || 'Unknown'}</span></div>
+              <div><span className="text-muted-foreground">City:</span> <span className="text-secondary-foreground">{asnResult.city || 'Unknown'}</span></div>
+              <div><span className="text-muted-foreground">Organization:</span> <span className="text-secondary-foreground">{asnResult.organization || 'Unknown'}</span></div>
+              <div><span className="text-muted-foreground">Network:</span> <span className="text-secondary-foreground font-mono text-xs">{asnResult.network || 'Unknown'}</span></div>
+              <div><span className="text-muted-foreground">IP:</span> <span className="text-secondary-foreground font-mono text-xs">{asnPopover.ip}</span></div>
             </div>
           ) : (
-            <p className="text-slate-400">No data available</p>
+            <p className="text-muted-foreground">No data available</p>
           )}
         </div>
       )}
@@ -323,31 +323,31 @@ export default function WafLogs({ onCreateException }: WafLogsProps = {}) {
       {uidPopover && (
         <div
           ref={uidPopoverRef}
-          className="fixed z-50 w-80 bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-3 text-sm"
+          className="fixed z-50 w-80 bg-muted border border-subtle rounded-lg shadow-xl p-3 text-sm"
           style={computePopoverPosition(uidPopover.rect, 320, 220)}
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="font-semibold text-slate-200">Unique ID Decoder</span>
+            <span className="font-semibold text-secondary-foreground">Unique ID Decoder</span>
             <button
               onClick={() => { setUidPopover(null); setUidDecoded(null) }}
-              className="text-slate-400 hover:text-slate-200"
+              className="text-muted-foreground hover:text-secondary-foreground"
             >&times;</button>
           </div>
           <div className="mb-2">
-            <code className="text-xs font-mono text-slate-400 break-all">{uidPopover.uid}</code>
+            <code className="text-xs font-mono text-muted-foreground break-all">{uidPopover.uid}</code>
           </div>
           {uidDecoded?.error ? (
             <p className="text-red-400 text-xs">{uidDecoded.error}</p>
           ) : uidDecoded?.decoded ? (
             <div className="space-y-1">
-              <div><span className="text-slate-500">{t('pages:uniqueIdDecoder.fields.clientIp')}:</span> <span className="text-slate-200 font-mono text-xs">{uidDecoded.decoded.clientIp}</span></div>
-              <div><span className="text-slate-500">{t('pages:uniqueIdDecoder.fields.clientPort')}:</span> <span className="text-slate-200 font-mono text-xs">{uidDecoded.decoded.clientPort}</span></div>
-              <div><span className="text-slate-500">{t('pages:uniqueIdDecoder.fields.timestamp')}:</span> <span className="text-slate-200 font-mono text-xs">{uidDecoded.decoded.timestampFormatted}</span></div>
-              <div><span className="text-slate-500">{t('pages:uniqueIdDecoder.fields.requestCounter')}:</span> <span className="text-slate-200 font-mono text-xs">{uidDecoded.decoded.requestCounter}</span></div>
-              <div><span className="text-slate-500">{t('pages:uniqueIdDecoder.fields.processId')}:</span> <span className="text-slate-200 font-mono text-xs">{uidDecoded.decoded.pid}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:uniqueIdDecoder.fields.clientIp')}:</span> <span className="text-secondary-foreground font-mono text-xs">{uidDecoded.decoded.clientIp}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:uniqueIdDecoder.fields.clientPort')}:</span> <span className="text-secondary-foreground font-mono text-xs">{uidDecoded.decoded.clientPort}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:uniqueIdDecoder.fields.timestamp')}:</span> <span className="text-secondary-foreground font-mono text-xs">{uidDecoded.decoded.timestampFormatted}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:uniqueIdDecoder.fields.requestCounter')}:</span> <span className="text-secondary-foreground font-mono text-xs">{uidDecoded.decoded.requestCounter}</span></div>
+              <div><span className="text-muted-foreground">{t('pages:uniqueIdDecoder.fields.processId')}:</span> <span className="text-secondary-foreground font-mono text-xs">{uidDecoded.decoded.pid}</span></div>
             </div>
           ) : (
-            <p className="text-slate-400">No data available</p>
+            <p className="text-muted-foreground">No data available</p>
           )}
         </div>
       )}

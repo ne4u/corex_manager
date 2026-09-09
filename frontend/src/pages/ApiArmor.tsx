@@ -26,7 +26,7 @@ export default function ApiArmor() {
       <h1 className="text-2xl font-bold flex items-center gap-2">
         <ShieldCheck className="h-5 w-5 text-primary" /> {t('pages:apiArmor.title')}
       </h1>
-      <p className="text-sm text-slate-400 max-w-3xl">
+      <p className="text-sm text-muted-foreground max-w-3xl">
         {t('pages:apiArmor.description')}
       </p>
 
@@ -89,7 +89,7 @@ function SettingsTab() {
   }
 
   return (
-    <div className="card space-y-4 max-w-3xl">
+    <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4 max-w-3xl">
       {!reqFpEnabled && (
         <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
           <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-amber-500" />
@@ -102,7 +102,7 @@ function SettingsTab() {
         <input type="checkbox" checked={!!settings.api_armor_enabled}
           disabled={!reqFpEnabled}
           onChange={(e) => setSettings({ ...settings, api_armor_enabled: e.target.checked })} />
-        <span className={`text-sm ${!reqFpEnabled ? 'text-slate-500' : ''}`}>{t('pages:apiArmor.settings.enableApiArmor')}</span>
+        <span className={`text-sm ${!reqFpEnabled ? 'text-muted-foreground' : ''}`}>{t('pages:apiArmor.settings.enableApiArmor')}</span>
       </label>
       <label className="flex items-center gap-2">
         <input type="checkbox" checked={!!settings.api_armor_schema_learning_enabled}
@@ -207,7 +207,7 @@ function PresetsTab() {
   }
 
   return (
-    <div className="card space-y-4 max-w-3xl">
+    <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4 max-w-3xl">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">{t('pages:apiArmor.presets.title')}</h2>
         <button className="btn-primary" onClick={apply}>{t('pages:apiArmor.presets.applyAllPresets')}</button>
@@ -215,10 +215,10 @@ function PresetsTab() {
       {msg && <p className={`text-sm ${msg.isError ? 'text-red-400' : 'text-green-400'}`}>{msg.text}</p>}
       <div className="space-y-2">
         {presets.map((p, i) => (
-          <div key={i} className="border border-slate-700 rounded p-3">
+          <div key={i} className="border border-subtle rounded p-3">
             <div className="font-medium text-sm">{p.name}</div>
-            <div className="text-xs text-slate-400">{p.description}</div>
-            <div className="text-xs text-slate-500 mt-1">
+            <div className="text-xs text-muted-foreground">{p.description}</div>
+            <div className="text-xs text-muted-foreground mt-1">
               <code>{p.expression}</code> → <span className="text-primary">{p.action}</span>
             </div>
           </div>
@@ -275,7 +275,7 @@ function SpecsTab() {
   }
 
   return (
-    <div className="card space-y-4 max-w-4xl">
+    <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4 max-w-4xl">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">{t('pages:apiArmor.specs.title')}</h2>
         <button className="btn-primary flex items-center gap-1" onClick={() => setShowUpload(!showUpload)}>
@@ -284,7 +284,7 @@ function SpecsTab() {
       </div>
       {msg && <p className={`text-sm ${msg.isError ? 'text-red-400' : 'text-green-400'}`}>{msg.text}</p>}
       {showUpload && (
-        <div className="space-y-2 border border-slate-700 rounded p-3">
+        <div className="space-y-2 border border-subtle rounded p-3">
           <input className="input" placeholder={t('pages:apiArmor.specs.specName')} value={name} onChange={(e) => setName(e.target.value)} />
           <textarea className="input font-mono text-xs" rows={10} placeholder={t('pages:apiArmor.specs.pasteSpec')}
             value={specText} onChange={(e) => setSpecText(e.target.value)} />
@@ -293,11 +293,11 @@ function SpecsTab() {
       )}
       <div className="space-y-2">
         {specs.map((s) => (
-          <div key={s.id} className="border border-slate-700 rounded p-3">
+          <div key={s.id} className="border border-subtle rounded p-3">
             <div className="flex items-center justify-between">
               <div>
                 <div className="font-medium text-sm">{s.name}</div>
-                <div className="text-xs text-slate-400">{t('pages:apiArmor.specs.schemasCount', { version: s.version, count: s.schema_count })}</div>
+                <div className="text-xs text-muted-foreground">{t('pages:apiArmor.specs.schemasCount', { version: s.version, count: s.schema_count })}</div>
               </div>
               <div className="flex items-center gap-2">
                 <button onClick={() => view(s.id)} className="text-primary hover:underline text-xs flex items-center gap-1">
@@ -309,9 +309,9 @@ function SpecsTab() {
               </div>
             </div>
             {viewing === s.id && (
-              <div className="mt-2 border-t border-slate-700 pt-2">
+              <div className="mt-2 border-t border-subtle pt-2">
                 {viewSchemas.map((sch) => (
-                  <div key={sch.id} className="text-xs text-slate-400 mb-1">
+                  <div key={sch.id} className="text-xs text-muted-foreground mb-1">
                     {sch.method} {sch.path} • {sch.name}
                   </div>
                 ))}
@@ -319,7 +319,7 @@ function SpecsTab() {
             )}
           </div>
         ))}
-        {specs.length === 0 && <p className="text-sm text-slate-500">{t('pages:apiArmor.specs.noSpecs')}</p>}
+        {specs.length === 0 && <p className="text-sm text-muted-foreground">{t('pages:apiArmor.specs.noSpecs')}</p>}
       </div>
     </div>
   )
@@ -384,7 +384,7 @@ function SchemasTab() {
   }
 
   return (
-    <div className="card space-y-4 max-w-4xl">
+    <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4 max-w-4xl">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">{t('pages:apiArmor.schemas.title')}</h2>
         <button className="btn-primary flex items-center gap-1" onClick={() => { setLearn({ method: 'POST', path: '/', body: '{}' }); setEditing(null) }}>
@@ -394,7 +394,7 @@ function SchemasTab() {
       {msg && <p className={`text-sm ${msg.isError ? 'text-red-400' : 'text-green-400'}`}>{msg.text}</p>}
 
       {learn && (
-        <div className="space-y-2 border border-slate-700 rounded p-3">
+        <div className="space-y-2 border border-subtle rounded p-3">
           <h3 className="text-sm font-medium">{t('pages:apiArmor.schemas.learnTitle')}</h3>
           <div className="flex gap-2">
             <input className="input" placeholder="GET" value={learn.method} onChange={(e) => setLearn({ ...learn, method: e.target.value })} />
@@ -410,7 +410,7 @@ function SchemasTab() {
       )}
 
       {editing && (
-        <div className="space-y-2 border border-slate-700 rounded p-3">
+        <div className="space-y-2 border border-subtle rounded p-3">
           <h3 className="text-sm font-medium">{t('pages:apiArmor.schemas.edit')}: {editing.method} {editing.path}</h3>
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={!!editing.enabled} onChange={(e) => setEditing({ ...editing, enabled: e.target.checked })} />
@@ -427,25 +427,25 @@ function SchemasTab() {
 
       <div className="space-y-2">
         {schemas.map((s) => (
-          <div key={s.id} className="border border-slate-700 rounded p-3">
+          <div key={s.id} className="border border-subtle rounded p-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="font-medium text-sm">{s.method} {s.path}</div>
                 <span className={`text-xs px-2 py-0.5 rounded ${s.source === 'openapi' ? 'bg-blue-900' : 'bg-green-900'}`}>{s.source}</span>
-                {s.enabled === false && <span className="text-xs text-slate-500">({t('pages:apiArmor.schemas.enabled')}: off)</span>}
+                {s.enabled === false && <span className="text-xs text-muted-foreground">({t('pages:apiArmor.schemas.enabled')}: off)</span>}
               </div>
               <button onClick={() => startEdit(s)} className="text-primary hover:underline text-xs flex items-center gap-1">
                 <Pencil className="h-3 w-3" /> {t('pages:apiArmor.schemas.edit')}
               </button>
             </div>
-            <div className="text-xs text-slate-400 mt-1">{s.name} • {t('pages:apiArmor.schemas.samples', { count: s.sample_count })}</div>
+            <div className="text-xs text-muted-foreground mt-1">{s.name} • {t('pages:apiArmor.schemas.samples', { count: s.sample_count })}</div>
             <details className="mt-2">
-              <summary className="text-xs text-slate-500 cursor-pointer">{t('pages:apiArmor.schemas.schemaJson')}</summary>
-              <pre className="text-xs text-slate-400 mt-1 overflow-auto max-h-48">{JSON.stringify(s.schema_def, null, 2)}</pre>
+              <summary className="text-xs text-muted-foreground cursor-pointer">{t('pages:apiArmor.schemas.schemaJson')}</summary>
+              <pre className="text-xs text-muted-foreground mt-1 overflow-auto max-h-48">{JSON.stringify(s.schema_def, null, 2)}</pre>
             </details>
           </div>
         ))}
-        {schemas.length === 0 && <p className="text-sm text-slate-500">{t('pages:apiArmor.schemas.noSchemas')}</p>}
+        {schemas.length === 0 && <p className="text-sm text-muted-foreground">{t('pages:apiArmor.schemas.noSchemas')}</p>}
       </div>
     </div>
   )
@@ -531,7 +531,7 @@ function AuthTab() {
   }
 
   return (
-    <div className="card space-y-4 max-w-4xl">
+    <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4 max-w-4xl">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">{t('pages:apiArmor.auth.title')}</h2>
         <button className="btn-primary flex items-center gap-1" onClick={startNew}>
@@ -541,7 +541,7 @@ function AuthTab() {
       {msg && <p className={`text-sm ${msg.isError ? 'text-red-400' : 'text-green-400'}`}>{msg.text}</p>}
 
       {editing && (
-        <div className="space-y-3 border border-slate-700 rounded p-3">
+        <div className="space-y-3 border border-subtle rounded p-3">
           <h3 className="text-sm font-medium">{editing.id ? t('pages:apiArmor.auth.editPolicy') : t('pages:apiArmor.auth.addPolicy')}</h3>
           <input className="input" placeholder={t('pages:apiArmor.auth.name')} value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
           <div className="grid grid-cols-2 gap-3">
@@ -558,7 +558,7 @@ function AuthTab() {
           </div>
 
           <div>
-            <label className="text-xs text-slate-400 block mb-1">{t('pages:apiArmor.auth.listeners')}</label>
+            <label className="text-xs text-muted-foreground block mb-1">{t('pages:apiArmor.auth.listeners')}</label>
             <select multiple className="input h-24" value={(editing.listener_ids || []).map(String)}
               onChange={(e) => {
                 const selected = Array.from(e.target.selectedOptions).map(o => parseInt(o.value))
@@ -579,7 +579,7 @@ function AuthTab() {
           </label>
 
           {editing.auth_type === 'jwt' && (
-            <div className="space-y-3 border-t border-slate-700 pt-3">
+            <div className="space-y-3 border-t border-subtle pt-3">
               <div className="grid grid-cols-2 gap-3">
                 <select className="input" value={editing.jwt_algorithm} onChange={(e) => setEditing({ ...editing, jwt_algorithm: e.target.value })}>
                   <option value="HS256">HS256</option>
@@ -596,7 +596,7 @@ function AuthTab() {
           )}
 
           {editing.auth_type === 'api_key' && (
-            <div className="space-y-3 border-t border-slate-700 pt-3">
+            <div className="space-y-3 border-t border-subtle pt-3">
               <input className="input" placeholder={t('pages:apiArmor.auth.apiKeyHeader')} value={editing.api_key_header} onChange={(e) => setEditing({ ...editing, api_key_header: e.target.value })} />
               <select className="input" value={editing.api_key_list_id || ''} onChange={(e) => setEditing({ ...editing, api_key_list_id: e.target.value ? parseInt(e.target.value) : null })}>
                 <option value="">{t('pages:apiArmor.auth.apiKeyList')}</option>
@@ -614,17 +614,17 @@ function AuthTab() {
 
       <div className="space-y-2">
         {policies.map((p) => (
-          <div key={p.id} className="border border-slate-700 rounded p-3">
+          <div key={p.id} className="border border-subtle rounded p-3">
             <div className="flex items-center justify-between">
               <div>
                 <div className="font-medium text-sm flex items-center gap-2">
                   {p.name}
-                  {p.enabled === false && <span className="text-xs text-slate-500">(disabled)</span>}
+                  {p.enabled === false && <span className="text-xs text-muted-foreground">(disabled)</span>}
                 </div>
-                <div className="text-xs text-slate-400">
+                <div className="text-xs text-muted-foreground">
                   {t('pages:apiArmor.auth.type')}: {p.auth_type} • {t('pages:apiArmor.auth.algorithm')}: {p.jwt_algorithm || '-'} • {t('pages:apiArmor.auth.onFailure')}: {p.on_failure}
                 </div>
-                {p.jwt_issuer && <div className="text-xs text-slate-500">{t('pages:apiArmor.auth.issuer')}: {p.jwt_issuer}</div>}
+                {p.jwt_issuer && <div className="text-xs text-muted-foreground">{t('pages:apiArmor.auth.issuer')}: {p.jwt_issuer}</div>}
               </div>
               <div className="flex items-center gap-2">
                 <button onClick={() => startEdit(p)} className="text-primary hover:underline text-xs flex items-center gap-1">
@@ -637,14 +637,14 @@ function AuthTab() {
             </div>
             {confirmDelete?.id === p.id && (
               <div className="mt-2 flex items-center gap-2 text-xs">
-                <span className="text-slate-400">{t('pages:apiArmor.auth.confirmDelete', { name: p.name })}</span>
+                <span className="text-muted-foreground">{t('pages:apiArmor.auth.confirmDelete', { name: p.name })}</span>
                 <button className="text-red-400 hover:underline" onClick={() => del(p)}>{t('common:yes', 'Yes')}</button>
                 <button className="text-primary hover:underline" onClick={() => setConfirmDelete(null)}>{t('common:cancel', 'Cancel')}</button>
               </div>
             )}
           </div>
         ))}
-        {policies.length === 0 && <p className="text-sm text-slate-500">{t('pages:apiArmor.auth.noPolicies')}</p>}
+        {policies.length === 0 && <p className="text-sm text-muted-foreground">{t('pages:apiArmor.auth.noPolicies')}</p>}
       </div>
     </div>
   )
@@ -718,7 +718,7 @@ function KeysTab() {
   }
 
   return (
-    <div className="card space-y-4 max-w-4xl">
+    <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4 max-w-4xl">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">{t('pages:apiArmor.keys.title')}</h2>
         <button className="btn-primary flex items-center gap-1" onClick={startNew}>
@@ -728,21 +728,21 @@ function KeysTab() {
       {msg && <p className={`text-sm ${msg.isError ? 'text-red-400' : 'text-green-400'}`}>{msg.text}</p>}
 
       {editing && (
-        <div className="space-y-3 border border-slate-700 rounded p-3">
+        <div className="space-y-3 border border-subtle rounded p-3">
           <h3 className="text-sm font-medium">{editing.id ? t('pages:apiArmor.keys.editList') : t('pages:apiArmor.keys.addList')}</h3>
           <input className="input" placeholder={t('pages:apiArmor.keys.name')} value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
           <input className="input" placeholder={t('pages:apiArmor.keys.description')} value={editing.description || ''} onChange={(e) => setEditing({ ...editing, description: e.target.value })} />
 
           <div>
-            <label className="text-xs text-slate-400 block mb-1">{t('pages:apiArmor.keys.entries')}</label>
+            <label className="text-xs text-muted-foreground block mb-1">{t('pages:apiArmor.keys.entries')}</label>
             <div className="flex gap-2 mb-2">
               <input className="input flex-1" placeholder={t('pages:apiArmor.keys.newKey')} value={newEntry} onChange={(e) => setNewEntry(e.target.value)} />
               <button className="btn-primary" onClick={addEntry}>{t('pages:apiArmor.keys.addKey')}</button>
             </div>
-            <div className="space-y-1 max-h-48 overflow-auto border border-slate-700 rounded p-2">
+            <div className="space-y-1 max-h-48 overflow-auto border border-subtle rounded p-2">
               {editing.entries?.map((e: any, idx: number) => (
                 <div key={idx} className="flex items-center justify-between text-xs">
-                  <code className="text-slate-300">{typeof e === 'string' ? e : e.value}</code>
+                  <code className="text-secondary-foreground">{typeof e === 'string' ? e : e.value}</code>
                   <button onClick={() => removeEntry(idx)} className="text-red-400 hover:underline">{t('common:remove', 'Remove')}</button>
                 </div>
               ))}
@@ -758,12 +758,12 @@ function KeysTab() {
 
       <div className="space-y-2">
         {lists.map((l) => (
-          <div key={l.id} className="border border-slate-700 rounded p-3">
+          <div key={l.id} className="border border-subtle rounded p-3">
             <div className="flex items-center justify-between">
               <div>
                 <div className="font-medium text-sm">{l.name}</div>
-                {l.description && <div className="text-xs text-slate-400">{l.description}</div>}
-                <div className="text-xs text-slate-500 mt-1">{t('pages:apiArmor.keys.keysCount', { count: l.entries?.length || 0 })}</div>
+                {l.description && <div className="text-xs text-muted-foreground">{l.description}</div>}
+                <div className="text-xs text-muted-foreground mt-1">{t('pages:apiArmor.keys.keysCount', { count: l.entries?.length || 0 })}</div>
               </div>
               <div className="flex items-center gap-2">
                 <button onClick={() => startEdit(l)} className="text-primary hover:underline text-xs flex items-center gap-1">
@@ -776,14 +776,14 @@ function KeysTab() {
             </div>
             {confirmDelete?.id === l.id && (
               <div className="mt-2 flex items-center gap-2 text-xs">
-                <span className="text-slate-400">{t('pages:apiArmor.keys.confirmDelete', { name: l.name })}</span>
+                <span className="text-muted-foreground">{t('pages:apiArmor.keys.confirmDelete', { name: l.name })}</span>
                 <button className="text-red-400 hover:underline" onClick={() => del(l)}>{t('common:yes', 'Yes')}</button>
                 <button className="text-primary hover:underline" onClick={() => setConfirmDelete(null)}>{t('common:cancel', 'Cancel')}</button>
               </div>
             )}
           </div>
         ))}
-        {lists.length === 0 && <p className="text-sm text-slate-500">{t('pages:apiArmor.keys.noLists')}</p>}
+        {lists.length === 0 && <p className="text-sm text-muted-foreground">{t('pages:apiArmor.keys.noLists')}</p>}
       </div>
     </div>
   )
@@ -819,12 +819,12 @@ function ProfilesTab() {
   }
 
   return (
-    <div className="card space-y-4 max-w-4xl">
+    <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4 max-w-4xl">
       <h2 className="text-lg font-semibold">{t('pages:apiArmor.profiles.title')}</h2>
       {msg && <p className={`text-sm ${msg.isError ? 'text-red-400' : 'text-green-400'}`}>{msg.text}</p>}
       <div className="space-y-2">
         {profiles.map((p) => (
-          <div key={p.id} className="border border-slate-700 rounded p-3">
+          <div key={p.id} className="border border-subtle rounded p-3">
             <div className="flex items-center justify-between">
               <div>
                 <div className="font-medium text-sm">{p.method} {p.path}</div>
@@ -843,22 +843,22 @@ function ProfilesTab() {
                 </button>
               </div>
             </div>
-            <div className="text-xs text-slate-400 mt-1">{t('pages:apiArmor.profiles.samples', { count: p.sample_count })}</div>
+            <div className="text-xs text-muted-foreground mt-1">{t('pages:apiArmor.profiles.samples', { count: p.sample_count })}</div>
             {Object.keys(p.dimensions || {}).length > 0 && (
-              <div className="text-xs text-slate-500 mt-1">
+              <div className="text-xs text-muted-foreground mt-1">
                 {t('pages:apiArmor.profiles.dimensions', { dims: Object.keys(p.dimensions).join(', ') })}
               </div>
             )}
             {confirmDelete?.id === p.id && (
               <div className="mt-2 flex items-center gap-2 text-xs">
-                <span className="text-slate-400">{t('pages:apiArmor.profiles.confirmDelete', { method: p.method, path: p.path })}</span>
+                <span className="text-muted-foreground">{t('pages:apiArmor.profiles.confirmDelete', { method: p.method, path: p.path })}</span>
                 <button className="text-red-400 hover:underline" onClick={() => del(p)}>{t('common:yes', 'Yes')}</button>
                 <button className="text-primary hover:underline" onClick={() => setConfirmDelete(null)}>{t('common:cancel', 'Cancel')}</button>
               </div>
             )}
           </div>
         ))}
-        {profiles.length === 0 && <p className="text-sm text-slate-500">{t('pages:apiArmor.profiles.noProfiles')}</p>}
+        {profiles.length === 0 && <p className="text-sm text-muted-foreground">{t('pages:apiArmor.profiles.noProfiles')}</p>}
       </div>
     </div>
   )
@@ -884,7 +884,7 @@ function AnomaliesTab() {
   }
 
   return (
-    <div className="card space-y-4 max-w-4xl">
+    <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4 max-w-4xl">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">{t('pages:apiArmor.anomalies.title')}</h2>
         {anomalies.length > 0 && (
@@ -900,19 +900,19 @@ function AnomaliesTab() {
       {msg && <p className={`text-sm ${msg.isError ? 'text-red-400' : 'text-green-400'}`}>{msg.text}</p>}
       <div className="space-y-2">
         {anomalies.map((a) => (
-          <div key={a.id} className="border border-slate-700 rounded p-3">
+          <div key={a.id} className="border border-subtle rounded p-3">
             <div className="flex items-center justify-between">
               <div className="font-medium text-sm">{a.method} {a.path}</div>
               <span className="text-xs text-yellow-400">{a.dimension}</span>
             </div>
-            <div className="text-xs text-slate-400 mt-1">
+            <div className="text-xs text-muted-foreground mt-1">
               {t('pages:apiArmor.anomalies.observed')}: <code>{a.observed_value}</code>
             </div>
-            {a.client_ip && <div className="text-xs text-slate-500">{t('pages:apiArmor.anomalies.ip')}: {a.client_ip}</div>}
-            <div className="text-xs text-slate-500">{a.created_at}</div>
+            {a.client_ip && <div className="text-xs text-muted-foreground">{t('pages:apiArmor.anomalies.ip')}: {a.client_ip}</div>}
+            <div className="text-xs text-muted-foreground">{a.created_at}</div>
           </div>
         ))}
-        {anomalies.length === 0 && <p className="text-sm text-slate-500">{t('pages:apiArmor.anomalies.noAnomalies')}</p>}
+        {anomalies.length === 0 && <p className="text-sm text-muted-foreground">{t('pages:apiArmor.anomalies.noAnomalies')}</p>}
       </div>
     </div>
   )

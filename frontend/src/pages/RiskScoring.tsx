@@ -76,7 +76,7 @@ const CATEGORY_COLOR_MAP: Record<string, string> = {
   teal: 'bg-teal-500/20 text-teal-400',
   red: 'bg-red-500/20 text-red-400',
   green: 'bg-green-500/20 text-green-400',
-  gray: 'bg-slate-500/20 text-slate-400',
+  gray: 'bg-muted-foreground/20 text-muted-foreground',
 }
 
 const FIELD_GROUPS = [
@@ -563,7 +563,7 @@ export default function RiskScoring() {
 
       {/* Ruleset Tabs */}
       {rulesets.length > 0 && (
-        <div className="flex items-center gap-1 border-b border-slate-800">
+        <div className="flex items-center gap-1 border-b border-border">
           {rulesets.map(rs => (
             <button
               key={rs.id}
@@ -571,11 +571,11 @@ export default function RiskScoring() {
               className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
                 activeRulesetId === rs.id
                   ? 'border-primary text-primary'
-                  : 'border-transparent text-slate-400 hover:text-slate-200'
+                  : 'border-transparent text-muted-foreground hover:text-secondary-foreground'
               }`}
             >
               {rs.name}
-              <span className="ml-1.5 text-xs text-slate-500">({rs.rule_count})</span>
+              <span className="ml-1.5 text-xs text-muted-foreground">({rs.rule_count})</span>
             </button>
           ))}
         </div>
@@ -583,16 +583,16 @@ export default function RiskScoring() {
 
       {/* How Risk Scoring Works */}
       {activeRuleset && (
-        <div className="card p-4">
+        <div className="rounded-lg border border-border bg-card shadow-sm p-4">
           <div className="flex items-center gap-2 mb-3">
             <Gauge className="h-4 w-4 text-primary" />
             <span className="font-semibold text-sm">{t('riskScoring.helpTitle')}</span>
           </div>
-          <div className="text-xs text-slate-400 space-y-2">
+          <div className="text-xs text-muted-foreground space-y-2">
             <p>{t('riskScoring.helpDescription')}</p>
             <p>{t('riskScoring.helpDensity')}</p>
             <div>
-              <span className="text-slate-300 font-medium">{t('riskScoring.helpCalibrationTitle')}</span>
+              <span className="text-secondary-foreground font-medium">{t('riskScoring.helpCalibrationTitle')}</span>
               <ul className="mt-1 space-y-0.5 ms-4 list-disc">
                 <li><span className="text-green-400 font-mono">0–5</span> — {t('riskScoring.calibrationTrusted')}</li>
                 <li><span className="text-green-400 font-mono">5–15</span> — {t('riskScoring.calibrationLow')}</li>
@@ -602,8 +602,8 @@ export default function RiskScoring() {
               </ul>
             </div>
             <div>
-              <span className="text-slate-300 font-medium">{t('riskScoring.helpExampleTitle')}</span>
-              <pre className="mt-1 p-2 rounded bg-slate-900/60 text-slate-300 font-mono text-xs overflow-x-auto"><code>{t('riskScoring.helpExampleCode')}</code></pre>
+              <span className="text-secondary-foreground font-medium">{t('riskScoring.helpExampleTitle')}</span>
+              <pre className="mt-1 p-2 rounded bg-card/60 text-secondary-foreground font-mono text-xs overflow-x-auto"><code>{t('riskScoring.helpExampleCode')}</code></pre>
             </div>
           </div>
         </div>
@@ -611,12 +611,12 @@ export default function RiskScoring() {
 
       {/* Category filter + table */}
       {rules.length === 0 ? (
-        <div className="card p-4 text-slate-500">{t('riskScoring.noRulesYet')}</div>
+        <div className="rounded-lg border border-border bg-card shadow-sm p-4 text-muted-foreground">{t('riskScoring.noRulesYet')}</div>
       ) : (
         <>
           {/* Category filter */}
           <div className="flex items-center gap-2">
-            <label className="text-sm text-slate-400">{t('riskScoring.categoryFilter')}</label>
+            <label className="text-sm text-muted-foreground">{t('riskScoring.categoryFilter')}</label>
             <select
               className="input text-sm py-1 w-auto"
               value={categoryFilter}
@@ -629,9 +629,9 @@ export default function RiskScoring() {
             </select>
           </div>
 
-          <div className="card overflow-x-auto">
+          <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
             <table className="w-full text-sm text-start">
-              <thead className="text-slate-400 border-b border-slate-800">
+              <thead className="text-muted-foreground border-b border-border">
                 <tr>
                   <th className="p-2 w-8"></th>
                   <th className="p-2 w-16">{t('riskScoring.tableHeaders.order')}</th>
@@ -646,29 +646,29 @@ export default function RiskScoring() {
               <tbody>
                 {groupedRules.map(group => (
                   <React.Fragment key={group.key}>
-                    <tr className="border-b border-slate-800 bg-slate-900/60">
+                    <tr className="border-b border-border bg-card/60">
                       <td colSpan={8} className="p-3">
                         <span className="font-semibold text-sm">{group.label}</span>
-                        <span className="text-xs text-slate-500 ms-2">({group.rules.length === 1 ? t('riskScoring.ruleCount', { count: group.rules.length }) : t('riskScoring.rulesCount', { count: group.rules.length })})</span>
+                        <span className="text-xs text-muted-foreground ms-2">({group.rules.length === 1 ? t('riskScoring.ruleCount', { count: group.rules.length }) : t('riskScoring.rulesCount', { count: group.rules.length })})</span>
                       </td>
                     </tr>
                     {group.rules.length === 0 ? (
-                      <tr className="border-b border-slate-800">
-                        <td colSpan={8} className="p-4 text-sm text-slate-500">{t('riskScoring.noRulesForAllListeners')}</td>
+                      <tr className="border-b border-border">
+                        <td colSpan={8} className="p-4 text-sm text-muted-foreground">{t('riskScoring.noRulesForAllListeners')}</td>
                       </tr>
                     ) : (
                       group.rules.map((r, gi) => (
                         <tr
                           key={r.id}
-                          className={`border-b border-slate-800 ${dragOverId === r.id ? 'bg-slate-800' : ''}`}
+                          className={`border-b border-border ${dragOverId === r.id ? 'bg-muted' : ''}`}
                           draggable
                           onDragStart={(e) => { e.dataTransfer.setData('text/plain', String(r.id)); e.dataTransfer.effectAllowed = 'move' }}
                           onDragOver={(e) => { e.preventDefault(); setDragOverId(r.id) }}
                           onDrop={(e) => { e.preventDefault(); const dragged = Number(e.dataTransfer.getData('text/plain')); if (dragged !== r.id) { setDragOverId(null); reorder(dragged, r.id) } }}
                           onDragEnd={() => setDragOverId(null)}
                         >
-                          <td className="p-2 cursor-grab"><GripVertical className="h-4 w-4 text-slate-500" /></td>
-                          <td className="p-2 text-slate-500">{gi + 1}</td>
+                          <td className="p-2 cursor-grab"><GripVertical className="h-4 w-4 text-muted-foreground" /></td>
+                          <td className="p-2 text-muted-foreground">{gi + 1}</td>
                           <td className="p-2 font-medium">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span>{r.name}</span>
@@ -678,22 +678,22 @@ export default function RiskScoring() {
                             </div>
                           </td>
                           <td className="p-2 whitespace-nowrap">
-                            <span className={`font-mono font-bold ${r.points > 0 ? 'text-green-400' : r.points < 0 ? 'text-blue-400' : 'text-slate-400'}`}>
+                            <span className={`font-mono font-bold ${r.points > 0 ? 'text-green-400' : r.points < 0 ? 'text-blue-400' : 'text-muted-foreground'}`}>
                               {r.points > 0 ? `+${r.points}` : r.points}
                             </span>
                           </td>
                           <td className="p-2">
                             <button
                               onClick={() => toggleEnabled(r)}
-                              className={`px-2 py-0.5 rounded text-xs font-medium ${r.enabled ? 'bg-green-500/20 text-green-400' : 'bg-slate-700 text-slate-400'}`}
+                              className={`px-2 py-0.5 rounded text-xs font-medium ${r.enabled ? 'bg-green-500/20 text-green-400' : 'bg-subtle text-muted-foreground'}`}
                             >
                               {r.enabled ? t('common:status.enabled') : t('common:status.disabled')}
                             </button>
                           </td>
-                          <td className="p-2 text-xs text-slate-400 max-w-xs truncate" title={r.expression}>
-                            <code className="text-slate-300">{r.expression}</code>
+                          <td className="p-2 text-xs text-muted-foreground max-w-xs truncate" title={r.expression}>
+                            <code className="text-secondary-foreground">{r.expression}</code>
                           </td>
-                          <td className="p-2 text-xs text-slate-400">{formatDateTime(r.updated_at)}</td>
+                          <td className="p-2 text-xs text-muted-foreground">{formatDateTime(r.updated_at)}</td>
                           <td className="p-2 whitespace-nowrap">
                             <div className="flex gap-1">
                               <IconButton icon={Pencil} aria-label={t('common:actions.edit')} onClick={() => openEdit(r)} />
@@ -718,7 +718,7 @@ export default function RiskScoring() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-slate-400 mb-1">{t('riskScoring.modal.name')}</label>
+              <label className="block text-sm text-muted-foreground mb-1">{t('riskScoring.modal.name')}</label>
               <input
                 className="input w-full"
                 value={form.name}
@@ -728,7 +728,7 @@ export default function RiskScoring() {
               />
             </div>
             <div>
-              <label className="block text-sm text-slate-400 mb-1">{t('riskScoring.modal.category')}</label>
+              <label className="block text-sm text-muted-foreground mb-1">{t('riskScoring.modal.category')}</label>
               <CategorySelect
                 value={form.category}
                 expression={form.expression}
@@ -740,14 +740,14 @@ export default function RiskScoring() {
 
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm text-slate-400 mb-1">{t('riskScoring.modal.points')}</label>
+              <label className="block text-sm text-muted-foreground mb-1">{t('riskScoring.modal.points')}</label>
               <PointsStepper
                 value={form.points}
                 onChange={v => setForm({ ...form, points: v })}
               />
             </div>
             <div>
-              <label className="block text-sm text-slate-400 mb-1">{t('riskScoring.modal.enabled')}</label>
+              <label className="block text-sm text-muted-foreground mb-1">{t('riskScoring.modal.enabled')}</label>
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -758,7 +758,7 @@ export default function RiskScoring() {
               </label>
             </div>
             <div>
-              <label className="block text-sm text-slate-400 mb-1">{t('riskScoring.modal.logRuleName')}</label>
+              <label className="block text-sm text-muted-foreground mb-1">{t('riskScoring.modal.logRuleName')}</label>
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -772,7 +772,7 @@ export default function RiskScoring() {
 
           {/* Listener scope */}
           <div>
-            <label className="block text-sm text-slate-400 mb-1">{t('riskScoring.modal.listenerScope')}</label>
+            <label className="block text-sm text-muted-foreground mb-1">{t('riskScoring.modal.listenerScope')}</label>
             <div className="flex items-center gap-4 mb-2">
               <label className="flex items-center gap-1">
                 <input
@@ -794,7 +794,7 @@ export default function RiskScoring() {
             {form.listener_ids.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {listenerList.map(l => (
-                  <label key={l.id} className="flex items-center gap-1 px-2 py-1 rounded bg-slate-800 text-sm">
+                  <label key={l.id} className="flex items-center gap-1 px-2 py-1 rounded bg-muted text-sm">
                     <input
                       type="checkbox"
                       checked={form.listener_ids.includes(l.id)}
@@ -829,15 +829,15 @@ export default function RiskScoring() {
           {/* Existing rulesets list */}
           <div className="space-y-2">
             {rulesets.map(rs => (
-              <div key={rs.id} className="flex items-center justify-between p-2 rounded border border-slate-800 bg-slate-900/50">
+              <div key={rs.id} className="flex items-center justify-between p-2 rounded border border-border bg-card/50">
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-slate-200">{rs.name}</div>
-                  <div className="text-xs text-slate-500">
-                    <code className="text-slate-400">risk.{rs.slug}.score</code>
+                  <div className="text-sm font-medium text-secondary-foreground">{rs.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    <code className="text-muted-foreground">risk.{rs.slug}.score</code>
                     {' · '}
                     {t('riskScoring.rulesets.ruleCount', { count: rs.rule_count })}
                   </div>
-                  {rs.description && <div className="text-xs text-slate-500 mt-0.5">{rs.description}</div>}
+                  {rs.description && <div className="text-xs text-muted-foreground mt-0.5">{rs.description}</div>}
                 </div>
                 <div className="flex gap-1">
                   <IconButton icon={Pencil} onClick={() => editRuleset(rs)} title={t('common:actions.edit')} aria-label={t('common:actions.edit')} />
@@ -850,8 +850,8 @@ export default function RiskScoring() {
           </div>
 
           {/* Create / Edit form */}
-          <div className="border-t border-slate-800 pt-3 space-y-2">
-            <div className="text-sm font-medium text-slate-200">
+          <div className="border-t border-border pt-3 space-y-2">
+            <div className="text-sm font-medium text-secondary-foreground">
               {editingRsId ? t('common:actions.edit') : t('riskScoring.rulesets.create')}
             </div>
             {editingRsId && (
@@ -866,8 +866,8 @@ export default function RiskScoring() {
               onChange={e => setRsForm({ ...rsForm, name: e.target.value })}
             />
             {rsForm.name && (
-              <div className="text-xs text-slate-500">
-                {t('riskScoring.rulesets.slug')}: <code className="text-slate-400">risk.{rsForm.name.toLowerCase().replace(/[^a-zA-Z0-9]+/g, '_').replace(/^(\d)/, 'rs_$1').replace(/^_|_$/g, '')}.score</code>
+              <div className="text-xs text-muted-foreground">
+                {t('riskScoring.rulesets.slug')}: <code className="text-muted-foreground">risk.{rsForm.name.toLowerCase().replace(/[^a-zA-Z0-9]+/g, '_').replace(/^(\d)/, 'rs_$1').replace(/^_|_$/g, '')}.score</code>
               </div>
             )}
             <input
@@ -930,7 +930,7 @@ function PointsStepper({ value, onChange }: { value: number; onChange: (v: numbe
         />
       </div>
       {/* Scale labels */}
-      <div className="flex justify-between text-xs text-slate-600">
+      <div className="flex justify-between text-xs text-subtle">
         <span className="text-blue-400">-99 ({t('riskScoring.modal.trustSignal')})</span>
         <span>0</span>
         <span className="text-red-400">99 ({t('riskScoring.modal.maxRisk')})</span>
@@ -1043,7 +1043,7 @@ function ExpressionEditor({ value, onChange }: { value: string; onChange: (v: st
 
   return (
     <div>
-      <label className="block text-sm text-slate-400 mb-1">{t('riskScoring.expression.label')}</label>
+      <label className="block text-sm text-muted-foreground mb-1">{t('riskScoring.expression.label')}</label>
       <Tabs
         tabs={[
           { id: 'text', label: t('riskScoring.expression.textTab'), icon: Code2 },
@@ -1152,13 +1152,13 @@ function ExpressionBuilder({ value, onChange }: { value: string; onChange: (v: s
   }
 
   return (
-    <div className="space-y-3 border border-slate-800 rounded-lg p-3 bg-slate-900/50">
+    <div className="space-y-3 border border-border rounded-lg p-3 bg-card/50">
       {groups.map((group, gi) => (
         <div key={gi} className="space-y-2">
-          {gi > 0 && <div className="text-xs text-slate-500 font-medium uppercase">{t('riskScoring.expression.or')}</div>}
+          {gi > 0 && <div className="text-xs text-muted-foreground font-medium uppercase">{t('riskScoring.expression.or')}</div>}
           {group.conditions.map((cond, ci) => (
             <div key={ci} className="flex items-center gap-2 flex-wrap">
-              {ci > 0 && <span className="text-xs text-slate-500">{t('riskScoring.expression.and')}</span>}
+              {ci > 0 && <span className="text-xs text-muted-foreground">{t('riskScoring.expression.and')}</span>}
               <label className="flex items-center gap-1 text-xs">
                 <input
                   type="checkbox"

@@ -7,6 +7,7 @@ import {
 import { Activity } from 'lucide-react'
 import { mcp } from '../services/api'
 import { useDateTime } from '../contexts/DateTimeContext'
+import { chartTooltipContentStyle, chartTooltipLabelStyle } from '../lib/utils'
 
 interface MetricsResponse {
   time: string[]
@@ -88,7 +89,7 @@ export default function McpTrafficTab() {
               onClick={() => setRange(r.seconds)}
               className={`px-3 py-1 text-xs rounded-md border transition-colors ${
                 range === r.seconds
-                  ? 'bg-primary text-primary-foreground border-primary'
+                  ? 'bg-primary text-white border-primary'
                   : 'border-border text-muted-foreground hover:bg-muted'
               }`}
             >
@@ -143,12 +144,13 @@ export default function McpTrafficTab() {
             </h3>
             <ResponsiveContainer width="100%" height={280}>
               <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                <XAxis dataKey="time" tickFormatter={formatTimeCompact} fontSize={11} />
-                <YAxis fontSize={11} allowDecimals={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--color-border-subtle))" className="opacity-30" />
+                <XAxis dataKey="time" tickFormatter={formatTimeCompact} fontSize={11} stroke="rgb(var(--color-text-tertiary))" />
+                <YAxis fontSize={11} allowDecimals={false} stroke="rgb(var(--color-text-tertiary))" />
                 <Tooltip
                   labelFormatter={(label) => formatDateTime(label as string)}
-                  contentStyle={{ backgroundColor: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '6px' }}
+                  contentStyle={chartTooltipContentStyle}
+                  labelStyle={chartTooltipLabelStyle}
                 />
                 <Legend />
                 {data.series.map((s, i) => (
@@ -170,11 +172,12 @@ export default function McpTrafficTab() {
             </h3>
             <ResponsiveContainer width="100%" height={200}>
               <LineChart data={latencyData}>
-                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                <XAxis dataKey="time" fontSize={11} />
-                <YAxis fontSize={11} allowDecimals={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--color-border-subtle))" className="opacity-30" />
+                <XAxis dataKey="time" fontSize={11} stroke="rgb(var(--color-text-tertiary))" />
+                <YAxis fontSize={11} allowDecimals={false} stroke="rgb(var(--color-text-tertiary))" />
                 <Tooltip
-                  contentStyle={{ backgroundColor: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '6px' }}
+                  contentStyle={chartTooltipContentStyle}
+                  labelStyle={chartTooltipLabelStyle}
                 />
                 <Legend />
                 <Line type="monotone" dataKey="p50" stroke="#10b981" strokeWidth={2} dot={false} name="p50" />

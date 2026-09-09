@@ -265,9 +265,9 @@ export default function FeatureFlags() {
 
   return (
     <div className="space-y-6">
-      <div className="card space-y-4 max-w-3xl">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4 max-w-3xl">
         <h2 className="text-lg font-semibold flex items-center gap-2"><Fingerprint className="h-5 w-5 text-primary" /> {t('pages:globalOptions.ja4.title')}</h2>
-        <p className="text-sm text-slate-400" dangerouslySetInnerHTML={{ __html: t('pages:globalOptions.ja4.description') }} />
+        <p className="text-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: t('pages:globalOptions.ja4.description') }} />
         <label className="flex items-center gap-2">
           <input
             type="checkbox"
@@ -290,10 +290,10 @@ export default function FeatureFlags() {
         )}
       </div>
 
-      <div className="card space-y-4 max-w-3xl">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4 max-w-3xl">
         <h2 className="text-lg font-semibold flex items-center gap-2"><FileText className="h-5 w-5 text-primary" /> {t('pages:globalOptions.reqFp.title')}</h2>
-        <p className="text-sm text-slate-400" dangerouslySetInnerHTML={{ __html: t('pages:globalOptions.reqFp.description') }} />
-        <p className="text-xs text-slate-500">{t('pages:globalOptions.reqFp.requiredByApiArmor')}</p>
+        <p className="text-sm text-muted-foreground" dangerouslySetInnerHTML={{ __html: t('pages:globalOptions.reqFp.description') }} />
+        <p className="text-xs text-muted-foreground">{t('pages:globalOptions.reqFp.requiredByApiArmor')}</p>
         <label className="flex items-center gap-2">
           <input
             type="checkbox"
@@ -314,7 +314,7 @@ export default function FeatureFlags() {
             {reqFpMessage}
           </p>
         )}
-        <div className="border-t border-slate-800 pt-4 space-y-3">
+        <div className="border-t border-border pt-4 space-y-3">
           <label className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -324,7 +324,7 @@ export default function FeatureFlags() {
             />
             <span className="text-sm">{t('pages:globalOptions.reqFp.parseBody.enable')}</span>
           </label>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-muted-foreground">
             {t('pages:globalOptions.reqFp.parseBody.description')}
           </p>
           <button
@@ -340,7 +340,7 @@ export default function FeatureFlags() {
             </p>
           )}
         </div>
-        <div className="border-t border-slate-800 pt-4 space-y-3">
+        <div className="border-t border-border pt-4 space-y-3">
           <label className="flex items-center gap-2">
             <span className="text-sm">{t('pages:globalOptions.reqFp.maxBodyBytes.label')}</span>
             <input
@@ -352,9 +352,9 @@ export default function FeatureFlags() {
               disabled={!reqFpEnabled || !reqFpParseBody}
               className="input w-40"
             />
-            <span className="text-xs text-slate-500">bytes</span>
+            <span className="text-xs text-muted-foreground">bytes</span>
           </label>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-muted-foreground">
             {t('pages:globalOptions.reqFp.maxBodyBytes.description')}
           </p>
           <button
@@ -370,7 +370,7 @@ export default function FeatureFlags() {
             </p>
           )}
         </div>
-        <div className="border-t border-slate-800 pt-4 space-y-3">
+        <div className="border-t border-border pt-4 space-y-3">
           <label className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -380,7 +380,7 @@ export default function FeatureFlags() {
             />
             <span className="text-sm">{t('pages:globalOptions.reqFp.enforceMaxBody.enable')}</span>
           </label>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-muted-foreground">
             {t('pages:globalOptions.reqFp.enforceMaxBody.description')}
           </p>
           <button
@@ -398,9 +398,9 @@ export default function FeatureFlags() {
         </div>
       </div>
 
-      <div className="card space-y-4 max-w-3xl">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4 max-w-3xl">
         <h2 className="text-lg font-semibold flex items-center gap-2"><Gauge className="h-5 w-5 text-primary" /> {t('pages:globalOptions.compression.title')}</h2>
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-muted-foreground">
           {t('pages:globalOptions.compression.description')}
         </p>
         <label className="flex items-center gap-2">
@@ -425,9 +425,9 @@ export default function FeatureFlags() {
         )}
       </div>
 
-      <div className="card space-y-4 max-w-3xl">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4 max-w-3xl">
         <h2 className="text-lg font-semibold flex items-center gap-2"><HardDrive className="h-5 w-5 text-primary" /> {t('pages:globalOptions.diskCache.title')}</h2>
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-muted-foreground">
           {t('pages:globalOptions.diskCache.description')}
         </p>
         <label className="flex items-center gap-2">
@@ -452,9 +452,9 @@ export default function FeatureFlags() {
         )}
       </div>
 
-      <div className="card space-y-4 max-w-3xl">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4 max-w-3xl">
         <h2 className="text-lg font-semibold flex items-center gap-2"><Wand2 className="h-5 w-5 text-primary" /> {t('pages:globalOptions.respTransform.title')}</h2>
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-muted-foreground">
           {t('pages:globalOptions.respTransform.description')}
         </p>
         <label className="flex items-center gap-2">
@@ -479,9 +479,9 @@ export default function FeatureFlags() {
         )}
       </div>
 
-      <div className="card space-y-4 max-w-3xl">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4 max-w-3xl">
         <h2 className="text-lg font-semibold flex items-center gap-2"><Image className="h-5 w-5 text-primary" /> {t('pages:globalOptions.img2Webp.title')}</h2>
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-muted-foreground">
           {t('pages:globalOptions.img2Webp.description')}
         </p>
         <label className="flex items-center gap-2">
@@ -506,9 +506,9 @@ export default function FeatureFlags() {
         )}
       </div>
 
-      <div className="card space-y-4 max-w-3xl">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4 max-w-3xl">
         <h2 className="text-lg font-semibold flex items-center gap-2"><Network className="h-5 w-5 text-primary" /> {t('pages:featureFlags.mcpGateway.title')}</h2>
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-muted-foreground">
           {t('pages:featureFlags.mcpGateway.description')}
         </p>
         <label className="flex items-center gap-2">
@@ -533,9 +533,9 @@ export default function FeatureFlags() {
         )}
       </div>
 
-      <div className="card space-y-4 max-w-3xl">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4 max-w-3xl">
         <h2 className="text-lg font-semibold flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" /> {t('pages:globalOptions.apiArmor.title')}</h2>
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-muted-foreground">
           {t('pages:globalOptions.apiArmor.description')}
         </p>
         <label className="flex items-center gap-2">
@@ -560,17 +560,17 @@ export default function FeatureFlags() {
         )}
       </div>
 
-      <div className="card space-y-4 max-w-3xl">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4 max-w-3xl">
         <h2 className="text-lg font-semibold flex items-center gap-2"><Network className="h-5 w-5 text-primary" /> {t('pages:featureFlags.restoreClientIp.title')}</h2>
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-muted-foreground">
           {t('pages:featureFlags.restoreClientIp.description')}
         </p>
         <div>
           <label className="text-sm">{t('pages:featureFlags.restoreClientIp.trustedNetworkLists')}</label>
           {networkLists.length === 0 ? (
-            <p className="text-sm text-slate-500 italic mt-1">{t('pages:featureFlags.restoreClientIp.noNetworkLists')}</p>
+            <p className="text-sm text-muted-foreground italic mt-1">{t('pages:featureFlags.restoreClientIp.noNetworkLists')}</p>
           ) : (
-            <div className="space-y-1 mt-1 max-h-48 overflow-y-auto border border-slate-700 rounded p-2">
+            <div className="space-y-1 mt-1 max-h-48 overflow-y-auto border border-subtle rounded p-2">
               {networkLists.map((l) => (
                 <label key={l.id} className="flex items-center gap-2 text-sm">
                   <input

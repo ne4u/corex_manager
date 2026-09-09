@@ -163,14 +163,14 @@ export default function Listeners() {
           <button onClick={openAdd} className="btn-primary">{t('pages:listeners.addListener')}</button>
         </div>
       {loading ? <p>{t('pages:listeners.loading')}</p> : (
-        <div className="card overflow-x-auto">
+        <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
           <table className="w-full text-sm text-start">
-            <thead className="text-slate-400 border-b border-slate-800"><tr><th>{t('pages:listeners.tableHeaders.name')}</th><th>{t('pages:listeners.tableHeaders.bind')}</th><th>{t('pages:listeners.tableHeaders.protocol')}</th><th>{t('pages:listeners.tableHeaders.mode')}</th><th>{t('pages:listeners.tableHeaders.ssl')}</th><th>{t('pages:listeners.tableHeaders.certs')}</th><th>{t('pages:listeners.tableHeaders.http2')}</th><th>{t('pages:listeners.tableHeaders.quic')}</th><th>{t('pages:listeners.tableHeaders.forceHttps')}</th><th>{t('pages:listeners.tableHeaders.defaultBackend')}</th><th>{t('pages:listeners.tableHeaders.waf')}</th><th></th></tr></thead>
+            <thead className="text-muted-foreground border-b border-border"><tr><th>{t('pages:listeners.tableHeaders.name')}</th><th>{t('pages:listeners.tableHeaders.bind')}</th><th>{t('pages:listeners.tableHeaders.protocol')}</th><th>{t('pages:listeners.tableHeaders.mode')}</th><th>{t('pages:listeners.tableHeaders.ssl')}</th><th>{t('pages:listeners.tableHeaders.certs')}</th><th>{t('pages:listeners.tableHeaders.http2')}</th><th>{t('pages:listeners.tableHeaders.quic')}</th><th>{t('pages:listeners.tableHeaders.forceHttps')}</th><th>{t('pages:listeners.tableHeaders.defaultBackend')}</th><th>{t('pages:listeners.tableHeaders.waf')}</th><th></th></tr></thead>
             <tbody>
               {items.map((l: any) => {
                 const waf = wafList.find((r: any) => r.listener_id === l.id)
                 return (
-                <tr key={l.id} className="border-b border-slate-800 last:border-0">
+                <tr key={l.id} className="border-b border-border last:border-0">
                   <td className="py-2">{l.name}</td>
                   <td>{l.bind_address}:{l.bind_port}</td>
                   <td>{l.protocol === 'mcp' ? 'MCP' : l.protocol}</td>
@@ -191,7 +191,7 @@ export default function Listeners() {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => wafRules.update(waf.id, { enabled: !waf.enabled }).then(reloadWaf)}
-                          className={`text-xs ${waf.enabled ? 'text-green-400' : 'text-slate-500'} hover:underline`}
+                          className={`text-xs ${waf.enabled ? 'text-green-400' : 'text-muted-foreground'} hover:underline`}
                           title={`${t('pages:waf.rules.fields.engine')}: ${waf.engine || t('common:status.enabled')}, ${t('pages:waf.rules.fields.action')}: ${waf.action}`}
                         >
                           {waf.enabled ? `${waf.engine || t('common:status.enabled')} / ${waf.action}` : t('common:status.disabled')}
@@ -199,7 +199,7 @@ export default function Listeners() {
                         <button onClick={() => navigate(`/waf?edit=${waf.id}`)} className="text-xs text-primary hover:underline">{t('pages:listeners.configure')}</button>
                       </div>
                     ) : (
-                      <button onClick={() => navigate(`/waf?listener=${l.id}`)} className="text-xs text-slate-500 hover:underline">{t('pages:listeners.attachWaf')}</button>
+                      <button onClick={() => navigate(`/waf?listener=${l.id}`)} className="text-xs text-muted-foreground hover:underline">{t('pages:listeners.attachWaf')}</button>
                     )}
                   </td>
                   <td className="text-end whitespace-nowrap">
@@ -229,8 +229,8 @@ export default function Listeners() {
         </div>
         <div className="space-y-4">
           {ruleList.length === 0 ? (
-            <div className="card">
-              <p className="text-sm text-slate-500 p-4">{t('pages:listeners.routingRulesEmpty')}</p>
+            <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
+              <p className="text-sm text-muted-foreground p-4">{t('pages:listeners.routingRulesEmpty')}</p>
             </div>
           ) : (
             items
@@ -240,15 +240,15 @@ export default function Listeners() {
                   .filter(r => r.listener_id === l.id)
                   .sort((a, b) => (a.priority || 0) - (b.priority || 0))
                 return (
-                  <div key={l.id} className="card overflow-x-auto">
-                    <div className="px-3 py-2 border-b border-slate-800 font-semibold text-sm text-slate-300">{l.name}</div>
+                  <div key={l.id} className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
+                    <div className="px-3 py-2 border-b border-border font-semibold text-sm text-secondary-foreground">{l.name}</div>
                     <table className="w-full text-sm text-start">
-                      <thead className="text-slate-400 border-b border-slate-800"><tr><th className="w-8"></th><th>{t('pages:listeners.rules.tableHeaders.condition')}</th><th>{t('pages:listeners.rules.tableHeaders.backend')}</th><th>{t('pages:listeners.rules.tableHeaders.enabled')}</th><th></th></tr></thead>
+                      <thead className="text-muted-foreground border-b border-border"><tr><th className="w-8"></th><th>{t('pages:listeners.rules.tableHeaders.condition')}</th><th>{t('pages:listeners.rules.tableHeaders.backend')}</th><th>{t('pages:listeners.rules.tableHeaders.enabled')}</th><th></th></tr></thead>
                       <tbody>
                         {groupRules.map((r: any) => (
-                          <tr key={r.id} className={`border-b border-slate-800 last:border-0 ${dragOverId === r.id ? 'bg-slate-800' : ''}`} draggable onDragStart={(e: any) => { e.dataTransfer.setData('text/plain', String(r.id)); e.dataTransfer.effectAllowed = 'move' }} onDragOver={(e: any) => { e.preventDefault(); setDragOverId(r.id) }} onDrop={(e: any) => { e.preventDefault(); const dragged = Number(e.dataTransfer.getData('text/plain')); if (dragged !== r.id) { setDragOverId(null); reorderRules(dragged, r.id) } }} onDragEnd={() => setDragOverId(null)}>
-                            <td className="py-2 w-8 cursor-grab"><GripVertical className="w-4 h-4 text-slate-500" /></td>
-                            <td>{r.condition_type} {r.condition_name} {r.operator} {r.value} {(r.conditions || []).map((c: any) => <span key={c.condition_type + c.operator} className="ms-2 text-slate-400">{c.join} {c.condition_type} {c.condition_name} {c.operator} {c.value}</span>)}</td>
+                          <tr key={r.id} className={`border-b border-border last:border-0 ${dragOverId === r.id ? 'bg-muted' : ''}`} draggable onDragStart={(e: any) => { e.dataTransfer.setData('text/plain', String(r.id)); e.dataTransfer.effectAllowed = 'move' }} onDragOver={(e: any) => { e.preventDefault(); setDragOverId(r.id) }} onDrop={(e: any) => { e.preventDefault(); const dragged = Number(e.dataTransfer.getData('text/plain')); if (dragged !== r.id) { setDragOverId(null); reorderRules(dragged, r.id) } }} onDragEnd={() => setDragOverId(null)}>
+                            <td className="py-2 w-8 cursor-grab"><GripVertical className="w-4 h-4 text-muted-foreground" /></td>
+                            <td>{r.condition_type} {r.condition_name} {r.operator} {r.value} {(r.conditions || []).map((c: any) => <span key={c.condition_type + c.operator} className="ms-2 text-muted-foreground">{c.join} {c.condition_type} {c.condition_name} {c.operator} {c.value}</span>)}</td>
                             <td>{backendList.find((b: any) => b.id === r.backend_id)?.name || 'None'}</td>
                             <td>{r.enabled ? t('common:actions.yes') : t('common:actions.no')}</td>
                             <td className="text-end whitespace-nowrap">
@@ -294,12 +294,12 @@ export default function Listeners() {
                 </label>
               </div>
             )}
-            <div className="col-span-2"><LabelWithTooltip tooltip={t('pages:listeners.tooltips.certificates')} className="label">{t('pages:listeners.modal.certificates')}</LabelWithTooltip><div className="max-h-32 overflow-y-auto card p-2 space-y-1">{certList.filter((c: any) => !c.kind || c.kind === 'server').map((c: any) => (
+            <div className="col-span-2"><LabelWithTooltip tooltip={t('pages:listeners.tooltips.certificates')} className="label">{t('pages:listeners.modal.certificates')}</LabelWithTooltip><div className="rounded-lg border border-border bg-card shadow-sm max-h-32 overflow-y-auto p-2 space-y-1">{certList.filter((c: any) => !c.kind || c.kind === 'server').map((c: any) => (
               <label key={c.id} className="flex items-center gap-2 text-sm cursor-pointer">
                 <input type="checkbox" checked={(form.certificate_ids || []).includes(c.id)} onChange={(e) => { const ids = new Set<number>(form.certificate_ids || []); if (e.target.checked) ids.add(c.id); else ids.delete(c.id); const arr = [...ids].sort((a, b) => a - b); setForm({ ...form, certificate_ids: arr, certificate_id: arr[0] || null }); }} />
-                <span>{c.name} <span className="text-slate-400">({c.subject_cn || '-'})</span></span>
+                <span>{c.name} <span className="text-muted-foreground">({c.subject_cn || '-'})</span></span>
               </label>
-            ))}{certList.filter((c: any) => !c.kind || c.kind === 'server').length === 0 && <p className="text-sm text-slate-500">{t('pages:listeners.noCertificates')}</p>}</div></div>
+            ))}{certList.filter((c: any) => !c.kind || c.kind === 'server').length === 0 && <p className="text-sm text-muted-foreground">{t('pages:listeners.noCertificates')}</p>}</div></div>
             <div><LabelWithTooltip tooltip={t('pages:listeners.tooltips.cipherSuite')} className="label">{t('pages:listeners.modal.cipherSuite')}</LabelWithTooltip><select className="input" value={form.options?.cipher_suite || ''} onChange={e => setForm({ ...form, options: { ...(form.options || {}), cipher_suite: e.target.value } })}><option value="">{t('pages:listeners.modal.cipherSuiteDefault')}</option>{cipherList.map((c: any) => <option key={c.id} value={c.name}>{c.name}</option>)}</select></div>
           </div>
           <div className="grid grid-cols-4 gap-3">
@@ -307,7 +307,7 @@ export default function Listeners() {
             <label className="flex items-center gap-2"><input type="checkbox" checked={form.http2} onChange={e => setForm({ ...form, http2: e.target.checked })} /><span>{t('pages:listeners.modal.http2')}</span><InfoTooltip content={t('pages:listeners.tooltips.http2')} /></label>
             <label className="flex items-center gap-2"><input type="checkbox" checked={form.quic} onChange={e => setForm({ ...form, quic: e.target.checked })} /><span>{t('pages:listeners.modal.quic')}</span><InfoTooltip content={t('pages:listeners.tooltips.quic')} /></label>
             <label className="flex items-center gap-2"><input type="checkbox" checked={form.proxy_protocol} onChange={e => setForm({ ...form, proxy_protocol: e.target.checked })} /><span>{t('pages:listeners.modal.proxyProtocol')}</span><InfoTooltip content={t('pages:listeners.tooltips.proxyProtocol')} /></label>
-            <label className={`flex items-center gap-2 ${(form.ssl_enabled || form.proxy_protocol || form.http2 || form.quic) ? 'text-slate-500 cursor-not-allowed' : ''}`}><input type="checkbox" checked={form.force_https} disabled={form.ssl_enabled || form.proxy_protocol || form.http2 || form.quic} onChange={e => setForm({ ...form, force_https: e.target.checked })} /><span>{t('pages:listeners.modal.forceHttps')}</span><InfoTooltip content={t('pages:listeners.tooltips.forceHttps')} /></label>
+            <label className={`flex items-center gap-2 ${(form.ssl_enabled || form.proxy_protocol || form.http2 || form.quic) ? 'text-muted-foreground cursor-not-allowed' : ''}`}><input type="checkbox" checked={form.force_https} disabled={form.ssl_enabled || form.proxy_protocol || form.http2 || form.quic} onChange={e => setForm({ ...form, force_https: e.target.checked })} /><span>{t('pages:listeners.modal.forceHttps')}</span><InfoTooltip content={t('pages:listeners.tooltips.forceHttps')} /></label>
           </div>
           {form.ssl_enabled && (
             <div><LabelWithTooltip tooltip={t('pages:listeners.tooltips.alpn')} className="label">{t('pages:listeners.modal.alpn')}</LabelWithTooltip><input className="input" placeholder={t('pages:listeners.modal.alpnPlaceholder')} value={form.alpn || ''} onChange={e => setForm({ ...form, alpn: e.target.value })} /></div>
@@ -340,7 +340,7 @@ export default function Listeners() {
                 <div><LabelWithTooltip tooltip={t('pages:listeners.tooltips.ruleValue')} className="label">{t('pages:listeners.rules.value')}</LabelWithTooltip><input className="input" value={ruleForm.value} onChange={e => setRuleForm({ ...ruleForm, value: e.target.value })} /></div>
               </div>
               {ruleForm.conditions.map((c: any, idx: number) => (
-                <div key={idx} className="grid grid-cols-12 gap-3 items-end border-t border-slate-800 pt-3">
+                <div key={idx} className="grid grid-cols-12 gap-3 items-end border-t border-border pt-3">
                   <div className="col-span-2"><LabelWithTooltip tooltip={t('pages:listeners.tooltips.join')} className="label">{t('pages:listeners.rules.join')}</LabelWithTooltip><select className="input" value={c.join} onChange={e => updateCondition(idx, 'join', e.target.value)}><option value="and">and</option><option value="or">or</option></select></div>
                   <div className="col-span-2"><LabelWithTooltip tooltip={t('pages:listeners.tooltips.additionalConditionType')} className="label">{t('pages:listeners.rules.type')}</LabelWithTooltip><select className="input" value={c.condition_type} onChange={e => updateCondition(idx, 'condition_type', e.target.value)}><option value="path">Path</option><option value="host">Host</option><option value="hdr">Header</option><option value="cookie">Cookie</option><option value="url_param">URL Param</option><option value="src">Source IP</option></select></div>
                   <div className="col-span-2"><LabelWithTooltip tooltip={t('pages:listeners.tooltips.operator')} className="label">{t('pages:listeners.rules.operator')}</LabelWithTooltip><select className="input" value={c.operator} onChange={e => updateCondition(idx, 'operator', e.target.value)}><option value="beg">beg</option><option value="end">end</option><option value="sub">sub</option><option value="dir">dir</option><option value="eq">eq</option><option value="found">found</option><option value="reg">reg</option><option value="len">len</option></select></div>
@@ -368,14 +368,14 @@ export default function Listeners() {
         <div className="space-y-2">
           {(() => {
             const ids = certModalListener ? getCertIds(certModalListener) : []
-            if (certListLoading) return <p className="text-sm text-slate-500">{t('pages:listeners.certModal.loading')}</p>
-            if (ids.length === 0) return <p className="text-sm text-slate-500">{t('pages:listeners.certModal.noCertificates')}</p>
+            if (certListLoading) return <p className="text-sm text-muted-foreground">{t('pages:listeners.certModal.loading')}</p>
+            if (ids.length === 0) return <p className="text-sm text-muted-foreground">{t('pages:listeners.certModal.noCertificates')}</p>
             return (
-              <ul className="divide-y divide-slate-800 border border-slate-800 rounded-lg">
+              <ul className="divide-y divide-border border border-border rounded-lg">
                 {ids.map((id: number) => {
                   const c = certList.find((c: any) => c.id === id)
                   if (!c) return null
-                  return <li key={id} className="py-2 px-3 flex justify-between items-center"><span>{c.name}</span><span className="text-slate-400 text-sm">{c.subject_cn || '-'}</span></li>
+                  return <li key={id} className="py-2 px-3 flex justify-between items-center"><span>{c.name}</span><span className="text-muted-foreground text-sm">{c.subject_cn || '-'}</span></li>
                 })}
               </ul>
             )

@@ -203,20 +203,20 @@ export default function McpMarketplaceTab() {
       {/* Search bar */}
       <div className="flex gap-2 items-center">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
             type="text"
             value={query}
             onChange={e => setQuery(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSearch()}
             placeholder={t('pages:mcpGateway.marketplace.searchPlaceholder')}
-            className="w-full pl-10 pr-4 py-2 rounded-md bg-slate-800 border border-slate-700 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full pl-10 pr-4 py-2 rounded-md bg-muted border border-subtle text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
         <select
           value={manager}
           onChange={e => setManager(e.target.value)}
-          className="px-3 py-2 rounded-md bg-slate-800 border border-slate-700 text-sm text-slate-100"
+          className="px-3 py-2 rounded-md bg-muted border border-subtle text-sm text-foreground"
         >
           <option value="npm">npm</option>
           <option value="pypi">PyPI</option>
@@ -230,18 +230,18 @@ export default function McpMarketplaceTab() {
 
       {/* Installed servers */}
       {servers.length > 0 && (
-        <div className="rounded-lg border border-slate-700 overflow-hidden">
-          <div className="bg-slate-800/50 px-4 py-2 text-sm font-medium text-slate-300">
+        <div className="rounded-lg border border-subtle overflow-hidden">
+          <div className="bg-muted/50 px-4 py-2 text-sm font-medium text-secondary-foreground">
             {t('pages:mcpGateway.marketplace.installedPackages', { count: servers.length })}
           </div>
-          <div className="divide-y divide-slate-700/50">
+          <div className="divide-y divide-subtle/50">
             {servers.map(s => (
-              <div key={s.id} className="flex items-center justify-between px-4 py-3 hover:bg-slate-800/30">
+              <div key={s.id} className="flex items-center justify-between px-4 py-3 hover:bg-muted/30">
                 <div className="flex items-center gap-3">
                   <Package className="h-4 w-4 text-primary" />
                   <div>
-                    <div className="text-sm font-medium text-slate-200">{s.display_name || s.name}</div>
-                    <div className="text-xs text-slate-500">
+                    <div className="text-sm font-medium text-secondary-foreground">{s.display_name || s.name}</div>
+                    <div className="text-xs text-muted-foreground">
                       {s.package_manager} · {s.source_package_name}
                       {s.installed_version && ` · v${s.installed_version}`}
                     </div>
@@ -264,28 +264,28 @@ export default function McpMarketplaceTab() {
 
       {/* Search results */}
       {results.length > 0 && (
-        <div className="rounded-lg border border-slate-700 overflow-hidden">
-          <div className="bg-slate-800/50 px-4 py-2 text-sm font-medium text-slate-300">
+        <div className="rounded-lg border border-subtle overflow-hidden">
+          <div className="bg-muted/50 px-4 py-2 text-sm font-medium text-secondary-foreground">
             {t('pages:mcpGateway.marketplace.searchResults', { count: results.length })}
           </div>
-          <div className="divide-y divide-slate-700/50">
+          <div className="divide-y divide-subtle/50">
             {results.map(pkg => (
-              <div key={`${manager}-${pkg.name}`} className="px-4 py-3 hover:bg-slate-800/30">
+              <div key={`${manager}-${pkg.name}`} className="px-4 py-3 hover:bg-muted/30">
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-slate-200">{pkg.name}</span>
+                      <span className="text-sm font-medium text-secondary-foreground">{pkg.name}</span>
                       {pkg.version && (
-                        <span className="text-xs text-slate-500">v{pkg.version}</span>
+                        <span className="text-xs text-muted-foreground">v{pkg.version}</span>
                       )}
                       {installedPackageNames.has(pkg.name) && (
                         <Badge variant="success">{t('pages:mcpGateway.marketplace.installed')}</Badge>
                       )}
                     </div>
                     {pkg.description && (
-                      <p className="text-xs text-slate-400 mt-1 line-clamp-2">{pkg.description}</p>
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{pkg.description}</p>
                     )}
-                    <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
+                    <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                       {pkg.author && <span>{t('pages:mcpGateway.marketplace.byAuthor', { author: pkg.author })}</span>}
                       {pkg.license && <span>{pkg.license}</span>}
                       {pkg.homepage && (
@@ -332,12 +332,12 @@ export default function McpMarketplaceTab() {
         ) : details ? (
           <div className="space-y-4 max-h-[60vh] overflow-y-auto">
             <div className="grid grid-cols-2 gap-3 text-sm">
-              {details.version && <div><span className="text-slate-500">{t('pages:mcpGateway.marketplace.modal.version')}</span> <span className="text-slate-200">{details.version}</span></div>}
-              {details.author && <div><span className="text-slate-500">{t('pages:mcpGateway.marketplace.modal.author')}</span> <span className="text-slate-200">{details.author}</span></div>}
-              {details.license && <div><span className="text-slate-500">{t('pages:mcpGateway.marketplace.modal.license')}</span> <span className="text-slate-200">{details.license}</span></div>}
+              {details.version && <div><span className="text-muted-foreground">{t('pages:mcpGateway.marketplace.modal.version')}</span> <span className="text-secondary-foreground">{details.version}</span></div>}
+              {details.author && <div><span className="text-muted-foreground">{t('pages:mcpGateway.marketplace.modal.author')}</span> <span className="text-secondary-foreground">{details.author}</span></div>}
+              {details.license && <div><span className="text-muted-foreground">{t('pages:mcpGateway.marketplace.modal.license')}</span> <span className="text-secondary-foreground">{details.license}</span></div>}
               {details.homepage && (
                 <div>
-                  <span className="text-slate-500">{t('pages:mcpGateway.marketplace.modal.homepage')}</span>{' '}
+                  <span className="text-muted-foreground">{t('pages:mcpGateway.marketplace.modal.homepage')}</span>{' '}
                   <a href={details.homepage} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                     {details.homepage}
                   </a>
@@ -345,7 +345,7 @@ export default function McpMarketplaceTab() {
               )}
             </div>
             {details.description && (
-              <p className="text-sm text-slate-300">{details.description}</p>
+              <p className="text-sm text-secondary-foreground">{details.description}</p>
             )}
             {details.keywords && details.keywords.length > 0 && (
               <div className="flex flex-wrap gap-1">
@@ -356,7 +356,7 @@ export default function McpMarketplaceTab() {
             )}
             {details.required_env_vars && details.required_env_vars.length > 0 && (
               <div>
-                <div className="text-sm font-medium text-slate-300 mb-1">{t('pages:mcpGateway.marketplace.modal.requiredEnvVars')}</div>
+                <div className="text-sm font-medium text-secondary-foreground mb-1">{t('pages:mcpGateway.marketplace.modal.requiredEnvVars')}</div>
                 <div className="flex flex-wrap gap-1">
                   {details.required_env_vars.map(v => (
                     <Badge key={v} variant="warning">{v}</Badge>
@@ -366,13 +366,13 @@ export default function McpMarketplaceTab() {
             )}
             {details.readme && (
               <div>
-                <div className="text-sm font-medium text-slate-300 mb-1">{t('pages:mcpGateway.marketplace.modal.readme')}</div>
-                <pre className="text-xs text-slate-400 bg-slate-800/50 rounded-md p-3 max-h-64 overflow-y-auto whitespace-pre-wrap">{details.readme}</pre>
+                <div className="text-sm font-medium text-secondary-foreground mb-1">{t('pages:mcpGateway.marketplace.modal.readme')}</div>
+                <pre className="text-xs text-muted-foreground bg-muted/50 rounded-md p-3 max-h-64 overflow-y-auto whitespace-pre-wrap">{details.readme}</pre>
               </div>
             )}
           </div>
         ) : (
-          <div className="text-sm text-slate-500 py-4">{t('pages:mcpGateway.marketplace.modal.noDetails')}</div>
+          <div className="text-sm text-muted-foreground py-4">{t('pages:mcpGateway.marketplace.modal.noDetails')}</div>
         )}
       </Modal>
 
@@ -389,11 +389,11 @@ export default function McpMarketplaceTab() {
             </div>
           )}
           <div>
-            <label className="block text-sm text-slate-400 mb-1">{t('pages:mcpGateway.marketplace.modal.team')}</label>
+            <label className="block text-sm text-muted-foreground mb-1">{t('pages:mcpGateway.marketplace.modal.team')}</label>
             <select
               value={installForm.team_id}
               onChange={e => setInstallForm(f => ({ ...f, team_id: Number(e.target.value) }))}
-              className="w-full px-3 py-2 rounded-md bg-slate-800 border border-slate-700 text-sm text-slate-100"
+              className="w-full px-3 py-2 rounded-md bg-muted border border-subtle text-sm text-foreground"
             >
               {teams.map(t => (
                 <option key={t.id} value={t.id}>{t.name}</option>
@@ -402,48 +402,48 @@ export default function McpMarketplaceTab() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm text-slate-400 mb-1">{t('pages:mcpGateway.marketplace.modal.serverNameOptional')}</label>
+              <label className="block text-sm text-muted-foreground mb-1">{t('pages:mcpGateway.marketplace.modal.serverNameOptional')}</label>
               <input
                 type="text"
                 value={installForm.name}
                 onChange={e => setInstallForm(f => ({ ...f, name: e.target.value }))}
                 placeholder="auto-generated"
-                className="w-full px-3 py-2 rounded-md bg-slate-800 border border-slate-700 text-sm text-slate-100"
+                className="w-full px-3 py-2 rounded-md bg-muted border border-subtle text-sm text-foreground"
               />
             </div>
             <div>
-              <label className="block text-sm text-slate-400 mb-1">{t('pages:mcpGateway.marketplace.modal.namespaceOptional')}</label>
+              <label className="block text-sm text-muted-foreground mb-1">{t('pages:mcpGateway.marketplace.modal.namespaceOptional')}</label>
               <input
                 type="text"
                 value={installForm.namespace}
                 onChange={e => setInstallForm(f => ({ ...f, namespace: e.target.value }))}
                 placeholder="auto-generated"
-                className="w-full px-3 py-2 rounded-md bg-slate-800 border border-slate-700 text-sm text-slate-100"
+                className="w-full px-3 py-2 rounded-md bg-muted border border-subtle text-sm text-foreground"
               />
             </div>
           </div>
           <div>
-            <label className="block text-sm text-slate-400 mb-1">{t('pages:mcpGateway.marketplace.modal.versionOptional')}</label>
+            <label className="block text-sm text-muted-foreground mb-1">{t('pages:mcpGateway.marketplace.modal.versionOptional')}</label>
             <input
               type="text"
               value={installForm.version}
               onChange={e => setInstallForm(f => ({ ...f, version: e.target.value }))}
               placeholder="latest"
-              className="w-full px-3 py-2 rounded-md bg-slate-800 border border-slate-700 text-sm text-slate-100"
+              className="w-full px-3 py-2 rounded-md bg-muted border border-subtle text-sm text-foreground"
             />
           </div>
           <div>
-            <label className="block text-sm text-slate-400 mb-1">{t('pages:mcpGateway.marketplace.modal.envVars')}</label>
+            <label className="block text-sm text-muted-foreground mb-1">{t('pages:mcpGateway.marketplace.modal.envVars')}</label>
             <div className="space-y-2">
               {Object.entries(envVars).map(([name, value]) => (
                 <div key={name} className="flex items-center gap-2">
-                  <span className="text-xs text-slate-500 w-40 truncate" title={name}>{name}</span>
+                  <span className="text-xs text-muted-foreground w-40 truncate" title={name}>{name}</span>
                   <input
                     type="text"
                     value={value}
                     onChange={e => setEnvVars(prev => ({ ...prev, [name]: e.target.value }))}
                     placeholder={t('pages:mcpGateway.marketplace.modal.valuePlaceholder')}
-                    className="flex-1 px-2 py-1 rounded bg-slate-800 border border-slate-700 text-xs text-slate-100"
+                    className="flex-1 px-2 py-1 rounded bg-muted border border-subtle text-xs text-foreground"
                   />
                   <IconButton
                     icon={Trash2}
@@ -459,7 +459,7 @@ export default function McpMarketplaceTab() {
                   value={newEnvName}
                   onChange={e => setNewEnvName(e.target.value)}
                   placeholder="NEW_VAR_NAME"
-                  className="w-40 px-2 py-1 rounded bg-slate-800 border border-slate-700 text-xs text-slate-100"
+                  className="w-40 px-2 py-1 rounded bg-muted border border-subtle text-xs text-foreground"
                 />
                 <Button
                   size="sm"

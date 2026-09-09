@@ -139,7 +139,7 @@ export default function SystemValkey() {
         </button>
       </div>
 
-      <p className="text-sm text-slate-400">{t('pages:systemValkey.description')}</p>
+      <p className="text-sm text-muted-foreground">{t('pages:systemValkey.description')}</p>
 
       {/* Server info card */}
       <ServerInfoCard info={info} loading={loading} />
@@ -148,13 +148,13 @@ export default function SystemValkey() {
       {loading ? (
         <p>{t('common:actions.loading')}</p>
       ) : !info || !info.available ? (
-        <p className="text-slate-400">{t('pages:systemValkey.unavailable')}</p>
+        <p className="text-muted-foreground">{t('pages:systemValkey.unavailable')}</p>
       ) : namespaces.length === 0 ? (
-        <p className="text-slate-400">{t('pages:systemValkey.noNamespaces')}</p>
+        <p className="text-muted-foreground">{t('pages:systemValkey.noNamespaces')}</p>
       ) : (
-        <div className="card overflow-x-auto">
+        <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
           <table className="w-full text-sm text-start">
-            <thead className="text-slate-400 border-b border-slate-800">
+            <thead className="text-muted-foreground border-b border-border">
               <tr>
                 <th className="pb-2 w-8"></th>
                 <th className="pb-2">{t('pages:systemValkey.namespace')}</th>
@@ -183,13 +183,13 @@ function ServerInfoCard({ info, loading }: { info: ValkeyServerInfo | null; load
   const { t } = useTranslation(['pages'])
 
   if (loading && !info) {
-    return <div className="card p-4 text-sm text-slate-400">{t('pages:common.loading', { defaultValue: 'Loading\u2026' })}</div>
+    return <div className="rounded-lg border border-border bg-card shadow-sm p-4 text-sm text-muted-foreground">{t('pages:common.loading', { defaultValue: 'Loading\u2026' })}</div>
   }
   if (!info) return null
 
   if (!info.available) {
     return (
-      <div className="card p-4 border border-amber-800/50 bg-amber-900/10">
+      <div className="rounded-lg border shadow-sm p-4 border-amber-800/50 bg-amber-900/10">
         <p className="text-sm text-amber-300">
           {t('pages:systemValkey.unavailable')}
           {info.error ? `: ${info.error}` : ''}
@@ -210,13 +210,13 @@ function ServerInfoCard({ info, loading }: { info: ValkeyServerInfo | null; load
   ]
 
   return (
-    <div className="card p-4">
-      <h3 className="text-sm font-semibold text-slate-200 mb-3">{t('pages:systemValkey.serverInfo')}</h3>
+    <div className="rounded-lg border border-border bg-card shadow-sm p-4">
+      <h3 className="text-sm font-semibold text-secondary-foreground mb-3">{t('pages:systemValkey.serverInfo')}</h3>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {stats.map((s) => (
           <div key={s.label} className="space-y-0.5">
-            <div className="text-xs text-slate-400">{s.label}</div>
-            <div className="text-sm font-mono text-slate-200 break-all">{s.value}</div>
+            <div className="text-xs text-muted-foreground">{s.label}</div>
+            <div className="text-sm font-mono text-secondary-foreground break-all">{s.value}</div>
           </div>
         ))}
       </div>
@@ -236,11 +236,11 @@ function NamespaceRow({
   const { t } = useTranslation(['pages', 'common'])
   return (
     <>
-      <tr className="border-b border-slate-800 last:border-0 hover:bg-slate-800/30">
+      <tr className="border-b border-border last:border-0 hover:bg-muted/30">
         <td className="py-2">
           <button
             onClick={onToggle}
-            className="text-slate-400 hover:text-slate-200"
+            className="text-muted-foreground hover:text-secondary-foreground"
             aria-label={expanded ? t('common:actions.collapse') : t('common:actions.expand')}
           >
             {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
@@ -248,15 +248,15 @@ function NamespaceRow({
         </td>
         <td className="py-2 font-mono">{ns.prefix}</td>
         <td className="text-end font-mono">
-          <span className="px-2 py-0.5 rounded-full bg-slate-800 text-xs">{ns.count.toLocaleString()}</span>
+          <span className="px-2 py-0.5 rounded-full bg-muted text-xs">{ns.count.toLocaleString()}</span>
         </td>
-        <td className="py-2 font-mono text-xs text-slate-400 break-all max-w-md">
+        <td className="py-2 font-mono text-xs text-muted-foreground break-all max-w-md">
           {ns.sample_keys.join(', ') || '-'}
         </td>
       </tr>
       {expanded && (
-        <tr className="border-b border-slate-800">
-          <td colSpan={4} className="p-4 bg-slate-900/40">
+        <tr className="border-b border-border">
+          <td colSpan={4} className="p-4 bg-card/40">
             <NamespaceEntries prefix={ns.prefix} />
           </td>
         </tr>
@@ -345,7 +345,7 @@ function NamespaceEntries({ prefix }: { prefix: string }) {
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative">
-          <Search className="absolute start-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+          <Search className="absolute start-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
           <input
             type="text"
             placeholder={t('pages:systemValkey.searchPlaceholder')}
@@ -356,7 +356,7 @@ function NamespaceEntries({ prefix }: { prefix: string }) {
           {searchInput && (
             <button
               onClick={() => { setSearchInput(''); setPage(0); setSearch('') }}
-              className="absolute end-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+              className="absolute end-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-secondary-foreground"
               aria-label={t('pages:systemValkey.clearSearch')}
             >
               <X className="w-4 h-4" />
@@ -374,7 +374,7 @@ function NamespaceEntries({ prefix }: { prefix: string }) {
           ))}
         </select>
 
-        <label className="flex items-center gap-2 text-sm text-slate-300">
+        <label className="flex items-center gap-2 text-sm text-secondary-foreground">
           <input
             type="checkbox"
             checked={autoRefresh}
@@ -400,11 +400,11 @@ function NamespaceEntries({ prefix }: { prefix: string }) {
       {loading ? (
         <p>{t('common:actions.loading')}</p>
       ) : !detail || detail.keys.length === 0 ? (
-        <p className="text-slate-400">{t('pages:systemValkey.noKeys')}</p>
+        <p className="text-muted-foreground">{t('pages:systemValkey.noKeys')}</p>
       ) : (
-        <div className="overflow-x-auto border border-slate-800 rounded-lg">
+        <div className="overflow-x-auto border border-border rounded-lg">
           <table className="w-full text-xs text-start">
-            <thead className="text-slate-400 bg-slate-900/60 border-b border-slate-800">
+            <thead className="text-muted-foreground bg-card/60 border-b border-border">
               <tr>
                 <th className="px-2 py-1.5 text-start">{t('pages:systemValkey.key')}</th>
                 <th className="px-2 py-1.5 text-start">{t('pages:systemValkey.type')}</th>
@@ -417,15 +417,15 @@ function NamespaceEntries({ prefix }: { prefix: string }) {
             </thead>
             <tbody>
               {previewKeys.map((e) => (
-                <tr key={e.key} className="border-b border-slate-800 last:border-0 hover:bg-slate-800/30">
-                  <td className="px-2 py-1.5 font-mono text-slate-200 break-all">{e.key}</td>
+                <tr key={e.key} className="border-b border-border last:border-0 hover:bg-muted/30">
+                  <td className="px-2 py-1.5 font-mono text-secondary-foreground break-all">{e.key}</td>
                   <td className="px-2 py-1.5">
                     <Badge variant={TYPE_BADGE_VARIANT[e.type] || 'default'} size="sm">{e.type}</Badge>
                   </td>
-                  <td className="px-2 py-1.5 text-end font-mono text-slate-300">{formatTtl(e.ttl)}</td>
-                  <td className="px-2 py-1.5 text-end text-slate-300">{formatExpiresAt(e.ttl, formatTime)}</td>
-                  <td className="px-2 py-1.5 text-end font-mono text-slate-300">{formatBytes(e.size)}</td>
-                  <td className="px-2 py-1.5 font-mono text-slate-300 break-all max-w-md">{e.preview || '-'}</td>
+                  <td className="px-2 py-1.5 text-end font-mono text-secondary-foreground">{formatTtl(e.ttl)}</td>
+                  <td className="px-2 py-1.5 text-end text-secondary-foreground">{formatExpiresAt(e.ttl, formatTime)}</td>
+                  <td className="px-2 py-1.5 text-end font-mono text-secondary-foreground">{formatBytes(e.size)}</td>
+                  <td className="px-2 py-1.5 font-mono text-secondary-foreground break-all max-w-md">{e.preview || '-'}</td>
                   <td className="px-2 py-1.5 text-end">
                     <IconButton
                       icon={Trash2}
@@ -444,7 +444,7 @@ function NamespaceEntries({ prefix }: { prefix: string }) {
       {/* Pagination */}
       {detail && (
         <div className="flex items-center justify-between text-sm">
-          <span className="text-slate-400">
+          <span className="text-muted-foreground">
             {t('pages:systemValkey.showing', {
               from: detail.total === 0 ? 0 : offset + 1,
               to: Math.min(offset + pageSize, detail.total),
@@ -459,7 +459,7 @@ function NamespaceEntries({ prefix }: { prefix: string }) {
             >
               {t('common:actions.previous')}
             </button>
-            <span className="text-slate-300">
+            <span className="text-secondary-foreground">
               {t('pages:systemValkey.pageOf', { page: page + 1, total: totalPages })}
             </span>
             <button

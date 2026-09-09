@@ -79,7 +79,7 @@ export default function HaproxyOptionsEditor({ scope, value, onChange }: Props) 
       </div>
 
       {showCatalog && (
-        <div className="card space-y-2">
+        <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-2">
           <input
             type="text"
             className="input w-full"
@@ -92,29 +92,29 @@ export default function HaproxyOptionsEditor({ scope, value, onChange }: Props) 
               <button
                 key={`${item.directive}-${item.target || 'section'}`}
                 type="button"
-                className="w-full text-start p-2 rounded hover:bg-slate-800 text-sm"
+                className="w-full text-start p-2 rounded hover:bg-muted text-sm"
                 onClick={() => applyCatalog(item)}
               >
                 <span className="font-medium">{item.label}</span>
-                <span className="text-slate-400 ms-2">({item.directive})</span>
+                <span className="text-muted-foreground ms-2">({item.directive})</span>
                 <span className="ms-2 inline-flex align-middle">
                   <InfoTooltip content={item.help ?? ''} />
                 </span>
               </button>
             ))}
             {filteredCatalog.length === 0 && (
-              <p className="text-sm text-slate-500">{t('pages:haproxyOptionsEditor.noMatching')}</p>
+              <p className="text-sm text-muted-foreground">{t('pages:haproxyOptionsEditor.noMatching')}</p>
             )}
           </div>
         </div>
       )}
 
       {value.length === 0 && (
-        <p className="text-sm text-slate-500">{t('pages:haproxyOptionsEditor.noOptions')}</p>
+        <p className="text-sm text-muted-foreground">{t('pages:haproxyOptionsEditor.noOptions')}</p>
       )}
 
       {value.map((opt, index) => (
-        <div key={index} className="card p-3 grid grid-cols-12 gap-2 items-end">
+        <div key={index} className="rounded-lg border border-border bg-card shadow-sm p-3 grid grid-cols-12 gap-2 items-end">
           {scope === 'listener' && (
             <div className="col-span-3">
               <LabelWithTooltip tooltip={t(haproxyOptionTooltipsKeys.target)} className="label flex items-center gap-1.5">
@@ -154,7 +154,7 @@ export default function HaproxyOptionsEditor({ scope, value, onChange }: Props) 
               placeholder={t('pages:haproxyOptionsEditor.valuePlaceholder')}
             />
           </div>
-          <label className="col-span-2 flex items-center gap-2 pb-2 text-slate-400">
+          <label className="col-span-2 flex items-center gap-2 pb-2 text-muted-foreground">
             <input
               id={`opt-enabled-${index}`}
               type="checkbox"

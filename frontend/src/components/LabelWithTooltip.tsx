@@ -11,7 +11,7 @@ interface LabelWithTooltipProps {
 export default function LabelWithTooltip({ children, tooltip, className, textClassName }: LabelWithTooltipProps) {
   return (
     <div className={className ?? 'flex items-center gap-1.5 mb-1'}>
-      <span className={textClassName ?? 'text-xs font-semibold text-slate-400'}>{children}</span>
+      <span className={textClassName ?? 'text-xs font-semibold text-muted-foreground'}>{children}</span>
       <InfoTooltip content={tooltip} />
     </div>
   )

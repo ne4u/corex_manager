@@ -11,15 +11,11 @@ html {
 }
 
 body {
-  @apply bg-slate-950 text-slate-100 antialiased;
-}
-
-.card {
-  @apply bg-slate-900 rounded-xl border border-slate-800 p-6 shadow-sm;
+  @apply bg-background text-foreground antialiased;
 }
 
 .input {
-  @apply w-full rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary;
+  @apply w-full rounded-lg bg-background border border-subtle px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary;
 }
 
 select.input {
@@ -35,7 +31,7 @@ select.input {
 }
 
 .btn-secondary {
-  @apply btn bg-slate-800 text-slate-100 hover:bg-slate-700 border border-slate-700;
+  @apply btn bg-muted text-foreground hover:bg-subtle border border-subtle;
 }
 
 .btn-danger {
@@ -43,7 +39,7 @@ select.input {
 }
 
 .label {
-  @apply block text-xs font-semibold text-slate-400 mb-1;
+  @apply block text-xs font-semibold text-muted-foreground mb-1;
 }
 
 .badge {

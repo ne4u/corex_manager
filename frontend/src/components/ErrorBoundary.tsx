@@ -30,7 +30,7 @@ export default class ErrorBoundary extends React.Component<ErrorBoundaryProps, E
             {this.props.fallbackTitle || 'Error'}: {this.state.error.message}
           </div>
           {this.props.fallbackHint && (
-            <div className="text-xs text-slate-400">{this.props.fallbackHint}</div>
+            <div className="text-xs text-muted-foreground">{this.props.fallbackHint}</div>
           )}
           <button
             type="button"

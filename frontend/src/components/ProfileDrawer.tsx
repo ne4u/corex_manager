@@ -84,18 +84,18 @@ export default function ProfileDrawer() {
 
       {/* Drawer — right side in LTR, left side in RTL */}
       <aside
-        className={`fixed inset-y-0 end-0 z-50 w-full max-w-md bg-slate-900 border-slate-800 shadow-2xl transform transition-transform duration-200 flex flex-col ${
+        className={`fixed inset-y-0 end-0 z-50 w-full max-w-md bg-card border-border shadow-2xl transform transition-transform duration-200 flex flex-col ${
           open ? 'translate-x-0' : 'translate-x-full rtl:-translate-x-full'
         } ${open ? 'border-e rtl:border-e-0 rtl:border-s' : ''}`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-primary/20 text-primary flex items-center justify-center font-semibold">
               {user?.username?.charAt(0).toUpperCase() ?? '?'}
             </div>
             <div>
-              <p className="font-semibold text-slate-100">{user?.username ?? '...'}</p>
+              <p className="font-semibold text-foreground">{user?.username ?? '...'}</p>
               {user && (
                 <Badge variant={user.is_admin ? 'info' : 'default'} size="sm">
                   {user.role}
@@ -103,7 +103,7 @@ export default function ProfileDrawer() {
               )}
             </div>
           </div>
-          <button onClick={() => setOpen(false)} className="text-slate-400 hover:text-slate-200">
+          <button onClick={() => setOpen(false)} className="text-muted-foreground hover:text-secondary-foreground">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -153,7 +153,7 @@ function ProfileTab({ user, onUserUpdated }: { user: UserInfo | null; onUserUpda
     }
   }, [user])
 
-  if (!user) return <p className="text-sm text-slate-400">{t('common:actions.loading')}</p>
+  if (!user) return <p className="text-sm text-muted-foreground">{t('common:actions.loading')}</p>
 
   const startEdit = () => {
     setForm({
@@ -195,7 +195,7 @@ function ProfileTab({ user, onUserUpdated }: { user: UserInfo | null; onUserUpda
 
   return (
     <div className="space-y-6">
-      <div className="card space-y-3">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold">{user.username}</h3>
           {!editing && (
@@ -206,21 +206,21 @@ function ProfileTab({ user, onUserUpdated }: { user: UserInfo | null; onUserUpda
         </div>
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
-            <span className="text-slate-400">{t('profile:identity.role')}</span>
-            <span className="capitalize text-slate-200">{user.role}</span>
+            <span className="text-muted-foreground">{t('profile:identity.role')}</span>
+            <span className="capitalize text-secondary-foreground">{user.role}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-slate-400">{t('profile:identity.memberSince')}</span>
-            <span className="text-slate-200">
+            <span className="text-muted-foreground">{t('profile:identity.memberSince')}</span>
+            <span className="text-secondary-foreground">
               {formatDate(user.created_at)}
             </span>
           </div>
         </div>
       </div>
 
-      <div className="card space-y-3">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-3">
         <div className="flex items-center justify-between">
-          <h4 className="text-sm font-semibold uppercase tracking-wider text-slate-400">{t('profile:identity.contactInfo')}</h4>
+          <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{t('profile:identity.contactInfo')}</h4>
           {!contactComplete && !editing && (
             <span className="text-xs text-amber-400">{t('profile:identity.incomplete')}</span>
           )}
@@ -258,20 +258,20 @@ function ProfileTab({ user, onUserUpdated }: { user: UserInfo | null; onUserUpda
         ) : (
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-slate-400">{t('profile:identity.firstName')}</span>
-              <span className="text-slate-200">{user.first_name || '-'}</span>
+              <span className="text-muted-foreground">{t('profile:identity.firstName')}</span>
+              <span className="text-secondary-foreground">{user.first_name || '-'}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-400">{t('profile:identity.lastName')}</span>
-              <span className="text-slate-200">{user.last_name || '-'}</span>
+              <span className="text-muted-foreground">{t('profile:identity.lastName')}</span>
+              <span className="text-secondary-foreground">{user.last_name || '-'}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-400">{t('profile:identity.email')}</span>
-              <span className="text-slate-200">{user.email || '-'}</span>
+              <span className="text-muted-foreground">{t('profile:identity.email')}</span>
+              <span className="text-secondary-foreground">{user.email || '-'}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-400">{t('profile:identity.organization')}</span>
-              <span className="text-slate-200">{user.organization || '-'}</span>
+              <span className="text-muted-foreground">{t('profile:identity.organization')}</span>
+              <span className="text-secondary-foreground">{user.organization || '-'}</span>
             </div>
           </div>
         )}
@@ -311,11 +311,11 @@ function AppearanceTab() {
           <Plus className="w-4 h-4" /> {t('profile:appearance.createCustom')}
         </button>
       </div>
-      <p className="text-sm text-slate-400">{t('profile:appearance.description')}</p>
+      <p className="text-sm text-muted-foreground">{t('profile:appearance.description')}</p>
 
       {/* Built-in themes */}
       <div>
-        <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
           {t('profile:appearance.builtinThemes')}
         </h4>
         <div className="grid grid-cols-2 gap-3">
@@ -326,12 +326,12 @@ function AppearanceTab() {
               className={`p-3 rounded-lg border text-start transition-colors ${
                 theme === tm.name
                   ? 'border-primary bg-primary/10'
-                  : 'border-slate-700 hover:border-slate-600 bg-slate-800/50'
+                  : 'border-subtle hover:border-subtle bg-muted/50'
               }`}
             >
               <div className="flex items-center gap-2 mb-2">
                 <div
-                  className="w-4 h-4 rounded-full border border-slate-600"
+                  className="w-4 h-4 rounded-full border border-subtle"
                   style={{ background: `rgb(${tm.colors.accentPrimary})` }}
                 />
                 <span className="text-sm font-medium">{tm.displayName}</span>
@@ -352,7 +352,7 @@ function AppearanceTab() {
       {/* Custom themes */}
       {Object.keys(customThemes).length > 0 && (
         <div>
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
             {t('profile:appearance.customThemes')}
           </h4>
           <div className="grid grid-cols-2 gap-3">
@@ -362,7 +362,7 @@ function AppearanceTab() {
                 className={`p-3 rounded-lg border text-start transition-colors ${
                   theme === tm.name
                     ? 'border-primary bg-primary/10'
-                    : 'border-slate-700 hover:border-slate-600 bg-slate-800/50'
+                    : 'border-subtle hover:border-subtle bg-muted/50'
                 }`}
               >
                 <div className="flex items-center justify-between mb-2">
@@ -371,7 +371,7 @@ function AppearanceTab() {
                     className="flex items-center gap-2 flex-1 min-w-0 text-start"
                   >
                     <div
-                      className="w-4 h-4 rounded-full border border-slate-600 shrink-0"
+                      className="w-4 h-4 rounded-full border border-subtle shrink-0"
                       style={{ background: `rgb(${tm.colors.accentPrimary})` }}
                     />
                     <span className="text-sm font-medium truncate">{tm.displayName}</span>
@@ -524,7 +524,7 @@ function SecurityTab({ user }: { user: UserInfo | null }) {
   return (
     <div className="space-y-6">
       {/* Change Password */}
-      <form onSubmit={handleChangePassword} className="card space-y-3">
+      <form onSubmit={handleChangePassword} className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-3">
         <h3 className="text-lg font-semibold flex items-center gap-2">
           <Shield className="h-5 w-5 text-primary" />
           {t('profile:security.changePassword.title')}
@@ -571,18 +571,18 @@ function SecurityTab({ user }: { user: UserInfo | null }) {
       </form>
 
       {/* Two-Factor Authentication */}
-      <div className="card space-y-4">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4">
         <h3 className="text-lg font-semibold flex items-center gap-2">
           <Shield className="h-5 w-5 text-primary" />
           {t('profile:security.twoFactor.title')}
         </h3>
         {mfaLoading ? (
-          <p className="text-sm text-slate-400">{t('profile:security.twoFactor.loading')}</p>
+          <p className="text-sm text-muted-foreground">{t('profile:security.twoFactor.loading')}</p>
         ) : !mfa ? (
-          <p className="text-sm text-slate-400">{t('profile:security.twoFactor.loadFailed')}</p>
+          <p className="text-sm text-muted-foreground">{t('profile:security.twoFactor.loadFailed')}</p>
         ) : mfa.enabled ? (
           <form onSubmit={disableMfa} className="space-y-3">
-            <p className="text-sm text-slate-400">{t('profile:security.twoFactor.enabled')}</p>
+            <p className="text-sm text-muted-foreground">{t('profile:security.twoFactor.enabled')}</p>
             <input
               type="password"
               className="input w-full"
@@ -596,9 +596,9 @@ function SecurityTab({ user }: { user: UserInfo | null }) {
           </form>
         ) : mfa.setup ? (
           <form onSubmit={verifyMfaCode} className="space-y-3">
-            <p className="text-sm text-slate-400">{t('profile:security.twoFactor.setupHint')}</p>
+            <p className="text-sm text-muted-foreground">{t('profile:security.twoFactor.setupHint')}</p>
             {mfaQr && <img src={mfaQr} alt={t('profile:security.twoFactor.mfaQrCode')} className="w-48 h-48 bg-white p-2 rounded" />}
-            <pre className="text-xs text-slate-300 break-all bg-slate-800 p-2 rounded">{mfaUri}</pre>
+            <pre className="text-xs text-secondary-foreground break-all bg-muted p-2 rounded">{mfaUri}</pre>
             <input
               className="input w-full"
               value={mfaCode}
@@ -611,7 +611,7 @@ function SecurityTab({ user }: { user: UserInfo | null }) {
           </form>
         ) : (
           <div className="space-y-3">
-            <p className="text-sm text-slate-400">{t('profile:security.twoFactor.disabled')}</p>
+            <p className="text-sm text-muted-foreground">{t('profile:security.twoFactor.disabled')}</p>
             <div>
               <label className="label">{t('profile:security.twoFactor.aliasLabel')}</label>
               <input
@@ -649,7 +649,7 @@ function LanguageTab() {
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold">{t('profile:language.title')}</h3>
-      <p className="text-sm text-slate-400">{t('profile:language.description')}</p>
+      <p className="text-sm text-muted-foreground">{t('profile:language.description')}</p>
       <div className="grid grid-cols-2 gap-3">
         {languages.map((lang) => (
           <button
@@ -658,7 +658,7 @@ function LanguageTab() {
             className={`p-3 rounded-lg border text-start transition-colors ${
               language === lang.code
                 ? 'border-primary bg-primary/10'
-                : 'border-slate-700 hover:border-slate-600 bg-slate-800/50'
+                : 'border-subtle hover:border-subtle bg-muted/50'
             }`}
           >
             <div className="flex items-center gap-2 mb-1">
@@ -670,7 +670,7 @@ function LanguageTab() {
                     <Badge variant="info" size="sm">{t('profile:language.default')}</Badge>
                   )}
                 </div>
-                <span className="text-xs text-slate-500 truncate">{lang.englishName}</span>
+                <span className="text-xs text-muted-foreground truncate">{lang.englishName}</span>
               </div>
             </div>
           </button>
@@ -741,17 +741,17 @@ function DateTimeTab() {
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold">{t('profile:dateTime.title')}</h3>
-      <p className="text-sm text-slate-400">{t('profile:dateTime.description')}</p>
+      <p className="text-sm text-muted-foreground">{t('profile:dateTime.description')}</p>
 
       {/* Timezone */}
-      <div className="card space-y-3">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-3">
         <label className="label">{t('profile:dateTime.timezone.label')}</label>
         <div className="flex gap-2">
           <button
             className={`flex-1 px-3 py-2 rounded-lg border text-sm transition-colors ${
               timezone === 'local'
                 ? 'border-primary bg-primary/10 text-primary'
-                : 'border-slate-700 hover:border-slate-600 bg-slate-800/50 text-slate-300'
+                : 'border-subtle hover:border-subtle bg-muted/50 text-secondary-foreground'
             }`}
             onClick={() => setTimezone('local')}
           >
@@ -761,7 +761,7 @@ function DateTimeTab() {
             className={`flex-1 px-3 py-2 rounded-lg border text-sm transition-colors ${
               timezone === 'utc'
                 ? 'border-primary bg-primary/10 text-primary'
-                : 'border-slate-700 hover:border-slate-600 bg-slate-800/50 text-slate-300'
+                : 'border-subtle hover:border-subtle bg-muted/50 text-secondary-foreground'
             }`}
             onClick={() => setTimezone('utc')}
           >
@@ -788,7 +788,7 @@ function DateTimeTab() {
       </div>
 
       {/* Date format */}
-      <div className="card space-y-3">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-3">
         <label className="label">{t('profile:dateTime.format.dateLabel')}</label>
         <select
           className="input w-full"
@@ -815,7 +815,7 @@ function DateTimeTab() {
       </div>
 
       {/* Time format */}
-      <div className="card space-y-3">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-3">
         <label className="label">{t('profile:dateTime.format.timeLabel')}</label>
         <select
           className="input w-full"
@@ -839,16 +839,16 @@ function DateTimeTab() {
             onChange={(e) => handleCustomTime(e.target.value)}
           />
         )}
-        <p className="text-xs text-slate-500">{t('profile:dateTime.format.tokenHelp')}</p>
+        <p className="text-xs text-muted-foreground">{t('profile:dateTime.format.tokenHelp')}</p>
       </div>
 
       {/* Preview */}
-      <div className="card space-y-2">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-2">
         <span className="label">{t('profile:dateTime.preview.label')}</span>
-        <div className="text-sm font-mono text-slate-200 bg-slate-800/50 rounded px-3 py-2">
+        <div className="text-sm font-mono text-secondary-foreground bg-muted/50 rounded px-3 py-2">
           {formatDateTime(now)}
         </div>
-        <span className="text-xs text-slate-500">
+        <span className="text-xs text-muted-foreground">
           {t('profile:dateTime.preview.now')} · {isValidTimezone(timezone) ? (timezone === 'local' ? localTzLabel : timezone) : timezone}
         </span>
       </div>

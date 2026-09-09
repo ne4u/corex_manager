@@ -288,9 +288,9 @@ export default function SystemSettings() {
 
   return (
     <div className="space-y-6">
-      <form onSubmit={save} className="card space-y-4 max-w-2xl">
+      <form onSubmit={save} className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4 max-w-2xl">
         <h2 className="text-lg font-semibold flex items-center gap-2"><Globe className="h-5 w-5 text-primary" /> {t('settings:geoip.title')}</h2>
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-muted-foreground">
           {t('settings:geoip.description')}
         </p>
         <div>
@@ -323,11 +323,11 @@ export default function SystemSettings() {
           </p>
         )}
         {geoipStatus && (
-          <div className="border-t border-slate-800 pt-4 space-y-2">
-            <div className="flex items-center gap-2 text-sm text-slate-300">
-              <Clock className="h-4 w-4 text-slate-400" />
+          <div className="border-t border-border pt-4 space-y-2">
+            <div className="flex items-center gap-2 text-sm text-secondary-foreground">
+              <Clock className="h-4 w-4 text-muted-foreground" />
               <span>{t('settings:geoip.lastUpdated')} </span>
-              <span className="font-mono text-slate-100">
+              <span className="font-mono text-foreground">
                 {geoipStatus.last_download
                   ? formatDateTime(geoipStatus.last_download)
                   : t('settings:geoip.never')}
@@ -336,9 +336,9 @@ export default function SystemSettings() {
             {geoipStatus.databases.length > 0 && (
               <div className="space-y-1">
                 {geoipStatus.databases.map((db) => (
-                  <div key={db.name} className="flex items-center justify-between text-xs text-slate-400">
+                  <div key={db.name} className="flex items-center justify-between text-xs text-muted-foreground">
                     <span>{db.name} {t('settings:geoip.dbSuffix')}</span>
-                    <span className={db.exists ? 'text-slate-300' : 'text-red-400'}>
+                    <span className={db.exists ? 'text-secondary-foreground' : 'text-red-400'}>
                       {db.exists
                         ? `${formatDateTime(db.modified)} (${(db.size_bytes / 1048576).toFixed(1)} MB)`
                         : t('settings:geoip.missing')}
@@ -351,13 +351,13 @@ export default function SystemSettings() {
         )}
       </form>
 
-      <form onSubmit={saveSession} className="card space-y-4 max-w-2xl">
+      <form onSubmit={saveSession} className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4 max-w-2xl">
         <h2 className="text-lg font-semibold flex items-center gap-2"><Clock className="h-5 w-5 text-primary" /> {t('settings:session.title')}</h2>
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-muted-foreground">
           {t('settings:session.description')}
         </p>
         {sessionLoading ? (
-          <p className="text-sm text-slate-400">{t('common:actions.loading')}</p>
+          <p className="text-sm text-muted-foreground">{t('common:actions.loading')}</p>
         ) : (
           <div className="space-y-3">
             <div className="flex items-center gap-4">
@@ -371,7 +371,7 @@ export default function SystemSettings() {
                 onChange={(e) => setSessionTimeout(Number(e.target.value))}
                 disabled={sessionSaving}
               />
-              <span className="text-xs text-slate-500">{t('settings:session.timeoutRange')}</span>
+              <span className="text-xs text-muted-foreground">{t('settings:session.timeoutRange')}</span>
             </div>
             <div className="flex items-center gap-4">
               <label className="label w-52 shrink-0 flex items-center gap-2">
@@ -387,7 +387,7 @@ export default function SystemSettings() {
                 onChange={(e) => setSessionWarning(Number(e.target.value))}
                 disabled={sessionSaving}
               />
-              <span className="text-xs text-slate-500">{t('settings:session.warningRange')}</span>
+              <span className="text-xs text-muted-foreground">{t('settings:session.warningRange')}</span>
             </div>
           </div>
         )}
@@ -401,13 +401,13 @@ export default function SystemSettings() {
         )}
       </form>
 
-      <form onSubmit={savePasswordPolicy} className="card space-y-4 max-w-2xl">
+      <form onSubmit={savePasswordPolicy} className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4 max-w-2xl">
         <h2 className="text-lg font-semibold flex items-center gap-2"><KeyRound className="h-5 w-5 text-primary" /> {t('settings:passwordPolicy.title')}</h2>
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-muted-foreground">
           {t('settings:passwordPolicy.description')}
         </p>
         {pwLoading ? (
-          <p className="text-sm text-slate-400">{t('common:actions.loading')}</p>
+          <p className="text-sm text-muted-foreground">{t('common:actions.loading')}</p>
         ) : (
           <div className="space-y-3">
             <div className="flex items-center gap-4">
@@ -421,42 +421,42 @@ export default function SystemSettings() {
                 onChange={(e) => setPwMinLength(Number(e.target.value))}
                 disabled={pwSaving}
               />
-              <span className="text-xs text-slate-500">{t('settings:passwordPolicy.minLengthRange')}</span>
+              <span className="text-xs text-muted-foreground">{t('settings:passwordPolicy.minLengthRange')}</span>
             </div>
-            <label className="flex items-center gap-2 text-sm text-slate-300">
+            <label className="flex items-center gap-2 text-sm text-secondary-foreground">
               <input
                 type="checkbox"
-                className="rounded border-slate-600 bg-slate-800 text-primary"
+                className="rounded border-subtle bg-muted text-primary"
                 checked={pwRequireUpper}
                 onChange={(e) => setPwRequireUpper(e.target.checked)}
                 disabled={pwSaving}
               />
               {t('settings:passwordPolicy.requireUppercase')}
             </label>
-            <label className="flex items-center gap-2 text-sm text-slate-300">
+            <label className="flex items-center gap-2 text-sm text-secondary-foreground">
               <input
                 type="checkbox"
-                className="rounded border-slate-600 bg-slate-800 text-primary"
+                className="rounded border-subtle bg-muted text-primary"
                 checked={pwRequireLower}
                 onChange={(e) => setPwRequireLower(e.target.checked)}
                 disabled={pwSaving}
               />
               {t('settings:passwordPolicy.requireLowercase')}
             </label>
-            <label className="flex items-center gap-2 text-sm text-slate-300">
+            <label className="flex items-center gap-2 text-sm text-secondary-foreground">
               <input
                 type="checkbox"
-                className="rounded border-slate-600 bg-slate-800 text-primary"
+                className="rounded border-subtle bg-muted text-primary"
                 checked={pwRequireDigit}
                 onChange={(e) => setPwRequireDigit(e.target.checked)}
                 disabled={pwSaving}
               />
               {t('settings:passwordPolicy.requireDigit')}
             </label>
-            <label className="flex items-center gap-2 text-sm text-slate-300">
+            <label className="flex items-center gap-2 text-sm text-secondary-foreground">
               <input
                 type="checkbox"
-                className="rounded border-slate-600 bg-slate-800 text-primary"
+                className="rounded border-subtle bg-muted text-primary"
                 checked={pwRequireSymbol}
                 onChange={(e) => setPwRequireSymbol(e.target.checked)}
                 disabled={pwSaving}
@@ -474,9 +474,9 @@ export default function SystemSettings() {
                 onChange={(e) => setPwRotationMonths(Number(e.target.value))}
                 disabled={pwSaving}
               />
-              <span className="text-xs text-slate-500">{t('settings:passwordPolicy.rotationRange')}</span>
+              <span className="text-xs text-muted-foreground">{t('settings:passwordPolicy.rotationRange')}</span>
             </div>
-            <p className="text-xs text-slate-500">{t('settings:passwordPolicy.rotationHint')}</p>
+            <p className="text-xs text-muted-foreground">{t('settings:passwordPolicy.rotationHint')}</p>
           </div>
         )}
         <button className="btn-primary" type="submit" disabled={pwSaving || pwLoading}>
@@ -489,13 +489,13 @@ export default function SystemSettings() {
         )}
       </form>
 
-      <form onSubmit={saveSsllabs} className="card space-y-4 max-w-2xl">
+      <form onSubmit={saveSsllabs} className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4 max-w-2xl">
         <h2 className="text-lg font-semibold flex items-center gap-2"><Radar className="h-5 w-5 text-primary" /> {t('settings:ssllabs.title')}</h2>
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-muted-foreground">
           {t('settings:ssllabs.description')}
         </p>
         {ssllabsLoading ? (
-          <p className="text-sm text-slate-400">{t('common:actions.loading')}</p>
+          <p className="text-sm text-muted-foreground">{t('common:actions.loading')}</p>
         ) : (
           <div className="space-y-3">
             <div className="flex items-center gap-4">
@@ -509,7 +509,7 @@ export default function SystemSettings() {
                 onChange={(e) => setSsllabsMaxScans(Number(e.target.value))}
                 disabled={ssllabsSaving}
               />
-              <span className="text-xs text-slate-500">{t('settings:ssllabs.maxScansRange')}</span>
+              <span className="text-xs text-muted-foreground">{t('settings:ssllabs.maxScansRange')}</span>
             </div>
           </div>
         )}
@@ -523,29 +523,29 @@ export default function SystemSettings() {
         )}
       </form>
 
-      <div className="card space-y-4 max-w-2xl">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4 max-w-2xl">
         <h2 className="text-lg font-semibold flex items-center gap-2"><Package className="h-5 w-5 text-primary" /> {t('settings:backup.title')}</h2>
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-muted-foreground">
           {t('settings:backup.description')}
         </p>
 
-        <div className="border-t border-slate-800 pt-4 space-y-4">
+        <div className="border-t border-border pt-4 space-y-4">
           <h3 className="text-sm font-semibold flex items-center gap-2"><Download className="h-4 w-4 text-primary" /> {t('settings:backup.export.title')}</h3>
           <div className="space-y-2">
-            <label className="flex items-center gap-2 text-sm text-slate-300">
+            <label className="flex items-center gap-2 text-sm text-secondary-foreground">
               <input
                 type="checkbox"
-                className="rounded border-slate-600 bg-slate-800 text-primary"
+                className="rounded border-subtle bg-muted text-primary"
                 checked={exportSecrets}
                 onChange={(e) => setExportSecrets(e.target.checked)}
                 disabled={exporting}
               />
               {t('settings:backup.export.exportSecrets')}
             </label>
-            <label className="flex items-center gap-2 text-sm text-slate-300">
+            <label className="flex items-center gap-2 text-sm text-secondary-foreground">
               <input
                 type="checkbox"
-                className="rounded border-slate-600 bg-slate-800 text-primary"
+                className="rounded border-subtle bg-muted text-primary"
                 checked={exportMetrics}
                 onChange={(e) => setExportMetrics(e.target.checked)}
                 disabled={exporting}
@@ -574,7 +574,7 @@ export default function SystemSettings() {
           )}
         </div>
 
-        <div className="border-t border-slate-800 pt-4 space-y-4">
+        <div className="border-t border-border pt-4 space-y-4">
           <h3 className="text-sm font-semibold flex items-center gap-2"><Upload className="h-4 w-4 text-primary" /> {t('settings:backup.restore.title')}</h3>
           <div>
             <label className="label">{t('settings:backup.restore.fileLabel')}</label>
@@ -591,7 +591,7 @@ export default function SystemSettings() {
                 />
               </label>
               {restoreFile && (
-                <span className="text-sm text-slate-400 truncate max-w-xs">{restoreFile.name}</span>
+                <span className="text-sm text-muted-foreground truncate max-w-xs">{restoreFile.name}</span>
               )}
             </div>
           </div>

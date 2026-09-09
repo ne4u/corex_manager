@@ -476,7 +476,7 @@ export default function McpPolicyExpressionBuilder({ value, onChange, metadata, 
           <ul className="space-y-1">
             {metadata.stale_servers.map(s => (
               <li key={s.id} className="flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">{s.name} <span className="text-slate-500">({s.namespace})</span></span>
+                <span className="text-muted-foreground">{s.name} <span className="text-muted-foreground">({s.namespace})</span></span>
                 <button
                   type="button"
                   onClick={() => handleRefreshServer(s.id)}

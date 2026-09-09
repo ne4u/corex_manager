@@ -28,9 +28,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 
     const variantClasses = {
       primary: 'bg-primary text-white hover:opacity-90 focus:ring-primary',
-      secondary: 'bg-slate-800 text-slate-100 hover:bg-slate-700 border border-slate-700 focus:ring-slate-700',
+      secondary: 'bg-muted text-foreground hover:bg-subtle border border-subtle focus:ring-subtle',
       danger: 'bg-red-600 text-white hover:opacity-90 focus:ring-red-600',
-      ghost: 'text-slate-100 hover:bg-slate-800 focus:ring-slate-700',
+      ghost: 'text-foreground hover:bg-muted focus:ring-subtle',
     }
 
     const sizeClasses = iconOnly

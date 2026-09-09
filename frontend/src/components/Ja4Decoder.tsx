@@ -31,7 +31,7 @@ export default function Ja4Decoder({ className }: Ja4DecoderProps) {
     setResult(null)
   }
 
-  const wrapperClass = `card ${className || ''}`.trim()
+  const wrapperClass = `rounded-lg border border-border bg-card p-6 shadow-sm ${className || ''}`.trim()
 
   return (
     <div className={wrapperClass}>
@@ -100,10 +100,10 @@ interface DecodedFieldProps {
 
 function DecodedField({ label, value, sub, className }: DecodedFieldProps) {
   return (
-    <div className={`bg-slate-950 rounded-lg p-3 border border-slate-800 ${className || ''}`.trim()}>
-      <p className="text-xs text-slate-400 mb-1">{label}</p>
+    <div className={`bg-background rounded-lg p-3 border border-border ${className || ''}`.trim()}>
+      <p className="text-xs text-muted-foreground mb-1">{label}</p>
       <p className="font-mono font-medium break-all">{value}</p>
-      {sub && <p className="text-xs text-slate-500 mt-1">{sub}</p>}
+      {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
     </div>
   )
 }

@@ -8,7 +8,7 @@ interface SslLabsReportProps {
 }
 
 function gradeColor(grade: string | null | undefined): string {
-  if (!grade) return 'text-slate-400'
+  if (!grade) return 'text-muted-foreground'
   if (grade.startsWith('A')) return 'text-green-400'
   if (grade.startsWith('B')) return 'text-amber-400'
   if (grade.startsWith('C') || grade.startsWith('D')) return 'text-orange-400'
@@ -16,7 +16,7 @@ function gradeColor(grade: string | null | undefined): string {
 }
 
 function gradeBg(grade: string | null | undefined): string {
-  if (!grade) return 'bg-slate-700 text-slate-300'
+  if (!grade) return 'bg-subtle text-secondary-foreground'
   if (grade.startsWith('A')) return 'bg-green-500/20 text-green-400 border-green-500/30'
   if (grade.startsWith('B')) return 'bg-amber-500/20 text-amber-400 border-amber-500/30'
   if (grade.startsWith('C') || grade.startsWith('D')) return 'bg-orange-500/20 text-orange-400 border-orange-500/30'
@@ -33,21 +33,21 @@ function vulnIcon(variant: 'success' | 'error' | 'warning' | 'default') {
 
 function boolVulnBadge(value: boolean | undefined, vulnerableLabel: string, safeLabel: string) {
   // For boolean vuln fields: true = vulnerable (bad), false = not vulnerable (good)
-  if (value === undefined || value === null) return <span className="text-slate-500">-</span>
+  if (value === undefined || value === null) return <span className="text-muted-foreground">-</span>
   const variant = value ? 'error' : 'success'
   return <Badge variant={variant} size="sm"><span className="inline-flex items-center gap-1">{vulnIcon(variant)}{value ? vulnerableLabel : safeLabel}</span></Badge>
 }
 
 function boolSafeBadge(value: boolean | undefined, trueLabel: string, falseLabel: string) {
   // For boolean security-feature fields: true = supported (good), false = not supported (bad)
-  if (value === undefined || value === null) return <span className="text-slate-500">-</span>
+  if (value === undefined || value === null) return <span className="text-muted-foreground">-</span>
   const variant = value ? 'success' : 'warning'
   return <Badge variant={variant} size="sm"><span className="inline-flex items-center gap-1">{vulnIcon(variant)}{value ? trueLabel : falseLabel}</span></Badge>
 }
 
 function intVulnBadge(value: number | undefined, labels: Record<number, { text: string; variant: 'success' | 'error' | 'warning' | 'default' }>) {
   // For integer vuln fields with specific value mappings per the SSL Labs API docs
-  if (value === undefined || value === null) return <span className="text-slate-500">-</span>
+  if (value === undefined || value === null) return <span className="text-muted-foreground">-</span>
   const entry = labels[value]
   if (entry) return <Badge variant={entry.variant} size="sm"><span className="inline-flex items-center gap-1">{vulnIcon(entry.variant)}{entry.text}</span></Badge>
   return <Badge variant="default" size="sm"><span className="inline-flex items-center gap-1">{vulnIcon('default')}{String(value)}</span></Badge>
@@ -55,7 +55,7 @@ function intVulnBadge(value: number | undefined, labels: Record<number, { text: 
 
 function forwardSecrecyBadge(value: number | undefined) {
   // Bitmask: bit 0 (1) = at least one browser FS, bit 1 (2) = FS with modern, bit 2 (4) = all clients FS
-  if (value === undefined || value === null) return <span className="text-slate-500">-</span>
+  if (value === undefined || value === null) return <span className="text-muted-foreground">-</span>
   if (value & 4) return <Badge variant="success" size="sm"><span className="inline-flex items-center gap-1"><CheckCircle2 className="h-3 w-3" />Full (all clients)</span></Badge>
   if (value & 2) return <Badge variant="success" size="sm"><span className="inline-flex items-center gap-1"><CheckCircle2 className="h-3 w-3" />Modern clients</span></Badge>
   if (value & 1) return <Badge variant="warning" size="sm"><span className="inline-flex items-center gap-1"><AlertTriangle className="h-3 w-3" />Partial (some clients)</span></Badge>
@@ -90,13 +90,13 @@ export default function SslLabsReport({ report }: SslLabsReportProps) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="card space-y-3">
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <ShieldCheck className="h-6 w-6 text-primary" />
             <div>
               <h3 className="text-xl font-bold">{host}</h3>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-muted-foreground">
                 {report.engineVersion && `Engine: ${report.engineVersion}`}
                 {report.engineVersion && report.criteriaVersion && ' · '}
                 {report.criteriaVersion && `Criteria: ${report.criteriaVersion}`}
@@ -109,12 +109,12 @@ export default function SslLabsReport({ report }: SslLabsReportProps) {
             </div>
           )}
         </div>
-        <div className="flex flex-wrap gap-4 text-sm text-slate-400">
+        <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
           {report.startTime && (
-            <div><span className="text-slate-500">Started:</span> {formatDateTime(new Date(report.startTime).toISOString())}</div>
+            <div><span className="text-muted-foreground">Started:</span> {formatDateTime(new Date(report.startTime).toISOString())}</div>
           )}
           {report.testTime && (
-            <div><span className="text-slate-500">Completed:</span> {formatDateTime(new Date(report.testTime).toISOString())}</div>
+            <div><span className="text-muted-foreground">Completed:</span> {formatDateTime(new Date(report.testTime).toISOString())}</div>
           )}
         </div>
         <a href={ssllabsUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-primary text-sm hover:underline">
@@ -124,11 +124,11 @@ export default function SslLabsReport({ report }: SslLabsReportProps) {
       </div>
 
       {/* Endpoints */}
-      <div className="card space-y-3">
-        <h4 className="text-sm font-semibold uppercase tracking-wider text-slate-400">{t('pages:ssllabs.report.endpoints')}</h4>
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-3">
+        <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{t('pages:ssllabs.report.endpoints')}</h4>
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-start">
-            <thead className="text-slate-400 border-b border-slate-800">
+            <thead className="text-muted-foreground border-b border-border">
               <tr>
                 <th>IP</th>
                 <th>Server</th>
@@ -139,12 +139,12 @@ export default function SslLabsReport({ report }: SslLabsReportProps) {
             </thead>
             <tbody>
               {endpoints.map((ep: any, i: number) => (
-                <tr key={i} className="border-b border-slate-800 last:border-0">
+                <tr key={i} className="border-b border-border last:border-0">
                   <td className="py-2 font-mono text-xs">{ep.ipAddress}</td>
-                  <td className="text-slate-400">{ep.serverName || '-'}</td>
+                  <td className="text-muted-foreground">{ep.serverName || '-'}</td>
                   <td><span className={`font-bold ${gradeColor(ep.grade)}`}>{ep.grade || '-'}</span></td>
-                  <td className="text-slate-400">{ep.statusMessage || '-'}</td>
-                  <td className="text-slate-400">{ep.eta != null ? `${ep.eta}s` : '-'}</td>
+                  <td className="text-muted-foreground">{ep.statusMessage || '-'}</td>
+                  <td className="text-muted-foreground">{ep.eta != null ? `${ep.eta}s` : '-'}</td>
                 </tr>
               ))}
             </tbody>
@@ -154,8 +154,8 @@ export default function SslLabsReport({ report }: SslLabsReportProps) {
 
       {/* Protocols */}
       {protocols.length > 0 && (
-        <div className="card space-y-3">
-          <h4 className="text-sm font-semibold uppercase tracking-wider text-slate-400">{t('pages:ssllabs.report.protocols')}</h4>
+        <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-3">
+          <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{t('pages:ssllabs.report.protocols')}</h4>
           <div className="flex flex-wrap gap-2">
             {protocols.map((p: any, i: number) => (
               <Badge key={i} variant={p.q === 0 ? 'error' : 'success'} size="sm">{p.name} {p.version}{p.q === 0 ? ' (insecure)' : ''}</Badge>
@@ -166,20 +166,20 @@ export default function SslLabsReport({ report }: SslLabsReportProps) {
 
       {/* Cipher Suites */}
       {suites.length > 0 && (
-        <div className="card space-y-3">
-          <h4 className="text-sm font-semibold uppercase tracking-wider text-slate-400">{t('pages:ssllabs.report.cipherSuites')}</h4>
+        <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-3">
+          <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{t('pages:ssllabs.report.cipherSuites')}</h4>
           <div className="space-y-4">
             {suites.map((s: any, i: number) => {
               const proto = protocols.find((p: any) => p.id === s.protocol)
               return (
                 <div key={i}>
-                  <p className="text-sm font-semibold text-slate-300 mb-2">
+                  <p className="text-sm font-semibold text-secondary-foreground mb-2">
                     {proto ? `${proto.name} ${proto.version}` : `Protocol ${s.protocol}`}
-                    {s.preference && <span className="text-xs text-slate-500 ms-2">(server preference)</span>}
+                    {s.preference && <span className="text-xs text-muted-foreground ms-2">(server preference)</span>}
                   </p>
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs text-start">
-                      <thead className="text-slate-500 border-b border-slate-800">
+                      <thead className="text-muted-foreground border-b border-border">
                         <tr>
                           <th>Cipher</th>
                           <th>Strength</th>
@@ -190,11 +190,11 @@ export default function SslLabsReport({ report }: SslLabsReportProps) {
                       </thead>
                       <tbody>
                         {(s.list || []).map((c: any, j: number) => (
-                          <tr key={j} className="border-b border-slate-800/50 last:border-0">
-                            <td className="py-1 font-mono text-slate-300">{c.name}</td>
-                            <td className="text-slate-400">{c.cipherStrength || '-'}</td>
-                            <td className="text-slate-400">{c.kxType || '-'} {c.kxStrength ? `(${c.kxStrength})` : ''}</td>
-                            <td className="text-slate-400">{c.namedGroupName || '-'}</td>
+                          <tr key={j} className="border-b border-border/50 last:border-0">
+                            <td className="py-1 font-mono text-secondary-foreground">{c.name}</td>
+                            <td className="text-muted-foreground">{c.cipherStrength || '-'}</td>
+                            <td className="text-muted-foreground">{c.kxType || '-'} {c.kxStrength ? `(${c.kxStrength})` : ''}</td>
+                            <td className="text-muted-foreground">{c.namedGroupName || '-'}</td>
                             <td>{c.q === 0 ? <Badge variant="error" size="sm">Insecure</Badge> : c.q === 1 ? <Badge variant="warning" size="sm">Weak</Badge> : <Badge variant="success" size="sm">Strong</Badge>}</td>
                           </tr>
                         ))}
@@ -213,9 +213,9 @@ export default function SslLabsReport({ report }: SslLabsReportProps) {
         const pqcGroups = namedGroups.filter((g: any) => g.namedGroupType === 'PQC')
         const hasPQC = pqcGroups.length > 0
         return (
-          <div className="card space-y-3">
+          <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-3">
             <div className="flex items-center justify-between">
-              <h4 className="text-sm font-semibold uppercase tracking-wider text-slate-400">{t('pages:ssllabs.report.namedGroups')}</h4>
+              <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{t('pages:ssllabs.report.namedGroups')}</h4>
               {hasPQC && (
                 <Badge variant="success" size="md">
                   <span className="inline-flex items-center gap-1">
@@ -238,14 +238,14 @@ export default function SslLabsReport({ report }: SslLabsReportProps) {
             )}
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-start">
-                <thead className="text-slate-400 border-b border-slate-800">
+                <thead className="text-muted-foreground border-b border-border">
                   <tr><th>Name</th><th>Bits</th><th>Type</th></tr>
                 </thead>
                 <tbody>
                   {namedGroups.map((g: any, i: number) => (
-                    <tr key={i} className="border-b border-slate-800/50 last:border-0">
+                    <tr key={i} className="border-b border-border/50 last:border-0">
                       <td className="py-1 font-mono text-xs">{g.name}</td>
-                      <td className="text-slate-400">{g.bits}</td>
+                      <td className="text-muted-foreground">{g.bits}</td>
                       <td><Badge variant={g.namedGroupType === 'PQC' ? 'success' : 'default'} size="sm">{g.namedGroupType || 'ECDHE'}</Badge></td>
                     </tr>
                   ))}
@@ -257,23 +257,23 @@ export default function SslLabsReport({ report }: SslLabsReportProps) {
       })()}
 
       {/* Vulnerabilities */}
-      <div className="card space-y-3">
-        <h4 className="text-sm font-semibold uppercase tracking-wider text-slate-400">{t('pages:ssllabs.report.vulnerabilities')}</h4>
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-3">
+        <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{t('pages:ssllabs.report.vulnerabilities')}</h4>
         <div className="grid grid-cols-2 gap-2 text-sm">
           {/* Boolean fields: true = vulnerable */}
-          <div className="flex items-center justify-between"><span className="text-slate-400">Heartbleed</span>{boolVulnBadge(details.heartbleed, 'Vulnerable', 'Not vulnerable')}</div>
-          <div className="flex items-center justify-between"><span className="text-slate-400">Heartbeat Supported</span>{boolVulnBadge(details.heartbeat, 'Yes', 'No')}</div>
-          <div className="flex items-center justify-between"><span className="text-slate-400">POODLE (SSL)</span>{boolVulnBadge(details.poodle, 'Vulnerable', 'Not vulnerable')}</div>
-          <div className="flex items-center justify-between"><span className="text-slate-400">BEAST</span>{boolVulnBadge(details.vulnBeast, 'Vulnerable', 'Not vulnerable')}</div>
-          <div className="flex items-center justify-between"><span className="text-slate-400">FREAK</span>{boolVulnBadge(details.freak, 'Vulnerable', 'Not vulnerable')}</div>
-          <div className="flex items-center justify-between"><span className="text-slate-400">Logjam</span>{boolVulnBadge(details.logjam, 'Vulnerable', 'Not vulnerable')}</div>
-          <div className="flex items-center justify-between"><span className="text-slate-400">DROWN</span>{boolVulnBadge(details.drownVulnerable, 'Vulnerable', 'Not vulnerable')}</div>
-          <div className="flex items-center justify-between"><span className="text-slate-400">RC4 Supported</span>{boolVulnBadge(details.supportsRc4, 'Yes', 'No')}</div>
-          <div className="flex items-center justify-between"><span className="text-slate-400">RC4 With Modern</span>{boolVulnBadge(details.rc4WithModern, 'Yes', 'No')}</div>
-          <div className="flex items-center justify-between"><span className="text-slate-400">TLS FALLBACK_SCSV</span>{boolSafeBadge(details.fallbackScsv, 'Supported', 'Not supported')}</div>
+          <div className="flex items-center justify-between"><span className="text-muted-foreground">Heartbleed</span>{boolVulnBadge(details.heartbleed, 'Vulnerable', 'Not vulnerable')}</div>
+          <div className="flex items-center justify-between"><span className="text-muted-foreground">Heartbeat Supported</span>{boolVulnBadge(details.heartbeat, 'Yes', 'No')}</div>
+          <div className="flex items-center justify-between"><span className="text-muted-foreground">POODLE (SSL)</span>{boolVulnBadge(details.poodle, 'Vulnerable', 'Not vulnerable')}</div>
+          <div className="flex items-center justify-between"><span className="text-muted-foreground">BEAST</span>{boolVulnBadge(details.vulnBeast, 'Vulnerable', 'Not vulnerable')}</div>
+          <div className="flex items-center justify-between"><span className="text-muted-foreground">FREAK</span>{boolVulnBadge(details.freak, 'Vulnerable', 'Not vulnerable')}</div>
+          <div className="flex items-center justify-between"><span className="text-muted-foreground">Logjam</span>{boolVulnBadge(details.logjam, 'Vulnerable', 'Not vulnerable')}</div>
+          <div className="flex items-center justify-between"><span className="text-muted-foreground">DROWN</span>{boolVulnBadge(details.drownVulnerable, 'Vulnerable', 'Not vulnerable')}</div>
+          <div className="flex items-center justify-between"><span className="text-muted-foreground">RC4 Supported</span>{boolVulnBadge(details.supportsRc4, 'Yes', 'No')}</div>
+          <div className="flex items-center justify-between"><span className="text-muted-foreground">RC4 With Modern</span>{boolVulnBadge(details.rc4WithModern, 'Yes', 'No')}</div>
+          <div className="flex items-center justify-between"><span className="text-muted-foreground">TLS FALLBACK_SCSV</span>{boolSafeBadge(details.fallbackScsv, 'Supported', 'Not supported')}</div>
 
           {/* Integer fields with specific value mappings */}
-          <div className="flex items-center justify-between"><span className="text-slate-400">POODLE (TLS)</span>{intVulnBadge(details.poodleTls, {
+          <div className="flex items-center justify-between"><span className="text-muted-foreground">POODLE (TLS)</span>{intVulnBadge(details.poodleTls, {
             [-3]: { text: 'Timeout', variant: 'warning' },
             [-2]: { text: 'TLS not supported', variant: 'default' },
             [-1]: { text: 'Test failed', variant: 'warning' },
@@ -281,27 +281,27 @@ export default function SslLabsReport({ report }: SslLabsReportProps) {
             [1]: { text: 'Not vulnerable', variant: 'success' },
             [2]: { text: 'Vulnerable', variant: 'error' },
           })}</div>
-          <div className="flex items-center justify-between"><span className="text-slate-400">OpenSSL CCS (CVE-2014-0224)</span>{intVulnBadge(details.openSslCcs, {
+          <div className="flex items-center justify-between"><span className="text-muted-foreground">OpenSSL CCS (CVE-2014-0224)</span>{intVulnBadge(details.openSslCcs, {
             [-1]: { text: 'Test failed', variant: 'warning' },
             [0]: { text: 'Unknown', variant: 'default' },
             [1]: { text: 'Not vulnerable', variant: 'success' },
             [2]: { text: 'Possibly vulnerable', variant: 'warning' },
             [3]: { text: 'Vulnerable & exploitable', variant: 'error' },
           })}</div>
-          <div className="flex items-center justify-between"><span className="text-slate-400">Lucky Minus 20 (CVE-2016-2107)</span>{intVulnBadge(details.openSSLLuckyMinus20, {
+          <div className="flex items-center justify-between"><span className="text-muted-foreground">Lucky Minus 20 (CVE-2016-2107)</span>{intVulnBadge(details.openSSLLuckyMinus20, {
             [-1]: { text: 'Test failed', variant: 'warning' },
             [0]: { text: 'Unknown', variant: 'default' },
             [1]: { text: 'Not vulnerable', variant: 'success' },
             [2]: { text: 'Vulnerable & insecure', variant: 'error' },
           })}</div>
-          <div className="flex items-center justify-between"><span className="text-slate-400">Ticketbleed (CVE-2016-9244)</span>{intVulnBadge(details.ticketbleed, {
+          <div className="flex items-center justify-between"><span className="text-muted-foreground">Ticketbleed (CVE-2016-9244)</span>{intVulnBadge(details.ticketbleed, {
             [-1]: { text: 'Test failed', variant: 'warning' },
             [0]: { text: 'Unknown', variant: 'default' },
             [1]: { text: 'Not vulnerable', variant: 'success' },
             [2]: { text: 'Vulnerable', variant: 'error' },
             [3]: { text: 'Similar bug detected', variant: 'warning' },
           })}</div>
-          <div className="flex items-center justify-between"><span className="text-slate-400">Bleichenbacher (ROBOT)</span>{intVulnBadge(details.bleichenbacher, {
+          <div className="flex items-center justify-between"><span className="text-muted-foreground">Bleichenbacher (ROBOT)</span>{intVulnBadge(details.bleichenbacher, {
             [-1]: { text: 'Test failed', variant: 'warning' },
             [0]: { text: 'Unknown', variant: 'default' },
             [1]: { text: 'Not vulnerable', variant: 'success' },
@@ -309,28 +309,28 @@ export default function SslLabsReport({ report }: SslLabsReportProps) {
             [3]: { text: 'Vulnerable (strong)', variant: 'error' },
             [4]: { text: 'Inconsistent results', variant: 'warning' },
           })}</div>
-          <div className="flex items-center justify-between"><span className="text-slate-400">Zombie POODLE</span>{intVulnBadge(details.zombiePoodle, {
+          <div className="flex items-center justify-between"><span className="text-muted-foreground">Zombie POODLE</span>{intVulnBadge(details.zombiePoodle, {
             [-1]: { text: 'Test failed', variant: 'warning' },
             [0]: { text: 'Unknown', variant: 'default' },
             [1]: { text: 'Not vulnerable', variant: 'success' },
             [2]: { text: 'Vulnerable', variant: 'error' },
             [3]: { text: 'Vulnerable & exploitable', variant: 'error' },
           })}</div>
-          <div className="flex items-center justify-between"><span className="text-slate-400">Golden Doodle</span>{intVulnBadge(details.goldenDoodle, {
+          <div className="flex items-center justify-between"><span className="text-muted-foreground">Golden Doodle</span>{intVulnBadge(details.goldenDoodle, {
             [-1]: { text: 'Test failed', variant: 'warning' },
             [0]: { text: 'Unknown', variant: 'default' },
             [1]: { text: 'Not vulnerable', variant: 'success' },
             [4]: { text: 'Vulnerable', variant: 'error' },
             [5]: { text: 'Vulnerable & exploitable', variant: 'error' },
           })}</div>
-          <div className="flex items-center justify-between"><span className="text-slate-400">Sleeping POODLE</span>{intVulnBadge(details.sleepingPoodle, {
+          <div className="flex items-center justify-between"><span className="text-muted-foreground">Sleeping POODLE</span>{intVulnBadge(details.sleepingPoodle, {
             [-1]: { text: 'Test failed', variant: 'warning' },
             [0]: { text: 'Unknown', variant: 'default' },
             [1]: { text: 'Not vulnerable', variant: 'success' },
             [10]: { text: 'Vulnerable', variant: 'error' },
             [11]: { text: 'Vulnerable & exploitable', variant: 'error' },
           })}</div>
-          <div className="flex items-center justify-between"><span className="text-slate-400">0-Length Padding Oracle (CVE-2019-1559)</span>{intVulnBadge(details.zeroLengthPaddingOracle, {
+          <div className="flex items-center justify-between"><span className="text-muted-foreground">0-Length Padding Oracle (CVE-2019-1559)</span>{intVulnBadge(details.zeroLengthPaddingOracle, {
             [-1]: { text: 'Test failed', variant: 'warning' },
             [0]: { text: 'Unknown', variant: 'default' },
             [1]: { text: 'Not vulnerable', variant: 'success' },
@@ -339,10 +339,10 @@ export default function SslLabsReport({ report }: SslLabsReportProps) {
           })}</div>
 
           {/* Bitmask field */}
-          <div className="flex items-center justify-between"><span className="text-slate-400">Forward Secrecy</span>{forwardSecrecyBadge(details.forwardSecrecy)}</div>
+          <div className="flex items-center justify-between"><span className="text-muted-foreground">Forward Secrecy</span>{forwardSecrecyBadge(details.forwardSecrecy)}</div>
 
           {/* 0-RTT (TLS 1.3 only) */}
-          <div className="flex items-center justify-between"><span className="text-slate-400">0-RTT (TLS 1.3)</span>{intVulnBadge(details.zeroRTTEnabled, {
+          <div className="flex items-center justify-between"><span className="text-muted-foreground">0-RTT (TLS 1.3)</span>{intVulnBadge(details.zeroRTTEnabled, {
             [-2]: { text: 'Test failed', variant: 'warning' },
             [-1]: { text: 'Not performed', variant: 'default' },
             [0]: { text: 'Not enabled', variant: 'success' },
@@ -353,12 +353,12 @@ export default function SslLabsReport({ report }: SslLabsReportProps) {
 
       {/* SNI & Chain Info */}
       {(details.sniRequired != null || certChains.length > 0) && (
-        <div className="card space-y-3">
-          <h4 className="text-sm font-semibold uppercase tracking-wider text-slate-400">Server Configuration</h4>
+        <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-3">
+          <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Server Configuration</h4>
           <div className="grid grid-cols-2 gap-2 text-sm">
             {details.sniRequired != null && (
               <div className="flex items-center justify-between">
-                <span className="text-slate-400">SNI Required</span>
+                <span className="text-muted-foreground">SNI Required</span>
                 <Badge variant={details.sniRequired ? 'info' : 'success'} size="sm">
                   <span className="inline-flex items-center gap-1">
                     {details.sniRequired ? <AlertTriangle className="h-3 w-3" /> : <CheckCircle2 className="h-3 w-3" />}
@@ -369,7 +369,7 @@ export default function SslLabsReport({ report }: SslLabsReportProps) {
             )}
             {details.noSniSuites && details.noSniSuites.list && details.noSniSuites.list.length > 0 && (
               <div className="flex items-center justify-between">
-                <span className="text-slate-400">No-SNI Cipher Suites</span>
+                <span className="text-muted-foreground">No-SNI Cipher Suites</span>
                 <Badge variant="warning" size="sm">{details.noSniSuites.list.length} suite(s) without SNI</Badge>
               </div>
             )}
@@ -377,8 +377,8 @@ export default function SslLabsReport({ report }: SslLabsReportProps) {
 
           {/* Chain issues */}
           {certChains.length > 0 && (
-            <div className="border-t border-slate-800 pt-3 space-y-2">
-              <p className="text-xs text-slate-500 uppercase tracking-wider">Certificate Chain Issues</p>
+            <div className="border-t border-border pt-3 space-y-2">
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Certificate Chain Issues</p>
               {certChains.map((chain: any, ci: number) => {
                 const chainIssues = chain.issues || 0
                 const hasIssues = chainIssues > 0
@@ -386,7 +386,7 @@ export default function SslLabsReport({ report }: SslLabsReportProps) {
                 return (
                   <div key={ci} className="text-xs space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-slate-500">Chain {ci + 1}{noSni ? ' (no SNI)' : ''}:</span>
+                      <span className="text-muted-foreground">Chain {ci + 1}{noSni ? ' (no SNI)' : ''}:</span>
                       {hasIssues ? (
                         <div className="flex flex-wrap gap-1">
                           {chainIssues & 2 && <Badge variant="warning" size="sm">Incomplete chain</Badge>}
@@ -412,26 +412,26 @@ export default function SslLabsReport({ report }: SslLabsReportProps) {
         const matchingCerts = certs.filter((c: any) => !(c.issues & 8))
         const mismatchedCerts = certs.filter((c: any) => !!(c.issues & 8))
         const renderCert = (cert: any, i: number) => (
-          <div key={cert.id || i} className="border border-slate-800 rounded-lg p-3 space-y-2">
+          <div key={cert.id || i} className="border border-border rounded-lg p-3 space-y-2">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm font-semibold text-slate-200">{cert.subject}</p>
-                <p className="text-xs text-slate-500">Issuer: {cert.issuerSubject}</p>
+                <p className="text-sm font-semibold text-secondary-foreground">{cert.subject}</p>
+                <p className="text-xs text-muted-foreground">Issuer: {cert.issuerSubject}</p>
               </div>
               <div className="flex flex-wrap gap-1 justify-end">
                 {cert.validationType === 'E' && <Badge variant="info" size="sm">EV</Badge>}
                 {cert.sct && <span title="Signed Certificate Timestamp — certificate is logged in a Certificate Transparency log"><Badge variant="success" size="sm">SCT</Badge></span>}
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2 text-xs text-slate-400">
-              <div><span className="text-slate-500">Key:</span> {cert.keyAlg} {cert.keySize}-bit (strength: {cert.keyStrength})</div>
-              <div><span className="text-slate-500">Signature:</span> {cert.sigAlg}</div>
-              <div><span className="text-slate-500">Not Before:</span> {cert.notBefore ? formatDateTime(new Date(cert.notBefore).toISOString()) : '-'}</div>
-              <div><span className="text-slate-500">Not After:</span> {cert.notAfter ? formatDateTime(new Date(cert.notAfter).toISOString()) : '-'}</div>
-              <div><span className="text-slate-500">Serial:</span> <span className="font-mono">{cert.serialNumber}</span></div>
-              <div><span className="text-slate-500">SHA256:</span> <span className="font-mono text-[10px]">{cert.sha256Hash?.substring(0, 24)}...</span></div>
+            <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+              <div><span className="text-muted-foreground">Key:</span> {cert.keyAlg} {cert.keySize}-bit (strength: {cert.keyStrength})</div>
+              <div><span className="text-muted-foreground">Signature:</span> {cert.sigAlg}</div>
+              <div><span className="text-muted-foreground">Not Before:</span> {cert.notBefore ? formatDateTime(new Date(cert.notBefore).toISOString()) : '-'}</div>
+              <div><span className="text-muted-foreground">Not After:</span> {cert.notAfter ? formatDateTime(new Date(cert.notAfter).toISOString()) : '-'}</div>
+              <div><span className="text-muted-foreground">Serial:</span> <span className="font-mono">{cert.serialNumber}</span></div>
+              <div><span className="text-muted-foreground">SHA256:</span> <span className="font-mono text-[10px]">{cert.sha256Hash?.substring(0, 24)}...</span></div>
               {cert.revocationStatus != null && (
-                <div><span className="text-slate-500">Revocation:</span> {intVulnBadge(cert.revocationStatus, {
+                <div><span className="text-muted-foreground">Revocation:</span> {intVulnBadge(cert.revocationStatus, {
                   [0]: { text: 'Not checked', variant: 'default' },
                   [1]: { text: 'Revoked', variant: 'error' },
                   [2]: { text: 'Not revoked', variant: 'success' },
@@ -484,15 +484,15 @@ export default function SslLabsReport({ report }: SslLabsReportProps) {
         return (
           <>
             {matchingCerts.length > 0 && (
-              <div className="card space-y-3">
-                <h4 className="text-sm font-semibold uppercase tracking-wider text-slate-400">{t('pages:ssllabs.report.certificateChain')}</h4>
+              <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-3">
+                <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{t('pages:ssllabs.report.certificateChain')}</h4>
                 <div className="space-y-4">
                   {matchingCerts.map((cert: any, i: number) => renderCert(cert, i))}
                 </div>
               </div>
             )}
             {mismatchedCerts.length > 0 && (
-              <div className="card space-y-3 border-amber-500/30">
+              <div className="rounded-lg border bg-card p-6 shadow-sm space-y-3 border-amber-500/30">
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="h-5 w-5 text-amber-400" />
                   <h4 className="text-sm font-semibold uppercase tracking-wider text-amber-400">Default / Non-SNI Certificate(s)</h4>
@@ -511,9 +511,9 @@ export default function SslLabsReport({ report }: SslLabsReportProps) {
 
       {/* Certificate Transparency */}
       {details.hasSct != null && details.hasSct > 0 && (
-        <div className="card space-y-3">
-          <h4 className="text-sm font-semibold uppercase tracking-wider text-slate-400">Certificate Transparency (SCT)</h4>
-          <p className="text-xs text-slate-500">Signed Certificate Timestamps prove the certificate was publicly logged. Browsers require SCTs for trust.</p>
+        <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-3">
+          <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Certificate Transparency (SCT)</h4>
+          <p className="text-xs text-muted-foreground">Signed Certificate Timestamps prove the certificate was publicly logged. Browsers require SCTs for trust.</p>
           <div className="flex flex-wrap gap-2">
             {details.hasSct & 1 && <Badge variant="success" size="sm"><span className="inline-flex items-center gap-1"><CheckCircle2 className="h-3 w-3" />Embedded in certificate</span></Badge>}
             {details.hasSct & 2 && <Badge variant="success" size="sm"><span className="inline-flex items-center gap-1"><CheckCircle2 className="h-3 w-3" />In stapled OCSP response</span></Badge>}
@@ -524,17 +524,17 @@ export default function SslLabsReport({ report }: SslLabsReportProps) {
 
       {/* HSTS */}
       {hsts && (
-        <div className="card space-y-3">
-          <h4 className="text-sm font-semibold uppercase tracking-wider text-slate-400">{t('pages:ssllabs.report.hsts')}</h4>
+        <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-3">
+          <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{t('pages:ssllabs.report.hsts')}</h4>
           <div className="space-y-2 text-sm">
             <div className="flex items-center justify-between">
-              <span className="text-slate-400">Status</span>
+              <span className="text-muted-foreground">Status</span>
               <Badge variant={hsts.status === 'present' ? 'success' : hsts.status === 'invalid' || hsts.status === 'disabled' ? 'error' : 'warning'} size="sm">{hsts.status}</Badge>
             </div>
-            {hsts.maxAge && <div className="flex justify-between"><span className="text-slate-400">Max Age</span><span>{hsts.maxAge}s</span></div>}
-            <div className="flex justify-between"><span className="text-slate-400">Include Subdomains</span>{hsts.includeSubDomains === undefined || hsts.includeSubDomains === null ? <span className="text-slate-500">-</span> : <Badge variant={hsts.includeSubDomains ? 'success' : 'default'} size="sm">{hsts.includeSubDomains ? 'Yes' : 'No'}</Badge>}</div>
-            <div className="flex justify-between"><span className="text-slate-400">Preload</span>{hsts.preload === undefined || hsts.preload === null ? <span className="text-slate-500">-</span> : <Badge variant={hsts.preload ? 'success' : 'default'} size="sm">{hsts.preload ? 'Yes' : 'No'}</Badge>}</div>
-            {hsts.header && <div className="text-xs font-mono text-slate-500 mt-2">{hsts.header}</div>}
+            {hsts.maxAge && <div className="flex justify-between"><span className="text-muted-foreground">Max Age</span><span>{hsts.maxAge}s</span></div>}
+            <div className="flex justify-between"><span className="text-muted-foreground">Include Subdomains</span>{hsts.includeSubDomains === undefined || hsts.includeSubDomains === null ? <span className="text-muted-foreground">-</span> : <Badge variant={hsts.includeSubDomains ? 'success' : 'default'} size="sm">{hsts.includeSubDomains ? 'Yes' : 'No'}</Badge>}</div>
+            <div className="flex justify-between"><span className="text-muted-foreground">Preload</span>{hsts.preload === undefined || hsts.preload === null ? <span className="text-muted-foreground">-</span> : <Badge variant={hsts.preload ? 'success' : 'default'} size="sm">{hsts.preload ? 'Yes' : 'No'}</Badge>}</div>
+            {hsts.header && <div className="text-xs font-mono text-muted-foreground mt-2">{hsts.header}</div>}
             {hsts.error && <p className="text-xs text-red-400">{hsts.error}</p>}
           </div>
         </div>
@@ -542,29 +542,29 @@ export default function SslLabsReport({ report }: SslLabsReportProps) {
 
       {/* HPKP */}
       {hpkp && hpkp.status !== 'absent' && (
-        <div className="card space-y-3">
-          <h4 className="text-sm font-semibold uppercase tracking-wider text-slate-400">{t('pages:ssllabs.report.hpkp')}</h4>
+        <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-3">
+          <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{t('pages:ssllabs.report.hpkp')}</h4>
           <div className="space-y-2 text-sm">
             <div className="flex items-center justify-between">
-              <span className="text-slate-400">Status</span>
+              <span className="text-muted-foreground">Status</span>
               <Badge variant={hpkp.status === 'valid' ? 'success' : hpkp.status === 'invalid' || hpkp.status === 'forbidden' ? 'error' : 'warning'} size="sm">{hpkp.status}</Badge>
             </div>
-            {hpkp.maxAge != null && <div className="flex justify-between"><span className="text-slate-400">Max Age</span><span>{hpkp.maxAge}s</span></div>}
-            {hpkp.includeSubDomains != null && <div className="flex justify-between"><span className="text-slate-400">Include Subdomains</span><Badge variant={hpkp.includeSubDomains ? 'success' : 'default'} size="sm">{hpkp.includeSubDomains ? 'Yes' : 'No'}</Badge></div>}
-            {hpkp.reportUri && <div className="flex justify-between"><span className="text-slate-400">Report URI</span><span className="text-xs font-mono text-slate-300">{hpkp.reportUri}</span></div>}
+            {hpkp.maxAge != null && <div className="flex justify-between"><span className="text-muted-foreground">Max Age</span><span>{hpkp.maxAge}s</span></div>}
+            {hpkp.includeSubDomains != null && <div className="flex justify-between"><span className="text-muted-foreground">Include Subdomains</span><Badge variant={hpkp.includeSubDomains ? 'success' : 'default'} size="sm">{hpkp.includeSubDomains ? 'Yes' : 'No'}</Badge></div>}
+            {hpkp.reportUri && <div className="flex justify-between"><span className="text-muted-foreground">Report URI</span><span className="text-xs font-mono text-secondary-foreground">{hpkp.reportUri}</span></div>}
             {hpkp.error && <p className="text-xs text-red-400">{hpkp.error}</p>}
-            {hpkp.header && <div className="text-xs font-mono text-slate-500 mt-2">{hpkp.header}</div>}
+            {hpkp.header && <div className="text-xs font-mono text-muted-foreground mt-2">{hpkp.header}</div>}
           </div>
         </div>
       )}
 
       {/* Client Simulations */}
       {sims.length > 0 && (
-        <div className="card space-y-3">
-          <h4 className="text-sm font-semibold uppercase tracking-wider text-slate-400">{t('pages:ssllabs.report.clientSimulations')}</h4>
+        <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-3">
+          <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{t('pages:ssllabs.report.clientSimulations')}</h4>
           <div className="overflow-x-auto max-h-96">
             <table className="w-full text-xs text-start">
-              <thead className="text-slate-400 border-b border-slate-800 sticky top-0 bg-slate-900">
+              <thead className="text-muted-foreground border-b border-border sticky top-0 bg-card">
                 <tr>
                   <th>Client</th>
                   <th>Platform</th>
@@ -577,13 +577,13 @@ export default function SslLabsReport({ report }: SslLabsReportProps) {
                   const c = sim.client || {}
                   const ok = sim.errorCode === 0
                   return (
-                    <tr key={i} className="border-b border-slate-800/50 last:border-0">
+                    <tr key={i} className="border-b border-border/50 last:border-0">
                       <td className="py-1">
                         {c.name}
                         {c.isReference && <span className="text-amber-400 ms-1" title="Reference client">*</span>}
                       </td>
-                      <td className="text-slate-500">{c.platform || '-'}</td>
-                      <td className="text-slate-400">{c.version}</td>
+                      <td className="text-muted-foreground">{c.platform || '-'}</td>
+                      <td className="text-muted-foreground">{c.version}</td>
                       <td>
                         {ok ? (
                           <span className="text-green-400 flex items-center gap-1">
@@ -608,21 +608,21 @@ export default function SslLabsReport({ report }: SslLabsReportProps) {
 
       {/* HTTP Transaction */}
       {httpTransactions.length > 0 && (
-        <div className="card space-y-3">
-          <h4 className="text-sm font-semibold uppercase tracking-wider text-slate-400">{t('pages:ssllabs.report.httpTransaction')}</h4>
+        <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-3">
+          <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{t('pages:ssllabs.report.httpTransaction')}</h4>
           {httpTransactions.map((txn: any, i: number) => (
             <div key={i} className="space-y-2">
               <div className="text-xs">
-                {txn.requestUrl && <p className="text-slate-500 font-mono">{txn.requestUrl}</p>}
-                <p className="text-slate-300 font-mono">{txn.requestLine}</p>
+                {txn.requestUrl && <p className="text-muted-foreground font-mono">{txn.requestUrl}</p>}
+                <p className="text-secondary-foreground font-mono">{txn.requestLine}</p>
                 <p className={`font-mono ${txn.statusCode && txn.statusCode >= 400 ? 'text-red-400' : 'text-green-400'}`}>{txn.responseLine}</p>
               </div>
               {txn.responseHeaders && txn.responseHeaders.length > 0 && (
                 <div className="text-xs space-y-1">
-                  <p className="text-slate-500 uppercase tracking-wider">Response Headers</p>
-                  <div className="font-mono text-slate-400 space-y-0.5 max-h-48 overflow-y-auto">
+                  <p className="text-muted-foreground uppercase tracking-wider">Response Headers</p>
+                  <div className="font-mono text-muted-foreground space-y-0.5 max-h-48 overflow-y-auto">
                     {txn.responseHeaders.map((h: any, j: number) => (
-                      <div key={j}><span className="text-slate-500">{h.name}:</span> {h.value}</div>
+                      <div key={j}><span className="text-muted-foreground">{h.name}:</span> {h.value}</div>
                     ))}
                   </div>
                 </div>

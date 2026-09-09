@@ -44,7 +44,7 @@ function statusColor(status: string): string {
 }
 
 function gradeColor(grade: string | null): string {
-  if (!grade) return 'text-slate-500'
+  if (!grade) return 'text-muted-foreground'
   if (grade.startsWith('A')) return 'text-green-400'
   if (grade.startsWith('B')) return 'text-amber-400'
   if (grade.startsWith('C') || grade.startsWith('D')) return 'text-orange-400'
@@ -215,22 +215,22 @@ export default function CertificateSslLabs() {
 
       {/* Certificate info */}
       {cert && (
-        <div className="card space-y-1">
-          <p className="text-sm"><span className="text-slate-400">{t('pages:ssllabs.certificate')}:</span> {cert.name}</p>
-          <p className="text-sm"><span className="text-slate-400">{t('pages:certificates.tableHeaders.cn')}:</span> {cert.subject_cn || '-'}</p>
-          {cert.sans && <p className="text-sm"><span className="text-slate-400">{t('pages:certificates.tableHeaders.sans')}:</span> {cert.sans}</p>}
+        <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-1">
+          <p className="text-sm"><span className="text-muted-foreground">{t('pages:ssllabs.certificate')}:</span> {cert.name}</p>
+          <p className="text-sm"><span className="text-muted-foreground">{t('pages:certificates.tableHeaders.cn')}:</span> {cert.subject_cn || '-'}</p>
+          {cert.sans && <p className="text-sm"><span className="text-muted-foreground">{t('pages:certificates.tableHeaders.sans')}:</span> {cert.sans}</p>}
         </div>
       )}
 
       {/* Permission banners */}
       {isViewer && (
-        <div className="card border-amber-500/30 bg-amber-500/5 flex items-center gap-2 text-sm text-amber-400">
+        <div className="rounded-lg border p-6 shadow-sm border-amber-500/30 bg-amber-500/5 flex items-center gap-2 text-sm text-amber-400">
           <Info className="h-4 w-4 shrink-0" />
           {t('pages:ssllabs.viewOnlyAccess')}
         </div>
       )}
       {contactIncomplete && (
-        <div className="card border-amber-500/30 bg-amber-500/5 flex items-center gap-2 text-sm text-amber-400">
+        <div className="rounded-lg border p-6 shadow-sm border-amber-500/30 bg-amber-500/5 flex items-center gap-2 text-sm text-amber-400">
           <AlertTriangle className="h-4 w-4 shrink-0" />
           {t('pages:ssllabs.contactFieldsRequired')}
         </div>
@@ -239,10 +239,10 @@ export default function CertificateSslLabs() {
       {error && <p className="text-red-400 text-sm">{error}</p>}
 
       {/* Hosts panel */}
-      <div className="card space-y-3">
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400">{t('pages:ssllabs.scannableHosts')}</h3>
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-3">
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{t('pages:ssllabs.scannableHosts')}</h3>
         {hosts.length === 0 ? (
-          <p className="text-sm text-slate-500">{t('pages:ssllabs.noHosts')}</p>
+          <p className="text-sm text-muted-foreground">{t('pages:ssllabs.noHosts')}</p>
         ) : (
           <div className="space-y-2">
             {hosts.map((host) => (
@@ -265,14 +265,14 @@ export default function CertificateSslLabs() {
 
       {/* Scans table */}
       {Object.keys(scansByHost).length > 0 && (
-        <div className="card space-y-4">
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400">{t('pages:ssllabs.scanHistory')}</h3>
+        <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{t('pages:ssllabs.scanHistory')}</h3>
           {Object.entries(scansByHost).map(([host, hostScans]) => (
             <div key={host} className="space-y-2">
-              <p className="font-mono text-sm font-semibold text-slate-300">{host}</p>
+              <p className="font-mono text-sm font-semibold text-secondary-foreground">{host}</p>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm text-start">
-                  <thead className="text-slate-400 border-b border-slate-800">
+                  <thead className="text-muted-foreground border-b border-border">
                     <tr>
                       <th>{t('pages:ssllabs.table.status')}</th>
                       <th>{t('pages:ssllabs.table.grade')}</th>
@@ -282,14 +282,14 @@ export default function CertificateSslLabs() {
                   </thead>
                   <tbody>
                     {hostScans.map((scan) => (
-                      <tr key={scan.id} className="border-b border-slate-800/50 last:border-0">
+                      <tr key={scan.id} className="border-b border-border/50 last:border-0">
                         <td className="py-2">
                           <span className={statusColor(scan.status)}>{scan.status}</span>
-                          {scanning[scan.id] && <span className="text-slate-400 ms-1 text-xs">({t('pages:ssllabs.polling')})</span>}
-                          {scan.status_message && <div className="text-xs text-slate-500">{scan.status_message}</div>}
+                          {scanning[scan.id] && <span className="text-muted-foreground ms-1 text-xs">({t('pages:ssllabs.polling')})</span>}
+                          {scan.status_message && <div className="text-xs text-muted-foreground">{scan.status_message}</div>}
                         </td>
                         <td><span className={`font-bold ${gradeColor(scan.grade)}`}>{scan.grade || '-'}</span></td>
-                        <td className="text-slate-400 text-xs">{scan.test_time ? formatDateTime(new Date(scan.test_time).toISOString()) : '-'}</td>
+                        <td className="text-muted-foreground text-xs">{scan.test_time ? formatDateTime(new Date(scan.test_time).toISOString()) : '-'}</td>
                         <td className="text-end">
                           <div className="inline-flex items-center gap-2">
                             {scan.status === 'READY' && scan.report && (
@@ -326,7 +326,7 @@ export default function CertificateSslLabs() {
         onClose={() => setDeleteConfirm(null)}
         title={t('pages:ssllabs.deleteConfirmTitle')}
       >
-        <p className="text-sm text-slate-300">{t('pages:ssllabs.deleteConfirmText', { host: deleteConfirm?.host })}</p>
+        <p className="text-sm text-secondary-foreground">{t('pages:ssllabs.deleteConfirmText', { host: deleteConfirm?.host })}</p>
         <div className="flex gap-2 mt-4">
           <button className="btn-primary bg-red-500/80" onClick={() => deleteConfirm && handleDelete(deleteConfirm)}>
             {t('common:actions.delete')}
