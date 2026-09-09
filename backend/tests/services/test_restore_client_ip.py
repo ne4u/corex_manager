@@ -301,3 +301,41 @@ def test_tcp_listener_no_set_src(db):
 
     cfg = haproxy.generate_config(db)
     assert "http-request set-src req.hdr_ip(X-Forwarded-For,1)" not in cfg
+
+
+def test_force_https_listener_with_no_backends_emits_catch_all_set_src(db, tmp_path, monkeypatch):
+    """A force-https listener that only redirects has no backend rules and no
+    default backend, but if a trusted network list is configured it should
+    still restore the client IP so the redirect log shows the real client."""
+    from app.core.config import get_settings
+    settings = get_settings()
+    monkeypatch.setattr(settings, "SECURITY_LISTS_DIR", str(tmp_path))
+
+    # Create a trusted network list
+    nl = NetworkList(name="cdn_edges")
+    db.add(nl)
+    db.flush()
+    db.add(NetworkListEntry(list_id=nl.id, value="173.245.48.0/20"))
+    db.commit()
+
+    set_setting(db, "restore_client_ip_trusted_network_list", "cdn_edges")
+
+    # Force-https listener with no default backend and no rules
+    listener = make_listener(db, name="force_tls", bind_port=80)
+    listener.force_https = True
+    listener.ssl_enabled = False
+    listener.default_backend_id = None
+    db.flush()
+
+    cfg = haproxy.generate_config(db)
+
+    # Catch-all set-src should be emitted for the force-https listener
+    assert "http-request set-src req.hdr_ip(X-Forwarded-For,1)" in cfg
+    assert "cdn_edges.lst" in cfg
+    # Original source captured and XFF hop uses it
+    assert "http-request set-var(txn.orig_src) src" in cfg
+    assert 'http-request add-header X-Forwarded-For "%[var(txn.orig_src)]"' in cfg
+    var_pos = cfg.find("set-var(txn.orig_src)")
+    set_src_pos = cfg.find("http-request set-src")
+    xff_pos = cfg.find('add-header X-Forwarded-For "%[var(txn.orig_src)]"')
+    assert var_pos < set_src_pos < xff_pos

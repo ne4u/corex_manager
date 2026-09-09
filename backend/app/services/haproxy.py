@@ -2413,6 +2413,25 @@ def generate_frontend(
         # req.fhdr (not req.hdr) preserves the full comma-separated chain.
         lines.append("    http-request set-var(txn.xff) req.fhdr(x-forwarded-for)")
         restore_lines = _cdn_restore_client_ip_rules(db, listener, backend_default, rule_combined_acls)
+
+        # Force-https (HTTP→HTTPS redirect) listeners may have no backends at
+        # all, so _cdn_restore_client_ip_rules returns nothing. The redirect is
+        # still logged though, and we want %[src] in that log to be the real
+        # client IP when the connection comes from a trusted reverse proxy/CDN.
+        # Fall back to a catch-all set-src using the default X-Forwarded-For
+        # header. (For Cloudflare with spoofing concerns, use CF-Connecting-IP
+        # as the client_ip_header on the real backend and via a listener-level
+        # setting once that is supported.)
+        if not restore_lines and force_https_redirect:
+            trusted = _trusted_src_condition(db)
+            if trusted:
+                header = _safe_token("X-Forwarded-For")
+                src_expr = f"req.hdr_ip({header},1)"
+                hdr_guard = f"{{ req.hdr_ip({header},1) -m found }}"
+                restore_lines = [
+                    f"    http-request set-src {src_expr} if {hdr_guard}{trusted}",
+                ]
+
         if restore_lines:
             lines.append("    http-request set-var(txn.orig_src) src")
             lines.extend(restore_lines)
