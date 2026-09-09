@@ -532,6 +532,10 @@ export default function Logs() {
                                 <code className="block text-xs mt-1 font-mono break-all">{p.client_port || '-'}</code>
                               </div>
                               <div>
+                                <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.xForwardedFor')}</span>
+                                <code className="block text-xs mt-1 font-mono break-all">{p.xff || '-'}</code>
+                              </div>
+                              <div>
                                 <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.wafStatus')}</span>
                                 <code className="block text-xs mt-1 font-mono break-all">{p.waf_status || '-'}</code>
                               </div>

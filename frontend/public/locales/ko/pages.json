@@ -105,6 +105,7 @@
       "fullPath": "\uc804\uccb4 \uacbd\ub85c:",
       "queryString": "\ucffc\ub9ac \ubb38\uc790\uc5f4:",
       "userAgent": "\uc0ac\uc6a9\uc790 \uc5d0\uc774\uc804\ud2b8:",
+      "xForwardedFor": "X-Forwarded-For:",
       "ja4Fingerprint": "JA4 \ud551\uac70\ud504\ub9b0\ud2b8:",
       "requestFingerprint": "\uc694\uccad \ud551\uac70\ud504\ub9b0\ud2b8:",
       "frontend": "\ud504\ub860\ud2b8\uc5d4\ub4dc:",

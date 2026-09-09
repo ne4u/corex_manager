@@ -619,6 +619,11 @@ def _default_json_log_fields(ja4_enabled: bool, page_protect_enabled: bool = Fal
         "ts": "%t",
         "client": "%[src]",
         "client_port": "%cp",
+        # The X-Forwarded-For chain as received from the client/upstream
+        # proxy, stashed in a txn var during the request phase BEFORE the
+        # add-header appends our own hop (see generate_frontend) — after the
+        # append, req.fhdr would return only the last occurrence.
+        "xff": "%[var(txn.xff),json]",
         "frontend": "%f",
         "backend": "%b",
         # host/path/query are user-controlled (Host header, URL) and can
@@ -2015,6 +2020,11 @@ def _cdn_restore_client_ip_rules(
     negation — set-src is idempotent, and the trusted-source gate ensures it
     only fires for legitimate CDN traffic).
 
+    HAProxy 3.4 stream-scopes source addresses, so each new stream/request
+    starts with the original TCP peer as ``src`` and ``set-src`` in
+    ``http-request`` rewrites only that stream. This means a per-request
+    ``{ src -f ... }`` check is correct for the running version.
+
     Returns a list of HAProxy config lines (may be empty).
     """
     if listener.mode == "tcp" or (getattr(listener, "protocol", "http") == "tcp"):
@@ -2391,6 +2401,17 @@ def generate_frontend(
         # original source — per XFF convention each proxy appends the peer
         # address it received the connection from. This yields e.g.
         # "client_ip, cdn_edge_ip" instead of duplicating the client IP.
+        #
+        # HAProxy 3.4 stream-scopes source addresses, so each stream/request
+        # has its own src. txn.orig_src only needs to live for the current
+        # transaction, not the whole session.
+        #
+        # Stash the received X-Forwarded-For chain in a txn var so the
+        # log-format can emit it via %[var(txn.xff),json]. This MUST run before
+        # the add-header below — afterwards req.fhdr(X-Forwarded-For) returns
+        # only the hop HAProxy appended, not the client-supplied chain.
+        # req.fhdr (not req.hdr) preserves the full comma-separated chain.
+        lines.append("    http-request set-var(txn.xff) req.fhdr(x-forwarded-for)")
         restore_lines = _cdn_restore_client_ip_rules(db, listener, backend_default, rule_combined_acls)
         if restore_lines:
             lines.append("    http-request set-var(txn.orig_src) src")

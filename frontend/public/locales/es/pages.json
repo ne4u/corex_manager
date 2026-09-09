@@ -105,6 +105,7 @@
       "fullPath": "Ruta completa:",
       "queryString": "Cadena de consulta:",
       "userAgent": "Agente de usuario:",
+      "xForwardedFor": "X-Forwarded-For:",
       "ja4Fingerprint": "Huella JA4:",
       "requestFingerprint": "Huella de solicitud:",
       "frontend": "Frontend:",

@@ -105,6 +105,7 @@
       "fullPath": "Chemin complet :",
       "queryString": "Cha\u00eene de requ\u00eate :",
       "userAgent": "Agent utilisateur :",
+      "xForwardedFor": "X-Forwarded-For :",
       "ja4Fingerprint": "Empreinte JA4 :",
       "requestFingerprint": "Empreinte de requ\u00eate :",
       "frontend": "Frontend :",

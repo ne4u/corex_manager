@@ -105,6 +105,7 @@
       "fullPath": "Vollst\u00e4ndiger Pfad:",
       "queryString": "Query-String:",
       "userAgent": "User-Agent:",
+      "xForwardedFor": "X-Forwarded-For:",
       "ja4Fingerprint": "JA4-Fingerabdruck:",
       "requestFingerprint": "Anfrage-Fingerabdruck:",
       "frontend": "Frontend:",
