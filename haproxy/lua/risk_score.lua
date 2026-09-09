@@ -78,17 +78,21 @@ local function risk_capture(txn)
     local ver = txn.f:req_ver() or '1.1'
     local path = txn.f:path() or '/'
     local query = txn.f:query() or ''
-    local conn = (txn.f:req_hdr('connection') or ''):lower()
-    local ua = txn.f:req_hdr('user-agent') or ''
-    local alang = (txn.f:req_hdr('accept-language') or ''):lower()
+    -- Use req_fhdr (req.fhdr) for full, comma-unsplit header values.
+    -- req_hdr (req.hdr) splits on commas and returns the last token,
+    -- which breaks Accept-Language (e.g. "en-US,en;q=0.9" -> "en;q=0.9")
+    -- and User-Agent values that contain commas.
+    local conn = (txn.f:req_fhdr('connection') or ''):lower()
+    local ua = txn.f:req_fhdr('user-agent') or ''
+    local alang = (txn.f:req_fhdr('accept-language') or ''):lower()
     -- param_keys is set by the Rust haproxy-req-fp module.
     local param_keys = txn:get_var('txn.req_fp.param_keys') or ''
 
     -- 1. keep_alive (boolean as "0"/"1" string)
     local kl = '0'
     if ver:match('2') then kl = '1'
-    elseif conn == 'close' then kl = '0'
-    elseif conn == 'keep-alive' then kl = '1'
+    elseif conn:find('close', 1, true) then kl = '0'
+    elseif conn:find('keep-alive', 1, true) then kl = '1'
     elseif ver:match('1%.1') then kl = '1' end
     txn:set_var('txn.risk_fp.keep_alive', kl)
 
