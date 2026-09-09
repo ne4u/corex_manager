@@ -1995,7 +1995,7 @@
       "geo": "GeoIP",
       "ja4": "JA4",
       "pattern": "Padr\u00e3o",
-      "feeds": "Feeds de Amea\u00e7as"
+      "feeds": "Feeds din\u00e2micos"
     },
     "addList": "Adicionar Lista",
     "addEntry": "Adicionar Entrada",
@@ -2041,7 +2041,7 @@
     "confirmDeleteList": "Excluir lista \"{{name}}\"? Isso tamb\u00e9m exclui todas as suas entradas.",
     "confirmDeleteEntry": "Excluir entrada \"{{value}}\"?",
     "feeds": {
-      "title": "Feeds de Amea\u00e7as",
+      "title": "Feeds din\u00e2micos",
       "editTitle": "Editar Feed",
       "addTitle": "Adicionar Feed",
       "name": "Nome",
@@ -2055,8 +2055,9 @@
       "targetListCreateNew": "Criar nova lista (nomeada ap\u00f3s o feed)",
       "description": "Descri\u00e7\u00e3o",
       "enabled": "Ativado",
+      "autoApply": "Aplicar automaticamente",
       "save": "Salvar",
-      "noFeedsYet": "Nenhum feed de amea\u00e7as ainda.",
+      "noFeedsYet": "Nenhum feed din\u00e2mico ainda.",
       "noEntriesInList": "Nenhuma entrada nesta lista.",
       "entriesTitle": "Entradas: {{name}}",
       "entriesTitleDefault": "Entradas",

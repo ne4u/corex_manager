@@ -1995,7 +1995,7 @@
       "geo": "GeoIP",
       "ja4": "JA4",
       "pattern": "Patr\u00f3n",
-      "feeds": "Feeds de Amenazas"
+      "feeds": "Feeds din\u00e1micos"
     },
     "addList": "A\u00f1adir Lista",
     "addEntry": "A\u00f1adir Entrada",
@@ -2041,7 +2041,7 @@
     "confirmDeleteList": "\u00bfEliminar lista \"{{name}}\"? Esto tambi\u00e9n elimina todas sus entradas.",
     "confirmDeleteEntry": "\u00bfEliminar entrada \"{{value}}\"?",
     "feeds": {
-      "title": "Feeds de Amenazas",
+      "title": "Feeds din\u00e1micos",
       "editTitle": "Editar Feed",
       "addTitle": "A\u00f1adir Feed",
       "name": "Nombre",
@@ -2055,8 +2055,9 @@
       "targetListCreateNew": "Crear nueva lista (nombrada seg\u00fan el feed)",
       "description": "Descripci\u00f3n",
       "enabled": "Habilitado",
+      "autoApply": "Aplicar automáticamente",
       "save": "Guardar",
-      "noFeedsYet": "A\u00fan no hay feeds de amenazas.",
+      "noFeedsYet": "A\u00fan no hay feeds din\u00e1micos.",
       "noEntriesInList": "No hay entradas en esta lista.",
       "entriesTitle": "Entradas: {{name}}",
       "entriesTitleDefault": "Entradas",

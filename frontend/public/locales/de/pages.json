@@ -1995,7 +1995,7 @@
       "geo": "GeoIP",
       "ja4": "JA4",
       "pattern": "Muster",
-      "feeds": "Bedrohungs-Feeds"
+      "feeds": "Dynamische Feeds"
     },
     "addList": "Liste hinzuf\u00fcgen",
     "addEntry": "Eintrag hinzuf\u00fcgen",
@@ -2041,7 +2041,7 @@
     "confirmDeleteList": "Liste \"{{name}}\" l\u00f6schen? Dies l\u00f6scht auch alle ihre Eintr\u00e4ge.",
     "confirmDeleteEntry": "Eintrag \"{{value}}\" l\u00f6schen?",
     "feeds": {
-      "title": "Bedrohungs-Feeds",
+      "title": "Dynamische Feeds",
       "editTitle": "Feed bearbeiten",
       "addTitle": "Feed hinzuf\u00fcgen",
       "name": "Name",
@@ -2055,8 +2055,9 @@
       "targetListCreateNew": "Neue Liste erstellen (nach Feed benannt)",
       "description": "Beschreibung",
       "enabled": "Aktiviert",
+      "autoApply": "Automatisch anwenden",
       "save": "Speichern",
-      "noFeedsYet": "Noch keine Bedrohungs-Feeds vorhanden.",
+      "noFeedsYet": "Noch keine dynamischen Feeds vorhanden.",
       "noEntriesInList": "Keine Eintr\u00e4ge in dieser Liste.",
       "entriesTitle": "Eintr\u00e4ge: {{name}}",
       "entriesTitleDefault": "Eintr\u00e4ge",

@@ -639,6 +639,7 @@ def create_dynamic_feed(f: DynamicFeedCreate, db: Session = Depends(get_db), use
         update_interval_hours=f.update_interval_hours,
         description=f.description,
         enabled=f.enabled,
+        auto_apply=f.auto_apply,
         target_list_id=target_list_id,
     )
     db.add(obj)

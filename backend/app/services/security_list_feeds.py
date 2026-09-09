@@ -97,20 +97,35 @@ def refresh_feed(db: Session, feed: DynamicFeed) -> Dict[str, Any]:
     # feed returns the same entries it already had).
     old_values = sorted(e.value for e in target.entries)
     new_values = sorted(v for v, _ in validated)
-    changed = old_values != new_values
+    values_changed = old_values != new_values
+    notes_changed = False
 
-    # Replace entries.
-    db.query(entry_cls).filter(entry_cls.list_id == target.id).delete()
-    for v, note in validated:
-        db.add(entry_cls(list_id=target.id, value=v, note=note))
+    if values_changed:
+        # Replace entries in the order returned by the feed.
+        db.query(entry_cls).filter(entry_cls.list_id == target.id).delete()
+        for v, note in validated:
+            db.add(entry_cls(list_id=target.id, value=v, note=note))
+    else:
+        # Same value set; preserve the existing entry order and only update
+        # any notes that changed. This prevents a remote feed that reorders
+        # identical values from producing a spurious .lst diff.
+        new_notes = dict(validated)
+        for e in target.entries:
+            new_note = new_notes.get(e.value)
+            if e.note != new_note:
+                e.note = new_note
+                notes_changed = True
+
+    changed = values_changed or notes_changed
 
     feed.last_error = None
     feed.last_entry_count = len(validated)
     feed.last_updated_at = _utcnow()
-    target.updated_at = _utcnow()
+    if changed:
+        target.updated_at = _utcnow()
     db.commit()
 
-    if changed:
+    if values_changed and feed.auto_apply:
         _maybe_auto_apply_after_feed_refresh(db)
 
     return {"ok": True, "entry_count": len(validated), "skipped": skipped, "changed": changed}

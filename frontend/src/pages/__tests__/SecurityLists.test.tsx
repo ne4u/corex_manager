@@ -144,11 +144,11 @@ describe('SecurityLists page', () => {
     expect(screen.getByText('scanner')).toBeInTheDocument()
   })
 
-  test('switches to Threat Feeds tab', async () => {
+  test('switches to Dynamic Feeds tab', async () => {
     renderPage()
     await waitFor(() => expect(screen.getByText('blocklist')).toBeInTheDocument())
     const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: /Threat Feeds/i }))
+    await user.click(screen.getByRole('button', { name: /Dynamic Feeds/i }))
     await waitFor(() => expect(screen.getByText('threat-feed')).toBeInTheDocument())
   })
 
@@ -156,7 +156,7 @@ describe('SecurityLists page', () => {
     renderPage()
     await waitFor(() => expect(screen.getByText('blocklist')).toBeInTheDocument())
     const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: /Threat Feeds/i }))
+    await user.click(screen.getByRole('button', { name: /Dynamic Feeds/i }))
     await waitFor(() => expect(screen.getByText('threat-feed')).toBeInTheDocument())
     await user.click(screen.getByRole('button', { name: /View/i }))
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Entries: threat-feed' })).toBeInTheDocument())

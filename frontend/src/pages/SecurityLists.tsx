@@ -35,6 +35,7 @@ interface FeedRow {
   update_interval_hours: number
   description?: string | null
   enabled: boolean
+  auto_apply: boolean
   target_list_id: number
   last_updated_at?: string | null
   last_error?: string | null
@@ -326,6 +327,7 @@ function FeedsTab({ feeds, reload, networkLists, asnLists, ja4Lists, reloadLists
     update_interval_hours: 24,
     description: '',
     enabled: true,
+    auto_apply: true,
     target_list_id: '' as number | string,
   }
   const [form, setForm] = useState<any>(initialForm)
@@ -340,6 +342,7 @@ function FeedsTab({ feeds, reload, networkLists, asnLists, ja4Lists, reloadLists
       update_interval_hours: f.update_interval_hours,
       description: f.description || '',
       enabled: f.enabled,
+      auto_apply: f.auto_apply,
       target_list_id: f.target_list_id,
     })
     setOpen(true)
@@ -370,6 +373,7 @@ function FeedsTab({ feeds, reload, networkLists, asnLists, ja4Lists, reloadLists
       update_interval_hours: Number(form.update_interval_hours),
       description: form.description || null,
       enabled: form.enabled,
+      auto_apply: form.auto_apply,
     }
     if (editing) {
       payload.target_list_id = form.target_list_id
@@ -416,14 +420,14 @@ function FeedsTab({ feeds, reload, networkLists, asnLists, ja4Lists, reloadLists
   return (
     <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
       <div className="flex items-center justify-between p-4 border-b border-border">
-        <h3 className="font-semibold">Threat Feeds</h3>
+        <h3 className="font-semibold">{t('pages:securityLists.feeds.title', { defaultValue: 'Dynamic Feeds' })}</h3>
         <button onClick={openAdd} className="btn-primary">Add Feed</button>
       </div>
       <table className="w-full text-sm text-start">
         <thead className="text-muted-foreground border-b border-border">
           <tr>
             <th className="p-2">Name</th><th className="p-2">Type</th><th className="p-2">URL</th>
-            <th className="p-2">Interval (h)</th><th className="p-2">Enabled</th>
+            <th className="p-2">Interval (h)</th><th className="p-2">Enabled</th><th className="p-2">{t('pages:securityLists.feeds.autoApply', { defaultValue: 'Auto-apply' })}</th>
             <th className="p-2">Last Updated</th><th className="p-2">Entries</th><th className="p-2">Error</th><th className="p-2"></th>
           </tr>
         </thead>
@@ -435,6 +439,7 @@ function FeedsTab({ feeds, reload, networkLists, asnLists, ja4Lists, reloadLists
               <td className="p-2 max-w-xs truncate font-mono text-xs" title={f.url}>{f.url}</td>
               <td className="p-2">{f.update_interval_hours}</td>
               <td className="p-2">{f.enabled ? 'yes' : 'no'}</td>
+              <td className="p-2">{f.auto_apply ? 'yes' : 'no'}</td>
               <td className="p-2 text-xs text-muted-foreground">{f.last_updated_at ? formatDateTime(f.last_updated_at) : '-'}</td>
               <td className="p-2">{f.last_entry_count ?? '-'}</td>
               <td className="p-2 max-w-xs truncate text-xs text-red-400" title={f.last_error || ''}>{f.last_error || '-'}</td>
@@ -446,7 +451,7 @@ function FeedsTab({ feeds, reload, networkLists, asnLists, ja4Lists, reloadLists
               </td>
             </tr>
           ))}
-          {feeds.length === 0 && <tr><td className="p-4 text-muted-foreground" colSpan={9}>No threat feeds yet.</td></tr>}
+          {feeds.length === 0 && <tr><td className="p-4 text-muted-foreground" colSpan={10}>{t('pages:securityLists.feeds.noFeedsYet', { defaultValue: 'No dynamic feeds yet.' })}</td></tr>}
         </tbody>
       </table>
 
@@ -476,6 +481,10 @@ function FeedsTab({ feeds, reload, networkLists, asnLists, ja4Lists, reloadLists
             <div className="col-span-2 flex items-center gap-2">
               <input type="checkbox" id="feed-enabled" checked={form.enabled} onChange={e => setForm({ ...form, enabled: e.target.checked })} />
               <label htmlFor="feed-enabled">Enabled</label>
+            </div>
+            <div className="col-span-2 flex items-center gap-2">
+              <input type="checkbox" id="feed-auto-apply" checked={form.auto_apply} onChange={e => setForm({ ...form, auto_apply: e.target.checked })} />
+              <label htmlFor="feed-auto-apply">{t('pages:securityLists.feeds.autoApply', { defaultValue: 'Auto-apply' })}</label>
             </div>
           </div>
           <button className="btn-primary w-full">Save</button>

@@ -134,6 +134,7 @@ class DynamicFeed(Base):
     update_interval_hours = Column(Integer, default=24)
     description = Column(String, nullable=True)
     enabled = Column(Boolean, default=True)
+    auto_apply = Column(Boolean, default=True, nullable=False, server_default=sa.text("true"))
     target_list_id = Column(Integer, nullable=False)  # FK to network_lists.id, asn_lists.id, or ja4_lists.id (polymorphic by list_type)
     last_updated_at = Column(DateTime, nullable=True)
     last_error = Column(Text, nullable=True)

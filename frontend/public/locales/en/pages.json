@@ -2181,7 +2181,7 @@
       "geo": "GeoIP",
       "ja4": "JA4",
       "pattern": "Pattern",
-      "feeds": "Threat Feeds"
+      "feeds": "Dynamic Feeds"
     },
     "addList": "Add List",
     "addEntry": "Add Entry",
@@ -2227,7 +2227,7 @@
     "confirmDeleteList": "Delete list \"{{name}}\"? This also deletes all its entries.",
     "confirmDeleteEntry": "Delete entry \"{{value}}\"?",
     "feeds": {
-      "title": "Threat Feeds",
+      "title": "Dynamic Feeds",
       "editTitle": "Edit Feed",
       "addTitle": "Add Feed",
       "name": "Name",
@@ -2241,8 +2241,9 @@
       "targetListCreateNew": "Create new list (named after feed)",
       "description": "Description",
       "enabled": "Enabled",
+      "autoApply": "Auto-apply",
       "save": "Save",
-      "noFeedsYet": "No threat feeds yet.",
+      "noFeedsYet": "No dynamic feeds yet.",
       "noEntriesInList": "No entries in this list.",
       "entriesTitle": "Entries: {{name}}",
       "entriesTitleDefault": "Entries",

@@ -220,6 +220,7 @@ class DynamicFeedBase(BaseModel):
     update_interval_hours: int = 24
     description: Optional[str] = None
     enabled: bool = True
+    auto_apply: bool = True
     target_list_id: Optional[int] = None
 
 

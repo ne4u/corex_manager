@@ -1995,7 +1995,7 @@
       "geo": "GeoIP",
       "ja4": "JA4",
       "pattern": "Mod\u00e8le",
-      "feeds": "Flux de Menaces"
+      "feeds": "Flux dynamiques"
     },
     "addList": "Ajouter une Liste",
     "addEntry": "Ajouter une Entr\u00e9e",
@@ -2041,7 +2041,7 @@
     "confirmDeleteList": "Supprimer la liste \"{{name}}\" ? Cela supprime \u00e9galement toutes ses entr\u00e9es.",
     "confirmDeleteEntry": "Supprimer l'entr\u00e9e \"{{value}}\" ?",
     "feeds": {
-      "title": "Flux de Menaces",
+      "title": "Flux dynamiques",
       "editTitle": "Modifier le Flux",
       "addTitle": "Ajouter un Flux",
       "name": "Nom",
@@ -2055,8 +2055,9 @@
       "targetListCreateNew": "Cr\u00e9er une nouvelle liste (nomm\u00e9e d'apr\u00e8s le flux)",
       "description": "Description",
       "enabled": "Activ\u00e9",
+      "autoApply": "Appliquer automatiquement",
       "save": "Enregistrer",
-      "noFeedsYet": "Aucun flux de menaces pour le moment.",
+      "noFeedsYet": "Aucun flux dynamique pour le moment.",
       "noEntriesInList": "Aucune entr\u00e9e dans cette liste.",
       "entriesTitle": "Entr\u00e9es : {{name}}",
       "entriesTitleDefault": "Entr\u00e9es",

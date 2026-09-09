@@ -590,3 +590,146 @@ def test_security_list_files_unapplied(db, tmp_path, monkeypatch):
     db.add(NetworkListEntry(list_id=nl.id, value="10.0.0.2"))
     db.commit()
     assert security_list_files_unapplied(db) == (True, False)
+
+
+def test_refresh_feed_same_values_reordered_does_not_create_diff(db, tmp_path, monkeypatch):
+    """A feed refresh that only reorders the same values must not produce a
+    config diff or re-insert entries in the new feed order."""
+    from app.models.models import AsnList, AsnListEntry, DynamicFeed
+    from app.services.config import get_config_status
+    from app.services.security_list_feeds import refresh_feed
+    from app.services.security_lists import write_security_list_files
+
+    _baseline_all_configs(db, tmp_path, monkeypatch)
+
+    lst = AsnList(name="asn-hosting", description="hosting ASN blocklist")
+    db.add(lst)
+    db.flush()
+    for v in ["AS401152", "AS401172", "AS559", "AS834", "AS906"]:
+        db.add(AsnListEntry(list_id=lst.id, value=v))
+    db.commit()
+
+    # Apply so .applied baselines are written.
+    write_security_list_files(db)
+    assert get_config_status(db) is False
+
+    feed = DynamicFeed(
+        name="hosting-feed",
+        list_type="asn",
+        url="http://example.com/feed",
+        target_list_id=lst.id,
+        update_interval_hours=1,
+        enabled=True,
+    )
+    db.add(feed)
+    db.commit()
+
+    # Remote feed returns the same values, just reordered.
+    class FakeResp:
+        status_code = 200
+        text = "AS906\nAS834\nAS559\nAS401172\nAS401152\n"
+
+        def raise_for_status(self):
+            pass
+
+    monkeypatch.setattr("app.services.security_list_feeds.requests.get", lambda *a, **k: FakeResp())
+    result = refresh_feed(db, feed)
+
+    assert result["ok"] is True
+    assert result["entry_count"] == 5
+    assert result["changed"] is False
+    assert get_config_status(db) is False
+
+    # Entry order must be preserved; we should not have re-inserted.
+    entries = db.query(AsnListEntry).filter(AsnListEntry.list_id == lst.id).order_by(AsnListEntry.id).all()
+    assert [e.value for e in entries] == ["AS401152", "AS401172", "AS559", "AS834", "AS906"]
+
+
+def test_refresh_feed_auto_apply_false_does_not_queue_apply(db, tmp_path, monkeypatch):
+    """When a feed has auto_apply=False, a real value change updates the list
+    but does not queue an apply."""
+    from app.models.models import AsnList, AsnListEntry, DynamicFeed
+    from app.services.config import get_config_status
+    from app.services.security_list_feeds import refresh_feed
+
+    _baseline_all_configs(db, tmp_path, monkeypatch)
+
+    lst = AsnList(name="asn-hosting")
+    db.add(lst)
+    db.flush()
+    db.add(AsnListEntry(list_id=lst.id, value="AS12345"))
+    db.commit()
+
+    feed = DynamicFeed(
+        name="hosting-feed",
+        list_type="asn",
+        url="http://example.com/feed",
+        target_list_id=lst.id,
+        update_interval_hours=1,
+        enabled=True,
+        auto_apply=False,
+    )
+    db.add(feed)
+    db.commit()
+
+    class FakeResp:
+        status_code = 200
+        text = "AS67890\n"
+
+        def raise_for_status(self):
+            pass
+
+    calls = []
+    monkeypatch.setattr("app.services.tasks.queue_task", lambda *a, **k: calls.append((a, k)) or 1)
+    monkeypatch.setattr("app.services.security_list_feeds.requests.get", lambda *a, **k: FakeResp())
+    result = refresh_feed(db, feed)
+
+    assert result["ok"] is True
+    assert result["changed"] is True
+    assert not calls
+    assert get_config_status(db) is True
+
+
+def test_refresh_feed_auto_apply_true_queues_apply(db, tmp_path, monkeypatch):
+    """When a feed has auto_apply=True, a real value change queues an apply."""
+    from app.models.models import AsnList, AsnListEntry, DynamicFeed
+    from app.services.security_list_feeds import refresh_feed
+
+    _baseline_all_configs(db, tmp_path, monkeypatch)
+
+    lst = AsnList(name="asn-hosting")
+    db.add(lst)
+    db.flush()
+    db.add(AsnListEntry(list_id=lst.id, value="AS12345"))
+    db.commit()
+
+    feed = DynamicFeed(
+        name="hosting-feed",
+        list_type="asn",
+        url="http://example.com/feed",
+        target_list_id=lst.id,
+        update_interval_hours=1,
+        enabled=True,
+        auto_apply=True,
+    )
+    db.add(feed)
+    db.commit()
+
+    class FakeResp:
+        status_code = 200
+        text = "AS67890\n"
+
+        def raise_for_status(self):
+            pass
+
+    calls = []
+    monkeypatch.setattr("app.services.tasks.queue_task", lambda *a, **k: calls.append((a, k)) or 1)
+    monkeypatch.setattr("app.services.security_list_feeds.requests.get", lambda *a, **k: FakeResp())
+    result = refresh_feed(db, feed)
+
+    assert result["ok"] is True
+    assert result["changed"] is True
+    assert len(calls) == 1
+    assert calls[0][0][0] == "apply_config"
+    assert calls[0][1]["payload"]["created_by"] == "system"
+    assert "Auto-apply: security list feed refresh" in calls[0][1]["payload"]["comment"]

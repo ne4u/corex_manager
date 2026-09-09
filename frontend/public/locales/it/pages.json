@@ -1995,7 +1995,7 @@
       "geo": "GeoIP",
       "ja4": "JA4",
       "pattern": "Modello",
-      "feeds": "Feed di Minacce"
+      "feeds": "Feed dinamici"
     },
     "addList": "Aggiungi Lista",
     "addEntry": "Aggiungi Voce",
@@ -2041,7 +2041,7 @@
     "confirmDeleteList": "Eliminare la lista \"{{name}}\"? Questo elimina anche tutte le sue voci.",
     "confirmDeleteEntry": "Eliminare la voce \"{{value}}\"?",
     "feeds": {
-      "title": "Feed di Minacce",
+      "title": "Feed dinamici",
       "editTitle": "Modifica Feed",
       "addTitle": "Aggiungi Feed",
       "name": "Nome",
@@ -2055,8 +2055,9 @@
       "targetListCreateNew": "Crea nuova lista (denominata come il feed)",
       "description": "Descrizione",
       "enabled": "Abilitato",
+      "autoApply": "Applica automaticamente",
       "save": "Salva",
-      "noFeedsYet": "Nessun feed di minacce ancora.",
+      "noFeedsYet": "Nessun feed dinamico ancora.",
       "noEntriesInList": "Nessuna voce in questa lista.",
       "entriesTitle": "Voci: {{name}}",
       "entriesTitleDefault": "Voci",

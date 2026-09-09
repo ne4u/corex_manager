@@ -1995,7 +1995,7 @@
       "geo": "GeoIP",
       "ja4": "JA4",
       "pattern": "\ud328\ud134",
-      "feeds": "\uc704\ud611 \ud53c\ub4dc"
+      "feeds": "\ub3d9\uc801 \ud53c\ub4dc"
     },
     "addList": "\ubaa9\ub85d \ucd94\uac00",
     "addEntry": "\ud56d\ubaa9 \ucd94\uac00",
@@ -2041,7 +2041,7 @@
     "confirmDeleteList": "\ubaa9\ub85d \"{{name}}\"\uc744(\ub97c) \uc0ad\uc81c\ud558\uc2dc\uaca0\uc2b5\ub2c8\uae4c? \uc774 \uc791\uc5c5\uc740 \ubaa8\ub4e0 \ud56d\ubaa9\ub3c4 \uc0ad\uc81c\ud569\ub2c8\ub2e4.",
     "confirmDeleteEntry": "\ud56d\ubaa9 \"{{value}}\"\uc744(\ub97c) \uc0ad\uc81c\ud558\uc2dc\uaca0\uc2b5\ub2c8\uae4c?",
     "feeds": {
-      "title": "\uc704\ud611 \ud53c\ub4dc",
+      "title": "\ub3d9\uc801 \ud53c\ub4dc",
       "editTitle": "\ud53c\ub4dc \ud3b8\uc9d1",
       "addTitle": "\ud53c\ub4dc \ucd94\uac00",
       "name": "\uc774\ub984",
@@ -2055,8 +2055,9 @@
       "targetListCreateNew": "\uc0c8 \ubaa9\ub85d \uc0dd\uc131 (\ud53c\ub4dc \uc774\ub984\uc73c\ub85c \uba85\uba85)",
       "description": "\uc124\uba85",
       "enabled": "\ud65c\uc131\ud654",
+      "autoApply": "\uc790\ub3d9 \uc801\uc6a9",
       "save": "\uc800\uc7a5",
-      "noFeedsYet": "\uc544\uc9c1 \uc704\ud611 \ud53c\ub4dc\uac00 \uc5c6\uc2b5\ub2c8\ub2e4.",
+      "noFeedsYet": "\uc544\uc9c1 \ub3d9\uc801 \ud53c\ub4dc\uac00 \uc5c6\uc2b5\ub2c8\ub2e4.",
       "noEntriesInList": "\uc774 \ubaa9\ub85d\uc5d0 \ud56d\ubaa9\uc774 \uc5c6\uc2b5\ub2c8\ub2e4.",
       "entriesTitle": "\ud56d\ubaa9: {{name}}",
       "entriesTitleDefault": "\ud56d\ubaa9",
