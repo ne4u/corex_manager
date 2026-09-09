@@ -637,12 +637,13 @@ def _default_json_log_fields(ja4_enabled: bool, page_protect_enabled: bool = Fal
         "path": "%[var(txn.path),json]",
         "query": "%[var(txn.query),json]",
         "user_agent": "%[capture.req.hdr(1),json]",
+        "referer": "%[capture.req.hdr(2),json]",
         "status": "%ST",
         "status_source": "%[var(txn.status_source),json]",
         "bytes_out": "%B",
-        "rt": "%Tr",
-        "ct": "%Tc",
-        "tt": "%Tt",
+        "be_response_time": "%Tr",
+        "be_connect_time": "%Tc",
+        "total_time": "%Tt",
         "termination": "%ts",
         # String vars (action labels, rule names, WAF messages) can contain
         # quotes/commas/special chars — ,json escapes them for JSON safety.
@@ -2555,13 +2556,15 @@ def generate_frontend(
         lines.append("    http-request set-var(txn.status_source) str(haproxy)")
         lines.append("    http-response set-var(txn.status_source) str(backend)")
         # Capture the User-Agent header into capture slot 1 (Host is slot 0)
-        # for inclusion in the log-format via %[capture.req.hdr(1),json].
+        # and the Referer header into slot 2, for inclusion in the log-format
+        # via %[capture.req.hdr(1),json] and %[capture.req.hdr(2),json].
         # Use req.fhdr() (full header) because req.hdr() splits comma-separated
         # values, which would chop UAs like "KHTML, like Gecko" at the comma.
         # Using capture (not set-var) because the capture buffer explicitly
         # preserves the full header value up to the declared len, whereas
         # set-var can truncate longer header values.
         lines.append("    http-request capture req.fhdr(user-agent) len 512")
+        lines.append("    http-request capture req.fhdr(referer) len 512")
 
         # ACME HTTP-01 challenge — serve challenge files from the shared
         # webroot volume via Lua (reads at request time, no reload needed).

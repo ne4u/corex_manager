@@ -447,6 +447,10 @@ export default function Logs() {
                                 <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.userAgent')}</span>
                                 <code className="block text-xs mt-1 font-mono break-all">{p.user_agent || '-'}</code>
                               </div>
+                              <div className="col-span-2 md:col-span-3">
+                                <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.referer')}</span>
+                                <code className="block text-xs mt-1 font-mono break-all">{p.referer || '-'}</code>
+                              </div>
                               <div>
                                 <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.ja4Fingerprint')}</span>
                                 {p.ja4 && p.ja4 !== '-' ? (
@@ -479,15 +483,15 @@ export default function Logs() {
                               </div>
                               <div>
                                 <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.responseTime')}</span>
-                                <code className="block text-xs mt-1 font-mono break-all">{p.rt || '-'}</code>
+                                <code className="block text-xs mt-1 font-mono break-all">{p.be_response_time || '-'}</code>
                               </div>
                               <div>
                                 <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.connectTime')}</span>
-                                <code className="block text-xs mt-1 font-mono break-all">{p.ct || '-'}</code>
+                                <code className="block text-xs mt-1 font-mono break-all">{p.be_connect_time || '-'}</code>
                               </div>
                               <div>
                                 <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.totalTime')}</span>
-                                <code className="block text-xs mt-1 font-mono break-all">{p.tt || '-'}</code>
+                                <code className="block text-xs mt-1 font-mono break-all">{p.total_time || '-'}</code>
                               </div>
                               <div>
                                 <span className="text-muted-foreground text-xs">{t('pages:logs.expandedFields.termination')}</span>
