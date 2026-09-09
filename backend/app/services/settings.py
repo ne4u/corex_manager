@@ -17,7 +17,7 @@ def get_setting(db: Session, key: str, default: Optional[str] = None) -> Optiona
         return row.value
     value = getattr(settings, key.upper(), default)
     if value is None:
-        return None
+        return default
     return str(value)
 
 

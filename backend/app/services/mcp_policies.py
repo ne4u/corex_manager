@@ -6,6 +6,7 @@ import logging
 import os
 import sys
 import threading
+import time
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import quote
 
@@ -30,6 +31,13 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 _CATALOG_TTL = 7200  # seconds
+
+# Background catalog refresh rate-limiting: per-server cooldown and in-flight
+# tracking. Prevents the Add Policy builder from spawning a new refresh thread
+# on every 3-second poll while a refresh is already running or has just failed.
+_CATALOG_REFRESH_COOLDOWN_SECONDS = 30
+_last_catalog_refresh_trigger: Dict[int, float] = {}
+_refreshing_server_ids: set = set()
 
 
 MCP_METHODS = [
@@ -222,7 +230,7 @@ def _background_refresh_thread(
     mcp-server may not be fully ready when the control plane first tries.
     """
     from ..core.database import SessionLocal
-    import time
+    from ..core.valkey_client import _get_client
 
     for sid in server_ids:
         db = SessionLocal()
@@ -233,9 +241,13 @@ def _background_refresh_thread(
                     if not server or not server.enabled:
                         break
 
-                    # If another worker already cataloged this server, stop retrying.
-                    if server.health_status == "healthy" and server.last_catalog_at:
-                        logger.debug("Server %s already healthy, skipping refresh", server.name)
+                    # If another worker already produced a non-empty catalog,
+                    # stop retrying. The DB can say "healthy" while the Valkey
+                    # cache is empty (e.g. after a worker restart/clear race), so
+                    # we must check the actual cache, not just DB health.
+                    client = _get_client()
+                    if not _server_is_stale(server, client):
+                        logger.debug("Server %s catalog is no longer stale, skipping refresh", server.name)
                         break
 
                     logger.info(
@@ -257,26 +269,51 @@ def _background_refresh_thread(
                         time.sleep(interval_seconds)
         finally:
             db.close()
+            _refreshing_server_ids.discard(sid)
 
 
 def trigger_background_catalog_refresh(
     server_ids: List[int],
     max_attempts: int = 1,
     interval_seconds: int = 5,
-) -> None:
-    """Fire-and-forget background refresh for a list of server IDs."""
+) -> List[int]:
+    """Fire-and-forget background refresh for a list of server IDs.
+
+    Returns the list of server IDs that were actually queued for refresh. IDs
+    are skipped if a refresh is already running for that server or if it was
+    refreshed too recently (rate limit).
+    """
     if not server_ids:
-        return
+        return []
     # Don't spawn background threads during unit tests; the shared SQLite
     # database and threadpools can deadlock with the test teardown.
     if os.environ.get("PYTEST_VERSION"):
-        return
+        return []
+
+    now = time.time()
+    to_trigger: List[int] = []
+    for sid in server_ids:
+        if sid in _refreshing_server_ids:
+            logger.debug("Catalog refresh for server %d already in progress, skipping", sid)
+            continue
+        last = _last_catalog_refresh_trigger.get(sid, 0)
+        if now - last < _CATALOG_REFRESH_COOLDOWN_SECONDS:
+            logger.debug("Catalog refresh for server %d is on cooldown, skipping", sid)
+            continue
+        _refreshing_server_ids.add(sid)
+        _last_catalog_refresh_trigger[sid] = now
+        to_trigger.append(sid)
+
+    if not to_trigger:
+        return []
+
     t = threading.Thread(
         target=_background_refresh_thread,
-        args=(server_ids, max_attempts, interval_seconds),
+        args=(to_trigger, max_attempts, interval_seconds),
         daemon=True,
     )
     t.start()
+    return to_trigger
 
 
 def build_policy_builder_metadata(db: Session, team_ids: List[int]) -> Dict[str, Any]:

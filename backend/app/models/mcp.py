@@ -109,6 +109,10 @@ class McpIdentity(Base):
     jwt_jwks_url = Column(String, nullable=True)
     enabled = Column(Boolean, default=True)
     expires_at = Column(DateTime, nullable=True)
+    # IdP integration
+    idp_source = Column(String, default="manual")  # manual | auth0
+    idp_external_id = Column(String, nullable=True)  # e.g. Auth0 user_id
+    idp_user_info = Column(JSON, nullable=True)  # snapshot of IdP user profile
     created_at = Column(DateTime, default=utcnow)
     last_used_at = Column(DateTime, nullable=True)
     team = relationship("Team")

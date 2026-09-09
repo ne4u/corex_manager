@@ -72,3 +72,8 @@ Thumbs.db
 
 # Sample configs are always tracked (templates for ignored runtime files)
 !samples/
+
+# Auth0 credentials
+.auth0-mcp-state.json
+
+.auth0-mcp-writes.log

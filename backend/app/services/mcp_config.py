@@ -205,6 +205,9 @@ def _build_identity_dict(identity: McpIdentity) -> dict:
         "jwt_jwks_url": identity.jwt_jwks_url,
         "enabled": identity.enabled,
         "expires_at": _serialize_datetime(identity.expires_at),
+        "idp_source": identity.idp_source,
+        "idp_external_id": identity.idp_external_id,
+        "idp_user_info": identity.idp_user_info,
     }
 
 
@@ -338,9 +341,9 @@ def build_config_bundle(db: Session) -> dict:
         "dlp_rules": dlp_rule_list,
         "guardrails": guardrail_list,
         "skills": skill_list,
-        "jwt_issuer": get_setting(db, "mcp_jwt_issuer", settings.MCP_JWT_ISSUER or ""),
-        "jwt_audience": get_setting(db, "mcp_jwt_audience", settings.MCP_JWT_AUDIENCE or ""),
-        "jwt_jwks_url": get_setting(db, "mcp_jwt_jwks_url", settings.MCP_JWT_JWKS_URL or ""),
+        "jwt_issuer": get_setting(db, "mcp_jwt_issuer", settings.MCP_JWT_ISSUER or _auth0_issuer()),
+        "jwt_audience": get_setting(db, "mcp_jwt_audience", settings.MCP_JWT_AUDIENCE or _auth0_audience()),
+        "jwt_jwks_url": get_setting(db, "mcp_jwt_jwks_url", settings.MCP_JWT_JWKS_URL or _auth0_jwks_url()),
         "allowed_origins": allowed_origins,
         "log_payloads": get_setting(db, "mcp_log_payloads", str(settings.MCP_LOG_PAYLOADS)).lower() in ("true", "1", "yes"),
         "default_rpm": int(get_setting(db, "mcp_default_rpm", str(settings.MCP_DEFAULT_RPM))),
@@ -351,6 +354,29 @@ def build_config_bundle(db: Session) -> dict:
     }
 
     return bundle
+
+
+def _auth0_issuer() -> str:
+    """Derive the MCP JWT issuer from Auth0 domain if not explicitly set."""
+    if settings.AUTH0_DOMAIN:
+        return f"https://{settings.AUTH0_DOMAIN}/"
+    return ""
+
+
+def _auth0_audience() -> str:
+    """Derive the MCP JWT audience from Auth0 API audience or client ID."""
+    if settings.AUTH0_MCP_AUDIENCE:
+        return settings.AUTH0_MCP_AUDIENCE
+    if settings.AUTH0_CLIENT_ID:
+        return settings.AUTH0_CLIENT_ID
+    return ""
+
+
+def _auth0_jwks_url() -> str:
+    """Derive the MCP JWT JWKS URL from Auth0 domain."""
+    if settings.AUTH0_DOMAIN:
+        return f"https://{settings.AUTH0_DOMAIN}/.well-known/jwks.json"
+    return ""
 
 
 def _build_team_rpm_overrides(db: Session, teams: list[Team]) -> dict:

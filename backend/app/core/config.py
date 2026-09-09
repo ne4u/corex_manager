@@ -1,5 +1,5 @@
 import secrets
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -415,6 +415,18 @@ class Settings(BaseSettings):
     MCP_JWT_ISSUER: Optional[str] = None
     MCP_JWT_AUDIENCE: Optional[str] = None
     MCP_JWT_JWKS_URL: Optional[str] = None
+
+    # Auth0 IdP integration for MCP identities
+    # The onboarding tool writes AUTH0_DOMAIN, CLIENT_ID, CLIENT_SECRET and SECRET.
+    # AUTH0_MCP_AUDIENCE is the Auth0 API identifier that MCP clients request tokens for.
+    AUTH0_DOMAIN: Optional[str] = None
+    AUTH0_CLIENT_ID: Optional[str] = None
+    AUTH0_CLIENT_SECRET: Optional[str] = None
+    AUTH0_SECRET: Optional[str] = None
+    AUTH0_MCP_AUDIENCE: Optional[str] = None
+    AUTH0_SYNC_ENABLED: bool = False
+    AUTH0_SYNC_TEAM_ID: Optional[int] = None
+
     MCP_ALLOWED_ORIGINS: Optional[str] = None  # comma-separated list
     MCP_LOG_PAYLOADS: bool = False
     MCP_DEFAULT_RPM: int = 600
@@ -507,6 +519,27 @@ class Settings(BaseSettings):
         # the DB-persisted value, then a random value is generated and
         # persisted. See resolve_pp_hasher_token() in main.py.
         return v
+
+    @field_validator("AUTH0_SYNC_TEAM_ID", mode="before")
+    @classmethod
+    def _validate_auth0_sync_team_id(cls, v: Any) -> Optional[int]:
+        if v is None or v == "":
+            return None
+        if isinstance(v, int):
+            return v
+        try:
+            return int(v)
+        except ValueError:
+            return None
+
+    @field_validator("AUTH0_SYNC_ENABLED", mode="before")
+    @classmethod
+    def _validate_auth0_sync_enabled(cls, v: Any) -> bool:
+        if v is None or v == "":
+            return False
+        if isinstance(v, bool):
+            return v
+        return str(v).lower() in ("true", "1", "yes", "on")
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

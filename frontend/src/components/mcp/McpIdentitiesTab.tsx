@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, Trash2, Pencil, KeyRound, Copy, Check, ChevronDown, ChevronRight, Ban } from 'lucide-react'
+import { Plus, Trash2, Pencil, KeyRound, Copy, Check, ChevronDown, ChevronRight, Ban, RefreshCw } from 'lucide-react'
 import { mcp } from '../../services/api'
 import Modal from '../Modal'
 import { IconButton, Badge } from '../ui'
@@ -19,6 +19,9 @@ interface McpIdentity {
   jwt_jwks_url: string | null
   enabled: boolean
   expires_at: string | null
+  idp_source: string
+  idp_external_id: string | null
+  idp_user_info: Record<string, unknown> | null
   created_at: string
   last_used_at: string | null
 }
@@ -46,6 +49,10 @@ export default function McpIdentitiesTab() {
   const [expandedId, setExpandedId] = useState<number | null>(null)
   const [sessions, setSessions] = useState<Record<number, any[]>>({})
   const [revoking, setRevoking] = useState(false)
+  const [syncOpen, setSyncOpen] = useState(false)
+  const [syncForm, setSyncForm] = useState({ team_id: teams[0]?.id || 0, dry_run: false, require_verified_email: true })
+  const [syncing, setSyncing] = useState(false)
+  const [syncResult, setSyncResult] = useState<{ created: number; updated: number; skipped: number; total_users: number } | null>(null)
 
   const fetch = useCallback(async () => {
     try {
@@ -158,15 +165,41 @@ export default function McpIdentitiesTab() {
     finally { setRevoking(false) }
   }
 
+  const openSync = () => {
+    setSyncForm({ team_id: teams[0]?.id || 0, dry_run: false, require_verified_email: true })
+    setSyncResult(null)
+    setSyncOpen(true)
+  }
+
+  const doSync = async () => {
+    setSyncing(true)
+    try {
+      const resp = await mcp.auth0.sync({
+        team_id: syncForm.team_id,
+        dry_run: syncForm.dry_run,
+        require_verified_email: syncForm.require_verified_email,
+      })
+      setSyncResult(resp.data)
+      if (!syncForm.dry_run) fetch()
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || t('pages:mcpGateway.identities.syncAuth0Failed'))
+    } finally { setSyncing(false) }
+  }
+
   if (loading) return <p className="text-sm text-muted-foreground">{t('common:actions.loading')}</p>
 
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <p className="text-sm text-muted-foreground">{t('pages:mcpGateway.identities.count', { count: identities.length })}</p>
-        <button className="btn-primary text-sm" onClick={openCreate}>
-          <Plus className="w-4 h-4 inline me-1" /> {t('pages:mcpGateway.identities.addIdentity')}
-        </button>
+        <div className="flex items-center gap-2">
+          <button className="btn-secondary text-sm" onClick={openSync}>
+            <RefreshCw className="w-4 h-4 inline me-1" /> {t('pages:mcpGateway.identities.syncFromAuth0')}
+          </button>
+          <button className="btn-primary text-sm" onClick={openCreate}>
+            <Plus className="w-4 h-4 inline me-1" /> {t('pages:mcpGateway.identities.addIdentity')}
+          </button>
+        </div>
       </div>
 
       {identities.length === 0 ? (
@@ -188,6 +221,7 @@ export default function McpIdentitiesTab() {
                       {i.name}
                       <Badge variant={i.enabled ? 'success' : 'default'} size="sm">{i.enabled ? t('pages:mcpGateway.identities.enabled') : t('pages:mcpGateway.identities.disabled')}</Badge>
                       <Badge variant="info" size="sm">{i.kind.toUpperCase()}</Badge>
+                      {i.idp_source !== 'manual' && <Badge variant="warning" size="sm">{i.idp_source}</Badge>}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {i.kind === 'pat' && i.pat_prefix ? t('pages:mcpGateway.identities.patPrefix', { prefix: i.pat_prefix }) : i.subject || t('pages:mcpGateway.identities.noSubject')}
@@ -311,6 +345,41 @@ export default function McpIdentitiesTab() {
           </div>
           <div className="flex justify-end">
             <button className="btn-primary" onClick={() => setPatResult(null)}>{t('common:actions.done')}</button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={syncOpen} onClose={() => setSyncOpen(false)} title={t('pages:mcpGateway.identities.syncFromAuth0')}>
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">{t('pages:mcpGateway.identities.syncAuth0Title')}</p>
+          <div>
+            <label className="label">{t('pages:mcpGateway.identities.syncAuth0Team')}</label>
+            <select className="input w-full" value={syncForm.team_id} onChange={e => setSyncForm(f => ({ ...f, team_id: Number(e.target.value) }))}>
+              {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={syncForm.dry_run} onChange={e => setSyncForm(f => ({ ...f, dry_run: e.target.checked }))} />
+            <span className="text-sm">{t('pages:mcpGateway.identities.syncAuth0DryRun')}</span>
+          </label>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={syncForm.require_verified_email} onChange={e => setSyncForm(f => ({ ...f, require_verified_email: e.target.checked }))} />
+            <span className="text-sm">{t('pages:mcpGateway.identities.syncAuth0VerifiedOnly')}</span>
+          </label>
+          {syncResult && (
+            <p className="text-sm text-green-400">
+              {t('pages:mcpGateway.identities.syncAuth0Result', {
+                created: syncResult.created,
+                updated: syncResult.updated,
+                skipped: syncResult.skipped,
+                total: syncResult.total_users,
+              })}
+            </p>
+          )}
+          {error && <p className="text-sm text-red-400">{error}</p>}
+          <div className="flex justify-end gap-2">
+            <button className="btn-secondary" onClick={() => setSyncOpen(false)}>{t('common:actions.cancel')}</button>
+            <button className="btn-primary" onClick={doSync} disabled={syncing}>{syncing ? t('pages:mcpGateway.identities.syncAuth0Running') : t('common:actions.save')}</button>
           </div>
         </div>
       </Modal>

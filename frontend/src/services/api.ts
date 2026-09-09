@@ -652,6 +652,9 @@ export const mcp = {
     delete: (id: number) => api.delete(`/mcp/identities/${id}`),
     issuePat: (id: number) => api.post(`/mcp/identities/${id}/tokens`),
   },
+  auth0: {
+    sync: (data: Record<string, unknown>) => api.post('/mcp/auth0/sync', data),
+  },
   policies: {
     list: () => api.get('/mcp/policies'),
     create: (data: Record<string, unknown>) => api.post('/mcp/policies', data),

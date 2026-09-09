@@ -1,4 +1,5 @@
 """Tests for MCP Gateway Phase 0 — models, schemas, CRUD API, secrets, and migration."""
+import datetime
 import os
 import tempfile
 
@@ -340,7 +341,7 @@ def test_policy_builder_metadata_triggers_background_refresh(client, monkeypatch
     sid = resp.json()["id"]
 
     triggered: list = []
-    monkeypatch.setattr("app.api.v1.mcp.trigger_background_catalog_refresh", lambda sids: triggered.extend(sids))
+    monkeypatch.setattr("app.api.v1.mcp.trigger_background_catalog_refresh", lambda sids: (triggered.extend(sids) or sids))
 
     resp = client.get("/api/v1/mcp/policies/builder-metadata")
     assert resp.status_code == 200
@@ -348,6 +349,82 @@ def test_policy_builder_metadata_triggers_background_refresh(client, monkeypatch
     assert data["refreshing"] is True
     assert any(s["id"] == sid for s in data["stale_servers"])
     assert sid in triggered
+
+
+def test_background_refresh_healthy_server_with_missing_catalog(db, monkeypatch):
+    """A server that is healthy in the DB but has no Valkey catalog must still be refreshed."""
+    from app.services import mcp_policies
+    from app.models.mcp import McpServer, Team
+
+    team = Team(name="T-bg", slug="t-bg")
+    db.add(team)
+    db.commit()
+
+    server = McpServer(
+        team_id=team.id,
+        name="healthy-but-missing-catalog",
+        namespace="hmc",
+        url="http://example.com/mcp",
+        enabled=True,
+        health_status="healthy",
+        last_catalog_at=datetime.datetime.now(datetime.timezone.utc),
+    )
+    db.add(server)
+    db.commit()
+
+    refreshed = []
+    def _fake_refresh(srv, session):
+        refreshed.append(srv.id)
+        return {"tools": [{"name": "tool1"}]}
+    monkeypatch.setattr(mcp_policies, "refresh_server_catalog", _fake_refresh)
+    monkeypatch.setattr(mcp_policies, "_get_server_catalog", lambda server, client: None)
+
+    mcp_policies._background_refresh_thread([server.id])
+
+    assert server.id in refreshed
+
+
+def test_trigger_background_catalog_refresh_rate_limit(db, monkeypatch):
+    """trigger_background_catalog_refresh should not re-trigger within the cooldown window."""
+    from app.services import mcp_policies
+
+    # Bypass the test guard and fake the thread worker.
+    monkeypatch.delenv("PYTEST_VERSION", raising=False)
+    monkeypatch.setattr(mcp_policies, "_background_refresh_thread", lambda *args, **kwargs: None)
+
+    # Freeze and control time.
+    class FakeTime:
+        @staticmethod
+        def time():
+            return fake_time[0]
+        @staticmethod
+        def sleep(x):
+            pass
+
+    fake_time = [100.0]
+    monkeypatch.setattr(mcp_policies, "time", FakeTime())
+
+    # Save and restore module-level state to keep the test isolated.
+    original_last = mcp_policies._last_catalog_refresh_trigger.copy()
+    original_in_flight = mcp_policies._refreshing_server_ids.copy()
+    try:
+        # Clean any leftover state from the module under test.
+        mcp_policies._last_catalog_refresh_trigger.clear()
+        mcp_policies._refreshing_server_ids.clear()
+
+        # First trigger should succeed and queue the server.
+        assert mcp_policies.trigger_background_catalog_refresh([42]) == [42]
+        mcp_policies._refreshing_server_ids.discard(42)  # simulate thread completion
+
+        # Second trigger immediately should be on cooldown.
+        assert mcp_policies.trigger_background_catalog_refresh([42]) == []
+
+        # Advance past cooldown.
+        fake_time[0] = fake_time[0] + mcp_policies._CATALOG_REFRESH_COOLDOWN_SECONDS + 1
+        assert mcp_policies.trigger_background_catalog_refresh([42]) == [42]
+    finally:
+        mcp_policies._last_catalog_refresh_trigger = original_last
+        mcp_policies._refreshing_server_ids = original_in_flight
 
 
 def test_server_catalog_refresh(client, monkeypatch):
@@ -653,3 +730,31 @@ def test_audit_skips_mcp_secret_paths():
     from app.services.audit import _PAYLOAD_SKIP_PATHS
     assert "/mcp/servers" in _PAYLOAD_SKIP_PATHS
     assert "/mcp/identities" in _PAYLOAD_SKIP_PATHS
+
+
+def test_auth0_sync_rejects_missing_config(client):
+    client.post("/api/v1/mcp/teams", json={"name": "TAuth0", "slug": "tauth0"})
+    tid = client.get("/api/v1/mcp/teams").json()[-1]["id"]
+
+    resp = client.post("/api/v1/mcp/auth0/sync", json={
+        "team_id": tid,
+        "dry_run": True,
+    })
+    assert resp.status_code == 400
+    assert "not fully configured" in resp.json()["detail"].lower()
+
+
+def test_build_config_bundle_derives_auth0_jwt(monkeypatch, db):
+    from app.services import mcp_config
+
+    monkeypatch.setattr(mcp_config.settings, "AUTH0_DOMAIN", "dev-tenant.us.auth0.com")
+    monkeypatch.setattr(mcp_config.settings, "AUTH0_CLIENT_ID", "test-client-id")
+    monkeypatch.setattr(mcp_config.settings, "AUTH0_MCP_AUDIENCE", "https://corex-manager/mcp")
+    monkeypatch.setattr(mcp_config.settings, "MCP_JWT_ISSUER", None)
+    monkeypatch.setattr(mcp_config.settings, "MCP_JWT_AUDIENCE", None)
+    monkeypatch.setattr(mcp_config.settings, "MCP_JWT_JWKS_URL", None)
+
+    bundle = mcp_config.build_config_bundle(db)
+    assert bundle["jwt_issuer"] == "https://dev-tenant.us.auth0.com/"
+    assert bundle["jwt_audience"] == "https://corex-manager/mcp"
+    assert bundle["jwt_jwks_url"] == "https://dev-tenant.us.auth0.com/.well-known/jwks.json"

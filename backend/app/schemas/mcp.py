@@ -160,6 +160,9 @@ class McpIdentityBase(BaseModel):
     jwt_jwks_url: Optional[str] = None
     enabled: bool = True
     expires_at: Optional[datetime] = None
+    idp_source: str = Field(default="manual", pattern="^(manual|auth0)$")
+    idp_external_id: Optional[str] = None
+    idp_user_info: Optional[Dict[str, Any]] = None
 
 
 class McpIdentityCreate(McpIdentityBase):
@@ -182,6 +185,9 @@ class McpIdentityResponse(BaseModel):
     jwt_jwks_url: Optional[str] = None
     enabled: bool
     expires_at: Optional[datetime] = None
+    idp_source: str
+    idp_external_id: Optional[str] = None
+    idp_user_info: Optional[Dict[str, Any]] = None
     created_at: datetime
     last_used_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
@@ -191,6 +197,24 @@ class PatCreateResponse(BaseModel):
     identity_id: int
     pat: str  # plaintext, shown once
     prefix: str
+
+
+# --- Auth0 IdP sync ---
+
+class McpAuth0SyncRequest(BaseModel):
+    team_id: int
+    dry_run: bool = False
+    require_verified_email: bool = False
+
+
+class McpAuth0SyncResponse(BaseModel):
+    created: int
+    updated: int
+    skipped: int
+    total_users: int
+    errors: List[str]
+    dry_run: bool
+    team_id: int
 
 
 # --- McpPolicy ---

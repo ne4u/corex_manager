@@ -29,6 +29,7 @@ from ...schemas.mcp import (
     McpServerReplicaCreate, McpServerReplicaUpdate, McpServerReplicaResponse,
     McpIdentityCreate, McpIdentityUpdate, McpIdentityResponse,
     PatCreateResponse,
+    McpAuth0SyncRequest, McpAuth0SyncResponse,
     McpPolicyCreate, McpPolicyUpdate, McpPolicyResponse,
     McpPolicyValidateRequest, McpPolicyValidateResponse,
     McpDlpRuleCreate, McpDlpRuleUpdate, McpDlpRuleResponse,
@@ -50,12 +51,14 @@ from ...schemas.mcp import (
     McpPolicyBuilderMetadataResponse,
 )
 from ...services.mcp_secrets import encrypt_secret, has_secrets_key
+from ...services.mcp_auth0 import sync_auth0_identities
 from ...services.mcp_policies import (
     parse_mcp_expression,
     validate_mcp_expression,
     build_policy_builder_metadata,
     refresh_server_catalog,
     trigger_background_catalog_refresh,
+    _refreshing_server_ids,
 )
 from ...services.mcp_config import write_config_bundle
 from ...core.valkey_client import _get_client as get_valkey_client
@@ -133,6 +136,9 @@ def _identity_to_response(obj: McpIdentity) -> McpIdentityResponse:
         jwt_jwks_url=obj.jwt_jwks_url,
         enabled=obj.enabled,
         expires_at=obj.expires_at,
+        idp_source=obj.idp_source,
+        idp_external_id=obj.idp_external_id,
+        idp_user_info=obj.idp_user_info,
         created_at=obj.created_at,
         last_used_at=obj.last_used_at,
     )
@@ -640,6 +646,9 @@ def create_identity(
         jwt_jwks_url=i.jwt_jwks_url,
         enabled=i.enabled,
         expires_at=i.expires_at,
+        idp_source=i.idp_source,
+        idp_external_id=i.idp_external_id,
+        idp_user_info=i.idp_user_info,
     )
     db.add(obj)
     db.commit()
@@ -841,8 +850,11 @@ def get_policy_builder_metadata(
     team_ids = get_user_team_ids(db, user)
     data = build_policy_builder_metadata(db, team_ids or [])
     if data.get("stale_servers"):
-        trigger_background_catalog_refresh([s["id"] for s in data["stale_servers"]])
-        data["refreshing"] = True
+        stale_ids = [s["id"] for s in data["stale_servers"]]
+        triggered = trigger_background_catalog_refresh(stale_ids)
+        # Keep the spinner going if any stale server is still being refreshed.
+        in_flight = any(sid in _refreshing_server_ids for sid in stale_ids)
+        data["refreshing"] = bool(triggered) or in_flight
     return data
 
 
@@ -2114,6 +2126,46 @@ def revoke_identity_tokens(
             pass
 
     return {"ok": True}
+
+
+@router.post("/auth0/sync", response_model=McpAuth0SyncResponse)
+def sync_auth0(
+    req: McpAuth0SyncRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_write),
+    _=Depends(rate_limit),
+):
+    """Fetch users from the configured Auth0 tenant and provision them as
+    JWT McpIdentity rows under the requested team.
+
+    Requires the Auth0 application to be granted the Auth0 Management API
+    with scope `read:users`.
+    """
+    team_ids = get_user_team_ids(db, user)
+    if req.team_id not in team_ids:
+        raise HTTPException(status_code=403, detail="Not a member of this team")
+    try:
+        result = sync_auth0_identities(
+            db,
+            team_id=req.team_id,
+            dry_run=req.dry_run,
+            require_verified_email=req.require_verified_email,
+        )
+        if not req.dry_run:
+            write_config_bundle(db)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    return McpAuth0SyncResponse(
+        created=result["created"],
+        updated=result["updated"],
+        skipped=result["skipped"],
+        total_users=result["total_users"],
+        errors=result["errors"],
+        dry_run=result["dry_run"],
+        team_id=result["team_id"],
+    )
 
 
 # ==================== Config Status ====================
