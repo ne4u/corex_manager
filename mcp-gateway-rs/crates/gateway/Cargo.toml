@@ -1,0 +1,37 @@
+[package]
+name = "corex-gateway"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+corex-core = { workspace = true }
+corex-scan = { workspace = true }
+corex-policy = { workspace = true }
+corex-proxy = { workspace = true }
+tokio = { workspace = true }
+axum = { version = "0.7", features = ["macros"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+reqwest = { workspace = true }
+redis = { workspace = true }
+jsonwebtoken = { workspace = true }
+bcrypt = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+parking_lot = { workspace = true }
+once_cell = { workspace = true }
+base64 = { workspace = true }
+sha2 = { workspace = true }
+futures = { workspace = true }
+url = { workspace = true }
+
+[[bin]]
+name = "mcp-gateway"
+path = "src/main.rs"

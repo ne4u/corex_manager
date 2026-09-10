@@ -37,6 +37,28 @@ def generate_request_id() -> str:
     return uuid.uuid4().hex[:16]
 
 
+def _lookup_name(collection: str, entity_id: Optional[int]) -> Optional[str]:
+    """Look up an entity name by ID from the config bundle.
+
+    Best-effort: returns None if the config is unavailable or the entity
+    is not found (e.g. deleted after the event was logged).
+    """
+    if entity_id is None:
+        return None
+    try:
+        try:
+            from .config_loader import get_config
+        except ImportError:
+            from config_loader import get_config
+        config = get_config()
+        for item in config.get(collection, []):
+            if item.get("id") == entity_id:
+                return item.get("name")
+    except Exception:
+        pass
+    return None
+
+
 def log_event(
     request_id: str,
     session_id: str,
@@ -58,15 +80,28 @@ def log_event(
     params: Optional[dict] = None,
     result: Optional[Any] = None,
 ) -> None:
-    """Write a single NDJSON event line to the events log."""
+    """Write a single NDJSON event line to the events log.
+
+    Identity, team, and server names are resolved from the config bundle so
+    the NDJSON file contains human-readable labels alongside the numeric IDs.
+    """
     path = _get_log_path()
+
+    # Resolve names from the config bundle (best-effort; None if not found).
+    identity_name = _lookup_name("identities", identity_id) if identity_id is not None else None
+    team_name = _lookup_name("teams", team_id) if team_id is not None else None
+    server_name = _lookup_name("servers", server_id) if server_id is not None else None
+
     event = {
         "ts": datetime.now(timezone.utc).isoformat(),
         "request_id": request_id,
         "session_id": session_id,
         "identity_id": identity_id,
+        "identity_name": identity_name,
         "team_id": team_id,
+        "team_name": team_name,
         "server_id": server_id,
+        "server_name": server_name,
         "method": jsonrpc_method,
         "tool": tool,
         "resource_uri": resource_uri,

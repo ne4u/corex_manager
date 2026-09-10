@@ -418,7 +418,12 @@ def _encrypt_bundle_bytes(data: bytes) -> bytes:
 
 
 def write_config_bundle(db: Session) -> str:
-    """Build and write the config bundle to MCP_CONFIG_PATH. Returns the path."""
+    """Build and write the config bundle to MCP_CONFIG_PATH. Returns the path.
+
+    Writes two formats during the Rust migration window:
+    - ``config.json``       — Fernet-encrypted (Python gateway)
+    - ``config.bundle.json`` — AES-256-GCM binary envelope (Rust gateway)
+    """
     bundle = build_config_bundle(db)
     bundle = _sign_bundle(bundle)
     config_path = settings.MCP_CONFIG_PATH
@@ -441,6 +446,29 @@ def write_config_bundle(db: Session) -> str:
 
     logger.info("Wrote MCP config bundle to %s (%d servers, %d identities)",
                 config_path, len(bundle["servers"]), len(bundle["identities"]))
+
+    # Also write the AES-256-GCM envelope for the Rust gateway.
+    # The Rust gateway reads config.bundle.json alongside the Python config.json.
+    rust_path = os.path.join(os.path.dirname(config_path), "config.bundle.json")
+    try:
+        from .mcp_secrets import encrypt_bundle_aesgcm, has_secrets_key
+        if has_secrets_key():
+            rust_encrypted = encrypt_bundle_aesgcm(plaintext)
+            tmp_rust = rust_path + ".tmp"
+            with open(tmp_rust, "wb") as f:
+                f.write(rust_encrypted)
+            os.replace(tmp_rust, rust_path)
+            logger.info("Wrote Rust MCP config bundle to %s", rust_path)
+        else:
+            # No secrets key — write plaintext JSON for dev mode.
+            tmp_rust = rust_path + ".tmp"
+            with open(tmp_rust, "wb") as f:
+                f.write(plaintext)
+            os.replace(tmp_rust, rust_path)
+            logger.info("Wrote plaintext Rust MCP config bundle to %s", rust_path)
+    except Exception as e:
+        logger.warning("Failed to write Rust config bundle: %s", e)
+
     return config_path
 
 

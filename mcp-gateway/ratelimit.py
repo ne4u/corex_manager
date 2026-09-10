@@ -176,9 +176,17 @@ def acquire_concurrent_slot(
 
 
 def release_concurrent_slot(identity_id: int) -> None:
-    """Release a concurrent request slot."""
-    if _DEFAULT_MAX_CONCURRENT <= 0:
-        return
+    """Release a concurrent request slot.
+
+    Always decrements if a Valkey client is present.  The guard in
+    ``acquire_concurrent_slot`` already short-circuits when the limit is 0,
+    so this function is only reached when a slot was actually acquired
+    (counter >= 1), making the DECR safe.  We must NOT check
+    ``_DEFAULT_MAX_CONCURRENT`` here because the per-request limit may come
+    from the config bundle (which can be non-zero even when the env-var
+    default is zero); checking the env-var default would skip the DECR and
+    leak the slot, permanently blocking the identity.
+    """
     client = _get_client()
     if not client:
         return

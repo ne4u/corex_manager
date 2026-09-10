@@ -405,6 +405,11 @@ class Settings(BaseSettings):
     MCP_GATEWAY_LISTEN: str = "0.0.0.0:8081"
     MCP_GATEWAY_INTERNAL_HOST: str = "mcp-gateway"
     MCP_GATEWAY_INTERNAL_PORT: int = 8081
+    # Which gateway backend HAProxy should route to: "python" or "rust".
+    # When "rust", HAProxy routes to mcp-gateway-rs:8089 instead of mcp-gateway:8081.
+    MCP_GATEWAY_BACKEND: str = "python"
+    MCP_GATEWAY_RS_INTERNAL_HOST: str = "mcp-gateway-rs"
+    MCP_GATEWAY_RS_INTERNAL_PORT: int = 8089
     MCP_EVENTS_LOG_PATH: str = "data/mcp/events.ndjson"
     MCP_CONFIG_PATH: str = "data/mcp/config.json"
     MCP_CATALOG_REFRESH_SECONDS: int = 60

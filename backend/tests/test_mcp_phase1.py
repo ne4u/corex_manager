@@ -123,6 +123,28 @@ def test_mcp_gateway_backend_emitted_when_enabled(db):
     assert "option http-keep-alive" in config
     assert "timeout tunnel 300s" in config
     assert "Cache-Control no-store" in config
+    # Default backend is the Python gateway on port 8081.
+    assert "server mcp-gateway mcp-gateway:8081 check" in config
+
+
+def test_mcp_gateway_backend_rust_when_setting_is_rust(db):
+    """When mcp_gateway_backend setting is 'rust', HAProxy routes to the Rust gateway."""
+    from app.services.haproxy import generate_mcp_gateway_backend
+    from app.services.settings import set_setting
+    set_setting(db, "mcp_gateway_backend", "rust")
+    config = generate_mcp_gateway_backend(db)
+    assert "server mcp-gateway-rs mcp-gateway-rs:8089 check" in config
+    assert "mcp-gateway:8081" not in config
+
+
+def test_mcp_gateway_backend_python_when_setting_is_python(db):
+    """When mcp_gateway_backend setting is 'python', HAProxy routes to the Python gateway."""
+    from app.services.haproxy import generate_mcp_gateway_backend
+    from app.services.settings import set_setting
+    set_setting(db, "mcp_gateway_backend", "python")
+    config = generate_mcp_gateway_backend(db)
+    assert "server mcp-gateway mcp-gateway:8081 check" in config
+    assert "mcp-gateway-rs:8089" not in config
 
 
 def test_mcp_upstreams_empty_when_no_replicas(db):

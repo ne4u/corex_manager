@@ -380,6 +380,141 @@ def test_mcp_metrics_sampler_stores_events(tmp_path, db):
         mcp_metrics._offset_path = original_offset
 
 
+def test_mcp_metrics_sampler_ingests_rust_events(tmp_path, db):
+    """sample_mcp_metrics correctly ingests events produced by the Rust gateway.
+
+    Rust events use chrono::Utc::now().to_rfc3339() timestamps (e.g.
+    '2026-09-09T17:28:26.437304Z') and may include resources/read and
+    prompts/get methods — not just tools/call.  They also include
+    identity_name, team_name, server_name resolved from the config bundle.
+    """
+    from app.services import mcp_metrics
+    from app.core.config import get_settings
+    from app.models.mcp import McpEvent
+
+    settings = get_settings()
+    log_file = tmp_path / "events.ndjson"
+    offset_file = tmp_path / ".mcp_metrics_offset"
+
+    # Write Rust-format events: RFC3339 with 'Z' suffix, various methods,
+    # with name fields resolved from the config bundle.
+    events = [
+        {"ts": "2026-09-09T17:28:26.437304Z", "request_id": "rust1", "session_id": "sess1",
+         "identity_id": 1, "identity_name": "ci-bot",
+         "team_id": 10, "team_name": "Engineering",
+         "server_id": 3, "server_name": "jira",
+         "method": "tools/call",
+         "tool": "jira__search", "resource_uri": None, "prompt": None,
+         "action": "allow", "status": "ok", "latency_ms": 15, "error": None,
+         "bytes_in": None, "bytes_out": None, "dlp_hits": None, "guardrail_hits": None},
+        {"ts": "2026-09-09T17:28:27.123456Z", "request_id": "rust2", "session_id": "sess1",
+         "identity_id": 1, "identity_name": "ci-bot",
+         "team_id": 10, "team_name": "Engineering",
+         "server_id": 3, "server_name": "jira",
+         "method": "resources/read",
+         "tool": None, "resource_uri": "file__example", "prompt": None,
+         "action": "allow", "status": "ok", "latency_ms": 8, "error": None,
+         "bytes_in": None, "bytes_out": None, "dlp_hits": None, "guardrail_hits": None},
+        {"ts": "2026-09-09T17:28:28.000000Z", "request_id": "rust3", "session_id": "sess1",
+         "identity_id": 1, "identity_name": "ci-bot",
+         "team_id": 10, "team_name": "Engineering",
+         "server_id": 3, "server_name": "jira",
+         "method": "prompts/get",
+         "tool": None, "resource_uri": None, "prompt": "skill__summarize",
+         "action": "deny", "status": "policy_denied", "latency_ms": None,
+         "error": "Policy denied: restricted", "bytes_in": None, "bytes_out": None,
+         "dlp_hits": None, "guardrail_hits": None},
+    ]
+    with open(log_file, "w") as f:
+        for e in events:
+            f.write(json.dumps(e) + "\n")
+
+    original_path = settings.MCP_EVENTS_LOG_PATH
+    settings.MCP_EVENTS_LOG_PATH = str(log_file)
+    original_offset = mcp_metrics._offset_path
+    mcp_metrics._offset_path = lambda: str(offset_file)
+
+    try:
+        mcp_metrics.sample_mcp_metrics()
+        rows = db.query(McpEvent).order_by(McpEvent.request_id).all()
+        assert len(rows) == 3
+
+        # tools/call event
+        assert rows[0].request_id == "rust1"
+        assert rows[0].jsonrpc_method == "tools/call"
+        assert rows[0].tool == "jira__search"
+        assert rows[0].action == "allow"
+        assert rows[0].status == "ok"
+        assert rows[0].latency_ms == 15
+        assert rows[0].identity_name == "ci-bot"
+        assert rows[0].team_name == "Engineering"
+        assert rows[0].server_name == "jira"
+
+        # resources/read event
+        assert rows[1].request_id == "rust2"
+        assert rows[1].jsonrpc_method == "resources/read"
+        assert rows[1].resource_uri == "file__example"
+        assert rows[1].tool is None
+        assert rows[1].server_name == "jira"
+
+        # prompts/get event
+        assert rows[2].request_id == "rust3"
+        assert rows[2].jsonrpc_method == "prompts/get"
+        assert rows[2].prompt == "skill__summarize"
+        assert rows[2].action == "deny"
+        assert rows[2].error == "Policy denied: restricted"
+        assert rows[2].identity_name == "ci-bot"
+    finally:
+        settings.MCP_EVENTS_LOG_PATH = original_path
+        mcp_metrics._offset_path = original_offset
+
+
+def test_mcp_metrics_sampler_handles_rotation(tmp_path, db):
+    """When the event file shrinks (rotation), the sampler resets offset to 0."""
+    from app.services import mcp_metrics
+    from app.core.config import get_settings
+    from app.models.mcp import McpEvent
+
+    settings = get_settings()
+    log_file = tmp_path / "events.ndjson"
+    offset_file = tmp_path / ".mcp_metrics_offset"
+
+    # First batch: write a large event and sample it
+    old_event = {"ts": datetime.now(timezone.utc).isoformat(), "request_id": "old1",
+                 "session_id": "s1", "identity_id": 1, "team_id": 10, "server_id": 1,
+                 "method": "tools/call", "tool": "old__tool", "action": "allow",
+                 "status": "ok", "latency_ms": 1}
+    with open(log_file, "w") as f:
+        f.write(json.dumps(old_event) + "\n")
+        f.write(json.dumps(old_event).replace("old1", "old2") + "\n")
+
+    original_path = settings.MCP_EVENTS_LOG_PATH
+    settings.MCP_EVENTS_LOG_PATH = str(log_file)
+    original_offset = mcp_metrics._offset_path
+    mcp_metrics._offset_path = lambda: str(offset_file)
+
+    try:
+        mcp_metrics.sample_mcp_metrics()
+        assert db.query(McpEvent).count() == 2
+
+        # Simulate rotation: file is replaced with a smaller new file
+        new_event = {"ts": datetime.now(timezone.utc).isoformat(), "request_id": "new1",
+                     "session_id": "s2", "identity_id": 1, "team_id": 10, "server_id": 1,
+                     "method": "tools/call", "tool": "new__tool", "action": "allow",
+                     "status": "ok", "latency_ms": 2}
+        with open(log_file, "w") as f:
+            f.write(json.dumps(new_event) + "\n")
+
+        mcp_metrics.sample_mcp_metrics()
+        # Should have the 2 old + 1 new = 3 total
+        assert db.query(McpEvent).count() == 3
+        new_rows = db.query(McpEvent).filter(McpEvent.request_id == "new1").all()
+        assert len(new_rows) == 1
+    finally:
+        settings.MCP_EVENTS_LOG_PATH = original_path
+        mcp_metrics._offset_path = original_offset
+
+
 def test_mcp_metrics_sampler_prune_old(db):
     """prune_mcp_metrics deletes rows older than retention."""
     from app.services import mcp_metrics

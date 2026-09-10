@@ -219,6 +219,7 @@ SWARM_IMAGE_NAMES = {
 # (mcp-gateway, mcp-server are optional and built on demand).
 SWARM_OPTIONAL_IMAGE_NAMES = {
     "mcp-gateway": "corex-mcp-gateway",
+    "mcp-gateway-rs": "corex-mcp-gateway-rs",
     "mcp-server": "corex-mcp-server",
 }
 

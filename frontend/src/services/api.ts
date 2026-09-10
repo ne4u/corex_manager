@@ -741,6 +741,12 @@ export const mcp = {
   catalog: {
     get: (serverId: number) => api.get(`/mcp/servers/${serverId}/catalog`),
   },
+  gateway: {
+    status: () => api.get('/mcp/gateway/status'),
+  },
+  health: {
+    get: (serverId: number) => api.get(`/mcp/servers/${serverId}/health`),
+  },
 }
 
 export const stickTables = {

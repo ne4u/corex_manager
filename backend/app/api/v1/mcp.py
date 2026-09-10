@@ -49,6 +49,9 @@ from ...schemas.mcp import (
     AlertConfigResponse, AlertConfigUpdate, AlertHistoryItem,
     ServerCatalogResponse, McpServerTestResponse,
     McpPolicyBuilderMetadataResponse,
+    McpRegexValidateRequest, McpRegexValidateResponse,
+    GatewayMetricsSnapshot, GatewayCircuitState, GatewayCatalogFreshness,
+    GatewayAlertState, GatewayStatusResponse, ServerHealthResponse,
 )
 from ...services.mcp_secrets import encrypt_secret, has_secrets_key
 from ...services.mcp_auth0 import sync_auth0_identities
@@ -77,6 +80,26 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+def _read_server_health_from_valkey(server_id: int) -> Optional[str]:
+    """Read live health status from Valkey (written by the gateway health checker).
+
+    Tries the Rust gateway key (mcp:gw:health:{id}) first, then the Python
+    gateway key (mcp:health:{id}).  Returns the status string or None.
+    """
+    client = get_valkey_client()
+    if not client:
+        return None
+    for prefix in ("mcp:gw:health:", "mcp:health:"):
+        try:
+            raw = client.get(f"{prefix}{server_id}")
+            if raw:
+                data = json.loads(raw)
+                return data.get("status")
+        except Exception:
+            pass
+    return None
+
+
 def _server_to_response(obj: McpServer) -> McpServerResponse:
     args = []
     if obj.args_json:
@@ -84,6 +107,9 @@ def _server_to_response(obj: McpServer) -> McpServerResponse:
             args = _json.loads(obj.args_json)
         except Exception:
             pass
+    # Read live health from Valkey (written by the gateway health checker).
+    live_health = _read_server_health_from_valkey(obj.id)
+    health_status = live_health or obj.health_status or "unknown"
     return McpServerResponse(
         id=obj.id,
         team_id=obj.team_id,
@@ -99,7 +125,7 @@ def _server_to_response(obj: McpServer) -> McpServerResponse:
         timeout_ms=obj.timeout_ms,
         max_body_bytes=obj.max_body_bytes,
         namespace=obj.namespace,
-        health_status=obj.health_status,
+        health_status=health_status,
         last_seen_at=obj.last_seen_at,
         last_error=obj.last_error,
         last_catalog_at=obj.last_catalog_at,
@@ -838,6 +864,89 @@ def validate_policy(
     """Validate an MCP policy expression without creating it."""
     ok, ast, error = validate_mcp_expression(payload.expression)
     return McpPolicyValidateResponse(ok=ok, ast=ast, error=error)
+
+
+# Rust `regex` crate does not support these features. Patterns using them are
+# rejected so custom DLP/guardrail rules behave identically in the Rust gateway.
+_RUST_UNSUPPORTED = [
+    (re.compile(r"\(\?P\s*=\w+\)"), "named backreferences (?P=name) are not supported by Rust's regex engine"),
+    (re.compile(r"\\[1-9]"), "numeric backreferences (\\1-\\9) are not supported by Rust's regex engine"),
+    (re.compile(r"\\g<"), "backreference groups (\\g<...>) are not supported by Rust's regex engine"),
+    (re.compile(r"\(\?<="), "lookbehind (?<=...) is not supported by Rust's regex engine"),
+    (re.compile(r"\(\?<!"), "negative lookbehind (?<!...) is not supported by Rust's regex engine"),
+    (re.compile(r"\(\?="), "lookahead (?=...) is not supported by Rust's regex engine"),
+    (re.compile(r"\(\?!"), "negative lookahead (?!...) is not supported by Rust's regex engine"),
+    (re.compile(r"\(\?>"), "atomic groups (?>...) are not supported by Rust's regex engine"),
+    (re.compile(r"[*+?]\+"), "possessive quantifiers (*+, ++, ?+) are not supported by Rust's regex engine"),
+]
+
+# ReDoS-vulnerable pattern fragments (checked at compile time). Uses [^)]* to
+# stay within a single group, matching shared/guardrails_core.py.
+_REGEX_REDOS_PATTERNS = [
+    re.compile(r"\([^)]*[+*][^)]*\)[+*]"),   # nested quantifiers like (a+)+
+    re.compile(r"\([^)]*\|[^)]*\)[+*]"),     # alternation with quantifier like (a|b)+
+]
+
+
+@router.post("/validate-regex", response_model=McpRegexValidateResponse)
+def validate_regex(
+    payload: McpRegexValidateRequest,
+    user: User = Depends(get_current_user),
+    _=Depends(rate_limit),
+):
+    """Validate a custom regex pattern for DLP/guardrail rules.
+
+    Rejects: invalid syntax, ReDoS-risk patterns, and patterns using features
+    Rust's `regex` crate does not support (so rules behave identically in the
+    Rust gateway).
+    """
+    pattern = payload.pattern
+    if not pattern:
+        return McpRegexValidateResponse(ok=False, error="Pattern is required")
+
+    # 1. Rust-compatibility check (before compile so the error is specific).
+    rust_compatible = True
+    rust_error = None
+    for rx, msg in _RUST_UNSUPPORTED:
+        if rx.search(pattern):
+            rust_compatible = False
+            rust_error = msg
+            break
+
+    # 2. Basic validity via Python re (syntax check).
+    flags = 0
+    if "i" in payload.flags:
+        flags |= re.IGNORECASE
+    if "m" in payload.flags:
+        flags |= re.MULTILINE
+    try:
+        re.compile(pattern, flags)
+    except re.error as e:
+        return McpRegexValidateResponse(
+            ok=False,
+            error=f"Invalid regex: {e}",
+            rust_compatible=rust_compatible,
+        )
+
+    # 3. ReDoS heuristic.
+    redos_risk = any(rx.search(pattern) for rx in _REGEX_REDOS_PATTERNS)
+    if redos_risk:
+        return McpRegexValidateResponse(
+            ok=False,
+            error="Pattern may be vulnerable to ReDoS (nested quantifiers or alternation with quantifier)",
+            redos_risk=True,
+            rust_compatible=rust_compatible,
+        )
+
+    # 4. Rust-incompatible (but otherwise valid) patterns.
+    if not rust_compatible:
+        return McpRegexValidateResponse(
+            ok=False,
+            error=rust_error,
+            rust_compatible=False,
+        )
+
+    return McpRegexValidateResponse(ok=True)
 
 
 @router.get("/policies/builder-metadata", response_model=McpPolicyBuilderMetadataResponse)
@@ -2010,9 +2119,25 @@ def list_events(
     user: User = Depends(get_current_user),
     _=Depends(rate_limit),
 ):
-    """List MCP gateway events with optional filters."""
+    """List MCP gateway events with optional filters.
+
+    Identity, team, and server names are resolved via outer joins so the UI
+    can display human-readable labels instead of numeric IDs.  The stored
+    name (written by the gateway into the NDJSON) is preferred; the joined
+    name is a fallback for old events that predate the name columns.
+    """
     team_ids = get_user_team_ids(db, user)
-    q = db.query(McpEvent)
+    q = (
+        db.query(
+            McpEvent,
+            McpIdentity.name.label("joined_identity_name"),
+            Team.name.label("joined_team_name"),
+            McpServer.name.label("joined_server_name"),
+        )
+        .outerjoin(McpIdentity, McpEvent.identity_id == McpIdentity.id)
+        .outerjoin(Team, McpEvent.team_id == Team.id)
+        .outerjoin(McpServer, McpEvent.server_id == McpServer.id)
+    )
     if team_ids:
         q = q.filter(McpEvent.team_id.in_(team_ids))
     if from_ts:
@@ -2034,7 +2159,34 @@ def list_events(
     if server_id:
         q = q.filter(McpEvent.server_id == server_id)
     total = q.count()
-    events = q.order_by(McpEvent.captured_at.desc()).offset(offset).limit(limit).all()
+    rows = q.order_by(McpEvent.captured_at.desc()).offset(offset).limit(limit).all()
+    events = [
+        McpEventResponse(
+            id=row[0].id,
+            captured_at=row[0].captured_at,
+            request_id=row[0].request_id,
+            session_id=row[0].session_id,
+            identity_id=row[0].identity_id,
+            identity_name=row[0].identity_name or row[1],
+            team_id=row[0].team_id,
+            team_name=row[0].team_name or row[2],
+            server_id=row[0].server_id,
+            server_name=row[0].server_name or row[3],
+            jsonrpc_method=row[0].jsonrpc_method,
+            tool=row[0].tool,
+            resource_uri=row[0].resource_uri,
+            prompt=row[0].prompt,
+            action=row[0].action,
+            status=row[0].status,
+            latency_ms=row[0].latency_ms,
+            error=row[0].error,
+            bytes_in=row[0].bytes_in,
+            bytes_out=row[0].bytes_out,
+            dlp_hits=row[0].dlp_hits,
+            guardrail_hits=row[0].guardrail_hits,
+        )
+        for row in rows
+    ]
     return McpEventListResponse(events=events, total=total)
 
 
@@ -2331,3 +2483,139 @@ def get_server_catalog(
         prompts=prompts,
         last_refresh=last_refresh,
     )
+
+
+# ==================== Gateway Status ====================
+
+def _gateway_status_url(db: Session) -> str:
+    """Return the /status URL for the active MCP gateway backend.
+
+    Reads the ``mcp_gateway_backend`` DB setting (same source HAProxy uses)
+    with fallback to the ``MCP_GATEWAY_BACKEND`` env var.
+    """
+    from ...core.config import get_settings
+    from .settings import get_setting
+    settings = get_settings()
+    backend = get_setting(db, "mcp_gateway_backend", settings.MCP_GATEWAY_BACKEND).lower()
+    if backend in ("rust", "rs", "mcp-gateway-rs"):
+        host = settings.MCP_GATEWAY_RS_INTERNAL_HOST
+        port = settings.MCP_GATEWAY_RS_INTERNAL_PORT
+    else:
+        host = settings.MCP_GATEWAY_INTERNAL_HOST
+        port = settings.MCP_GATEWAY_INTERNAL_PORT
+    return f"http://{host}:{port}/status", backend
+
+
+@router.get("/gateway/status", response_model=GatewayStatusResponse)
+def gateway_status(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    _=Depends(rate_limit),
+):
+    """Get live status from the active MCP gateway.
+
+    For the Rust gateway, this scrapes the /status JSON endpoint which returns
+    metrics counters, latency histogram, active session count, open circuit
+    breakers, catalog freshness, and alert state.  For the Python gateway
+    (which does not expose /status), only basic reachability is reported.
+    """
+    import httpx
+
+    url, backend = _gateway_status_url(db)
+
+    try:
+        resp = httpx.get(url, timeout=5.0)
+        if resp.status_code != 200:
+            return GatewayStatusResponse(
+                backend=backend,
+                reachable=False,
+                error=f"Gateway returned HTTP {resp.status_code}",
+            )
+        data = resp.json()
+        metrics = None
+        if isinstance(data.get("metrics"), dict):
+            m = data["metrics"]
+            # Convert latency_buckets from list of tuples to list of dicts.
+            buckets = []
+            for item in m.get("latency_buckets", []):
+                if isinstance(item, (list, tuple)) and len(item) == 2:
+                    buckets.append({"le": item[0], "count": item[1]})
+            metrics = GatewayMetricsSnapshot(
+                requests_total=m.get("requests_total", 0),
+                auth_success_total=m.get("auth_success_total", 0),
+                auth_failure_total=m.get("auth_failure_total", 0),
+                policy_denied_total=m.get("policy_denied_total", 0),
+                rate_limited_total=m.get("rate_limited_total", 0),
+                dlp_blocked_total=m.get("dlp_blocked_total", 0),
+                guardrail_blocked_total=m.get("guardrail_blocked_total", 0),
+                upstream_errors_total=m.get("upstream_errors_total", 0),
+                tools_listed_total=m.get("tools_listed_total", 0),
+                tools_called_total=m.get("tools_called_total", 0),
+                latency_sum_ms=m.get("latency_sum_ms", 0),
+                latency_count=m.get("latency_count", 0),
+                latency_buckets=buckets,
+                latency_inf_bucket=m.get("latency_inf_bucket", 0),
+            )
+        return GatewayStatusResponse(
+            status=data.get("status", "ok"),
+            configured=data.get("configured", False),
+            backend=backend,
+            reachable=True,
+            metrics=metrics,
+            active_sessions=data.get("active_sessions", 0),
+            open_circuits=[
+                GatewayCircuitState(**c) for c in data.get("open_circuits", [])
+            ],
+            catalog_freshness=[
+                GatewayCatalogFreshness(**c) for c in data.get("catalog_freshness", [])
+            ],
+            alerts=[GatewayAlertState(**a) for a in data.get("alerts", [])],
+        )
+    except httpx.ConnectError:
+        return GatewayStatusResponse(
+            backend=backend,
+            reachable=False,
+            error="Could not connect to gateway",
+        )
+    except Exception as e:
+        return GatewayStatusResponse(
+            backend=backend,
+            reachable=False,
+            error=str(e),
+        )
+
+
+# ==================== Server Health ====================
+
+@router.get("/servers/{sid}/health", response_model=ServerHealthResponse)
+def server_health(
+    sid: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    _=Depends(rate_limit),
+):
+    """Get cached health status for an MCP server from Valkey.
+
+    The Rust gateway's health checker writes to `mcp:gw:health:{id}`;
+    the Python gateway writes to `mcp:health:{id}`.  Both are tried.
+    """
+    client = get_valkey_client()
+    if not client:
+        return ServerHealthResponse(server_id=sid, status="unknown")
+
+    # Try Rust gateway key first, then Python gateway key.
+    for prefix in ("mcp:gw:health:", "mcp:health:"):
+        try:
+            raw = client.get(f"{prefix}{sid}")
+            if raw:
+                data = json.loads(raw)
+                return ServerHealthResponse(
+                    server_id=sid,
+                    status=data.get("status", "unknown"),
+                    error=data.get("error"),
+                    checked_at=data.get("checked_at"),
+                )
+        except Exception:
+            pass
+
+    return ServerHealthResponse(server_id=sid, status="unknown")

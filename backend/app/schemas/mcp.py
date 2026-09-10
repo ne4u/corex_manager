@@ -523,8 +523,11 @@ class McpEventResponse(BaseModel):
     request_id: Optional[str] = None
     session_id: Optional[str] = None
     identity_id: Optional[int] = None
+    identity_name: Optional[str] = None
     team_id: Optional[int] = None
+    team_name: Optional[str] = None
     server_id: Optional[int] = None
+    server_name: Optional[str] = None
     jsonrpc_method: Optional[str] = None
     tool: Optional[str] = None
     resource_uri: Optional[str] = None
@@ -620,6 +623,28 @@ class McpPolicyValidateResponse(BaseModel):
     error: Optional[str] = None
 
 
+# --- Regex Validation (DLP / guardrail custom patterns) ---
+
+class McpRegexValidateRequest(BaseModel):
+    pattern: str
+    """The regex pattern to validate."""
+    flags: str = ""
+    """Optional flags: 'i' (case-insensitive), 'm' (multi-line). Defaults to the
+    flags the gateway applies (case-insensitive for DLP, case-insensitive +
+    multi-line for guardrails)."""
+
+
+class McpRegexValidateResponse(BaseModel):
+    ok: bool
+    error: Optional[str] = None
+    """Human-readable reason when ok=False (invalid syntax, ReDoS risk, or
+    unsupported Rust regex feature)."""
+    redos_risk: bool = False
+    rust_compatible: bool = True
+    """False if the pattern uses features Rust's `regex` crate does not support
+    (backreferences, lookaround, possessive quantifiers, atomic groups)."""
+
+
 # --- Policy Builder Metadata ---
 
 class McpPolicyBuilderServer(BaseModel):
@@ -649,6 +674,66 @@ class McpPolicyBuilderMetadataResponse(BaseModel):
     refreshing: bool = False
 
 
+# --- Gateway Status ---
+
+class GatewayMetricsSnapshot(BaseModel):
+    requests_total: int = 0
+    auth_success_total: int = 0
+    auth_failure_total: int = 0
+    policy_denied_total: int = 0
+    rate_limited_total: int = 0
+    dlp_blocked_total: int = 0
+    guardrail_blocked_total: int = 0
+    upstream_errors_total: int = 0
+    tools_listed_total: int = 0
+    tools_called_total: int = 0
+    latency_sum_ms: int = 0
+    latency_count: int = 0
+    latency_buckets: List[Dict[str, Any]] = []
+    latency_inf_bucket: int = 0
+
+
+class GatewayCircuitState(BaseModel):
+    server_id: int
+    failures: int
+    open_until: float
+
+
+class GatewayCatalogFreshness(BaseModel):
+    server_id: int
+    fetched_at: float
+    tools: int
+    resources: int
+    prompts: int
+
+
+class GatewayAlertState(BaseModel):
+    event_type: str
+    recent_count: int
+    threshold: int
+    last_alert_ts: Optional[float] = None
+
+
+class GatewayStatusResponse(BaseModel):
+    status: str = "ok"
+    configured: bool = False
+    backend: str = "python"
+    reachable: bool = False
+    metrics: Optional[GatewayMetricsSnapshot] = None
+    active_sessions: int = 0
+    open_circuits: List[GatewayCircuitState] = []
+    catalog_freshness: List[GatewayCatalogFreshness] = []
+    alerts: List[GatewayAlertState] = []
+    error: Optional[str] = None
+
+
+class ServerHealthResponse(BaseModel):
+    server_id: int
+    status: str = "unknown"
+    error: Optional[str] = None
+    checked_at: Optional[float] = None
+
+
 __all__ = [
     "TeamBase", "TeamCreate", "TeamUpdate", "TeamResponse",
     "UserTeamBase", "UserTeamCreate", "UserTeamResponse",
@@ -676,4 +761,7 @@ __all__ = [
     "ServerCatalogResponse", "McpServerTestResponse",
     "McpPolicyValidateRequest", "McpPolicyValidateResponse",
     "McpPolicyBuilderServer", "McpPolicyBuilderTeam", "McpPolicyBuilderMetadataResponse",
+    "McpRegexValidateRequest", "McpRegexValidateResponse",
+    "GatewayMetricsSnapshot", "GatewayCircuitState", "GatewayCatalogFreshness",
+    "GatewayAlertState", "GatewayStatusResponse", "ServerHealthResponse",
 ]

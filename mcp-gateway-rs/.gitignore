@@ -1,0 +1,11 @@
+# Rust build output
+target/
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Cargo lock is tracked for binary workspaces
+# (do NOT ignore Cargo.lock)

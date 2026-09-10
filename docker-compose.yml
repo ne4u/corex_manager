@@ -45,6 +45,7 @@ services:
       - MCP_GATEWAY_ENABLED=${MCP_GATEWAY_ENABLED:-false}
       - MCP_SELF_REGISTER=${MCP_SELF_REGISTER:-true}
       - MCP_CONFIG_PATH=/app/data/mcp/config.json
+      - MCP_EVENTS_LOG_PATH=/app/data/mcp/events.ndjson
       - MCP_SERVER_INTERNAL_HOST=mcp-server
       - MCP_SERVER_INTERNAL_PORT=8082
     depends_on:
@@ -244,6 +245,37 @@ services:
     restart: unless-stopped
     networks:
       - corex-net
+
+  # Rust MCP Gateway — parallel deployment for validation (port 8089).
+  # Runs alongside the Python gateway (port 8081) during the validation phase.
+  # Cutover: switch HAProxy backend from mcp-gateway:8081 to mcp-gateway-rs:8089.
+  mcp-gateway-rs:
+    build:
+      context: ./mcp-gateway-rs
+      dockerfile: Dockerfile
+    ports:
+      - "8089:8089"
+    env_file:
+      - .env
+    volumes:
+      - ${DATA_DIR:-./data}/haproxy:/app/data
+    environment:
+      - MCP_GATEWAY_BIND=0.0.0.0:8089
+      - MCP_CONFIG_PATH=/app/data/mcp/config.bundle.json
+      - MCP_EVENTS_LOG_PATH=/app/data/mcp/events.ndjson
+      - MCP_SECRETS_KEY=${MCP_SECRETS_KEY:-}
+      - VALKEY_HOST=valkey
+      - VALKEY_PORT=6379
+      - VALKEY_PASSWORD=${VALKEY_PASSWORD:-}
+      - RUST_LOG=${RUST_LOG:-info}
+    depends_on:
+      valkey:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - corex-net
+    profiles:
+      - mcp-rs
 
   mcp-server:
     build:

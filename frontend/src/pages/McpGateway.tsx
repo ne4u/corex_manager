@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Network, Server, KeyRound, Shield, Eye, AlertTriangle, FileText, Activity, Store, Users, Settings, ScrollText } from 'lucide-react'
+import { Network, Server, KeyRound, Shield, Eye, AlertTriangle, FileText, Activity, Store, Users, Settings, ScrollText, LayoutDashboard } from 'lucide-react'
 import { Tabs } from '../components/ui'
+import McpDashboardTab from '../components/mcp/McpDashboardTab'
 import McpTrafficTab from '../components/McpTrafficTab'
 import McpServersTab from '../components/mcp/McpServersTab'
 import McpIdentitiesTab from '../components/mcp/McpIdentitiesTab'
@@ -14,9 +15,10 @@ import McpTeamsTab from '../components/mcp/McpTeamsTab'
 import McpSettingsTab from '../components/mcp/McpSettingsTab'
 import McpEventsTab from '../components/mcp/McpEventsTab'
 
-type Tab = 'teams' | 'servers' | 'marketplace' | 'identities' | 'policies' | 'dlp' | 'guardrails' | 'skills' | 'traffic' | 'events' | 'settings'
+type Tab = 'dashboard' | 'teams' | 'servers' | 'marketplace' | 'identities' | 'policies' | 'dlp' | 'guardrails' | 'skills' | 'traffic' | 'events' | 'settings'
 
 const TABS: { key: Tab; labelKey: string; icon: typeof Server }[] = [
+  { key: 'dashboard', labelKey: 'pages:mcpGateway.tabs.dashboard', icon: LayoutDashboard },
   { key: 'teams', labelKey: 'pages:mcpGateway.tabs.teams', icon: Users },
   { key: 'servers', labelKey: 'pages:mcpGateway.tabs.servers', icon: Server },
   { key: 'marketplace', labelKey: 'pages:mcpGateway.tabs.marketplace', icon: Store },
@@ -32,7 +34,7 @@ const TABS: { key: Tab; labelKey: string; icon: typeof Server }[] = [
 
 export default function McpGateway() {
   const { t } = useTranslation(['pages', 'common'])
-  const [tab, setTab] = useState<Tab>('servers')
+  const [tab, setTab] = useState<Tab>('dashboard')
 
   return (
     <div className="space-y-6">
@@ -49,6 +51,7 @@ export default function McpGateway() {
         onChange={(id) => setTab(id as Tab)}
       />
 
+      {tab === 'dashboard' && <McpDashboardTab />}
       {tab === 'teams' && <McpTeamsTab />}
       {tab === 'servers' && <McpServersTab />}
       {tab === 'marketplace' && <McpMarketplaceTab />}

@@ -4396,9 +4396,21 @@ def generate_mcp_gateway_backend(db: Session) -> str:
 
     Includes a stick-table on Mcp-Session-Id for SSE affinity so a session's
     POST and GET SSE land on the same gateway replica.
+
+    The backend target (Python or Rust gateway) is controlled by the
+    ``mcp_gateway_backend`` setting: ``"python"`` (default) routes to
+    ``mcp-gateway:8081``; ``"rust"`` routes to ``mcp-gateway-rs:8089``.
     """
-    host = settings.MCP_GATEWAY_INTERNAL_HOST
-    port = settings.MCP_GATEWAY_INTERNAL_PORT
+    from .settings import get_setting
+    backend_choice = get_setting(db, "mcp_gateway_backend", settings.MCP_GATEWAY_BACKEND).lower()
+    if backend_choice in ("rust", "rs", "mcp-gateway-rs"):
+        host = settings.MCP_GATEWAY_RS_INTERNAL_HOST
+        port = settings.MCP_GATEWAY_RS_INTERNAL_PORT
+        server_name = "mcp-gateway-rs"
+    else:
+        host = settings.MCP_GATEWAY_INTERNAL_HOST
+        port = settings.MCP_GATEWAY_INTERNAL_PORT
+        server_name = "mcp-gateway"
     peers = _maybe_peers(db)
     return f"""backend mcp_gateway
     mode http
@@ -4409,7 +4421,7 @@ def generate_mcp_gateway_backend(db: Session) -> str:
     http-request set-header Cache-Control no-store
     stick-table type string len 128 size 10k expire 1h{peers}
     stick on req.hdr(Mcp-Session-Id)
-    server mcp-gateway {host}:{port} check
+    server {server_name} {host}:{port} check
 
 """
 

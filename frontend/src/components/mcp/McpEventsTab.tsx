@@ -11,8 +11,11 @@ interface McpEvent {
   request_id: string | null
   session_id: string | null
   identity_id: number | null
+  identity_name: string | null
   team_id: number | null
+  team_name: string | null
   server_id: number | null
+  server_name: string | null
   jsonrpc_method: string | null
   tool: string | null
   resource_uri: string | null
@@ -147,6 +150,8 @@ export default function McpEventsTab() {
                 {e.action && <Badge variant={ACTION_COLORS[e.action] || 'default'} size="sm">{e.action}</Badge>}
                 <span className="text-sm font-mono truncate flex-1">{e.jsonrpc_method || '-'}</span>
                 <span className="text-sm text-muted-foreground truncate max-w-32">{e.tool || e.resource_uri || e.prompt || '-'}</span>
+                {e.server_name && <span className="text-xs text-muted-foreground truncate max-w-28">{e.server_name}</span>}
+                {e.identity_name && <span className="text-xs text-muted-foreground truncate max-w-28">{e.identity_name}</span>}
                 {e.latency_ms != null && <span className="text-xs text-muted-foreground">{e.latency_ms}ms</span>}
                 {e.status && e.status !== 'ok' && <Badge variant="warning" size="sm">{e.status}</Badge>}
               </div>
@@ -155,9 +160,9 @@ export default function McpEventsTab() {
                   <div className="grid grid-cols-2 gap-x-6 gap-y-1">
                     <div><span className="text-muted-foreground">{t('pages:mcpGateway.events.fields.requestId')}</span> <code className="text-xs">{e.request_id || '-'}</code></div>
                     <div><span className="text-muted-foreground">{t('pages:mcpGateway.events.fields.session')}</span> <code className="text-xs">{e.session_id || '-'}</code></div>
-                    <div><span className="text-muted-foreground">{t('pages:mcpGateway.events.fields.identity')}</span> #{e.identity_id || '-'}</div>
-                    <div><span className="text-muted-foreground">{t('pages:mcpGateway.events.fields.team')}</span> #{e.team_id || '-'}</div>
-                    <div><span className="text-muted-foreground">{t('pages:mcpGateway.events.fields.server')}</span> #{e.server_id || '-'}</div>
+                    <div><span className="text-muted-foreground">{t('pages:mcpGateway.events.fields.identity')}</span> {e.identity_name || `#${e.identity_id}` || '-'}</div>
+                    <div><span className="text-muted-foreground">{t('pages:mcpGateway.events.fields.team')}</span> {e.team_name || `#${e.team_id}` || '-'}</div>
+                    <div><span className="text-muted-foreground">{t('pages:mcpGateway.events.fields.server')}</span> {e.server_name || `#${e.server_id}` || '-'}</div>
                     <div><span className="text-muted-foreground">{t('pages:mcpGateway.events.fields.status')}</span> {e.status || '-'}</div>
                     <div><span className="text-muted-foreground">{t('pages:mcpGateway.events.fields.bytesIn')}</span> {e.bytes_in ?? '-'}</div>
                     <div><span className="text-muted-foreground">{t('pages:mcpGateway.events.fields.bytesOut')}</span> {e.bytes_out ?? '-'}</div>
