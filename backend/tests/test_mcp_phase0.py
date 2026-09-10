@@ -62,13 +62,17 @@ def test_encrypt_decrypt_secret():
     ms._fernet = None  # cleanup
 
 
-def test_decrypt_wrong_key_fails():
-    os.environ["MCP_SECRETS_KEY"] = "test-mcp-secrets-key-for-fernet-encryption"
+def test_decrypt_wrong_key_fails(monkeypatch):
+    key1 = "test-mcp-secrets-key-for-fernet-encryption"
+    key2 = "different-key-also-long-enough-for-test"
+    from app.core.config import get_settings
+    s = get_settings()
+    monkeypatch.setattr(s, "MCP_SECRETS_KEY", key1)
     import app.services.mcp_secrets as ms
     ms._fernet = None
     ciphertext = ms.encrypt_secret("hello")
     ms._fernet = None
-    os.environ["MCP_SECRETS_KEY"] = "different-key-also-long-enough-for-test"
+    monkeypatch.setattr(s, "MCP_SECRETS_KEY", key2)
     with pytest.raises(ValueError, match="decryption failed"):
         ms.decrypt_secret(ciphertext)
     ms._fernet = None

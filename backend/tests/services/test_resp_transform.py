@@ -226,6 +226,7 @@ def _baseline_configs(db, tmp_path, monkeypatch):
     monkeypatch.setattr(s, "SECURITY_LISTS_DIR", str(lists_dir))
     monkeypatch.setattr(s, "HAPROXY_CONFIG_PATH", str(tmp_path / "haproxy.cfg"))
     monkeypatch.setattr(s, "CORAZA_SPOA_ENABLED", False)
+    monkeypatch.setattr(s, "MCP_GATEWAY_ENABLED", False)
     # Enable the resp_transform filter so the backend filter line is stable.
     set_setting(db, "resp_transform_enabled", "true")
 

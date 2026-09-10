@@ -6,19 +6,27 @@ from typing import Optional
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import StreamingResponse
-from .database import SessionLocal
 from .security import decode_access_token
-from ..models.models import AuditEvent, User
 from ..services.audit import (
     derive_action,
+    enqueue_audit_event,
     is_config_change,
     should_capture_payload,
     truncate_payload,
+    write_audit_event,
 )
 from ..core.config import get_settings
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+
+
+def _is_service_call(request: Request) -> bool:
+    """True if this is an in-process MCP service call (skip audit + revocation)."""
+    token = settings.MCP_SERVICE_TOKEN
+    if not token:
+        return False
+    return request.headers.get("x-mcp-service-token") == token
 
 
 def _is_trusted_proxy(host: Optional[str]) -> bool:
@@ -78,13 +86,19 @@ class AuditEventMiddleware(BaseHTTPMiddleware):
         if not path.startswith("/api/v1") or path == "/api/v1/health":
             return await call_next(request)
 
+        # Skip audit for in-process MCP service calls (identified by the
+        # X-MCP-Service-Token header). These calls mint their own admin JWT
+        # and don't need per-request audit logging — the MCP server's own
+        # event log captures tool invocations.
+        if _is_service_call(request):
+            return await call_next(request)
+
         # Read request body before handler runs (Starlette caches it)
         body_bytes = await request.body()
         content_type = request.headers.get("content-type")
 
         # Identify user from bearer token
         username = None
-        user_id = None
         auth = request.headers.get("authorization")
         if auth and auth.lower().startswith("bearer "):
             token = auth.split(" ", 1)[1]
@@ -115,46 +129,27 @@ class AuditEventMiddleware(BaseHTTPMiddleware):
                 logger.debug("Could not buffer POST response body for audit", exc_info=True)
 
         # Build payload
-        payload = None
+        audit_payload = None
         if should_capture_payload(path, content_type):
-            payload = truncate_payload(body_bytes, settings.AUDIT_PAYLOAD_MAX_BYTES)
+            audit_payload = truncate_payload(body_bytes, settings.AUDIT_PAYLOAD_MAX_BYTES)
 
-        # Resolve user_id if we have a username
-        if username:
-            db = SessionLocal()
-            try:
-                user = db.query(User).filter(User.username == username).first()
-                if user:
-                    user_id = user.id
-            except Exception:
-                pass
-            finally:
-                db.close()
-
-        # Write the audit event
-        db = SessionLocal()
-        try:
-            event = AuditEvent(
-                user_id=user_id,
-                username=username,
-                action=action,
-                method=method,
-                path=path,
-                resource_type=resource_type,
-                resource_id=resource_id,
-                status_code=response.status_code,
-                ip_address=ip,
-                payload=payload,
-                config_change=is_config_change(method, path),
-            )
-            db.add(event)
-            db.commit()
-            db.refresh(event)
-        except Exception:
-            logger.exception("Failed to write audit event for %s %s", method, path)
-            db.rollback()
-        finally:
-            db.close()
+        # Assemble the audit event data and enqueue for async writing.
+        # Falls back to synchronous write when the worker isn't running
+        # (e.g. in tests) or Valkey is unavailable.
+        audit_data = {
+            "username": username,
+            "action": action,
+            "method": method,
+            "path": path,
+            "resource_type": resource_type,
+            "resource_id": resource_id,
+            "status_code": response.status_code,
+            "ip_address": ip,
+            "payload": audit_payload,
+            "config_change": is_config_change(method, path),
+        }
+        if not enqueue_audit_event(audit_data):
+            write_audit_event(audit_data)
 
         # If we buffered the response body, re-wrap it
         if response_body_bytes is not None:

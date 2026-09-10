@@ -1,3 +1,6 @@
+import time
+from collections import OrderedDict
+
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
@@ -18,18 +21,63 @@ ROLE_LEVEL = {
     "admin": 3,
 }
 
+# ---------------------------------------------------------------------------
+# In-process user lookup cache (short-lived LRU keyed by username).
+# Eliminates the per-request SELECT user query for repeated authentications
+# (e.g. the MCP server's fixed admin JWT). The cached User is a detached
+# instance merged into the current session via db.merge(load=False), which
+# avoids a DB round-trip while keeping the object usable for column access.
+# ---------------------------------------------------------------------------
+_user_cache: "OrderedDict[str, tuple[float, User]]" = OrderedDict()
+_USER_CACHE_TTL = 30  # seconds
+_USER_CACHE_MAX = 256
+
+
+def _get_user_cached(db: Session, username: str) -> User | None:
+    """Look up a user by username with a short-lived in-process cache."""
+    now = time.time()
+    cached = _user_cache.get(username)
+    if cached is not None:
+        ts, cached_user = cached
+        if now - ts < _USER_CACHE_TTL:
+            return db.merge(cached_user, load=False)
+        _user_cache.pop(username, None)
+    user = db.query(User).filter(User.username == username).first()
+    if user is not None:
+        db.expunge(user)
+        _user_cache[username] = (now, user)
+        if len(_user_cache) > _USER_CACHE_MAX:
+            _user_cache.popitem(last=False)
+        return db.merge(user, load=False)
+    return user
+
+
+def _is_service_call(request: Request) -> bool:
+    """True if this is an in-process MCP service call (skip revocation check)."""
+    token = settings.MCP_SERVICE_TOKEN
+    if not token:
+        return False
+    return request.headers.get("x-mcp-service-token") == token
+
 
 async def get_current_user(
+    request: Request,
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ) -> User:
     payload = decode_access_token(token)
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid token")
-    if is_token_revoked(token):
-        raise HTTPException(status_code=401, detail="Token has been revoked")
     username = payload.get("sub")
-    user = db.query(User).filter(User.username == username).first()
+    if _is_service_call(request):
+        # In-process MCP service calls use a fixed admin JWT that is never
+        # revoked — skip the Valkey round-trip and use the user cache to
+        # avoid a per-request DB query.
+        user = _get_user_cached(db, username)
+    else:
+        if is_token_revoked(token):
+            raise HTTPException(status_code=401, detail="Token has been revoked")
+        user = db.query(User).filter(User.username == username).first()
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
     return user

@@ -21,6 +21,7 @@ from .api.v1 import build_v1_router
 from .services.metrics import start_sampler as start_metrics_sampler
 from .services.waf_metrics import start_waf_sampler
 from .services.tasks import start_task_worker, AutoRenewScheduler
+from .services.audit import start_audit_worker
 from .services.geoip import GeoIpDownloader
 from .services.security_list_feeds import DynamicFeedUpdater
 from .services.rule_set_downloader import RuleSetUpdater
@@ -135,6 +136,7 @@ async def lifespan(app: FastAPI):
     if _settings.CORAZA_SPOA_ENABLED:
         start_waf_sampler()
     start_task_worker()
+    start_audit_worker()
     _auto_renew_scheduler.start()
     _geoip_downloader.start()
     _security_list_feed_updater.start()

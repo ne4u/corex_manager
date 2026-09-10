@@ -48,6 +48,7 @@ services:
       - MCP_EVENTS_LOG_PATH=/app/data/mcp/events.ndjson
       - MCP_SERVER_INTERNAL_HOST=mcp-server
       - MCP_SERVER_INTERNAL_PORT=8082
+      - MCP_SERVICE_TOKEN=${MCP_SERVICE_TOKEN:-}
     depends_on:
       postgres:
         condition: service_healthy

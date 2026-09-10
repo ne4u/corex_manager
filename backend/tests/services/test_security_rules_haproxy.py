@@ -992,6 +992,7 @@ def test_global_options_change_detected_by_config_status(db, monkeypatch, tmp_pa
     cfg_path = str(tmp_path / "haproxy.cfg")
     monkeypatch.setattr(s, "HAPROXY_CONFIG_PATH", cfg_path)
     monkeypatch.setattr(s, "CORAZA_SPOA_ENABLED", False)
+    monkeypatch.setattr(s, "MCP_GATEWAY_ENABLED", False)
     # Isolate security-list and resp-transform dirs (empty → no files to compare).
     monkeypatch.setattr(s, "SECURITY_LISTS_DIR", str(tmp_path / "lists"))
     monkeypatch.setattr(s, "RESP_TRANSFORM_DIR", str(tmp_path / "resp-transform"))

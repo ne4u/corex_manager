@@ -1,11 +1,23 @@
 """Audit event helpers: action derivation, payload truncation, config-change classification."""
 import json
+import logging
 import re
+import threading
+import time
 from typing import Any, Dict, Optional, Tuple
 
 from ..core.config import get_settings
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
+
+AUDIT_QUEUE_NAME = "audit_events"
+
+# Set to True by start_audit_worker(). When False (e.g. in tests where
+# lifespan is suppressed), the middleware writes synchronously instead of
+# enqueuing — this preserves the synchronous behaviour tests rely on.
+_audit_worker_running = False
+_audit_worker_thread: Optional[threading.Thread] = None
 
 # Paths whose request bodies contain secrets and must NOT be captured.
 _PAYLOAD_SKIP_PATHS = {
@@ -391,3 +403,86 @@ def truncate_payload(body_bytes: bytes, max_bytes: int) -> Optional[Dict[str, An
         "_truncated": len(body_bytes) > max_bytes,
         "_size": len(body_bytes),
     }
+
+
+# ---------------------------------------------------------------------------
+# Async audit event persistence (fire-and-forget via Valkey task queue)
+# ---------------------------------------------------------------------------
+
+def write_audit_event(data: dict) -> None:
+    """Synchronously persist an audit event to the database.
+
+    Called by the audit worker thread (for queued events) and as a fallback
+    when Valkey is unavailable or the worker isn't running (e.g. in tests).
+    """
+    from ..core.database import SessionLocal
+    from ..models.models import AuditEvent, User
+
+    db = SessionLocal()
+    try:
+        username = data.get("username")
+        user_id = None
+        if username:
+            user = db.query(User).filter(User.username == username).first()
+            if user:
+                user_id = user.id
+        event = AuditEvent(
+            user_id=user_id,
+            username=username,
+            action=data["action"],
+            method=data["method"],
+            path=data["path"],
+            resource_type=data.get("resource_type"),
+            resource_id=data.get("resource_id"),
+            status_code=data["status_code"],
+            ip_address=data.get("ip_address"),
+            payload=data.get("payload"),
+            config_change=data.get("config_change", False),
+        )
+        db.add(event)
+        db.commit()
+    except Exception:
+        logger.exception("Failed to write audit event for %s %s",
+                         data.get("method"), data.get("path"))
+        db.rollback()
+    finally:
+        db.close()
+
+
+def enqueue_audit_event(data: dict) -> bool:
+    """Enqueue an audit event for async writing.
+
+    Returns True if enqueued, False if the caller should fall back to a
+    synchronous write (worker not running or Valkey unavailable).
+    """
+    if not _audit_worker_running:
+        return False
+    from ..core.valkey_client import enqueue, is_available
+    if not is_available():
+        return False
+    return enqueue(AUDIT_QUEUE_NAME, data)
+
+
+def _audit_worker_loop() -> None:
+    from ..core.valkey_client import dequeue, is_available
+    while True:
+        if not is_available():
+            time.sleep(5)
+            continue
+        try:
+            item = dequeue(AUDIT_QUEUE_NAME, timeout=2)
+            if item:
+                write_audit_event(item)
+        except Exception as e:
+            logger.error("Audit queue worker error: %s", e, exc_info=True)
+
+
+def start_audit_worker() -> None:
+    """Start the background audit event consumer thread."""
+    global _audit_worker_running, _audit_worker_thread
+    if _audit_worker_thread is not None:
+        return
+    _audit_worker_running = True
+    _audit_worker_thread = threading.Thread(target=_audit_worker_loop, daemon=True)
+    _audit_worker_thread.start()
+    logger.info("Audit event worker started")
