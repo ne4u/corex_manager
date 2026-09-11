@@ -403,6 +403,8 @@ def test_is_config_change_validation_only():
     assert is_config_change("POST", "/api/v1/security-rules/validate") is False
     assert is_config_change("POST", "/api/v1/risk-rules/validate") is False
     assert is_config_change("POST", "/api/v1/resp-transforms/validate") is False
+    assert is_config_change("POST", "/api/v1/mcp/policies/validate") is False
+    assert is_config_change("POST", "/api/v1/mcp/validate-regex") is False
 
 
 def test_is_config_change_cache_flush():

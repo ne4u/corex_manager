@@ -153,6 +153,8 @@ _NON_CONFIG_PATHS: list[tuple[str, str]] = [
     ("POST", r"^/security-rules/validate$"),
     ("POST", r"^/risk-rules/validate$"),
     ("POST", r"^/resp-transforms/validate$"),
+    ("POST", r"^/mcp/policies/validate$"),
+    ("POST", r"^/mcp/validate-regex$"),
     # --- Cache flush (operational, no config change) ---
     ("POST", r"^/cache/\d+/clear$"),
     ("POST", r"^/cache/clear-all$"),
