@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, Legend,
+  AreaChart, Area, LineChart, Line, XAxis, YAxis, Tooltip, Legend,
   ResponsiveContainer, CartesianGrid,
 } from 'recharts'
 import { Activity } from 'lucide-react'
@@ -44,8 +44,9 @@ export default function McpTrafficTab() {
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
+      const to = new Date().toISOString()
       const from = new Date(Date.now() - range * 1000).toISOString()
-      const resp = await mcp.metrics.get({ from, breakdown })
+      const resp = await mcp.metrics.get({ from, to, breakdown })
       setData(resp.data)
     } catch {
       setData(null)
@@ -137,13 +138,13 @@ export default function McpTrafficTab() {
             ))}
           </div>
 
-          {/* Stacked bar chart */}
+          {/* Stacked area chart */}
           <div className="rounded-lg border border-border bg-card p-4">
             <h3 className="text-sm font-medium mb-3">
               {t('pages:mcpGateway.traffic.eventsByBreakdown')} {breakdown}
             </h3>
             <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={chartData}>
+              <AreaChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--color-border-subtle))" className="opacity-30" />
                 <XAxis dataKey="time" tickFormatter={formatTimeCompact} fontSize={11} stroke="rgb(var(--color-text-tertiary))" />
                 <YAxis fontSize={11} allowDecimals={false} stroke="rgb(var(--color-text-tertiary))" />
@@ -154,14 +155,17 @@ export default function McpTrafficTab() {
                 />
                 <Legend />
                 {data.series.map((s, i) => (
-                  <Bar
+                  <Area
                     key={s.key}
+                    type="monotone"
                     dataKey={s.key}
-                    stackId="a"
+                    stackId="1"
+                    stroke={COLORS[i % COLORS.length]}
                     fill={COLORS[i % COLORS.length]}
+                    isAnimationActive={false}
                   />
                 ))}
-              </BarChart>
+              </AreaChart>
             </ResponsiveContainer>
           </div>
 

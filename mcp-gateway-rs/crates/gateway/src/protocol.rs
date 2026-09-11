@@ -704,6 +704,9 @@ async fn handle_call(
         .and_then(|v| v.as_str())
         .unwrap_or("");
 
+    // Compute request payload size for event logging.
+    let bytes_in = serde_json::to_string(params).map(|s| s.len() as u64).ok();
+
     // Handle meta-tools.
     if kind == "tool" && is_meta_tool(name) {
         return handle_meta_tool_call(state, msg_id, params, auth).await;
@@ -798,7 +801,7 @@ async fn handle_call(
         log_event(
             state, &req_id, session_id, auth, Some(server.id), method,
             name, kind, "deny", "policy_denied",
-            &format!("Policy denied: {}", pr.rule_name), None, None,
+            &format!("Policy denied: {}", pr.rule_name), None, bytes_in, None,
         );
         return error_response(msg_id, MCP_POLICY_DENIED, &format!("Policy denied: {}", pr.rule_name), StatusCode::OK);
     }
@@ -818,7 +821,7 @@ async fn handle_call(
             log_event(
                 state, &req_id, session_id, auth, Some(server.id), method,
                 name, kind, "rate_limited", "rate_limited",
-                &format!("Rate limit exceeded for {name}"), None, None,
+                &format!("Rate limit exceeded for {name}"), None, bytes_in, None,
             );
             return error_response(msg_id, MCP_RATE_LIMITED, &format!("Rate limit exceeded for {name}"), StatusCode::OK);
         }
@@ -836,7 +839,7 @@ async fn handle_call(
                 log_event(
                     state, &req_id, session_id, auth, Some(server.id), method,
                     name, kind, "dlp_blocked", "dlp_blocked",
-                    "DLP blocked in request", None, None,
+                    "DLP blocked in request", None, bytes_in, None,
                 );
                 return error_response(msg_id, MCP_DLP_BLOCKED, "DLP blocked in request", StatusCode::OK);
             }
@@ -857,7 +860,7 @@ async fn handle_call(
                 log_event(
                     state, &req_id, session_id, auth, Some(server.id), method,
                     name, kind, "guardrail_blocked", "guardrail_blocked",
-                    "Guardrail blocked in request", None, None,
+                    "Guardrail blocked in request", None, bytes_in, None,
                 );
                 return error_response(msg_id, MCP_GUARDRAIL_BLOCKED, "Guardrail blocked in request", StatusCode::OK);
             }
@@ -894,7 +897,7 @@ async fn handle_call(
         log_event(
             state, &req_id, session_id, auth, Some(server.id), method,
             name, kind, "rate_limited", "concurrent_limit",
-            "Concurrent request limit exceeded", None, None,
+            "Concurrent request limit exceeded", None, bytes_in, None,
         );
         return error_response(msg_id, MCP_RATE_LIMITED, "Concurrent request limit exceeded", StatusCode::OK);
     }
@@ -929,7 +932,7 @@ async fn handle_call(
                 log_event(
                     state, &req_id, session_id, auth, Some(server.id), method,
                     name, kind, "dlp_blocked", "dlp_blocked_response",
-                    "DLP blocked in response", Some(latency_ms), None,
+                    "DLP blocked in response", Some(latency_ms), bytes_in, None,
                 );
                 return error_response(msg_id, MCP_DLP_BLOCKED, "DLP blocked in response", StatusCode::OK);
             }
@@ -950,7 +953,7 @@ async fn handle_call(
                 log_event(
                     state, &req_id, session_id, auth, Some(server.id), method,
                     name, kind, "guardrail_blocked", "guardrail_blocked_response",
-                    "Guardrail blocked in response", Some(latency_ms), None,
+                    "Guardrail blocked in response", Some(latency_ms), bytes_in, None,
                 );
                 return error_response(msg_id, MCP_GUARDRAIL_BLOCKED, "Guardrail blocked in response", StatusCode::OK);
             }
@@ -962,10 +965,11 @@ async fn handle_call(
 
     // Log the event.
     let action = if status == 200 { "ok" } else { "upstream_error" };
+    let bytes_out = serde_json::to_string(&body).map(|s| s.len() as u64).ok();
     log_event(
         state, &req_id, session_id, auth, Some(server.id), method,
         name, kind, "allow", action,
-        "", Some(latency_ms), None,
+        "", Some(latency_ms), bytes_in, bytes_out,
     );
 
     if status >= 500 {
@@ -1151,7 +1155,8 @@ fn log_event(
     status: &str,
     error: &str,
     latency_ms: Option<u64>,
-    _bytes_out: Option<u64>,
+    bytes_in: Option<u64>,
+    bytes_out: Option<u64>,
 ) {
     let event = Event {
         ts: chrono::Utc::now().to_rfc3339(),
@@ -1171,8 +1176,8 @@ fn log_event(
         status: status.to_string(),
         latency_ms,
         error: if error.is_empty() { None } else { Some(error.to_string()) },
-        bytes_in: None,
-        bytes_out: None,
+        bytes_in,
+        bytes_out,
         dlp_hits: None,
         guardrail_hits: None,
         params: None,

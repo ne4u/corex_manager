@@ -123,8 +123,10 @@ def test_mcp_gateway_backend_emitted_when_enabled(db):
     assert "option http-keep-alive" in config
     assert "timeout tunnel 300s" in config
     assert "Cache-Control no-store" in config
+    assert "option httpchk GET /healthz" in config
+    assert "http-check expect status 200" in config
     # Default backend is the Rust gateway on port 8089.
-    assert "server mcp-gateway-rs mcp-gateway-rs:8089 check" in config
+    assert "server mcp-gateway-rs mcp-gateway-rs:8089 check inter 5s fall 3 rise 2" in config
 
 
 def test_mcp_gateway_backend_rust_when_setting_is_rust(db):
@@ -133,7 +135,7 @@ def test_mcp_gateway_backend_rust_when_setting_is_rust(db):
     from app.services.settings import set_setting
     set_setting(db, "mcp_gateway_backend", "rust")
     config = generate_mcp_gateway_backend(db)
-    assert "server mcp-gateway-rs mcp-gateway-rs:8089 check" in config
+    assert "server mcp-gateway-rs mcp-gateway-rs:8089 check inter 5s fall 3 rise 2" in config
     assert "mcp-gateway:8081" not in config
 
 
@@ -143,7 +145,7 @@ def test_mcp_gateway_backend_python_when_setting_is_python(db):
     from app.services.settings import set_setting
     set_setting(db, "mcp_gateway_backend", "python")
     config = generate_mcp_gateway_backend(db)
-    assert "server mcp-gateway mcp-gateway:8081 check" in config
+    assert "server mcp-gateway mcp-gateway:8081 check inter 5s fall 3 rise 2" in config
     assert "mcp-gateway-rs:8089" not in config
 
 

@@ -86,6 +86,9 @@ services:
       - DATAPLANEAPI_PASS=${DATAPLANE_API_PASSWORD:-}
       - HAPROXY_STATS_USER=${HAPROXY_STATS_USER:-}
       - HAPROXY_STATS_PASS=${HAPROXY_STATS_PASS:-}
+    depends_on:
+      mcp-gateway-rs:
+        condition: service_started
     restart: unless-stopped
     networks:
       corex-net:

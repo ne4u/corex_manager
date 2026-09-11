@@ -566,7 +566,58 @@ def test_mcp_metrics_aggregation(db):
     assert result["totals"]["allow"] == 5
     assert result["totals"]["deny"] == 3
     assert len(result["latency"]) > 0
-    assert result["latency"][0]["p50"] > 0
+    # Find the bucket with events (near "now") and verify it has non-zero p50
+    non_zero_lat = [l for l in result["latency"] if l["p50"] > 0]
+    assert len(non_zero_lat) > 0
+    # Continuous time axis: 1-hour range with 300s step = 13 buckets
+    # (floored start to floored end, inclusive: 3600/300 + 1)
+    assert len(result["time"]) == 13
+    # Each series should have one data point per timestamp
+    for s in result["series"]:
+        assert len(s["data"]) == len(result["time"])
+    # Latency should have one entry per timestamp
+    assert len(result["latency"]) == len(result["time"])
+
+
+def test_mcp_metrics_continuous_time_axis_sparse_events(db):
+    """get_mcp_metrics fills empty buckets so sparse traffic produces a
+    continuous time axis, not a single bar."""
+    from app.services import mcp_metrics
+    from app.models.mcp import McpEvent
+
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    # Only 2 events, both in the same 5-minute bucket near "now"
+    db.add(McpEvent(
+        captured_at=now - timedelta(seconds=10),
+        request_id="r1", session_id="s1", identity_id=1, team_id=10,
+        server_id=5, jsonrpc_method="tools/call", tool="jira__search",
+        action="allow", status="ok", latency_ms=20,
+    ))
+    db.add(McpEvent(
+        captured_at=now - timedelta(seconds=5),
+        request_id="r2", session_id="s1", identity_id=1, team_id=10,
+        server_id=5, jsonrpc_method="tools/call", tool="jira__search",
+        action="allow", status="ok", latency_ms=30,
+    ))
+    db.commit()
+
+    # 1-hour range with 300s (5 min) step => 13 buckets (inclusive)
+    result = mcp_metrics.get_mcp_metrics(
+        db, start=now - timedelta(hours=1), end=now, step=300, breakdown="action",
+    )
+    assert len(result["time"]) == 13
+    # Only the last bucket should have non-zero counts
+    allow_series = next(s for s in result["series"] if s["key"] == "allow")
+    non_zero = [d for d in allow_series["data"] if d["count"] > 0]
+    assert len(non_zero) == 1
+    assert non_zero[0]["count"] == 2
+    # The rest should be zero
+    zero = [d for d in allow_series["data"] if d["count"] == 0]
+    assert len(zero) == 12
+    # Latency: only the bucket with events should have non-zero p50
+    non_zero_lat = [l for l in result["latency"] if l["p50"] > 0]
+    assert len(non_zero_lat) == 1
+    assert non_zero_lat[0]["count"] == 2
 
 
 def test_mcp_metrics_aggregation_empty(db):

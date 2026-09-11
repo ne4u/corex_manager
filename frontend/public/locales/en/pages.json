@@ -3037,7 +3037,11 @@
         "action": "Action:",
         "error": "Error:",
         "dlpHits": "DLP Hits:",
-        "guardrailHits": "Guardrail Hits:"
+        "guardrailHits": "Guardrail Hits:",
+        "method": "Method:",
+        "tool": "Tool:",
+        "resourceUri": "Resource URI:",
+        "prompt": "Prompt:"
       },
       "pagination": {
         "range": "{{from}}-{{to}} of {{total}}"
@@ -3290,7 +3294,11 @@
       "openCircuits": "Open Circuit Breakers",
       "catalogFreshness": "Catalog Freshness",
       "alertState": "Alert State (60s window)",
-      "thresholdExceeded": "EXCEEDED"
+      "thresholdExceeded": "EXCEEDED",
+      "serverStatus": "MCP Server Status",
+      "noServers": "No MCP servers configured.",
+      "circuitOpen": "CIRCUIT OPEN",
+      "lastSeen": "Last seen"
     }
   },
   "system": {

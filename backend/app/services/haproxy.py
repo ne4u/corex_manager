@@ -4419,9 +4419,11 @@ def generate_mcp_gateway_backend(db: Session) -> str:
     timeout server 300s
     timeout tunnel 300s
     http-request set-header Cache-Control no-store
+    option httpchk GET /healthz
+    http-check expect status 200
     stick-table type string len 128 size 10k expire 1h{peers}
     stick on req.hdr(Mcp-Session-Id)
-    server {server_name} {host}:{port} check
+    server {server_name} {host}:{port} check inter 5s fall 3 rise 2
 
 """
 

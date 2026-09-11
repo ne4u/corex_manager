@@ -166,15 +166,21 @@ def _bucket(ts: datetime, step: int) -> datetime:
 
 
 def _auto_step(start: datetime, end: datetime) -> int:
+    """Pick a reasonable aggregation step based on the requested range.
+
+    Finer than the WAF metrics schedule because MCP events are individual
+    requests (not continuous samples), so sparse traffic needs small buckets
+    to produce a meaningful chart.
+    """
     duration = (end - start).total_seconds()
-    if duration <= 300:
+    if duration <= 300:  # <= 5 min
+        return 10
+    if duration <= 3600:  # <= 1 hour
         return 60
-    if duration <= 3600:
-        return 300
-    if duration <= 86400:
-        return 1800
-    if duration <= 604800:
-        return 21600
+    if duration <= 86400:  # <= 1 day
+        return 300  # 5 min
+    if duration <= 604800:  # <= 7 days
+        return 1800  # 30 min
     return 86400
 
 
@@ -231,14 +237,25 @@ def get_mcp_metrics(
         series_keys.add(val)
         totals[val] = totals.get(val, 0) + 1
 
-    timestamps = sorted(buckets)
+    # Build a continuous time axis from the floored start to the floored end
+    # at step intervals. This ensures the chart always shows the full selected
+    # range with regular intervals, even when traffic is sparse (e.g. a handful
+    # of requests during a day should produce many buckets, not a single bar).
+    start_bucket = _bucket(start.replace(tzinfo=timezone.utc), step)
+    end_bucket = _bucket(end.replace(tzinfo=timezone.utc), step)
+    timestamps: List[datetime] = []
+    cur = start_bucket
+    while cur <= end_bucket:
+        timestamps.append(cur)
+        cur = datetime.fromtimestamp(cur.timestamp() + step, tz=timezone.utc)
+
     series: List[Dict[str, Any]] = []
     for key in sorted(series_keys):
         data = []
         for ts in timestamps:
             count = sum(
                 1
-                for row in buckets[ts]
+                for row in buckets.get(ts, [])
                 if str(getattr(row, breakdown_col) or "unknown") == key
             )
             data.append({"time": ts.isoformat(), "count": count})
@@ -247,7 +264,8 @@ def get_mcp_metrics(
     # Latency stats per bucket
     latency_data: List[Dict[str, Any]] = []
     for ts in timestamps:
-        latencies = [r.latency_ms for r in buckets[ts] if r.latency_ms is not None]
+        bucket_rows = buckets.get(ts, [])
+        latencies = [r.latency_ms for r in bucket_rows if r.latency_ms is not None]
         if latencies:
             latencies.sort()
             p50 = latencies[len(latencies) // 2]

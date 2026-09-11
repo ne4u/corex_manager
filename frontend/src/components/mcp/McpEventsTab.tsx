@@ -116,9 +116,9 @@ export default function McpEventsTab() {
           <option value="prompts/get">prompts/get</option>
         </select>
         <div className="relative flex-1 min-w-48">
-          <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <input
-            className="input w-full text-sm ps-8"
+            className="input w-full text-sm !pl-10"
             placeholder={t('pages:mcpGateway.events.searchPlaceholder')}
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -157,17 +157,63 @@ export default function McpEventsTab() {
               </div>
               {expandedId === e.id && (
                 <div className="border-t border-border p-3 space-y-2 text-sm">
-                  <div className="grid grid-cols-2 gap-x-6 gap-y-1">
-                    <div><span className="text-muted-foreground">{t('pages:mcpGateway.events.fields.requestId')}</span> <code className="text-xs">{e.request_id || '-'}</code></div>
-                    <div><span className="text-muted-foreground">{t('pages:mcpGateway.events.fields.session')}</span> <code className="text-xs">{e.session_id || '-'}</code></div>
-                    <div><span className="text-muted-foreground">{t('pages:mcpGateway.events.fields.identity')}</span> {e.identity_name || `#${e.identity_id}` || '-'}</div>
-                    <div><span className="text-muted-foreground">{t('pages:mcpGateway.events.fields.team')}</span> {e.team_name || `#${e.team_id}` || '-'}</div>
-                    <div><span className="text-muted-foreground">{t('pages:mcpGateway.events.fields.server')}</span> {e.server_name || `#${e.server_id}` || '-'}</div>
-                    <div><span className="text-muted-foreground">{t('pages:mcpGateway.events.fields.status')}</span> {e.status || '-'}</div>
-                    <div><span className="text-muted-foreground">{t('pages:mcpGateway.events.fields.bytesIn')}</span> {e.bytes_in ?? '-'}</div>
-                    <div><span className="text-muted-foreground">{t('pages:mcpGateway.events.fields.bytesOut')}</span> {e.bytes_out ?? '-'}</div>
-                    <div><span className="text-muted-foreground">{t('pages:mcpGateway.events.fields.latency')}</span> {e.latency_ms != null ? `${e.latency_ms}ms` : '-'}</div>
-                    <div><span className="text-muted-foreground">{t('pages:mcpGateway.events.fields.action')}</span> {e.action || '-'}</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
+                    <div className="flex gap-2 min-w-0">
+                      <span className="text-muted-foreground shrink-0">{t('pages:mcpGateway.events.fields.method')}</span>
+                      <code className="text-xs break-all">{e.jsonrpc_method || '-'}</code>
+                    </div>
+                    <div className="flex gap-2 min-w-0">
+                      <span className="text-muted-foreground shrink-0">{t('pages:mcpGateway.events.fields.action')}</span>
+                      {e.action || '-'}
+                    </div>
+                    <div className="flex gap-2 min-w-0">
+                      <span className="text-muted-foreground shrink-0">{t('pages:mcpGateway.events.fields.tool')}</span>
+                      <code className="text-xs break-all">{e.tool || '-'}</code>
+                    </div>
+                    <div className="flex gap-2 min-w-0">
+                      <span className="text-muted-foreground shrink-0">{t('pages:mcpGateway.events.fields.resourceUri')}</span>
+                      <code className="text-xs break-all">{e.resource_uri || '-'}</code>
+                    </div>
+                    <div className="flex gap-2 min-w-0">
+                      <span className="text-muted-foreground shrink-0">{t('pages:mcpGateway.events.fields.prompt')}</span>
+                      <code className="text-xs break-all">{e.prompt || '-'}</code>
+                    </div>
+                    <div className="flex gap-2 min-w-0">
+                      <span className="text-muted-foreground shrink-0">{t('pages:mcpGateway.events.fields.status')}</span>
+                      {e.status || '-'}
+                    </div>
+                    <div className="flex gap-2 min-w-0">
+                      <span className="text-muted-foreground shrink-0">{t('pages:mcpGateway.events.fields.requestId')}</span>
+                      <code className="text-xs break-all">{e.request_id || '-'}</code>
+                    </div>
+                    <div className="flex gap-2 min-w-0">
+                      <span className="text-muted-foreground shrink-0">{t('pages:mcpGateway.events.fields.session')}</span>
+                      <code className="text-xs break-all">{e.session_id || '-'}</code>
+                    </div>
+                    <div className="flex gap-2 min-w-0">
+                      <span className="text-muted-foreground shrink-0">{t('pages:mcpGateway.events.fields.identity')}</span>
+                      <span className="break-all">{e.identity_name || (e.identity_id != null ? `#${e.identity_id}` : '-')}</span>
+                    </div>
+                    <div className="flex gap-2 min-w-0">
+                      <span className="text-muted-foreground shrink-0">{t('pages:mcpGateway.events.fields.team')}</span>
+                      <span className="break-all">{e.team_name || (e.team_id != null ? `#${e.team_id}` : '-')}</span>
+                    </div>
+                    <div className="flex gap-2 min-w-0">
+                      <span className="text-muted-foreground shrink-0">{t('pages:mcpGateway.events.fields.server')}</span>
+                      <span className="break-all">{e.server_name || (e.server_id != null ? `#${e.server_id}` : '-')}</span>
+                    </div>
+                    <div className="flex gap-2 min-w-0">
+                      <span className="text-muted-foreground shrink-0">{t('pages:mcpGateway.events.fields.latency')}</span>
+                      {e.latency_ms != null ? `${e.latency_ms}ms` : '-'}
+                    </div>
+                    <div className="flex gap-2 min-w-0">
+                      <span className="text-muted-foreground shrink-0">{t('pages:mcpGateway.events.fields.bytesIn')}</span>
+                      {e.bytes_in ?? '-'}
+                    </div>
+                    <div className="flex gap-2 min-w-0">
+                      <span className="text-muted-foreground shrink-0">{t('pages:mcpGateway.events.fields.bytesOut')}</span>
+                      {e.bytes_out ?? '-'}
+                    </div>
                   </div>
                   {e.error && (
                     <div className="rounded border border-red-500/30 bg-red-500/10 p-2 text-xs text-red-300">

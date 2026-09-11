@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { RefreshCw, Bell, Activity, Zap, AlertTriangle, Gauge, Clock, ServerCrash } from 'lucide-react'
+import { RefreshCw, Bell, Activity, Zap, AlertTriangle, Gauge, Clock, ServerCrash, Server } from 'lucide-react'
 import { mcp } from '../../services/api'
 import { Badge } from '../ui'
 import { useDateTime } from '../../contexts/DateTimeContext'
@@ -57,6 +57,20 @@ interface GatewayAlert {
   last_alert_ts: number | null
 }
 
+interface McpServerInfo {
+  id: number
+  name: string
+  display_name: string | null
+  namespace: string
+  url: string | null
+  enabled: boolean
+  transport_type: string
+  health_status: string | null
+  last_seen_at: string | null
+  last_error: string | null
+  last_catalog_at: string | null
+}
+
 interface GatewayStatus {
   status: string
   configured: boolean
@@ -83,6 +97,7 @@ export default function McpDashboardTab() {
   const { formatDateTime } = useDateTime()
   const [gatewayStatus, setGatewayStatus] = useState<GatewayStatus | null>(null)
   const [gatewayLoading, setGatewayLoading] = useState(false)
+  const [servers, setServers] = useState<McpServerInfo[]>([])
   const [serverNames, setServerNames] = useState<Record<number, string>>({})
 
   const [alertConfig, setAlertConfig] = useState<AlertConfig>({ webhook_url: '', thresholds: {} })
@@ -93,8 +108,10 @@ export default function McpDashboardTab() {
   const fetchServerNames = useCallback(async () => {
     try {
       const resp = await mcp.servers.list()
+      const list = resp.data as McpServerInfo[]
+      setServers(list)
       const map: Record<number, string> = {}
-      for (const s of resp.data) {
+      for (const s of list) {
         map[s.id] = s.display_name || s.name
       }
       setServerNames(map)
@@ -255,6 +272,56 @@ export default function McpDashboardTab() {
               </div>
             )}
           </>
+        )}
+      </div>
+
+      {/* MCP Server Status */}
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold flex items-center gap-2"><Server className="h-5 w-5 text-primary" /> {t('pages:mcpGateway.settings.serverStatus')}</h2>
+          <button className="text-muted-foreground hover:text-foreground" onClick={fetchServerNames}>
+            <RefreshCw className="w-4 h-4" />
+          </button>
+        </div>
+        {servers.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{t('pages:mcpGateway.settings.noServers')}</p>
+        ) : (
+          <div className="space-y-1">
+            {servers.map(s => {
+              const circuit = gatewayStatus?.open_circuits.find(c => c.server_id === s.id)
+              const catalog = gatewayStatus?.catalog_freshness.find(c => c.server_id === s.id)
+              const healthVariant = s.health_status === 'healthy' ? 'success' : s.health_status === 'unhealthy' || s.health_status === 'stopped' ? 'error' : 'default'
+              return (
+                <div key={s.id} className="rounded border border-border px-3 py-2 space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-medium truncate">{s.display_name || s.name}</span>
+                      <Badge variant={s.enabled ? 'success' : 'default'} size="sm">
+                        {s.enabled ? t('common:status.enabled') : t('common:status.disabled')}
+                      </Badge>
+                      <Badge variant={healthVariant} size="sm">{s.health_status || t('common:status.unknown')}</Badge>
+                      <Badge variant={s.transport_type === 'stdio' ? 'info' : 'default'} size="sm">
+                        {s.transport_type === 'stdio' ? t('pages:mcpGateway.servers.transportStdio') : t('pages:mcpGateway.servers.transportHttp')}
+                      </Badge>
+                      {circuit && (
+                        <Badge variant="error" size="sm">{t('pages:mcpGateway.settings.circuitOpen')}</Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0">
+                      {catalog && (
+                        <span>{catalog.tools}T · {catalog.resources}R · {catalog.prompts}P</span>
+                      )}
+                      {s.last_seen_at && (
+                        <span>{t('pages:mcpGateway.settings.lastSeen')}: {formatDateTime(s.last_seen_at)}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-xs text-muted-foreground truncate">{s.namespace} · {s.transport_type === 'stdio' ? t('pages:mcpGateway.servers.transportStdio') : s.url}</div>
+                  {s.last_error && <div className="text-xs text-red-400 truncate">{s.last_error}</div>}
+                </div>
+              )
+            })}
+          </div>
         )}
       </div>
 

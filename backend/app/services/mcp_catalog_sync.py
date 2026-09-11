@@ -68,7 +68,10 @@ def _update_server_state(db: Session, server: McpServer) -> None:
     # has been stale for more than two intervals.
     now = datetime.datetime.now(datetime.timezone.utc)
     stale_threshold = datetime.timedelta(seconds=SYNC_INTERVAL_SECONDS * 2 + 5)
-    if not server.last_catalog_at or (now - server.last_catalog_at) > stale_threshold:
+    last_cat = server.last_catalog_at
+    if last_cat and last_cat.tzinfo is None:
+        last_cat = last_cat.replace(tzinfo=datetime.timezone.utc)
+    if not last_cat or (now - last_cat) > stale_threshold:
         if server.health_status != "unhealthy" or not server.last_error:
             server.health_status = "unhealthy"
             server.last_error = "Catalog not yet available from worker"
