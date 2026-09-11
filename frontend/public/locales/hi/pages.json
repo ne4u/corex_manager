@@ -2584,7 +2584,15 @@
         "expiresAt": "समाप्ति",
         "patIssued": "PAT जारी",
         "patWarning": "इस टोकन को अभी कॉपी करें — यह दोबारा नहीं दिखेगा।"
-      }
+      },
+      "syncFromAuth0": "Auth0 से सिंक करें",
+      "syncAuth0Title": "Auth0 उपयोगकर्ताओं को पहचानों में सिंक करें",
+      "syncAuth0Team": "टीम",
+      "syncAuth0DryRun": "ड्राई रन (पहचानें न बनाएं या अपडेट करें)",
+      "syncAuth0VerifiedOnly": "सत्यापित ईमेल आवश्यक",
+      "syncAuth0Running": "सिंक हो रहा है…",
+      "syncAuth0Result": "{{created}} बनाए गए, {{updated}} अपडेट किए गए, {{skipped}} छोड़े गए {{total}} Auth0 उपयोगकर्ताओं में से",
+      "syncAuth0Failed": "Auth0 सिंक विफल"
     },
     "policies": {
       "count": "{{count}} नीति/नीतियाँ",
@@ -2803,7 +2811,11 @@
         "action": "क्रिया:",
         "error": "त्रुटि:",
         "dlpHits": "DLP हिट:",
-        "guardrailHits": "गार्डरेल हिट:"
+        "guardrailHits": "गार्डरेल हिट:",
+        "method": "विधि:",
+        "prompt": "प्रॉम्प्ट:",
+        "resourceUri": "संसाधन URI:",
+        "tool": "टूल:"
       },
       "pagination": {
         "range": "{{from}}-{{to}} / {{total}}"
@@ -2985,7 +2997,12 @@
         "clientId": "क्लाइंट ID:",
         "scopes": "स्कोप:",
         "tokenExpires": "टोकन समाप्त:"
-      }
+      },
+      "lastError": "अंतिम त्रुटि:",
+      "testConnection": "कनेक्शन परीक्षण",
+      "testFailed": "कनेक्शन परीक्षण विफल",
+      "testSuccess": "कनेक्शन सफल",
+      "testing": "परीक्षण हो रहा है..."
     },
     "settings": {
       "generalTitle": "सामान्य सेटिंग्स",
@@ -3028,7 +3045,34 @@
       "noWebhook": "कोई webhook नहीं",
       "defaultRpmHelp": "प्रति-पहचान, प्रति-उपकरण सीमा। 0 अक्षम।",
       "perIpLimitHelp": "प्रमाणीकरण से पहले प्रति-IP अनुरोध सीमा। 0 अक्षम।",
-      "concurrentLimitHelp": "प्रत्येक पहचान के लिए अधिकतम समवर्ती अनुरोध। 0 अक्षम।"
+      "concurrentLimitHelp": "प्रत्येक पहचान के लिए अधिकतम समवर्ती अनुरोध। 0 अक्षम।",
+      "gatewayStatus": "गेटवे लाइव स्थिति",
+      "gatewayUnreachable": "गेटवे पहुँच योग्य नहीं है। सुनिश्चित करें कि गेटवे सेवा चल रही है।",
+      "reachable": "पहुँच योग्य",
+      "unreachable": "अपहुँच्य",
+      "configured": "कॉन्फ़िगर किया गया",
+      "mRequests": "अनुरोध",
+      "mToolsCalled": "टूल कॉल किए गए",
+      "mToolsListed": "टूल सूचीबद्ध",
+      "mAuthFail": "प्रमाणीकरण विफलता",
+      "mPolicyDenied": "नीति अस्वीकृत",
+      "mRateLimited": "दर सीमित",
+      "mDlpBlocked": "DLP अवरुद्ध",
+      "mGuardrailBlocked": "गार्डरेल अवरुद्ध",
+      "mUpstreamErrors": "अपस्ट्रीम त्रुटियाँ",
+      "mAuthSuccess": "प्रमाणीकरण सफल",
+      "latencyHistogram": "टूल्स/कॉल विलंबता हिस्टोग्राम",
+      "avgLatency": "औसत विलंबता",
+      "samples": "नमूने",
+      "activeSessions": "सक्रिय सत्र",
+      "openCircuits": "खुले सर्किट ब्रेकर",
+      "catalogFreshness": "कैटलॉग ताजगी",
+      "alertState": "अलर्ट स्थिति (60s विंडो)",
+      "thresholdExceeded": "सीमा पार",
+      "serverStatus": "MCP सर्वर स्थिति",
+      "noServers": "कोई MCP सर्वर कॉन्फ़िगर नहीं किया गया है।",
+      "circuitOpen": "सर्किट खुला",
+      "lastSeen": "अंतिम बार देखा गया"
     }
   },
   "featureFlags": {

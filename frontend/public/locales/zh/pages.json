@@ -2584,7 +2584,15 @@
         "expiresAt": "过期于",
         "patIssued": "PAT已签发",
         "patWarning": "立即复制此令牌 — 不会再次显示。"
-      }
+      },
+      "syncFromAuth0": "从 Auth0 同步",
+      "syncAuth0Title": "将 Auth0 用户同步到身份",
+      "syncAuth0Team": "团队",
+      "syncAuth0DryRun": "试运行（不创建或更新身份）",
+      "syncAuth0VerifiedOnly": "需要已验证的电子邮件",
+      "syncAuth0Running": "同步中…",
+      "syncAuth0Result": "已创建 {{created}}，已更新 {{updated}}，已跳过 {{skipped}}，共 {{total}} 个 Auth0 用户",
+      "syncAuth0Failed": "Auth0 同步失败"
     },
     "policies": {
       "count": "{{count}}条策略",
@@ -2803,7 +2811,11 @@
         "action": "操作:",
         "error": "错误:",
         "dlpHits": "DLP命中:",
-        "guardrailHits": "护栏命中:"
+        "guardrailHits": "护栏命中:",
+        "method": "方法:",
+        "prompt": "提示:",
+        "resourceUri": "资源 URI:",
+        "tool": "工具:"
       },
       "pagination": {
         "range": "{{from}}-{{to}} / {{total}}"
@@ -2985,7 +2997,12 @@
         "clientId": "客户端ID:",
         "scopes": "范围:",
         "tokenExpires": "令牌过期:"
-      }
+      },
+      "lastError": "上一个错误:",
+      "testConnection": "测试连接",
+      "testFailed": "连接测试失败",
+      "testSuccess": "连接成功",
+      "testing": "测试中..."
     },
     "settings": {
       "generalTitle": "常规设置",
@@ -3028,7 +3045,34 @@
       "noWebhook": "无webhook",
       "defaultRpmHelp": "每个身份、每个工具的限制。0禁用。",
       "perIpLimitHelp": "身份验证前的每IP请求限制。0禁用。",
-      "concurrentLimitHelp": "每个身份的最大并发请求数。0禁用。"
+      "concurrentLimitHelp": "每个身份的最大并发请求数。0禁用。",
+      "gatewayStatus": "网关实时状态",
+      "gatewayUnreachable": "网关无法访问。请确保网关服务正在运行。",
+      "reachable": "可达",
+      "unreachable": "不可达",
+      "configured": "已配置",
+      "mRequests": "请求",
+      "mToolsCalled": "已调用工具",
+      "mToolsListed": "已列出工具",
+      "mAuthFail": "认证失败",
+      "mPolicyDenied": "策略拒绝",
+      "mRateLimited": "速率受限",
+      "mDlpBlocked": "DLP 已阻止",
+      "mGuardrailBlocked": "护栏已阻止",
+      "mUpstreamErrors": "上游错误",
+      "mAuthSuccess": "认证成功",
+      "latencyHistogram": "工具/调用延迟直方图",
+      "avgLatency": "平均延迟",
+      "samples": "样本",
+      "activeSessions": "活动会话",
+      "openCircuits": "断路器打开",
+      "catalogFreshness": "目录新鲜度",
+      "alertState": "告警状态（60秒窗口）",
+      "thresholdExceeded": "已超限",
+      "serverStatus": "MCP 服务器状态",
+      "noServers": "未配置 MCP 服务器。",
+      "circuitOpen": "断路器开启",
+      "lastSeen": "最后出现"
     }
   },
   "featureFlags": {

@@ -2584,7 +2584,15 @@
         "expiresAt": "ينتهي في",
         "patIssued": "تم إصدار PAT",
         "patWarning": "انسخ هذا الرمز الآن — لن يظهر مرة أخرى."
-      }
+      },
+      "syncFromAuth0": "مزامنة من Auth0",
+      "syncAuth0Title": "مزامنة مستخدمي Auth0 إلى الهوياتات",
+      "syncAuth0Team": "الفريق",
+      "syncAuth0DryRun": "تشغيل تجريبي (عدم إنشاء أو تحديث الهوياتات)",
+      "syncAuth0VerifiedOnly": "يتطلب بريد إلكتروني مؤكد",
+      "syncAuth0Running": "جارٍ المزامنة…",
+      "syncAuth0Result": "تم إنشاء {{created}}، تحديث {{updated}}، تخطي {{skipped}} من {{total}} مستخدم Auth0",
+      "syncAuth0Failed": "فشلت مزامنة Auth0"
     },
     "policies": {
       "count": "{{count}} سياسة/سياسات",
@@ -2803,7 +2811,11 @@
         "action": "إجراء:",
         "error": "خطأ:",
         "dlpHits": "إصابات DLP:",
-        "guardrailHits": "إصابات الحواجز:"
+        "guardrailHits": "إصابات الحواجز:",
+        "method": "الطريقة:",
+        "prompt": "المطالبة:",
+        "resourceUri": "معرف المورد:",
+        "tool": "الأداة:"
       },
       "pagination": {
         "range": "{{from}}-{{to}} من {{total}}"
@@ -2985,7 +2997,12 @@
         "clientId": "معرّف العميل:",
         "scopes": "النطاقات:",
         "tokenExpires": "تنتهي صلاحية الرمز:"
-      }
+      },
+      "lastError": "آخر خطأ:",
+      "testConnection": "اختبار الاتصال",
+      "testFailed": "فشل اختبار الاتصال",
+      "testSuccess": "اتصال ناجح",
+      "testing": "جارٍ الاختبار..."
     },
     "settings": {
       "generalTitle": "الإعدادات العامة",
@@ -3028,7 +3045,34 @@
       "noWebhook": "لا يوجد webhook",
       "defaultRpmHelp": "حد لكل هوية، لكل أداة. 0 يعطل.",
       "perIpLimitHelp": "حد الطلبات لكل IP قبل المصادقة. 0 يعطل.",
-      "concurrentLimitHelp": "الحد الأقصى لعدد الطلبات المتزامنة لكل هوية. 0 يعطل."
+      "concurrentLimitHelp": "الحد الأقصى لعدد الطلبات المتزامنة لكل هوية. 0 يعطل.",
+      "gatewayStatus": "حالة البوابة المباشرة",
+      "gatewayUnreachable": "لا يمكن الوصول إلى البوابة. تأكد من تشغيل خدمة البوابة.",
+      "reachable": "قابل للوصول",
+      "unreachable": "غير قابل للوصول",
+      "configured": "مُعد",
+      "mRequests": "الطلبات",
+      "mToolsCalled": "الأدوات المستدعاة",
+      "mToolsListed": "الأدوات المدرجة",
+      "mAuthFail": "فشل المصادقة",
+      "mPolicyDenied": "السياسة المرفوضة",
+      "mRateLimited": "محدود بالمعدل",
+      "mDlpBlocked": "DLP محظور",
+      "mGuardrailBlocked": "الحاجز محظور",
+      "mUpstreamErrors": "أخطاء المنبع",
+      "mAuthSuccess": "نجاح المصادقة",
+      "latencyHistogram": "رسم تكراري زمن الاستجابة للأدوات/الاستدعاءات",
+      "avgLatency": "متوسط زمن الاستجابة",
+      "samples": "عينات",
+      "activeSessions": "الجلسات النشطة",
+      "openCircuits": "قواطع الدائرة المفتوحة",
+      "catalogFreshness": "حداثة الكتالوج",
+      "alertState": "حالة التنبيه (نافذة 60 ثانية)",
+      "thresholdExceeded": "تجاوز الحد",
+      "serverStatus": "حالة خادم MCP",
+      "noServers": "لا توجد خوادم MCP مُعدة.",
+      "circuitOpen": "الدائرة مفتوحة",
+      "lastSeen": "آخر ظهور"
     }
   },
   "featureFlags": {

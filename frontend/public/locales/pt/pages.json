@@ -2584,7 +2584,15 @@
         "expiresAt": "Expira em",
         "patIssued": "PAT emitido",
         "patWarning": "Copie este token agora — não será mostrado novamente."
-      }
+      },
+      "syncFromAuth0": "Sincronizar do Auth0",
+      "syncAuth0Title": "Sincronizar usuários Auth0 em identidades",
+      "syncAuth0Team": "Equipe",
+      "syncAuth0DryRun": "Execução de teste (não criar ou atualizar identidades)",
+      "syncAuth0VerifiedOnly": "Exigir e-mail verificado",
+      "syncAuth0Running": "Sincronizando…",
+      "syncAuth0Result": "Criados {{created}}, atualizados {{updated}}, ignorados {{skipped}} de {{total}} usuários Auth0",
+      "syncAuth0Failed": "Falha na sincronização Auth0"
     },
     "policies": {
       "count": "{{count}} política(s)",
@@ -2803,7 +2811,11 @@
         "action": "Ação:",
         "error": "Erro:",
         "dlpHits": "Hits DLP:",
-        "guardrailHits": "Hits guardrail:"
+        "guardrailHits": "Hits guardrail:",
+        "method": "Método:",
+        "prompt": "Prompt:",
+        "resourceUri": "URI do recurso:",
+        "tool": "Ferramenta:"
       },
       "pagination": {
         "range": "{{from}}-{{to}} de {{total}}"
@@ -2985,7 +2997,12 @@
         "clientId": "ID do cliente:",
         "scopes": "Scopes:",
         "tokenExpires": "O token expira em:"
-      }
+      },
+      "lastError": "Último erro:",
+      "testConnection": "Testar conexão",
+      "testFailed": "Teste de conexão falhou",
+      "testSuccess": "Conexão bem-sucedida",
+      "testing": "Testando..."
     },
     "settings": {
       "generalTitle": "Configurações gerais",
@@ -3028,7 +3045,34 @@
       "noWebhook": "Sem webhook",
       "defaultRpmHelp": "Limite por identidade, por ferramenta. 0 desativa.",
       "perIpLimitHelp": "Limite de solicitações por IP antes da autenticação. 0 desativa.",
-      "concurrentLimitHelp": "Máximo de solicitações simultâneas por identidade. 0 desativa."
+      "concurrentLimitHelp": "Máximo de solicitações simultâneas por identidade. 0 desativa.",
+      "gatewayStatus": "Status do gateway ao vivo",
+      "gatewayUnreachable": "O gateway está inacessível. Certifique-se de que o serviço do gateway está em execução.",
+      "reachable": "Acessível",
+      "unreachable": "Inacessível",
+      "configured": "Configurado",
+      "mRequests": "Solicitações",
+      "mToolsCalled": "Ferramentas chamadas",
+      "mToolsListed": "Ferramentas listadas",
+      "mAuthFail": "Falhas de autenticação",
+      "mPolicyDenied": "Política negada",
+      "mRateLimited": "Limitado por taxa",
+      "mDlpBlocked": "DLP bloqueado",
+      "mGuardrailBlocked": "Guardrail bloqueado",
+      "mUpstreamErrors": "Erros de upstream",
+      "mAuthSuccess": "Autenticação bem-sucedida",
+      "latencyHistogram": "Histograma de latência de Tools/Call",
+      "avgLatency": "Latência média",
+      "samples": "amostras",
+      "activeSessions": "Sessões ativas",
+      "openCircuits": "Circuit breakers abertos",
+      "catalogFreshness": "Atualização do catálogo",
+      "alertState": "Estado de alerta (janela 60s)",
+      "thresholdExceeded": "EXCEDIDO",
+      "serverStatus": "Status do servidor MCP",
+      "noServers": "Nenhum servidor MCP configurado.",
+      "circuitOpen": "CIRCUITO ABERTO",
+      "lastSeen": "Visto pela última vez"
     }
   },
   "featureFlags": {

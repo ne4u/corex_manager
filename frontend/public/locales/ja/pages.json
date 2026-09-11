@@ -2584,7 +2584,15 @@
         "expiresAt": "有効期限",
         "patIssued": "PAT発行済み",
         "patWarning": "このトークンを今すぐコピー — 再表示されません。"
-      }
+      },
+      "syncFromAuth0": "Auth0から同期",
+      "syncAuth0Title": "Auth0ユーザーをアイデンティティに同期",
+      "syncAuth0Team": "チーム",
+      "syncAuth0DryRun": "ドライラン（アイデンティティを作成・更新しない）",
+      "syncAuth0VerifiedOnly": "確認済みメール必須",
+      "syncAuth0Running": "同期中…",
+      "syncAuth0Result": "{{created}}作成、{{updated}}更新、{{skipped}}スキップ（{{total}} Auth0ユーザー中）",
+      "syncAuth0Failed": "Auth0同期に失敗しました"
     },
     "policies": {
       "count": "{{count}}ポリシー",
@@ -2803,7 +2811,11 @@
         "action": "アクション:",
         "error": "エラー:",
         "dlpHits": "DLPヒット:",
-        "guardrailHits": "ガードレールヒット:"
+        "guardrailHits": "ガードレールヒット:",
+        "method": "メソッド:",
+        "prompt": "プロンプト:",
+        "resourceUri": "リソース URI:",
+        "tool": "ツール:"
       },
       "pagination": {
         "range": "{{from}}-{{to}} / {{total}}"
@@ -2985,7 +2997,12 @@
         "clientId": "クライアントID:",
         "scopes": "スコープ:",
         "tokenExpires": "トークン有効期限:"
-      }
+      },
+      "lastError": "最後のエラー:",
+      "testConnection": "接続テスト",
+      "testFailed": "接続テストに失敗しました",
+      "testSuccess": "接続成功",
+      "testing": "テスト中..."
     },
     "settings": {
       "generalTitle": "一般設定",
@@ -3028,7 +3045,34 @@
       "noWebhook": "webhookなし",
       "defaultRpmHelp": "IDごと、ツールごとの上限。0で無効。",
       "perIpLimitHelp": "認証前のIPごとの要求制限。0で無効。",
-      "concurrentLimitHelp": "IDごとの最大同時リクエスト数。0で無効。"
+      "concurrentLimitHelp": "IDごとの最大同時リクエスト数。0で無効。",
+      "gatewayStatus": "ゲートウェイライブステータス",
+      "gatewayUnreachable": "ゲートウェイに到達できません。ゲートウェイサービスが実行されていることを確認してください。",
+      "reachable": "到達可能",
+      "unreachable": "到達不能",
+      "configured": "設定済み",
+      "mRequests": "リクエスト",
+      "mToolsCalled": "呼び出されたツール",
+      "mToolsListed": "リストされたツール",
+      "mAuthFail": "認証失敗",
+      "mPolicyDenied": "ポリシー拒否",
+      "mRateLimited": "レート制限",
+      "mDlpBlocked": "DLPブロック",
+      "mGuardrailBlocked": "ガードレールブロック",
+      "mUpstreamErrors": "アップストリームエラー",
+      "mAuthSuccess": "認証成功",
+      "latencyHistogram": "ツール/呼び出しレイテンシヒストグラム",
+      "avgLatency": "平均レイテンシ",
+      "samples": "サンプル",
+      "activeSessions": "アクティブセッション",
+      "openCircuits": "オープンサーキットブレーカー",
+      "catalogFreshness": "カタログの鮮度",
+      "alertState": "アラート状態（60秒ウィンドウ）",
+      "thresholdExceeded": "超過",
+      "serverStatus": "MCPサーバーステータス",
+      "noServers": "MCPサーバーが設定されていません。",
+      "circuitOpen": "サーキットオープン",
+      "lastSeen": "最終確認"
     }
   },
   "featureFlags": {

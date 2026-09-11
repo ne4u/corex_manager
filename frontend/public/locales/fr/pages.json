@@ -2584,7 +2584,15 @@
         "expiresAt": "Expire le",
         "patIssued": "PAT émis",
         "patWarning": "Copiez ce token maintenant — il ne sera plus affiché."
-      }
+      },
+      "syncFromAuth0": "Synchroniser depuis Auth0",
+      "syncAuth0Title": "Synchroniser les utilisateurs Auth0 en identités",
+      "syncAuth0Team": "Équipe",
+      "syncAuth0DryRun": "Simulation (ne pas créer ni mettre à jour les identités)",
+      "syncAuth0VerifiedOnly": "Exiger un e-mail vérifié",
+      "syncAuth0Running": "Synchronisation…",
+      "syncAuth0Result": "{{created}} créés, {{updated}} mis à jour, {{skipped}} ignorés sur {{total}} utilisateurs Auth0",
+      "syncAuth0Failed": "Échec de la synchronisation Auth0"
     },
     "policies": {
       "count": "{{count}} politique(s)",
@@ -2803,7 +2811,11 @@
         "action": "Action :",
         "error": "Erreur :",
         "dlpHits": "Hits DLP:",
-        "guardrailHits": "Hits guardrail:"
+        "guardrailHits": "Hits guardrail:",
+        "method": "Méthode :",
+        "prompt": "Prompt :",
+        "resourceUri": "URI de la ressource :",
+        "tool": "Outil :"
       },
       "pagination": {
         "range": "{{from}}-{{to}} sur {{total}}"
@@ -2985,7 +2997,12 @@
         "clientId": "ID client:",
         "scopes": "Scopes:",
         "tokenExpires": "Le token expire le:"
-      }
+      },
+      "lastError": "Dernier erreur :",
+      "testConnection": "Tester la connexion",
+      "testFailed": "Échec du test de connexion",
+      "testSuccess": "Connexion réussie",
+      "testing": "Test en cours..."
     },
     "settings": {
       "generalTitle": "Paramètres généraux",
@@ -3028,7 +3045,34 @@
       "noWebhook": "Aucun webhook",
       "defaultRpmHelp": "Limite par identité, par outil. 0 désactive.",
       "perIpLimitHelp": "Limite de requêtes par IP avant authentification. 0 désactive.",
-      "concurrentLimitHelp": "Nombre maximal de requêtes simultanées par identité. 0 désactive."
+      "concurrentLimitHelp": "Nombre maximal de requêtes simultanées par identité. 0 désactive.",
+      "gatewayStatus": "État du gateway en direct",
+      "gatewayUnreachable": "Le gateway est inaccessible. Assurez-vous que le service gateway est en cours d'exécution.",
+      "reachable": "Accessible",
+      "unreachable": "Inaccessible",
+      "configured": "Configuré",
+      "mRequests": "Requêtes",
+      "mToolsCalled": "Outils appelés",
+      "mToolsListed": "Outils listés",
+      "mAuthFail": "Échecs d'authentification",
+      "mPolicyDenied": "Politique refusée",
+      "mRateLimited": "Limité par débit",
+      "mDlpBlocked": "DLP bloqué",
+      "mGuardrailBlocked": "Guardrail bloqué",
+      "mUpstreamErrors": "Erreurs en amont",
+      "mAuthSuccess": "Authentification réussie",
+      "latencyHistogram": "Histogramme de latence Tools/Call",
+      "avgLatency": "Latence moyenne",
+      "samples": "échantillons",
+      "activeSessions": "Sessions actives",
+      "openCircuits": "Circuit breakers ouverts",
+      "catalogFreshness": "Fraîcheur du catalogue",
+      "alertState": "État d'alerte (fenêtre 60s)",
+      "thresholdExceeded": "DÉPASSÉ",
+      "serverStatus": "Statut du serveur MCP",
+      "noServers": "Aucun serveur MCP configuré.",
+      "circuitOpen": "CIRCUIT OUVERT",
+      "lastSeen": "Vu pour la dernière fois"
     }
   },
   "featureFlags": {

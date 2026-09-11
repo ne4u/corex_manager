@@ -2584,7 +2584,15 @@
         "expiresAt": "Expira el",
         "patIssued": "PAT emitido",
         "patWarning": "Copia este token ahora — no se mostrará de nuevo."
-      }
+      },
+      "syncFromAuth0": "Sincronizar desde Auth0",
+      "syncAuth0Title": "Sincronizar usuarios de Auth0 en identidades",
+      "syncAuth0Team": "Equipo",
+      "syncAuth0DryRun": "Ejecución de prueba (no crear ni actualizar identidades)",
+      "syncAuth0VerifiedOnly": "Requerir email verificado",
+      "syncAuth0Running": "Sincronizando…",
+      "syncAuth0Result": "Creados {{created}}, actualizados {{updated}}, omitidos {{skipped}} de {{total}} usuarios Auth0",
+      "syncAuth0Failed": "Error de sincronización Auth0"
     },
     "policies": {
       "count": "{{count}} política(s)",
@@ -2803,7 +2811,11 @@
         "action": "Acción:",
         "error": "Error:",
         "dlpHits": "Hits DLP:",
-        "guardrailHits": "Hits guardrail:"
+        "guardrailHits": "Hits guardrail:",
+        "method": "Método:",
+        "prompt": "Prompt:",
+        "resourceUri": "URI del recurso:",
+        "tool": "Herramienta:"
       },
       "pagination": {
         "range": "{{from}}-{{to}} de {{total}}"
@@ -2985,7 +2997,12 @@
         "clientId": "ID de cliente:",
         "scopes": "Scopes:",
         "tokenExpires": "El token expira:"
-      }
+      },
+      "lastError": "Último error:",
+      "testConnection": "Probar conexión",
+      "testFailed": "Prueba de conexión fallida",
+      "testSuccess": "Conexión exitosa",
+      "testing": "Probando..."
     },
     "settings": {
       "generalTitle": "Ajustes generales",
@@ -3028,7 +3045,34 @@
       "noWebhook": "Sin webhook",
       "defaultRpmHelp": "Límite por identidad y por herramienta. 0 lo deshabilita.",
       "perIpLimitHelp": "Límite de solicitudes por IP antes de la autenticación. 0 lo deshabilita.",
-      "concurrentLimitHelp": "Máximo de solicitudes simultáneas por identidad. 0 lo deshabilita."
+      "concurrentLimitHelp": "Máximo de solicitudes simultáneas por identidad. 0 lo deshabilita.",
+      "gatewayStatus": "Estado del gateway en vivo",
+      "gatewayUnreachable": "El gateway no es alcanzable. Asegúrese de que el servicio del gateway esté en ejecución.",
+      "reachable": "Alcanzable",
+      "unreachable": "No alcanzable",
+      "configured": "Configurado",
+      "mRequests": "Solicitudes",
+      "mToolsCalled": "Herramientas llamadas",
+      "mToolsListed": "Herramientas listadas",
+      "mAuthFail": "Fallos de autenticación",
+      "mPolicyDenied": "Política denegada",
+      "mRateLimited": "Limitado por tasa",
+      "mDlpBlocked": "DLP bloqueado",
+      "mGuardrailBlocked": "Guardrail bloqueado",
+      "mUpstreamErrors": "Errores de upstream",
+      "mAuthSuccess": "Autenticación exitosa",
+      "latencyHistogram": "Histograma de latencia de Tools/Call",
+      "avgLatency": "Latencia promedio",
+      "samples": "muestras",
+      "activeSessions": "Sesiones activas",
+      "openCircuits": "Circuit Breakers abiertos",
+      "catalogFreshness": "Actualización del catálogo",
+      "alertState": "Estado de alerta (ventana de 60s)",
+      "thresholdExceeded": "EXCEDIDO",
+      "serverStatus": "Estado del servidor MCP",
+      "noServers": "No hay servidores MCP configurados.",
+      "circuitOpen": "CIRCUITO ABIERTO",
+      "lastSeen": "Visto por última vez"
     }
   },
   "featureFlags": {

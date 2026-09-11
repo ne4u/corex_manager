@@ -2584,7 +2584,15 @@
         "expiresAt": "Истекает",
         "patIssued": "PAT выдан",
         "patWarning": "Скопируйте этот токен сейчас — он не будет показан снова."
-      }
+      },
+      "syncFromAuth0": "Синхронизировать из Auth0",
+      "syncAuth0Title": "Синхронизировать пользователей Auth0 в идентичности",
+      "syncAuth0Team": "Команда",
+      "syncAuth0DryRun": "Пробный запуск (не создавать и не обновлять идентичности)",
+      "syncAuth0VerifiedOnly": "Требовать подтверждённый email",
+      "syncAuth0Running": "Синхронизация…",
+      "syncAuth0Result": "Создано {{created}}, обновлено {{updated}}, пропущено {{skipped}} из {{total}} пользователей Auth0",
+      "syncAuth0Failed": "Ошибка синхронизации Auth0"
     },
     "policies": {
       "count": "{{count}} политик(а)",
@@ -2803,7 +2811,11 @@
         "action": "Действие:",
         "error": "Ошибка:",
         "dlpHits": "Попадания DLP:",
-        "guardrailHits": "Попадания ограждений:"
+        "guardrailHits": "Попадания ограждений:",
+        "method": "Метод:",
+        "prompt": "Промпт:",
+        "resourceUri": "URI ресурса:",
+        "tool": "Инструмент:"
       },
       "pagination": {
         "range": "{{from}}-{{to}} из {{total}}"
@@ -2985,7 +2997,12 @@
         "clientId": "ID клиента:",
         "scopes": "Области:",
         "tokenExpires": "Токен истекает:"
-      }
+      },
+      "lastError": "Последняя ошибка:",
+      "testConnection": "Проверить подключение",
+      "testFailed": "Ошибка проверки подключения",
+      "testSuccess": "Подключение успешно",
+      "testing": "Тестирование..."
     },
     "settings": {
       "generalTitle": "Общие настройки",
@@ -3028,7 +3045,34 @@
       "noWebhook": "Нет webhook",
       "defaultRpmHelp": "Лимит на идентификатор, на инструмент. 0 отключает.",
       "perIpLimitHelp": "Лимит запросов на IP до аутентификации. 0 отключает.",
-      "concurrentLimitHelp": "Максимальное количество одновременных запросов на идентификатор. 0 отключает."
+      "concurrentLimitHelp": "Максимальное количество одновременных запросов на идентификатор. 0 отключает.",
+      "gatewayStatus": "Статус шлюза в реальном времени",
+      "gatewayUnreachable": "Шлюз недоступен. Убедитесь, что служба шлюза запущена.",
+      "reachable": "Доступен",
+      "unreachable": "Недоступен",
+      "configured": "Настроен",
+      "mRequests": "Запросы",
+      "mToolsCalled": "Инструментов вызвано",
+      "mToolsListed": "Инструментов перечислено",
+      "mAuthFail": "Ошибки аутентификации",
+      "mPolicyDenied": "Политика отклонена",
+      "mRateLimited": "Ограничено по скорости",
+      "mDlpBlocked": "DLP заблокировано",
+      "mGuardrailBlocked": "Guardrail заблокирован",
+      "mUpstreamErrors": "Ошибки восходящего потока",
+      "mAuthSuccess": "Аутентификация успешна",
+      "latencyHistogram": "Гистограмма задержки Tools/Call",
+      "avgLatency": "Средняя задержка",
+      "samples": "образцы",
+      "activeSessions": "Активные сессии",
+      "openCircuits": "Открытые автоматические выключатели",
+      "catalogFreshness": "Свежесть каталога",
+      "alertState": "Состояние оповещений (окно 60с)",
+      "thresholdExceeded": "ПРЕВЫШЕНО",
+      "serverStatus": "Статус сервера MCP",
+      "noServers": "Серверы MCP не настроены.",
+      "circuitOpen": "ЦЕПЬ РАЗОМКНУТА",
+      "lastSeen": "Последнее наблюдение"
     }
   },
   "featureFlags": {

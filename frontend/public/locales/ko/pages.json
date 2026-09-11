@@ -2584,7 +2584,15 @@
         "expiresAt": "만료",
         "patIssued": "PAT 발급됨",
         "patWarning": "이 토큰을 지금 복사하세요 — 다시 표시되지 않습니다."
-      }
+      },
+      "syncFromAuth0": "Auth0에서 동기화",
+      "syncAuth0Title": "Auth0 사용자를 아이덴티티에 동기화",
+      "syncAuth0Team": "팀",
+      "syncAuth0DryRun": "드라이 런 (아이덴티티 생성 또는 업데이트 안 함)",
+      "syncAuth0VerifiedOnly": "인증된 이메일 필요",
+      "syncAuth0Running": "동기화 중…",
+      "syncAuth0Result": "{{created}} 생성, {{updated}} 업데이트, {{skipped}} 건너뜀 ({{total}} Auth0 사용자 중)",
+      "syncAuth0Failed": "Auth0 동기화 실패"
     },
     "policies": {
       "count": "{{count}}개 정책",
@@ -2803,7 +2811,11 @@
         "action": "작업:",
         "error": "오류:",
         "dlpHits": "DLP 히트:",
-        "guardrailHits": "가드레일 히트:"
+        "guardrailHits": "가드레일 히트:",
+        "method": "메서드:",
+        "prompt": "프롬프트:",
+        "resourceUri": "리소스 URI:",
+        "tool": "도구:"
       },
       "pagination": {
         "range": "{{from}}-{{to}} / {{total}}"
@@ -2985,7 +2997,12 @@
         "clientId": "클라이언트 ID:",
         "scopes": "범위:",
         "tokenExpires": "토큰 만료:"
-      }
+      },
+      "lastError": "마지막 오류:",
+      "testConnection": "연결 테스트",
+      "testFailed": "연결 테스트 실패",
+      "testSuccess": "연결 성공",
+      "testing": "테스트 중..."
     },
     "settings": {
       "generalTitle": "일반 설정",
@@ -3028,7 +3045,34 @@
       "noWebhook": "webhook 없음",
       "defaultRpmHelp": "ID별, 도구별 제한. 0은 비활성화.",
       "perIpLimitHelp": "인증 전 IP당 요청 한도. 0은 비활성화.",
-      "concurrentLimitHelp": "ID당 최대 동시 요청 수. 0은 비활성화."
+      "concurrentLimitHelp": "ID당 최대 동시 요청 수. 0은 비활성화.",
+      "gatewayStatus": "게이트웨이 실시간 상태",
+      "gatewayUnreachable": "게이트웨이에 연결할 수 없습니다. 게이트웨이 서비스가 실행 중인지 확인하세요.",
+      "reachable": "접근 가능",
+      "unreachable": "접근 불가",
+      "configured": "구성됨",
+      "mRequests": "요청",
+      "mToolsCalled": "호출된 도구",
+      "mToolsListed": "나열된 도구",
+      "mAuthFail": "인증 실패",
+      "mPolicyDenied": "정책 거부됨",
+      "mRateLimited": "속도 제한됨",
+      "mDlpBlocked": "DLP 차단됨",
+      "mGuardrailBlocked": "가드레일 차단됨",
+      "mUpstreamErrors": "업스트림 오류",
+      "mAuthSuccess": "인증 성공",
+      "latencyHistogram": "도구/호출 지연 시간 히스토그램",
+      "avgLatency": "평균 지연 시간",
+      "samples": "샘플",
+      "activeSessions": "활성 세션",
+      "openCircuits": "열린 서킷 브레이커",
+      "catalogFreshness": "카탈로그 신선도",
+      "alertState": "알림 상태 (60초 윈도우)",
+      "thresholdExceeded": "초과됨",
+      "serverStatus": "MCP 서버 상태",
+      "noServers": "구성된 MCP 서버가 없습니다.",
+      "circuitOpen": "서킷 열림",
+      "lastSeen": "마지막 확인"
     }
   },
   "featureFlags": {
