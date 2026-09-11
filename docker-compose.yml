@@ -219,37 +219,12 @@ services:
     networks:
       - corex-net
 
-  mcp-gateway:
-    build:
-      context: .
-      dockerfile: mcp-gateway/Dockerfile
-    ports:
-      - "8081:8081"
-    env_file:
-      - .env
-    volumes:
-      - ${DATA_DIR:-./data}/haproxy:/app/data
-    environment:
-      - MCP_GATEWAY_ENABLED=${MCP_GATEWAY_ENABLED:-false}
-      - MCP_GATEWAY_LISTEN=0.0.0.0:8081
-      - MCP_CONFIG_PATH=/app/data/mcp/config.json
-      - MCP_EVENTS_LOG_PATH=/app/data/mcp/events.ndjson
-      - MCP_SECRETS_KEY=${MCP_SECRETS_KEY:-}
-      - VALKEY_HOST=valkey
-      - VALKEY_PORT=6379
-      - VALKEY_PASSWORD=${VALKEY_PASSWORD:-}
-    depends_on:
-      valkey:
-        condition: service_healthy
-      mcp-server:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - corex-net
-
-  # Rust MCP Gateway — parallel deployment for validation (port 8089).
-  # Runs alongside the Python gateway (port 8081) during the validation phase.
-  # Cutover: switch HAProxy backend from mcp-gateway:8081 to mcp-gateway-rs:8089.
+  # Rust MCP Gateway — the default MCP gateway (port 8089).
+  # The Python mcp-gateway service has been removed from deployment; its
+  # source remains in the repo for reference/rollback. The backend routes
+  # HAProxy to this service via the `mcp_gateway_backend` setting (default
+  # "rust"). The api container still bind-mounts ./mcp-gateway because the
+  # backend imports mcp-gateway.upstream for catalog fetching.
   mcp-gateway-rs:
     build:
       context: ./mcp-gateway-rs
@@ -272,11 +247,11 @@ services:
     depends_on:
       valkey:
         condition: service_healthy
+      mcp-server:
+        condition: service_started
     restart: unless-stopped
     networks:
       - corex-net
-    profiles:
-      - mcp-rs
 
   mcp-server:
     build:

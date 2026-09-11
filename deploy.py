@@ -166,10 +166,15 @@ SERVICE_PATHS: dict[str, dict[str, list[str]]] = {
         "rebuild": [],
         "restart": [],
     },
+    "mcp-gateway-rs": {
+        # Entire mcp-gateway-rs/ dir is COPYed into the image (Cargo workspace)
+        "rebuild": ["mcp-gateway-rs/"],
+        "restart": [],
+    },
 }
 
 # Services that have a Dockerfile (can be rebuilt)
-BUILDABLE_SERVICES = {"api", "corex", "frontend"}
+BUILDABLE_SERVICES = {"api", "corex", "frontend", "mcp-gateway-rs"}
 
 # Files that trigger a full redeploy (all services) when changed.
 # `.env` is deliberately absent: it is in RSYNC_EXCLUDES (so it is never hashed
@@ -216,9 +221,8 @@ SWARM_IMAGE_NAMES = {
 }
 
 # Additional Swarm services that have Dockerfiles but aren't in BUILDABLE_SERVICES
-# (mcp-gateway, mcp-server are optional and built on demand).
+# (mcp-server is optional and built on demand).
 SWARM_OPTIONAL_IMAGE_NAMES = {
-    "mcp-gateway": "corex-mcp-gateway",
     "mcp-gateway-rs": "corex-mcp-gateway-rs",
     "mcp-server": "corex-mcp-server",
 }
@@ -1243,6 +1247,9 @@ def _deploy_swarm(args: argparse.Namespace) -> int:
                 df = "haproxy/Dockerfile"
             elif service == "frontend":
                 ctx = f"{remote_path}/frontend"
+                df = "Dockerfile"
+            elif service == "mcp-gateway-rs":
+                ctx = f"{remote_path}/mcp-gateway-rs"
                 df = "Dockerfile"
             else:
                 continue

@@ -39,7 +39,7 @@
 #   SWARM_API_IMAGE=corex-api:latest
 #   SWARM_HAPROXY_IMAGE=corex-haproxy:latest
 #   SWARM_FRONTEND_IMAGE=corex-frontend:latest
-#   SWARM_MCP_GATEWAY_IMAGE=corex-mcp-gateway:latest
+#   SWARM_MCP_GATEWAY_RS_IMAGE=corex-mcp-gateway-rs:latest
 #   SWARM_MCP_SERVER_IMAGE=corex-mcp-server:latest
 # =============================================================================
 
@@ -379,25 +379,25 @@ services:
       - corex-net
 
   # -------------------------------------------------------------------------
-  # mcp-gateway — MCP Gateway proxy (optional)
+  # mcp-gateway-rs — Rust MCP Gateway proxy (optional)
   # -------------------------------------------------------------------------
-  mcp-gateway:
-    image: ${SWARM_MCP_GATEWAY_IMAGE:-corex-mcp-gateway:latest}
+  mcp-gateway-rs:
+    image: ${SWARM_MCP_GATEWAY_RS_IMAGE:-corex-mcp-gateway-rs:latest}
     ports:
-      - "8081:8081"
+      - "8089:8089"
     env_file:
       - .env
     volumes:
       - ${DATA_DIR:-./data}/haproxy:/app/data
     environment:
-      - MCP_GATEWAY_ENABLED=${MCP_GATEWAY_ENABLED:-false}
-      - MCP_GATEWAY_LISTEN=0.0.0.0:8081
-      - MCP_CONFIG_PATH=/app/data/mcp/config.json
+      - MCP_GATEWAY_BIND=0.0.0.0:8089
+      - MCP_CONFIG_PATH=/app/data/mcp/config.bundle.json
       - MCP_EVENTS_LOG_PATH=/app/data/mcp/events.ndjson
       - MCP_SECRETS_KEY=${MCP_SECRETS_KEY:-}
       - VALKEY_HOST=${VALKEY_HOST:-valkey}
       - VALKEY_PORT=6379
       - VALKEY_PASSWORD=${VALKEY_PASSWORD:-}
+      - RUST_LOG=${RUST_LOG:-info}
     deploy:
       replicas: 1
       update_config:

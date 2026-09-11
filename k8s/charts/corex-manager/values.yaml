@@ -21,7 +21,7 @@ image:
     tag: latest
     pullPolicy: IfNotPresent
   mcpGateway:
-    repository: corex-mcp-gateway
+    repository: corex-mcp-gateway-rs
     tag: latest
     pullPolicy: IfNotPresent
   mcpServer:
@@ -224,10 +224,12 @@ corexService:
   # -- LoadBalancer annotations (e.g. for cloud provider config)
   annotations: {}
 
-# -- MCP Gateway (optional)
+# -- MCP Gateway (Rust; optional)
 mcpGateway:
   enabled: false
   secretsKey: ""
+  # -- RUST_LOG level for the gateway container
+  rustLog: "info"
   resources:
     requests:
       cpu: 50m

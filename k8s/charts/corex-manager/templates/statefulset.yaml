@@ -205,8 +205,8 @@ spec:
         {{- end }}
 
         {{- if .Values.mcpGateway.enabled }}
-        # ── MCP Gateway ──────────────────────────────────────────────
-        - name: mcp-gateway
+        # ── MCP Gateway (Rust) ────────────────────────────────────────
+        - name: mcp-gateway-rs
           image: {{ include "corex-manager.image" .Values.image.mcpGateway }}
           imagePullPolicy: {{ .Values.image.mcpGateway.pullPolicy }}
           envFrom:
@@ -214,9 +214,18 @@ spec:
                 name: {{ .Release.Name }}-config
             - secretRef:
                 name: {{ .Values.secrets.existingSecret | default (printf "%s-secrets" .Release.Name) }}
+          env:
+            - name: MCP_GATEWAY_BIND
+              value: "0.0.0.0:8089"
+            - name: MCP_CONFIG_PATH
+              value: "/app/data/mcp/config.bundle.json"
+            - name: MCP_EVENTS_LOG_PATH
+              value: "/app/data/mcp/events.ndjson"
+            - name: RUST_LOG
+              value: {{ .Values.mcpGateway.rustLog | default "info" | quote }}
           ports:
             - name: mcp-gateway
-              containerPort: 8081
+              containerPort: 8089
               protocol: TCP
           volumeMounts:
             - name: haproxy-data

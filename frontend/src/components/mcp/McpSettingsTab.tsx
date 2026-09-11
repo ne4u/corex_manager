@@ -18,7 +18,6 @@ export default function McpSettingsTab() {
   const [defaultRpm, setDefaultRpm] = useState(600)
   const [perIpLimit, setPerIpLimit] = useState(0)
   const [concurrentLimit, setConcurrentLimit] = useState(0)
-  const [gatewayBackend, setGatewayBackend] = useState<'python' | 'rust'>('python')
   const [teams, setTeams] = useState<Team[]>([])
   const [teamRpmOverrides, setTeamRpmOverrides] = useState<Record<number, number>>({})
   const [saving, setSaving] = useState(false)
@@ -33,7 +32,7 @@ export default function McpSettingsTab() {
       const [teamsResp] = await Promise.all([mcp.teams.list()])
       setTeams(teamsResp.data)
 
-      const keys = ['mcp_allowed_origins', 'mcp_jwt_issuer', 'mcp_jwt_audience', 'mcp_jwt_jwks_url', 'mcp_log_payloads', 'mcp_default_rpm', 'mcp_per_ip_limit', 'mcp_concurrent_limit', 'mcp_team_rpm_overrides', 'mcp_gateway_backend']
+      const keys = ['mcp_allowed_origins', 'mcp_jwt_issuer', 'mcp_jwt_audience', 'mcp_jwt_jwks_url', 'mcp_log_payloads', 'mcp_default_rpm', 'mcp_per_ip_limit', 'mcp_concurrent_limit', 'mcp_team_rpm_overrides']
       const results = await Promise.all(keys.map(k => settings.get(k).catch(() => ({ data: { value: '' } }))))
       setAllowedOrigins(results[0].data.value || '')
       setJwtIssuer(results[1].data.value || '')
@@ -47,7 +46,6 @@ export default function McpSettingsTab() {
         const overrides = JSON.parse(results[8].data.value || '{}')
         setTeamRpmOverrides(overrides)
       } catch { setTeamRpmOverrides({}) }
-      setGatewayBackend((results[9].data.value || 'python').toLowerCase() === 'rust' ? 'rust' : 'python')
     } catch { /* ignore */ }
   }, [])
 
@@ -77,7 +75,6 @@ export default function McpSettingsTab() {
         settings.update('mcp_per_ip_limit', { value: String(perIpLimit) }),
         settings.update('mcp_concurrent_limit', { value: String(concurrentLimit) }),
         settings.update('mcp_team_rpm_overrides', { value: JSON.stringify(teamRpmOverrides) }),
-        settings.update('mcp_gateway_backend', { value: gatewayBackend }),
       ])
       setMessage(t('pages:mcpGateway.settings.settingsSaved'))
     } catch (err: any) {
@@ -182,35 +179,6 @@ export default function McpSettingsTab() {
             <input type="checkbox" checked={logPayloads} onChange={e => setLogPayloads(e.target.checked)} />
             <span className="text-sm">{t('pages:mcpGateway.settings.logPayloads')}</span>
           </label>
-        </div>
-
-        <div className="border-t border-border pt-4">
-          <h3 className="text-sm font-semibold mb-2">{t('pages:mcpGateway.settings.gatewayBackend')}</h3>
-          <div className="flex items-center gap-4">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="gatewayBackend"
-                value="python"
-                checked={gatewayBackend === 'python'}
-                onChange={() => setGatewayBackend('python')}
-              />
-              <span className="text-sm">{t('pages:mcpGateway.settings.gatewayBackendPython')}</span>
-              <Badge variant={gatewayBackend === 'python' ? 'success' : 'default'} size="sm">:8081</Badge>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="radio"
-                name="gatewayBackend"
-                value="rust"
-                checked={gatewayBackend === 'rust'}
-                onChange={() => setGatewayBackend('rust')}
-              />
-              <span className="text-sm">{t('pages:mcpGateway.settings.gatewayBackendRust')}</span>
-              <Badge variant={gatewayBackend === 'rust' ? 'success' : 'default'} size="sm">:8089</Badge>
-            </label>
-          </div>
-          <p className="text-xs text-muted-foreground mt-2">{t('pages:mcpGateway.settings.gatewayBackendHelp')}</p>
         </div>
 
         {message && <p className={`text-sm ${message.includes('saved') ? 'text-green-400' : 'text-red-400'}`}>{message}</p>}

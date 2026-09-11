@@ -123,8 +123,8 @@ def test_mcp_gateway_backend_emitted_when_enabled(db):
     assert "option http-keep-alive" in config
     assert "timeout tunnel 300s" in config
     assert "Cache-Control no-store" in config
-    # Default backend is the Python gateway on port 8081.
-    assert "server mcp-gateway mcp-gateway:8081 check" in config
+    # Default backend is the Rust gateway on port 8089.
+    assert "server mcp-gateway-rs mcp-gateway-rs:8089 check" in config
 
 
 def test_mcp_gateway_backend_rust_when_setting_is_rust(db):

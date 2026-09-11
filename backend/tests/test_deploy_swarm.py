@@ -56,7 +56,8 @@ class TestSwarmConstants:
         assert ".env.example" in deploy.SWARM_FULL_REDEPLOY_PATHS
 
     def test_swarm_optional_image_names(self):
-        assert "mcp-gateway" in deploy.SWARM_OPTIONAL_IMAGE_NAMES
+        assert "mcp-gateway-rs" in deploy.SWARM_OPTIONAL_IMAGE_NAMES
+        assert deploy.SWARM_OPTIONAL_IMAGE_NAMES["mcp-gateway-rs"] == "corex-mcp-gateway-rs"
         assert "mcp-server" in deploy.SWARM_OPTIONAL_IMAGE_NAMES
 
 
