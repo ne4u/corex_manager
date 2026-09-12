@@ -42,7 +42,7 @@ from ..models.routing import (
 )
 from ..models.logging import CustomErrorPage, LogDestination, LoggedField
 from ..models.cache import CacheConfig, CacheRule
-from ..models.page_protect import PageProtectPolicy
+from ..models.page_protect import PageProtectPolicy, PageProtectScript
 from ..services.page_protect import get_page_protect_settings
 from ..services.settings import get_setting, get_maxmind_license_key
 from ..services.ha import get_ha_config
@@ -52,8 +52,178 @@ from ..models.mcp import (
     McpDlpRule, McpGuardrail, McpIdentity, McpPolicy, McpServer,
     McpServerReplica, McpSkill, McpSkillVersion, Team, UserTeam,
 )
+from .provider_schema import get_computed_fields, get_provider_field_names
 
 # ─── Configuration ──────────────────────────────────────────────────────────
+
+# Provider field overrides — maps resource_type to field-level corrections
+# so the exporter emits only attributes the provider actually supports.
+# The provider schema is the source of truth; the DB may have extra columns.
+#
+# Each entry can have:
+#   'skip':   set of DB fields to NOT emit (not in provider schema)
+#   'rename': {db_field: provider_field} for name mismatches
+#   'raw_int': set of FK fields that should stay as raw ints (no resource ref)
+#
+# This is a short-term bridge until the exporter reads the provider schema
+# directly (option 1) or shares Go structs (option 2).
+PROVIDER_FIELD_OVERRIDES: Dict[str, Dict[str, Any]] = {
+    'user': {
+        'skip': {'hashed_password', 'totp_secret', 'totp_enabled', 'is_admin'},
+    },
+    'waf_exception': {
+        'skip': {'update_action', 'update_target',
+                 'condition_variable', 'condition_operator', 'condition_value'},
+    },
+    'waf_rule': {
+        'skip': {'rule_set_plugins', 'sec_rules', 'captcha_valid_seconds',
+                 'content_types', 'export_rule_ids',
+                 'rate_enabled', 'rate_events', 'rate_window_seconds',
+                 'rate_key', 'rate_header', 'rate_action', 'rate_duration_seconds'},
+        # siem_integration_id stays as raw int — no waf_siem_integration resource
+        'raw_int': {'siem_integration_id'},
+    },
+    'cache_config': {
+        'skip': {'name', 'haproxy_max_object_size', 'haproxy_max_secondary_entries',
+                 'haproxy_cache_condition', 'haproxy_process_vary',
+                 'disk_cache_grace', 'disk_cache_purge_enabled'},
+        'rename': {
+            'haproxy_total_max_size': 'haproxy_cache_size',
+            'haproxy_max_age': 'haproxy_cache_max_age',
+            'haproxy_rfc7234_compliance': 'rfc7234_compliance',
+            'disk_cache_ttl': 'disk_cache_max_age',
+        },
+    },
+    'mcp_identity': {
+        'skip': {'pat_hash'},
+    },
+    'mcp_skill_version': {
+        'skip': {'name', 'created_by'},
+        # version is computed-only in the provider
+        'raw_int_skip': {'version'},
+    },
+    'mcp_policy': {
+        # priority is computed-only in the provider
+        'skip': {'priority'},
+    },
+    'security_rule': {
+        # priority is computed-only in the provider — don't set it
+        'skip': {'priority'},
+    },
+    'certificate': {
+        # dns_credentials is a map in the provider, not a string
+        # The type fix is handled in the variable type builder
+        # 'provider' is a reserved Terraform word; the provider uses 'provider_name'
+        'rename': {'provider': 'provider_name'},
+    },
+    'backend': {
+        'skip': {'health_check_expect_status', 'health_check_expect_body',
+                 'timeout_connect', 'timeout_server', 'timeout_queue',
+                 'timeout_check', 'timeout_tunnel',
+                 'http_reuse', 'fullconn',
+                 'fcgi_app_id', 'options', 'http2_enabled', 'http2_npn',
+                 'max_connections', 'max_queue', 'max_queue_time',
+                 'connect_timeout', 'tfo_enabled', 'dynamic_cookie_key',
+                 'cookie_domain', 'cookie_path', 'cookie_type',
+                 'health_check_rise', 'health_check_fall',
+                 'health_check_port', 'health_check_ssl',
+                 'health_check_check_ssl', 'health_check_send_proxy',
+                 'health_check_enabled_tls'},
+    },
+    'listener': {
+        'skip': {'options', 'haproxy_options'},
+    },
+    'server': {
+        'skip': {'options', 'ca_certificate_id', 'client_certificate_id'},
+    },
+    'mcp_server': {
+        'skip': {'has_secret', 'has_env_vars', 'env_var_names',
+                 'health_status', 'last_seen_at', 'last_error', 'last_catalog_at',
+                 'installed_version', 'oauth_auth_status'},
+        'rename': {
+            'auth_secret_enc': 'auth_secret',
+            'oauth_client_secret_enc': 'oauth_client_secret',
+            'args_json': 'args',
+            'env_vars_json': 'env_vars',
+        },
+    },
+    'mcp_team_member': {
+        'skip': {'name'},
+    },
+    'page_protect_script': {
+        # Skip runtime/computed fields — provider only has url, resource_type, notes, fetch_method, ignored
+        'skip': {'first_seen', 'last_seen', 'occurrence_count', 'domain',
+                 'first_hash', 'first_hash_at', 'last_hash', 'last_hash_at',
+                 'hash_checked_at', 'hash_changed', 'content', 'has_content',
+                 'source', 'last_fetch_method'},
+    },
+    'mcp_server_replica': {
+        # Provider schema is only: server_id, url, enabled, verify_tls
+        'skip': {'name'},
+    },
+    'mcp_dlp_rule': {
+        # priority is computed-only (assigned by server)
+        'skip': {'priority'},
+    },
+    'mcp_guardrail': {
+        # priority is computed-only (assigned by server)
+        'skip': {'priority'},
+    },
+    'mcp_skill': {
+        # enable_when_ast is computed-only (server-generated JSON AST)
+        'skip': {'enable_when_ast'},
+    },
+}
+
+
+def _resolve_provider_overrides(resource_type: str, model_cls=None) -> Dict[str, Any]:
+    """Merge manual PROVIDER_FIELD_OVERRIDES with schema-derived overrides.
+
+    Returns a dict with keys: skip, rename, raw_int, raw_int_skip.
+
+    Schema-derived additions (on top of manual overrides):
+      - Computed-only attributes from the provider schema are added to 'skip'
+        so the exporter never writes them.
+      - DB fields not present in the provider schema (after applying renames)
+        are added to 'skip' so the exporter never emits unsupported attributes.
+
+    This is the single entry point for provider-aware field handling.
+    Both the module builder and the tfvars builder should call this instead
+    of reading PROVIDER_FIELD_OVERRIDES directly.
+    """
+    overrides = PROVIDER_FIELD_OVERRIDES.get(resource_type, {})
+    skip = set(overrides.get('skip', set()))
+    rename = dict(overrides.get('rename', {}))
+    raw_int = set(overrides.get('raw_int', set()))
+    raw_int_skip = set(overrides.get('raw_int_skip', set()))
+
+    # Schema-derived: skip computed-only attributes
+    schema_computed = get_computed_fields(resource_type)
+    skip |= schema_computed
+
+    # Schema-derived: skip DB fields that have no corresponding provider attribute.
+    # A DB field 'foo' maps to provider attribute rename.get('foo', 'foo').
+    # If that provider attribute doesn't exist in the schema, skip it.
+    if model_cls is not None:
+        schema_attrs = get_provider_field_names(resource_type)
+        if schema_attrs:  # only if we have a schema for this resource
+            from sqlalchemy import inspect as sa_inspect
+            mapper = sa_inspect(model_cls)
+            for col in mapper.columns:
+                col_key = col.key
+                if col_key in skip or col_key in raw_int or col_key in raw_int_skip:
+                    continue
+                provider_attr = rename.get(col_key, col_key)
+                if provider_attr not in schema_attrs:
+                    skip.add(col_key)
+
+    return {
+        'skip': skip,
+        'rename': rename,
+        'raw_int': raw_int,
+        'raw_int_skip': raw_int_skip,
+    }
+
 
 # Fields that are runtime/computed and should never be exported.
 SKIP_FIELDS: Set[str] = {
@@ -77,11 +247,15 @@ SKIP_FIELDS: Set[str] = {
 }
 
 # Sensitive fields per table — when include_secrets=False, these become var.xxx.
+# NOTE: users no longer have sensitive fields here. The provider's user resource
+# has a write-only `password` field, but existing password hashes cannot be
+# round-tripped. Users are import-only for identity fields; set passwords
+# out-of-band after import.
+# NOTE: mcp_identities no longer have pat_hash here. The provider has
+# pat_prefix (computed) but not pat_hash. PATs cannot be round-tripped.
 SENSITIVE_FIELDS: Dict[str, Set[str]] = {
     "certificates": {"dns_credentials"},
-    "users": {"hashed_password", "totp_secret"},
     "mcp_servers": {"auth_secret_enc", "oauth_client_secret_enc", "env_vars_json"},
-    "mcp_identities": {"pat_hash", "idp_user_info"},
 }
 
 # Map (table_name, field_name) → secret category for granular inline control.
@@ -142,6 +316,10 @@ SKIP_SETTING_KEYS: Set[str] = {
     "keepalived_interface", "keepalived_auth_password", "keepalived_peer_addresses",
     "keepalived_advert_int", "keepalived_preempt", "keepalived_track_script",
     "valkey_sentinel_enabled", "valkey_sentinel_hosts", "valkey_sentinel_service",
+    # SSL Labs settings (exported as corex_ssl_labs_settings singleton per cert)
+    "ssllabs_max_scans_per_host",
+    # MCP alert config (exported as corex_mcp_alert_config singleton)
+    "mcp_alert_thresholds",
 }
 
 # Tables excluded entirely (runtime/metrics).
@@ -150,8 +328,81 @@ EXCLUDED_TABLES: Set[str] = {
     "config_snapshots", "challenge_events", "csp_reports", "api_anomalies",
     "mcp_events", "mcp_installations", "ssllabs_scans", "waf_rule_versions",
     "cache_metric_snapshots", "user_preferences", "api_profiles",
-    "page_protect_scripts",  # runtime script monitoring data, not configuration
 }
+
+# Singleton setting keys that the provider expects as bool/int/list (not string).
+# Settings are stored as strings in the DB; we coerce them to the right Python
+# type so the HCL emitter produces native bool/int/list, not quoted strings.
+SINGLETON_BOOL_KEYS: Set[str] = {
+    'ha_enabled', 'valkey_sentinel_enabled', 'keepalived_preempt',
+    'api_armor_enabled', 'api_armor_module_enabled',
+    'api_armor_schema_learning_enabled', 'api_armor_profiling_learning_enabled',
+}
+SINGLETON_INT_KEYS: Set[str] = {
+    'captcha_valid_seconds',
+    'haproxy_ha_replicas', 'valkey_ha_replicas', 'coraza_ha_replicas',
+    'haproxy_peer_port',
+    'keepalived_virtual_router_id', 'keepalived_priority', 'keepalived_advert_int',
+    'api_armor_max_body_bytes', 'api_armor_profile_retention_days',
+}
+SINGLETON_LIST_KEYS: Set[str] = {
+    'keepalived_peer_addresses', 'valkey_sentinel_hosts',
+    'api_armor_backend_ids', 'api_armor_path_patterns',
+}
+
+
+def _coerce_setting_value(key: str, value):
+    """Coerce a string setting value to the Python type the provider expects.
+
+    Settings are stored as strings in the DB. The HCL emitter quotes strings
+    but passes bool/int/list natively. Without coercion, "true" becomes a
+    string, not a bool, and the provider rejects it.
+    """
+    if value is None:
+        return None
+    if key in SINGLETON_BOOL_KEYS:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            return value.lower() in ('true', '1', 'yes')
+        return bool(value)
+    if key in SINGLETON_INT_KEYS:
+        if isinstance(value, int):
+            return value
+        try:
+            return int(value)
+        except (ValueError, TypeError):
+            return value
+    if key in SINGLETON_LIST_KEYS:
+        if isinstance(value, list):
+            return value
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+                return parsed if isinstance(parsed, list) else [value]
+            except (json.JSONDecodeError, ValueError):
+                # Comma-separated fallback
+                return [v.strip() for v in value.split(',') if v.strip()] if value else []
+        return value
+    return value
+
+
+def _try_json_parse(value):
+    """Try to parse a JSON string into a dict/list; return original on failure.
+
+    Used for fields like dns_credentials that are stored as JSON strings
+    but the provider expects a map/list.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        return value
+    if not value:
+        return value
+    try:
+        return json.loads(value)
+    except (json.JSONDecodeError, ValueError):
+        return value
 
 
 # ─── HCL Formatting Helpers ─────────────────────────────────────────────────
@@ -282,7 +533,7 @@ def _build_attributes(
     Handles sensitive fields by either inlining them or creating variable references.
     should_inline(table_name, field_name) returns True if the field should be inlined.
     When resource_name is provided, variable names are unique per resource
-    (e.g. users_admin_hashed_password) so each resource gets its own placeholder.
+    so each resource gets its own placeholder.
     """
     sensitive = SENSITIVE_FIELDS.get(table_name, set())
     attrs = []
@@ -392,11 +643,12 @@ class Module:
             f'}}'
         )
 
-    def add_secret_map_variable(self, var_name: str, description: str):
+    def add_secret_map_variable(self, var_name: str, description: str, var_type: str = None):
         """Add a secret map variable (map(string), sensitive)."""
+        actual_type = var_type or 'map(string)'
         self.variables.append(
             f'variable "{var_name}" {{\n'
-            f'  type        = map(string)\n'
+            f'  type        = {actual_type}\n'
             f'  description = {_hcl_string(description)}\n'
             f'  default     = {{}}\n'
             f'  sensitive   = true\n'
@@ -433,6 +685,9 @@ class Module:
         secret_maps: Dict[str, str] = None,
         polymorphic_fks: Dict[str, List[Tuple[str, str]]] = None,
         name_field: str = 'name',
+        provider_rename: Dict[str, str] = None,
+        provider_raw_int: Set[str] = None,
+        provider_skip: Set[str] = None,
     ):
         """Generate a for_each resource block for reusable modules.
         
@@ -453,6 +708,9 @@ class Module:
         fk_lists = fk_lists or {}
         secret_maps = secret_maps or {}
         polymorphic_fks = polymorphic_fks or {}
+        provider_rename = provider_rename or {}
+        provider_raw_int = provider_raw_int or set()
+        provider_skip = provider_skip or set()
 
         lines = [f'resource "corex_{resource_type}" "this" {{']
         lines.append(f'  for_each = var.{var_name}')
@@ -460,42 +718,54 @@ class Module:
         # Use the original name from tfvars if present (preserves hyphens,
         # dots, spaces that are sanitized out of the Terraform map key).
         # name_field defaults to 'name' but can be 'username' (User resource).
-        lines.append(f'  {name_field} = try(each.value.{name_field}, each.key)')
+        # Skip the name_field line if the provider doesn't have a name attribute.
+        if name_field not in provider_skip:
+            lines.append(f'  {name_field} = try(each.value.{name_field}, each.key)')
         
         for field in fields:
             if field == name_field:
                 continue  # already set
             
+            # Determine the provider-facing attribute name (after rename).
+            # The tfvars and variable type use the renamed key, so the
+            # right-hand side must reference each.value.{attr_name} too.
+            attr_name = provider_rename.get(field, field)
+            
+            # Raw int fields: just pass the value through (no FK resolution)
+            if field in provider_raw_int:
+                lines.append(f'  {attr_name} = try(each.value.{attr_name}, null)')
+                continue
+            
             # Secret map resolution
             if field in secret_maps:
                 secret_var = secret_maps[field]
-                lines.append(f'  {field} = try(var.{secret_var}[each.key], null)')
+                lines.append(f'  {attr_name} = try(var.{secret_var}[each.key], null)')
             
             # Same-module FK resolution
             elif field in same_module_fks:
                 ref_type, nullable = same_module_fks[field]
                 if nullable:
-                    lines.append(f'  {field} = try(corex_{ref_type}.this[each.value.{field}].id, null)')
+                    lines.append(f'  {attr_name} = try(corex_{ref_type}.this[each.value.{attr_name}].id, null)')
                 else:
                     # Non-nullable FK: fail loud if the key doesn't match.
                     # A silent null would create a resource with a dangling FK.
-                    lines.append(f'  {field} = corex_{ref_type}.this[each.value.{field}].id')
+                    lines.append(f'  {attr_name} = corex_{ref_type}.this[each.value.{attr_name}].id')
             
             # Cross-module FK resolution — fail loud on required refs.
             # A typo'd key should error, not silently produce null.
             elif field in cross_module_fks:
                 var = cross_module_fks[field]
-                lines.append(f'  {field} = var.{var}[each.value.{field}]')
+                lines.append(f'  {attr_name} = var.{var}[each.value.{attr_name}]')
 
             # Optional cross-module FK resolution — nullable, use try().
             elif field in optional_cross_module_fks:
                 var = optional_cross_module_fks[field]
-                lines.append(f'  {field} = try(var.{var}[each.value.{field}], null)')
+                lines.append(f'  {attr_name} = try(var.{var}[each.value.{attr_name}], null)')
             
             # FK list resolution
             elif field in fk_lists:
                 var = fk_lists[field]
-                lines.append(f'  {field} = try([for k in each.value.{field} : var.{var}[k]], [])')
+                lines.append(f'  {attr_name} = try([for k in each.value.{attr_name} : var.{var}[k]], [])')
             
             # Polymorphic FK resolution using coalesce() with per-type try()
             # Each type is wrapped in its own try() so that missing resources
@@ -510,18 +780,18 @@ class Module:
             elif field in polymorphic_fks:
                 type_attempts = polymorphic_fks[field]
                 if not type_attempts:
-                    lines.append(f'  {field} = null')
+                    lines.append(f'  {attr_name} = null')
                 else:
                     coalesce_args = ', '.join(
-                        f'try(local.{type_key}_list_ids[each.value.{field}], null)'
+                        f'try(local.{type_key}_list_ids[each.value.{attr_name}], null)'
                         for type_key, _ in type_attempts
                     )
-                    lines.append(f'  {field} = coalesce({coalesce_args})')
+                    lines.append(f'  {attr_name} = coalesce({coalesce_args})')
             
             # Simple field copy — wrap in try() because the field may be
             # absent from the tfvars object when it was None in the database.
             else:
-                lines.append(f'  {field} = try(each.value.{field}, null)')
+                lines.append(f'  {attr_name} = try(each.value.{attr_name}, null)')
         
         lines.append('}')
         self.blocks.append('\n'.join(lines))
@@ -549,6 +819,8 @@ class TerraformExporter:
         self.secret_vars: Dict[str, str] = {}
         # Track whether each secret var is a map (per-resource) or string (singleton)
         self.secret_var_types: Dict[str, str] = {}
+        # Map secret var name → HCL type override (e.g. map(map(string)) for dns_credentials)
+        self.secret_var_hcl_types: Dict[str, str] = {}
         # Map secret var name → name_maps key, so tfvars can pre-populate per-resource keys
         self.secret_var_name_maps: Dict[str, str] = {}
         # ID → sanitized name maps per resource type (for cross-module refs)
@@ -611,7 +883,7 @@ class TerraformExporter:
         self.name_maps[resource_key] = mapping
 
     def _add_secret_map_var(self, mod: 'Module', var_name: str, description: str,
-                            name_map_key: str = None):
+                            name_map_key: str = None, var_type: str = None):
         """Register a secret map variable on both the module and the exporter.
 
         This ensures the variable is declared in the module's variables.tf,
@@ -620,11 +892,16 @@ class TerraformExporter:
         If name_map_key is provided, the exporter tracks which name map
         corresponds to this secret var so the tfvars generator can pre-populate
         per-resource placeholder keys.
+
+        var_type overrides the default map(string) type (e.g. map(map(string))
+        for dns_credentials).
         """
-        mod.add_secret_map_variable(var_name, description)
+        mod.add_secret_map_variable(var_name, description, var_type=var_type)
         if var_name not in self.secret_vars:
             self.secret_vars[var_name] = description
             self.secret_var_types[var_name] = 'map'
+            if var_type:
+                self.secret_var_hcl_types[var_name] = var_type
         if name_map_key:
             self.secret_var_name_maps[var_name] = name_map_key
 
@@ -675,11 +952,17 @@ class TerraformExporter:
         polymorphic_fks: Dict[str, list] = None,
         skip_fields: set = None,
         extra_fields: Dict[str, str] = None,
+        resource_type: str = None,
+        type_overrides: Dict[str, str] = None,
     ) -> str:
         """Build a map(object({...})) HCL type string from a SQLAlchemy model.
 
         All fields are optional() so missing fields become null, not plan errors.
         FK fields are typed as string (they hold logical keys, not integer IDs).
+        When resource_type is provided, PROVIDER_FIELD_OVERRIDES is consulted
+        to skip/rename fields to match the provider schema.
+        type_overrides: {field_name: hcl_type} to override inferred types
+        (e.g. dns_credentials should be map(string), not string).
         """
         same_module_fks = same_module_fks or {}
         cross_module_fks = cross_module_fks or {}
@@ -689,16 +972,31 @@ class TerraformExporter:
         skip_fields = skip_fields or set()
         extra_fields = extra_fields or {}
 
+        # Apply provider field overrides (manual + schema-derived)
+        provider_skip = set()
+        provider_rename = {}
+        provider_raw_int_skip = set()
+        if resource_type:
+            overrides = _resolve_provider_overrides(resource_type, model_cls)
+            provider_skip = overrides['skip']
+            provider_rename = overrides['rename']
+            provider_raw_int_skip = overrides['raw_int_skip']
+        skip_fields = skip_fields | provider_skip | provider_raw_int_skip
+
         mapper = sa_inspect(model_cls)
         all_fk_fields = set(same_module_fks.keys()) | set(cross_module_fks.keys()) | set(optional_cross_module_fks.keys()) | set(polymorphic_fks.keys())
         all_fk_list_fields = set(fk_list_fields.keys())
+        type_overrides = type_overrides or {}
 
         fields = []
         for attr in mapper.column_attrs:
             if attr.key in SKIP_FIELDS or attr.key in skip_fields:
                 continue
-            name = attr.key
-            if name in all_fk_fields:
+            name = provider_rename.get(attr.key, attr.key)
+            # Check for explicit type override first
+            if attr.key in type_overrides:
+                fields.append(f'    {name} = optional({type_overrides[attr.key]})')
+            elif attr.key in all_fk_fields:
                 # FK fields hold logical keys (strings), not integer IDs
                 fields.append(f'    {name} = optional(string)')
             elif name in all_fk_list_fields:
@@ -745,6 +1043,7 @@ class TerraformExporter:
         skip_fields: set = None,
         add_output: bool = True,
         filter_fn=None,
+        type_overrides: Dict[str, str] = None,
     ):
         """Generic helper: build a complete for_each collection with ALL model fields.
         
@@ -789,6 +1088,8 @@ class TerraformExporter:
             fk_list_fields=fk_list_fields,
             polymorphic_fks=polymorphic_fks,
             skip_fields=skip_fields | set(secret_fields.keys()),
+            resource_type=resource_type,
+            type_overrides=type_overrides,
         )
         self.collection_types[var_name] = obj_type
         mod.add_collection_variable(var_name, description, var_type=obj_type)
@@ -811,8 +1112,18 @@ class TerraformExporter:
             all_fields_minus_name = [f for f in all_fields if f != name_attr]
         else:
             all_fields_minus_name = list(all_fields)
-        # Remove skip_fields
-        ordered_fields = [f for f in all_fields_minus_name if f not in skip_fields]
+        # Remove skip_fields + provider skip
+        provider_skip = set()
+        provider_rename = {}
+        provider_raw_int = set()
+        provider_raw_int_skip = set()
+        if resource_type:
+            overrides = _resolve_provider_overrides(resource_type, model_cls)
+            provider_skip = overrides['skip']
+            provider_rename = overrides['rename']
+            provider_raw_int = overrides['raw_int']
+            provider_raw_int_skip = overrides['raw_int_skip']
+        ordered_fields = [f for f in all_fields_minus_name if f not in skip_fields and f not in provider_skip and f not in provider_raw_int_skip]
 
         mod.add_section(description)
         mod.add_for_each_resource(
@@ -826,6 +1137,9 @@ class TerraformExporter:
             secret_maps=secret_fields,
             polymorphic_fks=polymorphic_fks,
             name_field=name_attr if not name_fn else 'name',
+            provider_rename=provider_rename,
+            provider_raw_int=provider_raw_int,
+            provider_skip=provider_skip,
         )
         if add_output:
             mod.add_map_output(f'{resource_type}_ids', resource_type, f'Map of {resource_type} name to ID')
@@ -843,6 +1157,8 @@ class TerraformExporter:
         skip_fields: set = None,
         secret_fields: set = None,
         filter_fn=None,
+        resource_type: str = None,
+        value_transforms: Dict[str, Callable] = None,
     ):
         """Generic helper: build tfvars data for a collection with ALL model fields.
         
@@ -860,12 +1176,22 @@ class TerraformExporter:
             skip_fields: additional fields to skip
             secret_fields: set of field names to skip (secrets referenced via var placeholders)
             filter_fn: optional fn(row) -> bool to filter rows
+            resource_type: provider resource type for field override lookup
         """
         cross_module_fks = cross_module_fks or {}
         fk_list_fields = fk_list_fields or {}
         same_module_fk_maps = same_module_fk_maps or {}
         skip_fields = skip_fields or set()
         secret_fields = secret_fields or set()
+
+        # Apply provider field overrides (manual + schema-derived)
+        provider_skip = set()
+        provider_rename = {}
+        if resource_type:
+            overrides = _resolve_provider_overrides(resource_type, model_cls)
+            provider_skip = overrides['skip'] | overrides['raw_int_skip']
+            provider_rename = overrides['rename']
+        value_transforms = value_transforms or {}
 
         rows = self._query_all(model_cls)
         if filter_fn:
@@ -884,31 +1210,35 @@ class TerraformExporter:
             # Include the name field in tfvars so resource blocks can use the
             # original (unsanitized) name. The Terraform map key is sanitized
             # (e.g. "asn_hosting"), but the API name may differ (e.g. "asn-hosting").
-            effective_skip = set(skip_fields) | set(secret_fields)
+            effective_skip = set(skip_fields) | set(secret_fields) | provider_skip
             for k, v in row_dict.items():
                 if v is None:
                     continue
                 if k in effective_skip:
                     continue
+                # Determine the provider-facing key (after rename)
+                tfvars_key = provider_rename.get(k, k)
                 if k in cross_module_fks:
                     map_name = cross_module_fks[k]
                     name_map = self.name_maps.get(map_name, {})
                     if v in name_map:
-                        entry[k] = name_map[v]
+                        entry[tfvars_key] = name_map[v]
                 elif k in fk_list_fields:
                     map_name = fk_list_fields[k]
                     name_map = self.name_maps.get(map_name, {})
                     if isinstance(v, list):
                         resolved = [name_map[vid] for vid in v if vid in name_map]
                         if resolved:
-                            entry[k] = resolved
+                            entry[tfvars_key] = resolved
                 elif k in same_module_fk_maps:
                     map_name = same_module_fk_maps[k]
                     name_map = self.name_maps.get(map_name, {})
                     if v in name_map:
-                        entry[k] = name_map[v]
+                        entry[tfvars_key] = name_map[v]
                 else:
-                    entry[k] = v
+                    if k in value_transforms:
+                        v = value_transforms[k](v)
+                    entry[tfvars_key] = v
             data[key] = entry
         tfvars[var_name] = data
 
@@ -1004,8 +1334,11 @@ class TerraformExporter:
                     continue
                 desc = self.secret_vars[var_name]
                 vtype = self.secret_var_types.get(var_name, 'map')
+                hcl_type = self.secret_var_hcl_types.get(var_name)
                 if vtype == 'string':
                     mod.add_variable(var_name, 'string', desc, 'null', sensitive=True)
+                elif hcl_type:
+                    mod.add_secret_map_variable(var_name, desc, var_type=hcl_type)
                 else:
                     mod.add_secret_map_variable(var_name, desc)
 
@@ -1105,6 +1438,8 @@ class TerraformExporter:
         cert_type = self._build_object_type(
             Certificate,
             skip_fields={'dns_credentials'} if not (self.include_secrets or self.include_certs) else set(),
+            type_overrides={'dns_credentials': 'map(string)'},
+            resource_type='certificate',
         )
         self.collection_types['certificates'] = cert_type
         mod.add_collection_variable('certificates', 'Map of certificate name to configuration', var_type=cert_type)
@@ -1150,17 +1485,24 @@ class TerraformExporter:
             if 'dns_credentials' in cert_fields and not (self.include_secrets or self.include_certs):
                 secret_fields = {'dns_credentials': 'certificates_dns_credentials'}
                 self._add_secret_map_var(mod, 'certificates_dns_credentials', 'Certificate DNS credentials',
-                                         name_map_key='certificates')
+                                         name_map_key='certificates',
+                                         var_type='map(map(string))')
 
             mod.add_section('Certificates')
             # Build the for_each block with ALL fields + PEM content from variables
             # Include secret fields so add_for_each_resource can emit var.xxx[each.key] references
             simple_fields = [f for f in cert_fields if f != 'name']
+            # Apply provider overrides (rename 'provider' -> 'provider_name')
+            cert_overrides = _resolve_provider_overrides('certificate', Certificate)
+            cert_fields_filtered = [f for f in simple_fields
+                                     if f not in cert_overrides['skip']
+                                     and f not in cert_overrides['raw_int_skip']]
             mod.add_for_each_resource(
                 resource_type='certificate',
                 var_name='certificates',
-                fields=simple_fields,
+                fields=cert_fields_filtered,
                 secret_maps=secret_fields,
+                provider_rename=cert_overrides['rename'],
             )
             # Append PEM content references from variables (environment-independent module).
             # Only pass fullchain/key for provider="custom" — Let's Encrypt certs
@@ -1170,19 +1512,56 @@ class TerraformExporter:
                 '',
                 '  # PEM content from environment-specific variables',
                 '  # Only for custom-provider certs; LE certs are provider-managed.',
-                '  fullchain = each.value.provider == "custom" ? var.cert_fullchains[each.key] : null',
-                '  key       = each.value.provider == "custom" ? var.cert_keys[each.key] : null',
+                '  fullchain = each.value.provider_name == "custom" ? var.cert_fullchains[each.key] : null',
+                '  key       = each.value.provider_name == "custom" ? var.cert_keys[each.key] : null',
             ]
             # Insert before the closing brace of the last block
             last_block = mod.blocks[-1]
             mod.blocks[-1] = last_block.replace('}', '\n'.join(pem_lines) + '\n}')
             mod.add_map_output('certificate_ids', 'certificate', 'Map of certificate name to ID')
 
-        # Cipher suites - all fields, no special handling
+        # Cipher suites - tls_options is a list in the provider but a string in the DB
         self._add_for_each_collection(
             mod, 'cipher_suite', 'cipher_suites', CipherSuite,
             'Map of cipher suite name to configuration',
+            type_overrides={'tls_options': 'list(string)'},
         )
+
+        # SSL Labs settings — singleton per certificate.
+        # The provider expects cert_id (int, RequiresReplace) and max_scans_per_host (int).
+        # The setting is stored as ssllabs_max_scans_per_host in the settings table.
+        from ..services.ssllabs import get_max_scans_per_host
+        max_scans = get_max_scans_per_host(self.db)
+        ssl_labs_data = {}
+        for cert in certs:
+            cert_slug = _sanitize_name(cert.name)
+            ssl_labs_data[cert_slug] = {
+                'max_scans_per_host': max_scans,
+            }
+        # Always declare the variable so the root module can pass it.
+        # Typed as map(object({...})) so typos in tfvars fail at validate.
+        # cert_id is NOT in the type — it's wired to the local cert resource.
+        ssl_labs_type = (
+            'map(object({\n'
+            '    max_scans_per_host = optional(number)\n'
+            '  }))'
+        )
+        self.collection_types['ssl_labs_settings'] = ssl_labs_type
+        mod.add_variable('ssl_labs_settings', ssl_labs_type,
+                        'SSL Labs settings per certificate (singleton per cert)', '{}')
+        if ssl_labs_data:
+            mod.add_section('SSL Labs Settings')
+            # cert_id is wired to the local certificate resource's ID,
+            # not a snapshot integer. This avoids the classic "snapshot ID"
+            # bug where the integer becomes stale after import/recreate.
+            mod.blocks.append(
+                'resource "corex_ssl_labs_settings" "this" {\n'
+                '  for_each = var.ssl_labs_settings\n'
+                '\n'
+                '  cert_id            = corex_certificate.this[each.key].id\n'
+                '  max_scans_per_host = try(each.value.max_scans_per_host, null)\n'
+                '}'
+            )
 
         return mod
 
@@ -1598,19 +1977,13 @@ class TerraformExporter:
         return mod
 
     def _build_waf_module(self) -> Module:
-        mod = Module('waf', 'Web Application Firewall rules, exceptions, and SIEM integrations')
+        mod = Module('waf', 'Web Application Firewall rules and exceptions')
         mod.add_variable('listener_ids', 'map(number)', 'Map of listener name to ID from the routing module', '{}')
         mod.add_variable('backend_ids', 'map(number)', 'Map of backend name to ID from the routing module', '{}')
 
-        # SIEM integrations - no FKs
-        self._add_for_each_collection(
-            mod, 'waf_siem_integration', 'waf_siem_integrations', WafSiemIntegration,
-            'Map of WAF SIEM integration name to configuration',
-            add_output=True,
-        )
-
-        # WAF rules - listener_id and backend_id are nullable cross-module FKs,
-        # siem_integration_id is a same-module FK to waf_siem_integration
+        # WAF rules - listener_id and backend_id are nullable cross-module FKs.
+        # siem_integration_id is a raw int (no waf_siem_integration resource in provider).
+        # http_methods is a comma-separated string in the DB but a list in the provider.
         self._add_for_each_collection(
             mod, 'waf_rule', 'waf_rules', WafRule,
             'Map of WAF rule name to configuration',
@@ -1618,7 +1991,7 @@ class TerraformExporter:
                 'listener_id': 'listener_ids',
                 'backend_id': 'backend_ids',
             },
-            same_module_fks={'siem_integration_id': ('waf_siem_integration', True)},
+            type_overrides={'http_methods': 'list(string)'},
         )
 
         self._add_for_each_collection(
@@ -1664,7 +2037,14 @@ class TerraformExporter:
         cache_config_type = self._build_object_type(
             CacheConfig,
             cross_module_fks={'backend_id': 'backend_ids'},
-            extra_fields={'rules': f'list({cache_rule_obj_type})'},
+            extra_fields={
+                'rules': f'list({cache_rule_obj_type})',
+                # Provider-only fields not in the DB model; optional so they
+                # default to null when unset.
+                'haproxy_cache_vary': 'list(string)',
+                'disk_cache_max_size': 'number',
+            },
+            resource_type='cache_config',
         )
         self.collection_types['cache_configs'] = cache_config_type
         mod.add_collection_variable('cache_configs', 'Map of cache config name to configuration', var_type=cache_config_type)
@@ -1681,13 +2061,34 @@ class TerraformExporter:
 
             # Build cache_config resource block
             config_fields = self._get_model_fields(CacheConfig)
+            # Apply provider overrides (manual + schema-derived) to match provider schema
+            cc_overrides = _resolve_provider_overrides('cache_config', CacheConfig)
+            cc_provider_skip = cc_overrides['skip']
+            cc_provider_rename = cc_overrides['rename']
+            cc_provider_raw_int = cc_overrides['raw_int']
+            cc_provider_raw_int_skip = cc_overrides['raw_int_skip']
+            # Filter out skipped/raw_int_skip fields from the resource block
+            cc_fields = [f for f in config_fields
+                         if f not in cc_provider_skip and f not in cc_provider_raw_int_skip]
             mod.add_section('Cache Configs')
             mod.add_for_each_resource(
                 resource_type='cache_config',
                 var_name='cache_configs',
-                fields=config_fields,
+                fields=cc_fields,
                 cross_module_fks={'backend_id': 'backend_ids'},
+                provider_rename=cc_provider_rename,
+                provider_raw_int=cc_provider_raw_int,
+                provider_skip=cc_provider_skip,
             )
+            # Append provider-only fields not in the DB model (optional, null when unset)
+            block = mod.blocks[-1]
+            block = block.replace(
+                '}',
+                '  haproxy_cache_vary = try(each.value.haproxy_cache_vary, null)\n'
+                '  disk_cache_max_size = try(each.value.disk_cache_max_size, null)\n'
+                '}',
+            )
+            mod.blocks[-1] = block
 
             # Build cache_rule resource block — flatten nested rules into
             # separate resources keyed by "<config_key>_<priority>".
@@ -1747,7 +2148,7 @@ class TerraformExporter:
         return mod
 
     def _build_page_protect_module(self) -> Module:
-        mod = Module('page-protect', 'Page protection: CSP policies and settings')
+        mod = Module('page-protect', 'Page protection: CSP policies, settings, and scripts')
         mod.add_variable('backend_ids', 'map(number)', 'Map of backend name to ID from the routing module', '{}')
 
         self._add_for_each_collection(
@@ -1756,6 +2157,56 @@ class TerraformExporter:
             fk_list_fields={'backend_ids': 'backend_ids'},
             add_output=False,
         )
+
+        # Page protect scripts — provider has url, resource_type, notes, fetch_method, ignored
+        # Only export manually-added scripts (source='manual'). Auto-detected scripts
+        # (csp/beacon) are inventory, not user configuration.
+        self._add_for_each_collection(
+            mod, 'page_protect_script', 'page_protect_scripts', PageProtectScript,
+            'Map of page protect script URL to configuration',
+            name_attr='url',
+            add_output=False,
+            filter_fn=lambda s: (s.source or '').lower() == 'manual',
+        )
+
+        # Page protect settings — singleton with flat attributes
+        mod.add_variable('page_protect_settings', 'any', 'Page protection configuration (singleton)', '{}')
+
+        db = self.db
+        pp_settings = get_page_protect_settings(db)
+        # Map DB setting names to provider field names and coerce types
+        pp_data = {}
+        pp_data['monitoring_enabled'] = pp_settings.get('monitoring_enabled', False)
+        pp_data['change_detection_enabled'] = pp_settings.get('change_detection_enabled', False)
+        pp_data['change_detection_interval_hours'] = pp_settings.get('change_detection_interval_hours', 24)
+        pp_data['report_retention_days'] = pp_settings.get('report_retention_days', 7)
+        pp_data['report_path'] = pp_settings.get('report_path', '')
+        pp_data['beacon_injection_enabled'] = pp_settings.get('beacon_injection_enabled', False)
+        pp_data['beacon_trust_enabled'] = pp_settings.get('beacon_trust_enabled', False)
+        # beacon_path (string) → beacon_paths (list)
+        beacon_path = pp_settings.get('beacon_path', '')
+        pp_data['beacon_paths'] = [beacon_path] if beacon_path else []
+        # beacon_content_types (comma-separated) → list
+        ct = pp_settings.get('beacon_content_types', '')
+        pp_data['beacon_content_types'] = [c.strip() for c in ct.split(',') if c.strip()] if ct else []
+        # beacon_path_patterns (comma-separated) → beacon_patterns (list)
+        pp_patterns = pp_settings.get('beacon_path_patterns', '')
+        pp_data['beacon_patterns'] = [p.strip() for p in pp_patterns.split(',') if p.strip()] if pp_patterns else []
+        # beacon_backend_ids (JSON list) → backend_ids (list of int)
+        pp_data['backend_ids'] = pp_settings.get('beacon_backend_ids', [])
+        pp_data['auto_prune_stale_days'] = pp_settings.get('auto_prune_stale_days', 7)
+
+        if pp_data:
+            mod.add_section('Page Protect Settings')
+            pp_lines = ['resource "corex_page_protect_settings" "this" {']
+            for k in ['monitoring_enabled', 'change_detection_enabled',
+                      'change_detection_interval_hours', 'report_retention_days',
+                      'report_path', 'beacon_injection_enabled', 'beacon_trust_enabled',
+                      'beacon_paths', 'beacon_content_types', 'beacon_patterns',
+                      'backend_ids', 'auto_prune_stale_days']:
+                pp_lines.append(f'  {k} = try(var.page_protect_settings["{k}"], null)')
+            pp_lines.append('}')
+            mod.blocks.append('\n'.join(pp_lines))
 
         return mod
 
@@ -1877,23 +2328,14 @@ class TerraformExporter:
     def _build_management_module(self) -> Module:
         mod = Module('management', 'Management: users, settings, and singleton configurations')
 
-        # Users - sensitive fields: hashed_password, totp_secret
-        user_secret_fields = {}
-        if not (self.include_secrets or self.include_users_identities):
-            user_secret_fields = {
-                'hashed_password': 'users_hashed_passwords',
-                'totp_secret': 'users_totp_secrets',
-            }
-            self._add_secret_map_var(mod, 'users_hashed_passwords', 'User password hashes',
-                                     name_map_key='users')
-            self._add_secret_map_var(mod, 'users_totp_secrets', 'User TOTP secrets',
-                                     name_map_key='users')
-
+        # Users — the provider's user resource has a write-only `password` field
+        # but no `hashed_password` or `totp_secret`. Existing password hashes
+        # cannot be round-tripped. Users are import-only for identity fields;
+        # set passwords out-of-band after import.
         self._add_for_each_collection(
             mod, 'user', 'users', User,
             'Map of username to user configuration',
             name_attr='username',
-            secret_fields=user_secret_fields,
         )
 
         # Settings (key-value pairs)
@@ -1921,10 +2363,16 @@ class TerraformExporter:
 
     def _add_singleton_tfvars(self, tfvars: dict, db) -> None:
         """Add singleton configuration data to tfvars."""
-        # HAProxy global options
+        # HAProxy global options — stored as a JSON string in the DB,
+        # but the provider expects a list of objects. Parse it here so
+        # the tfvars contains a real list, not a JSON string.
         global_opts = get_setting(db, 'haproxy_global_options')
         if global_opts:
-            tfvars['haproxy_global_options'] = global_opts
+            parsed = _try_json_parse(global_opts)
+            if isinstance(parsed, list):
+                tfvars['haproxy_global_options'] = parsed
+            else:
+                tfvars['haproxy_global_options'] = []
 
         # Captcha settings — split non-secret and secret keys when secrets excluded.
         # Non-secret keys go in captcha_settings (dev.tfvars).
@@ -1943,7 +2391,7 @@ class TerraformExporter:
         for k in captcha_nonsecret_keys:
             v = get_setting(db, k)
             if v is not None:
-                captcha_data[k] = v
+                captcha_data[k] = _coerce_setting_value(k, v)
         if self.include_secrets or self.include_system_secrets:
             # Include all keys in captcha_settings
             for k in captcha_secret_keys:
@@ -1970,25 +2418,37 @@ class TerraformExporter:
             if self.include_secrets or self.include_system_secrets:
                 tfvars['maxmind_license_key'] = maxmind_key
 
-        # HA config
+        # HA config — nest keepalived fields under keepalived key
         ha_config_keys = [
             'ha_enabled', 'ha_topology', 'haproxy_ha_replicas', 'valkey_ha_replicas',
             'coraza_ha_replicas', 'haproxy_instances', 'haproxy_peer_port',
+            'valkey_sentinel_enabled', 'valkey_sentinel_hosts', 'valkey_sentinel_service',
+        ]
+        keepalived_keys = [
             'keepalived_vip', 'keepalived_virtual_router_id', 'keepalived_priority',
             'keepalived_interface', 'keepalived_auth_password', 'keepalived_peer_addresses',
             'keepalived_advert_int', 'keepalived_preempt', 'keepalived_track_script',
-            'valkey_sentinel_enabled', 'valkey_sentinel_hosts', 'valkey_sentinel_service',
         ]
         ha_data = {}
+        keepalived_data = {}
         for k in ha_config_keys:
             v = get_setting(db, k)
             if v is not None:
                 is_sensitive = k in SENSITIVE_SETTING_KEYS
                 if not is_sensitive or self.include_secrets or self.include_system_secrets:
-                    ha_data[k] = v
+                    ha_data[k] = _coerce_setting_value(k, v)
                 else:
-                    # Placeholder so user knows the key needs to be filled in
                     ha_data[k] = "change-me"
+        for k in keepalived_keys:
+            v = get_setting(db, k)
+            if v is not None:
+                is_sensitive = k in SENSITIVE_SETTING_KEYS
+                if not is_sensitive or self.include_secrets or self.include_system_secrets:
+                    keepalived_data[k.replace('keepalived_', '')] = _coerce_setting_value(k, v)
+                else:
+                    keepalived_data[k.replace('keepalived_', '')] = "change-me"
+        if keepalived_data:
+            ha_data['keepalived'] = keepalived_data
         if ha_data:
             tfvars['ha_config'] = ha_data
 
@@ -2003,7 +2463,7 @@ class TerraformExporter:
         for k in api_armor_keys:
             v = get_setting(db, k)
             if v is not None:
-                api_armor_data[k] = v
+                api_armor_data[k] = _coerce_setting_value(k, v)
         if api_armor_data:
             tfvars['api_armor_settings'] = api_armor_data
 
@@ -2014,17 +2474,25 @@ class TerraformExporter:
         singleton resources (corex_captcha_settings, corex_ha_config, etc.)
         with flat attributes, not key/value maps.
         """
-        # HAProxy global options — provider expects a list of objects, not a
-        # JSON string. The setting is stored as JSON in the DB; we jsondecode()
-        # it in the module so the provider gets the right type.
+        # HAProxy global options — provider expects a list of objects
+        # with target/directive/value/enabled fields. The setting is stored
+        # as JSON in the DB; the tfvars builder parses it to a real list,
+        # so the module variable is list(object({...})) and the resource
+        # block passes it through directly (no jsondecode()).
         global_opts = get_setting(db, 'haproxy_global_options')
-        mod.add_variable('haproxy_global_options', 'string',
-                       'HAProxy global options (JSON string, decoded to list of objects)', '"[]"')
+        global_opts_type = ('list(object({ target = optional(string) '
+                            'directive = optional(string) '
+                            'value = optional(string) '
+                            'enabled = optional(bool) }))')
+        # Register the type so the root variables.tf uses it instead of `any`
+        self.collection_types['haproxy_global_options'] = global_opts_type
+        mod.add_variable('haproxy_global_options', global_opts_type,
+                       'HAProxy global options (list of objects)', '[]')
         if global_opts:
             mod.add_section('HAProxy Global Options')
             mod.blocks.append(
                 'resource "corex_global_options" "this" {\n'
-                '  options = jsondecode(var.haproxy_global_options)\n'
+                '  options = var.haproxy_global_options\n'
                 '}'
             )
 
@@ -2044,7 +2512,7 @@ class TerraformExporter:
         for k in captcha_nonsecret_keys:
             v = get_setting(db, k)
             if v is not None:
-                captcha_data[k] = v
+                captcha_data[k] = _coerce_setting_value(k, v)
         # Always declare singleton setting variables so the root module can pass them
         mod.add_variable('captcha_settings', 'any', 'Captcha configuration (singleton)', '{}')
         mod.add_variable('ha_config', 'any', 'HA configuration (singleton)', '{}')
@@ -2087,7 +2555,7 @@ class TerraformExporter:
                 mod.add_section('MaxMind License Key')
                 mod.blocks.append(
                     'resource "corex_maxmind_license_key" "this" {\n'
-                    '  license_key = var.maxmind_license_key\n'
+                    '  value = var.maxmind_license_key\n'
                     '}'
                 )
             else:
@@ -2095,28 +2563,41 @@ class TerraformExporter:
                 mod.add_section('MaxMind License Key')
                 mod.blocks.append(
                     'resource "corex_maxmind_license_key" "this" {\n'
-                    '  license_key = var.maxmind_license_key\n'
+                    '  value = var.maxmind_license_key\n'
                     '}'
                 )
 
-        # HA config — singleton with flat attributes
+        # HA config — singleton with flat attributes + nested keepalived block
         ha_config_keys = [
             'ha_enabled', 'ha_topology', 'haproxy_ha_replicas', 'valkey_ha_replicas',
             'coraza_ha_replicas', 'haproxy_instances', 'haproxy_peer_port',
+            'valkey_sentinel_enabled', 'valkey_sentinel_hosts', 'valkey_sentinel_service',
+        ]
+        keepalived_keys = [
             'keepalived_vip', 'keepalived_virtual_router_id', 'keepalived_priority',
             'keepalived_interface', 'keepalived_auth_password', 'keepalived_peer_addresses',
             'keepalived_advert_int', 'keepalived_preempt', 'keepalived_track_script',
-            'valkey_sentinel_enabled', 'valkey_sentinel_hosts', 'valkey_sentinel_service',
         ]
         ha_data = {}
+        keepalived_data = {}
         for k in ha_config_keys:
             v = get_setting(db, k)
             if v is not None:
                 is_sensitive = k in SENSITIVE_SETTING_KEYS
                 if not is_sensitive or self.include_secrets or self.include_system_secrets:
-                    ha_data[k] = v
+                    ha_data[k] = _coerce_setting_value(k, v)
                 else:
                     ha_data[k] = "change-me"
+        for k in keepalived_keys:
+            v = get_setting(db, k)
+            if v is not None:
+                is_sensitive = k in SENSITIVE_SETTING_KEYS
+                if not is_sensitive or self.include_secrets or self.include_system_secrets:
+                    keepalived_data[k.replace('keepalived_', '')] = _coerce_setting_value(k, v)
+                else:
+                    keepalived_data[k.replace('keepalived_', '')] = "change-me"
+        if keepalived_data:
+            ha_data['keepalived'] = keepalived_data
         if ha_data:
             mod.add_section('HA Configuration')
             # Singleton resource — no for_each, flat attributes from var
@@ -2124,6 +2605,9 @@ class TerraformExporter:
             for k in ha_config_keys:
                 if k in ha_data:
                     ha_lines.append(f'  {k} = try(var.ha_config["{k}"], null)')
+            if 'keepalived' in ha_data:
+                # keepalived is a SingleNestedAttribute (assignment, not a block)
+                ha_lines.append('  keepalived = try(var.ha_config["keepalived"], null)')
             ha_lines.append('}')
             mod.blocks.append('\n'.join(ha_lines))
 
@@ -2184,8 +2668,11 @@ class TerraformExporter:
                                      name_map_key='mcp_servers')
             self._add_secret_map_var(mod, 'mcp_servers_oauth_secrets', 'MCP server OAuth client secrets',
                                      name_map_key='mcp_servers')
+            # env_vars is a map in the provider (mapAttrSensitive), so the
+            # secret var must be map(map(string)) — each server has a map of env vars.
             self._add_secret_map_var(mod, 'mcp_servers_env_vars', 'MCP server environment variables',
-                                     name_map_key='mcp_servers')
+                                     name_map_key='mcp_servers',
+                                     var_type='map(map(string))')
 
         self._add_for_each_collection(
             mod, 'mcp_server', 'mcp_servers', McpServer,
@@ -2193,6 +2680,7 @@ class TerraformExporter:
             same_module_fks={'team_id': ('mcp_team', False)},
             secret_fields=srv_secret_fields,
             filter_fn=lambda s: s.namespace != SELF_REGISTERED_SERVER_NAMESPACE and s.team_id in valid_team_ids,
+            type_overrides={'args_json': 'list(string)', 'env_vars_json': 'map(string)'},
         )
 
         # Server replicas - server_id same-module FK
@@ -2206,23 +2694,15 @@ class TerraformExporter:
             add_output=False,
         )
 
-        # Identities - team_id same-module FK, sensitive: pat_hash, idp_user_info
-        ident_secret_fields = {}
-        if not (self.include_secrets or self.include_users_identities):
-            ident_secret_fields = {
-                'pat_hash': 'mcp_identities_pat_hashes',
-                'idp_user_info': 'mcp_identities_idp_info',
-            }
-            self._add_secret_map_var(mod, 'mcp_identities_pat_hashes', 'MCP identity PAT hashes',
-                                     name_map_key='mcp_identities')
-            self._add_secret_map_var(mod, 'mcp_identities_idp_info', 'MCP identity provider info',
-                                     name_map_key='mcp_identities')
-
+        # Identities - team_id same-module FK.
+        # The provider has idp_user_info (non-sensitive) but not pat_hash.
+        # pat_hash is in PROVIDER_FIELD_OVERRIDES skip set.
+        # idp_user_info is NOT sensitive in the provider, so it's exported as
+        # a regular field (not a secret).
         self._add_for_each_collection(
             mod, 'mcp_identity', 'mcp_identities', McpIdentity,
             'Map of MCP identity name to configuration',
             same_module_fks={'team_id': ('mcp_team', False)},
-            secret_fields=ident_secret_fields,
             filter_fn=lambda i: i.team_id in valid_team_ids,
         )
 
@@ -2309,6 +2789,16 @@ class TerraformExporter:
                 if row.get('frontmatter'):
                     fname = f'skills/{sv_key}.json'
                     self.extra_files[f'environments/dev/files/mcp-gateway/{fname}'] = json.dumps(row['frontmatter'], indent=2)
+
+        # MCP alert config — singleton with webhook_url and thresholds map
+        mod.add_variable('mcp_alert_config', 'any', 'MCP alert configuration (singleton)', '{}')
+        mod.add_section('MCP Alert Config')
+        mod.blocks.append(
+            'resource "corex_mcp_alert_config" "this" {\n'
+            '  webhook_url = try(var.mcp_alert_config["webhook_url"], null)\n'
+            '  thresholds  = try(var.mcp_alert_config["thresholds"], null)\n'
+            '}'
+        )
 
         return mod
 
@@ -2435,7 +2925,13 @@ class TerraformExporter:
         )
 
     def _generate_versions_tf(self) -> str:
-        """Generate versions.tf with Terraform version and provider requirements."""
+        """Generate versions.tf with Terraform version and provider requirements.
+
+        The provider is installed locally via `make install` (VERSION=dev by
+        default). The version constraint accepts any version so the local
+        dev build is picked up. Once published to the Terraform Registry,
+        pin to a real version constraint (e.g. ~> 0.1).
+        """
         return '''# Terraform and provider version constraints
 # Auto-generated by coreX Manager Terraform Export
 
@@ -2445,7 +2941,10 @@ terraform {
   required_providers {
     corex = {
       source  = "ne4u/corex"
-      version = "~> 0.1"
+      # The provider is installed locally via `make install` (VERSION=dev).
+      # Once published to the Terraform Registry, pin to a real version
+      # (e.g. ~> 0.1) and remove the dev_overrides entry from ~/.terraformrc.
+      version = ">= 0.0.1"
     }
   }
 }
@@ -2535,16 +3034,15 @@ data "vault_generic_secret" "corex" {
 #   corex_host = "https://corex.prod.example.com"
 #
 # dev.secrets.tfvars (gitignored, or use TF_VAR_ env vars):
-#   corex_password             = data.vault_generic_secret.corex.data["password"]
-#   users_hashed_passwords     = jsondecode(data.vault_generic_secret.corex.data["users_hashed_passwords"])
-#   certificates_dns_credentials = jsondecode(data.vault_generic_secret.corex.data["cert_dns_credentials"])
+#   corex_password                = data.vault_generic_secret.corex.data["password"]
+#   certificates_dns_credentials  = jsondecode(data.vault_generic_secret.corex.data["cert_dns_credentials"])
 ```
 
 ### Option 3: Environment variables
 
 ```bash
 export TF_VAR_corex_password="..."
-export TF_VAR_users_hashed_passwords='{"admin":"...","api_user":"..."}'
+export TF_VAR_certificates_dns_credentials='{"wildcard":{"api_key":"..."}}'
 terraform apply -var-file=environments/dev.tfvars
 ```
 
@@ -2569,19 +3067,41 @@ replace the `"change-me"` values with real secrets or secrets manager references
         if not (self.include_secrets or self.include_certs):
             cert_secret_fields = {'dns_credentials'}
         self._add_tfvars_collection(tfvars, 'certificates', Certificate,
-            secret_fields=cert_secret_fields)
-        self._add_tfvars_collection(tfvars, 'cipher_suites', CipherSuite)
+            secret_fields=cert_secret_fields,
+            resource_type='certificate',
+            value_transforms={
+                'dns_credentials': lambda v: _try_json_parse(v),
+            })
+        self._add_tfvars_collection(tfvars, 'cipher_suites', CipherSuite,
+            value_transforms={'tls_options': lambda v: v.split() if v else []})
+        
+        # SSL Labs settings — singleton per certificate.
+        # cert_id is NOT included in tfvars — it's wired to the local
+        # certificate resource ID in the module (corex_certificate.this[each.key].id).
+        from ..services.ssllabs import get_max_scans_per_host
+        max_scans = get_max_scans_per_host(self.db)
+        ssl_labs_data = {}
+        for cert in self._query_all(Certificate):
+            cert_slug = _sanitize_name(cert.name)
+            ssl_labs_data[cert_slug] = {
+                'max_scans_per_host': max_scans,
+            }
+        if ssl_labs_data:
+            tfvars['ssl_labs_settings'] = ssl_labs_data
         
         # Routing module
         self._add_tfvars_collection(tfvars, 'fcgi_apps', FcgiApp)
         self._add_tfvars_collection(tfvars, 'backends', Backend,
-            same_module_fk_maps={'fcgi_app_id': 'fcgi_apps'})
+            same_module_fk_maps={'fcgi_app_id': 'fcgi_apps'},
+            resource_type='backend')
         self._add_tfvars_collection(tfvars, 'servers', Server,
-            same_module_fk_maps={'backend_id': 'backends'})
+            same_module_fk_maps={'backend_id': 'backends'},
+            resource_type='server')
         self._add_tfvars_collection(tfvars, 'listeners', Listener,
             cross_module_fks={'certificate_id': 'certificates'},
             same_module_fk_maps={'default_backend_id': 'backends'},
-            fk_list_fields={'certificate_ids': 'certificates'})
+            fk_list_fields={'certificate_ids': 'certificates'},
+            resource_type='listener')
         self._add_tfvars_collection(tfvars, 'backend_rules', BackendRule,
             same_module_fk_maps={'listener_id': 'listeners', 'backend_id': 'backends'})
         
@@ -2702,18 +3222,23 @@ replace the `"change-me"` values with real secrets or secrets manager references
         
         # Security rules
         self._add_tfvars_collection(tfvars, 'security_rules', SecurityRule,
-            fk_list_fields={'listener_ids': 'listeners'})
+            fk_list_fields={'listener_ids': 'listeners'},
+            resource_type='security_rule')
         
         # WAF
-        self._add_tfvars_collection(tfvars, 'waf_siem_integrations', WafSiemIntegration)
         self._add_tfvars_collection(tfvars, 'waf_rules', WafRule,
             cross_module_fks={'listener_id': 'listeners', 'backend_id': 'backends'},
-            same_module_fk_maps={'siem_integration_id': 'waf_siem_integrations'})
+            resource_type='waf_rule',
+            value_transforms={'http_methods': lambda v: [m for m in str(v).split(',') if m] if v else v})
         self._add_tfvars_collection(tfvars, 'waf_exceptions', WafException,
-            same_module_fk_maps={'waf_rule_id': 'waf_rules'})
+            same_module_fk_maps={'waf_rule_id': 'waf_rules'},
+            resource_type='waf_exception')
         
         # Cache — nest rules under their config for readability
         backend_map = self.name_maps.get('backends', {})
+        cc_overrides = _resolve_provider_overrides('cache_config', CacheConfig)
+        cc_provider_skip = cc_overrides['skip']
+        cc_provider_rename = cc_overrides['rename']
         cc_rows = self._query_all(CacheConfig)
         if cc_rows:
             cc_data = {}
@@ -2733,14 +3258,15 @@ replace the `"change-me"` values with real secrets or secrets manager references
                 key = f"cache_{backend_map.get(cc.backend_id, 'unknown')}"
                 entry = {}
                 for k, v in row_dict.items():
-                    if v is None or k == 'name':
+                    if v is None or k == 'name' or k in cc_provider_skip:
                         continue
+                    tfvars_key = cc_provider_rename.get(k, k)
                     if k == 'backend_id':
                         name_map = self.name_maps.get('backends', {})
                         if v in name_map:
-                            entry[k] = name_map[v]
+                            entry[tfvars_key] = name_map[v]
                     else:
-                        entry[k] = v
+                        entry[tfvars_key] = v
                 # Nest rules under the config
                 rules = rules_by_config.get(cc.id, [])
                 if rules:
@@ -2757,6 +3283,30 @@ replace the `"change-me"` values with real secrets or secrets manager references
         # Page protect
         self._add_tfvars_collection(tfvars, 'page_protect_policies', PageProtectPolicy,
             fk_list_fields={'backend_ids': 'backends'})
+        self._add_tfvars_collection(tfvars, 'page_protect_scripts', PageProtectScript,
+            name_attr='url',
+            filter_fn=lambda s: (s.source or '').lower() == 'manual',
+            resource_type='page_protect_script')
+        
+        # Page protect settings (singleton)
+        pp_settings = get_page_protect_settings(self.db)
+        pp_data = {}
+        pp_data['monitoring_enabled'] = pp_settings.get('monitoring_enabled', False)
+        pp_data['change_detection_enabled'] = pp_settings.get('change_detection_enabled', False)
+        pp_data['change_detection_interval_hours'] = pp_settings.get('change_detection_interval_hours', 24)
+        pp_data['report_retention_days'] = pp_settings.get('report_retention_days', 7)
+        pp_data['report_path'] = pp_settings.get('report_path', '')
+        pp_data['beacon_injection_enabled'] = pp_settings.get('beacon_injection_enabled', False)
+        pp_data['beacon_trust_enabled'] = pp_settings.get('beacon_trust_enabled', False)
+        beacon_path = pp_settings.get('beacon_path', '')
+        pp_data['beacon_paths'] = [beacon_path] if beacon_path else []
+        ct = pp_settings.get('beacon_content_types', '')
+        pp_data['beacon_content_types'] = [c.strip() for c in ct.split(',') if c.strip()] if ct else []
+        pp_patterns = pp_settings.get('beacon_path_patterns', '')
+        pp_data['beacon_patterns'] = [p.strip() for p in pp_patterns.split(',') if p.strip()] if pp_patterns else []
+        pp_data['backend_ids'] = pp_settings.get('beacon_backend_ids', [])
+        pp_data['auto_prune_stale_days'] = pp_settings.get('auto_prune_stale_days', 7)
+        tfvars['page_protect_settings'] = pp_data
         
         # API Armor
         self._add_tfvars_collection(tfvars, 'auth_policies', AuthPolicy,
@@ -2794,7 +3344,8 @@ replace the `"change-me"` values with real secrets or secrets manager references
         if not (self.include_secrets or self.include_users_identities):
             user_secret_fields = {'hashed_password', 'totp_secret'}
         self._add_tfvars_collection(tfvars, 'users', User, name_attr='username',
-            secret_fields=user_secret_fields)
+            secret_fields=user_secret_fields,
+            resource_type='user')
         
         # Management - settings (key-value pairs)
         settings = self._query_all(Setting)
@@ -2821,7 +3372,8 @@ replace the `"change-me"` values with real secrets or secrets manager references
             name_fn=lambda ut: f"member_{mcp_team_map.get(ut.team_id, 'unknown')}_{user_map.get(ut.user_id, 'unknown')}",
             same_module_fk_maps={'team_id': 'mcp_teams'},
             cross_module_fks={'user_id': 'users'},
-            filter_fn=lambda ut: ut.team_id in valid_team_ids)
+            filter_fn=lambda ut: ut.team_id in valid_team_ids,
+            resource_type='mcp_team_member')
         # MCP servers - secret fields: auth_secret_enc, oauth_client_secret_enc, env_vars_json
         srv_secret_fields = set()
         if not (self.include_secrets or self.include_system_secrets):
@@ -2829,12 +3381,18 @@ replace the `"change-me"` values with real secrets or secrets manager references
         self._add_tfvars_collection(tfvars, 'mcp_servers', McpServer,
             same_module_fk_maps={'team_id': 'mcp_teams'},
             secret_fields=srv_secret_fields,
-            filter_fn=lambda s: s.namespace != 'corex-manager' and s.team_id in valid_team_ids)
+            filter_fn=lambda s: s.namespace != 'corex-manager' and s.team_id in valid_team_ids,
+            resource_type='mcp_server',
+            value_transforms={
+                'args_json': _try_json_parse,
+                'env_vars_json': _try_json_parse,
+            })
         mcp_server_map = self.name_maps.get('mcp_servers', {})
         self._add_tfvars_collection(tfvars, 'mcp_server_replicas', McpServerReplica,
             name_fn=lambda r: f"replica_{mcp_server_map.get(r.server_id, 'unknown')}_{r.id}",
             same_module_fk_maps={'server_id': 'mcp_servers'},
-            filter_fn=lambda r: r.server_id in set(mcp_server_map.keys()))
+            filter_fn=lambda r: r.server_id in set(mcp_server_map.keys()),
+            resource_type='mcp_server_replica')
         # MCP identities - secret fields: pat_hash, idp_user_info
         ident_secret_fields = set()
         if not (self.include_secrets or self.include_users_identities):
@@ -2842,19 +3400,24 @@ replace the `"change-me"` values with real secrets or secrets manager references
         self._add_tfvars_collection(tfvars, 'mcp_identities', McpIdentity,
             same_module_fk_maps={'team_id': 'mcp_teams'},
             secret_fields=ident_secret_fields,
-            filter_fn=lambda i: i.team_id in valid_team_ids)
+            filter_fn=lambda i: i.team_id in valid_team_ids,
+            resource_type='mcp_identity')
         self._add_tfvars_collection(tfvars, 'mcp_policies', McpPolicy,
             same_module_fk_maps={'team_id': 'mcp_teams'},
-            filter_fn=lambda p: p.team_id in valid_team_ids)
+            filter_fn=lambda p: p.team_id in valid_team_ids,
+            resource_type='mcp_policy')
         self._add_tfvars_collection(tfvars, 'mcp_dlp_rules', McpDlpRule,
             same_module_fk_maps={'team_id': 'mcp_teams'},
-            filter_fn=lambda r: r.team_id in valid_team_ids)
+            filter_fn=lambda r: r.team_id in valid_team_ids,
+            resource_type='mcp_dlp_rule')
         self._add_tfvars_collection(tfvars, 'mcp_guardrails', McpGuardrail,
             same_module_fk_maps={'team_id': 'mcp_teams'},
-            filter_fn=lambda g: g.team_id in valid_team_ids)
+            filter_fn=lambda g: g.team_id in valid_team_ids,
+            resource_type='mcp_guardrail')
         self._add_tfvars_collection(tfvars, 'mcp_skills', McpSkill,
             same_module_fk_maps={'team_id': 'mcp_teams'},
-            filter_fn=lambda s: s.name != 'corex-manager' and s.team_id in valid_team_ids)
+            filter_fn=lambda s: s.name != 'corex-manager' and s.team_id in valid_team_ids,
+            resource_type='mcp_skill')
         skill_map = self.name_maps.get('mcp_skills', {})
         # Filter out self-registered skill versions (same filter as the module builder)
         self_reg_skill_ids = {s.id for s in self._query_all(McpSkill) if s.name == 'corex-manager'}
@@ -2862,7 +3425,23 @@ replace the `"change-me"` values with real secrets or secrets manager references
             name_fn=lambda sv: f"version_{skill_map.get(sv.skill_id, 'unknown')}_v{sv.version}",
             same_module_fk_maps={'skill_id': 'mcp_skills'},
             skip_fields={'body', 'frontmatter'},
-            filter_fn=lambda sv: sv.skill_id not in self_reg_skill_ids)
+            filter_fn=lambda sv: sv.skill_id not in self_reg_skill_ids,
+            resource_type='mcp_skill_version')
+        
+        # MCP alert config — singleton
+        import os as _os
+        alert_webhook = _os.environ.get('MCP_ALERT_WEBHOOK_URL', '')
+        alert_thresholds = {}
+        alert_row = self.db.query(Setting).filter(Setting.key == 'mcp_alert_thresholds').first()
+        if alert_row and alert_row.value:
+            try:
+                alert_thresholds = json.loads(alert_row.value)
+            except (json.JSONDecodeError, ValueError):
+                pass
+        tfvars['mcp_alert_config'] = {
+            'webhook_url': alert_webhook,
+            'thresholds': alert_thresholds,
+        }
         
         return tfvars
 
@@ -2916,7 +3495,7 @@ replace the `"change-me"` values with real secrets or secrets manager references
         in production (Vault, AWS Secrets Manager, etc.).
         Contains:
           - corex_password (provider credential)
-          - Standalone secret map vars (users_hashed_passwords, etc.) with
+          - Standalone secret map vars (mcp_servers_auth_secrets, etc.) with
             per-resource keys pre-populated
           - Singleton secret string vars (maxmind_license_key)
           - captcha_secrets map (cap_secret, recaptcha_secret, turnstile_secret)
@@ -2931,7 +3510,7 @@ replace the `"change-me"` values with real secrets or secrets manager references
             '#',
             '# For production, replace this file with secrets manager references, e.g.:',
             '#   corex_password = data.vault_generic_secret.corex.data["password"]',
-            '#   users_hashed_passwords = jsondecode(data.vault_generic_secret.corex.data["users_hashed_passwords"])',
+            '#   certificates_dns_credentials = jsondecode(data.vault_generic_secret.corex.data["cert_dns_credentials"])',
             '',
             '# Provider connection',
             'corex_password = "change-me"',
@@ -2961,9 +3540,14 @@ replace the `"change-me"` values with real secrets or secrets manager references
                     # Pre-populate with actual resource names from the name map
                     name_map_key = self.secret_var_name_maps.get(var_name)
                     name_map = self.name_maps.get(name_map_key, {}) if name_map_key else {}
+                    hcl_type = self.secret_var_hcl_types.get(var_name)
                     if name_map:
                         for resource_name in sorted(name_map.values()):
-                            lines.append(f'  {_hcl_string(resource_name)} = "change-me"')
+                            if hcl_type == 'map(map(string))':
+                                # dns_credentials is a map per cert, not a string
+                                lines.append(f'  {_hcl_string(resource_name)} = {{}}')
+                            else:
+                                lines.append(f'  {_hcl_string(resource_name)} = "change-me"')
                     else:
                         lines.append(f'  # "<resource_name>" = "<secret_value>"')
                     lines.append('}')
@@ -2979,7 +3563,7 @@ terraform {
   required_providers {
     corex = {
       source  = "ne4u/corex"
-      version = "~> 0.1"
+      version = ">= 0.0.1"
     }
   }
 }
@@ -3061,7 +3645,6 @@ provider "corex" {
             # Security rules module
             'security_rules': 'Security filtering rules',
             # WAF module
-            'waf_siem_integrations': 'WAF SIEM integrations',
             'waf_rules': 'WAF ruleset configurations',
             'waf_exceptions': 'WAF rule exceptions',
             # Cache module
@@ -3071,6 +3654,8 @@ provider "corex" {
             'logged_fields': 'Custom logged fields',
             # Page protect module
             'page_protect_policies': 'Page protect CSP policies',
+            'page_protect_scripts': 'Page protect scripts',
+            'page_protect_settings': 'Page protect settings (singleton)',
             # API Armor module
             'auth_policies': 'API authentication policies',
             'api_key_lists': 'API key lists',
@@ -3082,7 +3667,7 @@ provider "corex" {
             # Management module
             'users': 'User accounts',
             'settings': 'System settings',
-            'haproxy_global_options': 'HAProxy global options (JSON string)',
+            'haproxy_global_options': 'HAProxy global options (list of objects)',
             'captcha_settings': 'Captcha configuration',
             'captcha_secrets': 'Captcha secret keys (cap_secret, recaptcha_secret, turnstile_secret)',
             'maxmind_license_key': 'MaxMind license key',
@@ -3099,29 +3684,32 @@ provider "corex" {
             'mcp_guardrails': 'MCP Gateway guardrails',
             'mcp_skills': 'MCP Gateway skills',
             'mcp_skill_versions': 'MCP Gateway skill versions',
+            'mcp_alert_config': 'MCP alert configuration (singleton)',
+            # SSL module extras
+            'ssl_labs_settings': 'SSL Labs settings per certificate',
         }
 
         # Determine which modules were generated, and only declare variables
         # for collections belonging to those modules.
         module_collections_map = {
-            'ssl': ['certificates', 'cipher_suites'],
+            'ssl': ['certificates', 'cipher_suites', 'ssl_labs_settings'],
             'routing': ['fcgi_apps', 'backends', 'servers', 'listeners', 'backend_rules'],
             'traffic': ['error_pages', 'rate_limits', 'response_headers',
                        'request_headers', 'redirects', 'rewrites', 'response_transforms'],
             'security-lists': ['network_lists', 'asn_lists', 'geo_lists', 'ja4_lists',
                               'pattern_lists', 'dynamic_feeds'],
             'security-rules': ['security_rules'],
-            'waf': ['waf_siem_integrations', 'waf_rules', 'waf_exceptions'],
+            'waf': ['waf_rules', 'waf_exceptions'],
             'cache': ['cache_configs'],
             'observability': ['log_destinations', 'logged_fields'],
-            'page-protect': ['page_protect_policies'],
+            'page-protect': ['page_protect_policies', 'page_protect_scripts', 'page_protect_settings'],
             'api-armor': ['api_armor_settings', 'auth_policies', 'api_key_lists', 'openapi_specs', 'api_schemas'],
             'risk-scoring': ['risk_rulesets', 'risk_rules'],
             'management': ['users', 'settings', 'haproxy_global_options', 'captcha_settings',
                           'captcha_secrets', 'ha_config'],
             'mcp-gateway': ['mcp_teams', 'mcp_team_members', 'mcp_servers', 'mcp_server_replicas',
                           'mcp_identities', 'mcp_policies', 'mcp_dlp_rules', 'mcp_guardrails',
-                          'mcp_skills', 'mcp_skill_versions'],
+                          'mcp_skills', 'mcp_skill_versions', 'mcp_alert_config'],
         }
 
         # Collect all variable names that belong to generated modules
@@ -3148,18 +3736,8 @@ provider "corex" {
             for key in sorted(declared_vars):
                 desc = all_collection_vars.get(key, f'{key.replace("_", " ").title()} configuration')
                 # Special-case variables that are not map(object) collections.
-                # haproxy_global_options is a JSON string (the module jsondecode()s it);
                 # maxmind_license_key is a plain string.
-                if key == 'haproxy_global_options':
-                    lines.extend([
-                        f'variable "{key}" {{',
-                        f'  type        = string',
-                        f'  description = "{desc}"',
-                        f'  default     = "[]"',
-                        f'}}',
-                        '',
-                    ])
-                elif key == 'maxmind_license_key':
+                if key == 'maxmind_license_key':
                     lines.extend([
                         f'variable "{key}" {{',
                         f'  type        = string',
@@ -3170,11 +3748,13 @@ provider "corex" {
                     ])
                 else:
                     var_type = self.collection_types.get(key, 'any')
+                    # Lists default to [], maps default to {}
+                    default_val = '[]' if var_type.startswith('list(') else '{}'
                     lines.extend([
                         f'variable "{key}" {{',
                         f'  type        = {var_type}',
                         f'  description = "{desc}"',
-                        f'  default     = {{}}',
+                        f'  default     = {default_val}',
                         f'}}',
                         '',
                     ])
@@ -3224,7 +3804,8 @@ provider "corex" {
             ])
             for var_name, desc in sorted(self.secret_vars.items()):
                 vtype = self.secret_var_types.get(var_name, 'map')
-                vtype_hcl = 'string' if vtype == 'string' else 'map(string)'
+                hcl_type = self.secret_var_hcl_types.get(var_name)
+                vtype_hcl = hcl_type or ('string' if vtype == 'string' else 'map(string)')
                 lines.extend([
                     f'variable "{var_name}" {{',
                     f'  type        = {vtype_hcl}',
@@ -3283,8 +3864,8 @@ provider "corex" {
         # file_pattern uses ${each.key} or ${k} which we translate to Terraform for expressions
         file_var_map: Dict[str, Dict[str, str]] = {
             'ssl': {
-                'cert_fullchains': '{ for k, v in var.certificates : k => v.provider == "custom" ? try(file("${path.module}/environments/${var.environment}/files/ssl/${k}_fullchain.pem"), "") : "" }',
-                'cert_keys': '{ for k, v in var.certificates : k => v.provider == "custom" ? try(file("${path.module}/environments/${var.environment}/files/ssl/${k}_key.pem"), "") : "" }',
+                'cert_fullchains': '{ for k, v in var.certificates : k => v.provider_name == "custom" ? try(file("${path.module}/environments/${var.environment}/files/ssl/${k}_fullchain.pem"), "") : "" }',
+                'cert_keys': '{ for k, v in var.certificates : k => v.provider_name == "custom" ? try(file("${path.module}/environments/${var.environment}/files/ssl/${k}_key.pem"), "") : "" }',
             },
             'traffic': {
                 'error_page_contents': '{ for k, v in var.error_pages : k => try(file("${path.module}/environments/${var.environment}/files/traffic/error_${k}.html"), "") }',
@@ -3298,7 +3879,9 @@ provider "corex" {
             },
             'mcp-gateway': {
                 'mcp_skill_bodies': '{ for k, v in var.mcp_skill_versions : k => try(file("${path.module}/environments/${var.environment}/files/mcp-gateway/skills/${k}.md"), "") }',
-                'mcp_skill_frontmatters': '{ for k, v in var.mcp_skill_versions : k => try(jsondecode(file("${path.module}/environments/${var.environment}/files/mcp-gateway/skills/${k}.json")), null) }',
+                # Provider wants frontmatter as a JSON string, not a decoded object.
+                # Pass the raw file content (which is JSON) as a string.
+                'mcp_skill_frontmatters': '{ for k, v in var.mcp_skill_versions : k => try(file("${path.module}/environments/${var.environment}/files/mcp-gateway/skills/${k}.json"), null) }',
             },
         }
         return file_var_map.get(mod_name, {})
@@ -3356,24 +3939,24 @@ provider "corex" {
 
         # Map module names to their collection variables
         module_collections = {
-            'ssl': ['certificates', 'cipher_suites'],
+            'ssl': ['certificates', 'cipher_suites', 'ssl_labs_settings'],
             'routing': ['fcgi_apps', 'backends', 'servers', 'listeners', 'backend_rules'],
             'traffic': ['error_pages', 'rate_limits', 'response_headers', 
                        'request_headers', 'redirects', 'rewrites', 'response_transforms'],
             'security-lists': ['network_lists', 'asn_lists', 'geo_lists', 'ja4_lists', 
                               'pattern_lists', 'dynamic_feeds'],
             'security-rules': ['security_rules'],
-            'waf': ['waf_siem_integrations', 'waf_rules', 'waf_exceptions'],
+            'waf': ['waf_rules', 'waf_exceptions'],
             'cache': ['cache_configs'],
             'observability': ['log_destinations', 'logged_fields'],
-            'page-protect': ['page_protect_policies'],
+            'page-protect': ['page_protect_policies', 'page_protect_scripts', 'page_protect_settings'],
             'api-armor': ['api_armor_settings', 'auth_policies', 'api_key_lists', 'openapi_specs', 'api_schemas'],
             'risk-scoring': ['risk_rulesets', 'risk_rules'],
             'management': ['users', 'settings', 'haproxy_global_options', 'captcha_settings',
                           'captcha_secrets', 'ha_config'],
             'mcp-gateway': ['mcp_teams', 'mcp_team_members', 'mcp_servers', 'mcp_server_replicas',
                           'mcp_identities', 'mcp_policies', 'mcp_dlp_rules', 'mcp_guardrails',
-                          'mcp_skills', 'mcp_skill_versions'],
+                          'mcp_skills', 'mcp_skill_versions', 'mcp_alert_config'],
         }
 
         # Cross-module dependencies (ID maps passed between modules)
@@ -3489,8 +4072,7 @@ provider "corex" {
 
         Singleton resources now have ImportState in the provider and can be
         imported. The import ID is arbitrary (the provider sets the fixed
-        singleton ID on Read). page_protect_settings is not yet exported
-        due to a provider client model mismatch with the backend API.
+        singleton ID on Read).
         """
         tfvars = self._build_tfvars_data()
 
@@ -3539,8 +4121,9 @@ provider "corex" {
             # Observability
             ('log_destinations', 'log_destination', 'observability', 'name', None),
             ('logged_fields', 'logged_field', 'observability', 'numeric', LoggedField),
-            # Page protect — by name
+            # Page protect — by name/URL
             ('page_protect_policies', 'page_protect_policy', 'page-protect', 'name', None),
+            ('page_protect_scripts', 'page_protect_script', 'page-protect', 'url', None),
             # API armor — by name
             ('auth_policies', 'api_armor_auth_policy', 'api-armor', 'name', None),
             ('api_key_lists', 'api_armor_api_key_list', 'api-armor', 'name', None),
@@ -3568,6 +4151,10 @@ provider "corex" {
             ('captcha_settings', 'captcha_settings', 'management', 'singleton', None),
             ('ha_config', 'ha_config', 'management', 'singleton', None),
             ('api_armor_settings', 'api_armor_settings', 'api-armor', 'singleton', None),
+            ('page_protect_settings', 'page_protect_settings', 'page-protect', 'singleton', None),
+            ('mcp_alert_config', 'mcp_alert_config', 'mcp-gateway', 'singleton', None),
+            # SSL Labs settings — singleton per cert, import by cert ID (string)
+            ('ssl_labs_settings', 'ssl_labs_settings', 'ssl', 'ssl_labs_cert_id', None),
         ]
 
         lines = [
@@ -3592,15 +4179,13 @@ provider "corex" {
             '#   composite  — mcp_team_member uses "{team_name}:{user_username}" (portable)',
             '#   key        — settings use the setting key string',
             '#   singleton  — fixed identifier; import ID is arbitrary (provider sets ID on Read)',
+            '#   url        — page protect scripts use the script URL as import ID',
+            '#   ssl_labs_cert_id — SSL Labs settings use the certificate ID as import ID',
             '#',
             '# Singleton resources (captcha_settings, ha_config,',
-            '# api_armor_settings, global_options) now have ImportState',
+            '# api_armor_settings, global_options, page_protect_settings,',
+            '# mcp_alert_config) now have ImportState',
             '# in the provider and are imported above.',
-            '#',
-            '# NOTE: page_protect_settings is not yet exported because the',
-            '# provider client model has a field name/type mismatch with the',
-            '# backend API (beacon_path vs beacon_paths, string vs []string).',
-            '# Fix the provider client model before emitting this resource.',
             '',
         ]
 
@@ -3799,6 +4384,43 @@ provider "corex" {
                 lines.append('')
                 import_count += 1
 
+            # ── URL-based imports (page_protect_script: import by URL) ──
+            elif id_mode == 'url':
+                col_data = tfvars.get(var_name, {})
+                if not col_data:
+                    continue
+                for key, entry in col_data.items():
+                    import_id = entry.get('url', key) if isinstance(entry, dict) else key
+                    lines.append(f'import {{')
+                    lines.append(f'  to = module.{mod_addr}.corex_{resource_type}.this["{key}"]')
+                    lines.append(f'  id = "{import_id}"')
+                    lines.append(f'}}')
+                    lines.append('')
+                    import_count += 1
+
+            # ── SSL Labs settings imports (singleton per cert, import by numeric cert ID) ──
+            # The provider's Read parses state.ID as the cert ID (integer).
+            # The resource block wires cert_id to corex_certificate.this[each.key].id,
+            # so the import ID must be the numeric cert ID from the DB.
+            elif id_mode == 'ssl_labs_cert_id':
+                col_data = tfvars.get(var_name, {})
+                if not col_data:
+                    continue
+                # Build cert_slug → cert_id map from DB
+                cert_id_by_slug = {
+                    _sanitize_name(c.name): c.id for c in self._query_all(Certificate)
+                }
+                for key in col_data:
+                    cert_id = cert_id_by_slug.get(key)
+                    if cert_id is None:
+                        continue
+                    lines.append(f'import {{')
+                    lines.append(f'  to = module.{mod_addr}.corex_{resource_type}.this["{key}"]')
+                    lines.append(f'  id = "{cert_id}"')
+                    lines.append(f'}}')
+                    lines.append('')
+                    import_count += 1
+
         if import_count == 0:
             lines.append('# No importable resources found in the current configuration.')
             lines.append('')
@@ -3959,6 +4581,41 @@ This enables:
 - **Multiple instances** — instantiate modules multiple times
 - **Clean separation** — resource logic in modules, data in environment files
 
+## Notes & Limitations
+
+### Users (import-only for identity fields)
+
+The provider's `corex_user` resource has a write-only `password` field but no
+`hashed_password` or `totp_secret` field. Existing password hashes and TOTP
+secrets cannot be round-tripped through the provider. Users are imported with
+their current identity attributes (username, role, email, etc.), but
+**passwords must be set out-of-band** after import (e.g. via the UI or the
+password reset flow).
+
+### MCP identities (PATs cannot be round-tripped)
+
+The provider's `corex_mcp_identity` resource has a computed `pat_prefix` field
+but no `pat_hash` field. Existing PAT hashes cannot be round-tripped. Identities
+are imported with their current attributes, but **PATs must be regenerated**
+after import if you need new tokens.
+
+### CAPTCHA keys (not exported)
+
+`corex_captcha_key` resources are not exported because Cap site keys are managed
+by the external Cap service (a separate HTTP API at `CAP_SERVICE_URL`), not by
+the coreX Manager backend database. There is no backend table or model
+representing Cap keys. To manage Cap keys, use the Cap service API directly or
+the coreX Manager UI (System → CAPTCHA → Cap Keys).
+
+### Page protect settings (field name mapping)
+
+The backend stores page protect settings with different field names than the
+provider expects. The exporter maps these automatically:
+- `beacon_path` (string) → `beacon_paths` (list)
+- `beacon_content_types` (comma-separated string) → `beacon_content_types` (list)
+- `beacon_path_patterns` (comma-separated string) → `beacon_patterns` (list)
+- `beacon_backend_ids` (JSON list) → `backend_ids` (list of int)
+
 ## Importing Existing Resources
 
 If coreX already has resources configured (e.g. via the UI or API), the export
@@ -4002,8 +4659,11 @@ secret values to version control.** Choose one of these approaches for productio
 Fill in `environments/dev.secrets.tfvars` (already in `.gitignore`):
 
 ```hcl
-users_admin_hashed_password = "..."
-users_admin_totp_secret     = "..."
+certificates_dns_credentials = {{
+  "wildcard" = {{
+    api_key = "..."
+  }}
+}}
 ```
 
 ### Option 2: Environment variables (CI/CD)
@@ -4011,8 +4671,8 @@ users_admin_totp_secret     = "..."
 Set `TF_VAR_*` environment variables in your CI/CD pipeline:
 
 ```bash
-export TF_VAR_users_admin_hashed_password='...'
-export TF_VAR_users_admin_totp_secret='...'
+export TF_VAR_certificates_dns_credentials='{{"wildcard":{{"api_key":"..."}}}}'
+export TF_VAR_mcp_servers_auth_secrets='{{"tools":"secret-token"}}'
 terraform apply
 ```
 

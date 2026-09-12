@@ -438,11 +438,11 @@ export default function Waf() {
           <div className="flex items-center justify-between"><h3 className="text-xl font-bold">{t('waf.exceptions.title')}</h3><button onClick={openExAdd} className="btn-primary">{t('waf.exceptions.addException')}</button></div>
           <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
             <table className="w-full text-sm text-start">
-              <thead className="text-muted-foreground border-b border-border"><tr><th>{t('waf.exceptions.tableHeaders.name')}</th><th>{t('waf.exceptions.fields.conditionVariable')}</th><th>{t('waf.exceptions.fields.conditionOperator')}</th><th>{t('waf.exceptions.fields.conditionValue')}</th><th>{t('waf.exceptions.tableHeaders.action')}</th><th className="w-40 whitespace-nowrap">{t('waf.exceptions.tableHeaders.updated')}</th><th></th></tr></thead>
+              <thead className="text-muted-foreground border-b border-border"><tr><th>{t('waf.exceptions.tableHeaders.name')}</th><th>{t('waf.exceptions.fields.wafRule')}</th><th>{t('waf.exceptions.fields.conditionVariable')}</th><th>{t('waf.exceptions.fields.conditionOperator')}</th><th>{t('waf.exceptions.fields.conditionValue')}</th><th>{t('waf.exceptions.tableHeaders.action')}</th><th className="w-40 whitespace-nowrap">{t('waf.exceptions.tableHeaders.updated')}</th><th></th></tr></thead>
               <tbody>
                 {exceptions.map((e: any) => (
                   <tr key={e.id} className="border-b border-border last:border-0">
-                    <td className="py-2">{e.name}</td><td className="font-mono text-xs">{e.condition_variable || '-'}</td><td>{e.condition_variable ? e.condition_operator : '-'}</td><td className="max-w-xs truncate" title={e.condition_value || undefined}>{e.condition_value || '-'}</td><td>{e.action}</td><td className="py-2 text-xs text-muted-foreground whitespace-nowrap">{e.updated_at ? formatDateTime(e.updated_at) : '-'}</td>
+                    <td className="py-2">{e.name}</td><td className="py-2 text-xs">{e.waf_rule_id ? (rules.find((r: any) => r.id === e.waf_rule_id)?.name || `#${e.waf_rule_id}`) : t('waf.exceptions.fields.global')}</td><td className="font-mono text-xs">{e.condition_variable || '-'}</td><td>{e.condition_variable ? e.condition_operator : '-'}</td><td className="max-w-xs truncate" title={e.condition_value || undefined}>{e.condition_value || '-'}</td><td>{e.action}</td><td className="py-2 text-xs text-muted-foreground whitespace-nowrap">{e.updated_at ? formatDateTime(e.updated_at) : '-'}</td>
                     <td>
                       <div className="flex gap-1">
                         <IconButton icon={Pencil} aria-label={t('common:actions.edit')} onClick={() => openExEdit(e)} />

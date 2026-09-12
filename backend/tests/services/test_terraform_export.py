@@ -238,7 +238,7 @@ class TestCollectionCompleteness:
             'request_headers', 'redirects', 'rewrites', 'response_transforms',
             'network_lists', 'dynamic_feeds',
             'security_rules',
-            'waf_siem_integrations', 'waf_rules', 'waf_exceptions',
+            'waf_rules', 'waf_exceptions',
             'cache_configs',  # cache_rules are nested under cache_configs
             'log_destinations', 'logged_fields',
             'page_protect_policies',
@@ -301,8 +301,8 @@ class TestFKResolution:
         """Module main.tf should reference cross-module FKs via var.xxx_ids.
 
         FCGI apps were moved from traffic to routing to break a circular
-        dependency (routing ↔ traffic). Now fcgi_app_id is a same-module FK
-        resolved via corex_fcgi_app.this[...].id, not var.fcgi_app_ids.
+        dependency (routing ↔ traffic). fcgi_app_id is NOT in the provider's
+        backend schema, so it's skipped via PROVIDER_FIELD_OVERRIDES.
         """
         from app.models.models import FcgiApp
         fcgi = FcgiApp(name="php", docroot="/var/www")
@@ -311,8 +311,9 @@ class TestFKResolution:
         db.add(be); db.commit()
         zf = _export(db)
         routing_tf = _module_tf(zf, 'routing')
-        # FCGI apps are now in the routing module, so fcgi_app_id is a same-module FK
-        assert 'fcgi_app_id = try(corex_fcgi_app.this[each.value.fcgi_app_id].id, null)' in routing_tf
+        # fcgi_app_id is not in the provider schema — it should be skipped
+        assert 'fcgi_app_id' not in routing_tf, \
+            "fcgi_app_id should be skipped (not in provider backend schema)"
         # Verify no circular dependency: routing should NOT reference module.traffic
         assert 'module.traffic' not in routing_tf
 
@@ -438,8 +439,8 @@ class TestFKResolution:
         assert m is not None
         assert '"https"' in m.group(1)
 
-    def test_waf_siem_integration_fk_resolved(self, db):
-        """WAF rule's siem_integration_id should resolve to the SIEM integration name."""
+    def test_waf_siem_integration_id_is_raw_int(self, db):
+        """WAF rule's siem_integration_id is a raw int (no waf_siem_integration resource)."""
         be = make_backend(db, name="web")
         ln = make_listener(db, backend=be, name="https")
         siem = make_siem_integration(db, name="splunk")
@@ -450,9 +451,13 @@ class TestFKResolution:
         tv = _tfvars(zf)
         m = re.search(r'waf_rules = \{(.*?)\n\}', tv, re.DOTALL)
         assert m is not None
-        assert '"splunk"' in m.group(1)
+        # siem_integration_id is a raw int, not resolved to a name
+        assert '"siem_integration_id" = 1' in m.group(1)
         waf_tf = _module_tf(zf, 'waf')
-        assert 'siem_integration_id = try(corex_waf_siem_integration.this[each.value.siem_integration_id].id, null)' in waf_tf
+        # The resource block should emit it as a raw int, not a FK reference
+        assert 'siem_integration_id = try(each.value.siem_integration_id, null)' in waf_tf
+        # No waf_siem_integration resource should be emitted
+        assert 'corex_waf_siem_integration' not in waf_tf
 
 
 # ─── Secret flag behavior ──────────────────────────────────────────────────
@@ -481,9 +486,11 @@ class TestSecretFlags:
         db.add(Setting(key="keepalived_auth_password", value="SECRET_HA_PASSWORD"))
         db.commit()
 
+    # Note: hashed_password, totp_secret, and pat_hash are not in the provider
+    # schema, so they're skipped entirely and never appear in tfvars.
     SECRET_VALUES = [
-        "SECRET_HASHED_PASSWORD", "SECRET_TOTP", "SECRET_AUTH_TOKEN",
-        "SECRET_PAT_HASH", "SECRET_DNS_CREDENTIALS", "SECRET_MAXMIND_KEY",
+        "SECRET_AUTH_TOKEN",
+        "SECRET_DNS_CREDENTIALS", "SECRET_MAXMIND_KEY",
         "SECRET_CAP_SECRET", "SECRET_HA_PASSWORD",
     ]
 
@@ -497,16 +504,22 @@ class TestSecretFlags:
             assert s not in tv, f"Secret '{s}' leaked in tfvars with all flags off"
 
     def test_all_flags_off_secret_placeholders_in_modules(self, db):
-        """With all flags off, modules should have var.xxx placeholders."""
+        """With all flags off, modules should have var.xxx placeholders for secrets.
+
+        Note: hashed_password, totp_secret, and pat_hash are not in the provider
+        schema, so they're skipped entirely (not emitted as placeholders).
+        """
         self._populate_with_secrets(db)
         zf = _export(db, include_secrets=False, include_certs=False,
                      include_users_identities=False, include_system_secrets=False)
         mgmt_tf = _module_tf(zf, 'management')
-        assert 'var.users_hashed_passwords' in mgmt_tf
-        assert 'var.users_totp_secrets' in mgmt_tf
+        # hashed_password and totp_secret are not in the provider schema — skipped
+        assert 'hashed_password' not in mgmt_tf
+        assert 'totp_secret' not in mgmt_tf
         mcp_tf = _module_tf(zf, 'mcp-gateway')
         assert 'var.mcp_servers_auth_secrets' in mcp_tf
-        assert 'var.mcp_identities_pat_hashes' in mcp_tf
+        # pat_hash is not in the provider schema — skipped
+        assert 'pat_hash' not in mcp_tf
         ssl_tf = _module_tf(zf, 'ssl')
         assert 'var.certificates_dns_credentials' in ssl_tf
 
@@ -531,14 +544,19 @@ class TestSecretFlags:
             assert s not in tv, f"Secret '{s}' leaked with include_certs=True only"
 
     def test_include_users_identities_only(self, db):
-        """include_users_identities=True should include user/identity secrets only."""
+        """include_users_identities=True should include user/identity secrets only.
+
+        Note: hashed_password, totp_secret, and pat_hash are not in the provider
+        schema, so they're skipped entirely even with include_users_identities=True.
+        """
         self._populate_with_secrets(db)
         zf = _export(db, include_secrets=False, include_certs=False,
                      include_users_identities=True, include_system_secrets=False)
         tv = _tfvars(zf)
-        assert "SECRET_HASHED_PASSWORD" in tv
-        assert "SECRET_TOTP" in tv
-        assert "SECRET_PAT_HASH" in tv
+        # hashed_password, totp_secret, pat_hash are not in the provider schema — skipped
+        assert "SECRET_HASHED_PASSWORD" not in tv
+        assert "SECRET_TOTP" not in tv
+        assert "SECRET_PAT_HASH" not in tv
         non_user = ["SECRET_AUTH_TOKEN", "SECRET_DNS_CREDENTIALS",
                     "SECRET_MAXMIND_KEY", "SECRET_CAP_SECRET", "SECRET_HA_PASSWORD"]
         for s in non_user:
@@ -565,8 +583,12 @@ class TestSecretFlags:
         zf = _export(db, include_secrets=False, include_certs=False,
                      include_users_identities=False, include_system_secrets=False)
         var_tf = _read(zf, "variables.tf")
-        for var_name in ['users_hashed_passwords', 'users_totp_secrets',
-                         'mcp_servers_auth_secrets', 'mcp_identities_pat_hashes',
+        # users_hashed_passwords and users_totp_secrets are no longer exported
+        # (the user provider has write-only password, not hashed_password/totp_secret).
+        # mcp_identities_pat_hashes is no longer exported (provider has pat_prefix, not pat_hash).
+        # The test data only has auth_secret_enc for MCP servers, so only
+        # mcp_servers_auth_secrets is declared.
+        for var_name in ['mcp_servers_auth_secrets',
                          'certificates_dns_credentials']:
             assert f'variable "{var_name}"' in var_tf, f"Secret variable '{var_name}' not declared in variables.tf"
             assert 'sensitive   = true' in var_tf.split(f'variable "{var_name}"')[1].split('}')[0]
@@ -610,20 +632,24 @@ class TestSecretPlaceholderFormat:
         db.add(Setting(key="keepalived_auth_password", value="SECRET_HA_PASSWORD"))
         db.commit()
 
+    # Note: hashed_password, totp_secret, and pat_hash are not in the provider
+    # schema, so they're skipped entirely and never appear in tfvars.
     ALL_SECRET_VALUES = [
-        "SECRET_HASHED_PASSWORD", "SECRET_TOTP", "SECRET_AUTH_TOKEN",
+        "SECRET_AUTH_TOKEN",
         "SECRET_OAUTH_TOKEN", "SECRET_ENV_VAR",
-        "SECRET_PAT_HASH", "SECRET_DNS_CREDENTIALS", "SECRET_MAXMIND_KEY",
+        "SECRET_DNS_CREDENTIALS", "SECRET_MAXMIND_KEY",
         "SECRET_CAP_SECRET", "SECRET_RECAPTCHA_SECRET", "SECRET_TURNSTILE_SECRET",
         "SECRET_HA_PASSWORD",
     ]
 
     # Per-resource map secrets → must be map(string) in variables.tf
     MAP_SECRET_VARS = [
-        'users_hashed_passwords', 'users_totp_secrets',
+        # users_hashed_passwords and users_totp_secrets are no longer exported
+        # (provider has write-only password, not hashed_password/totp_secret).
+        # mcp_identities_pat_hashes is no longer exported (provider has pat_prefix, not pat_hash).
+        # mcp_identities_idp_info is not a secret (provider has idp_user_info as regular field).
         'mcp_servers_auth_secrets', 'mcp_servers_oauth_secrets',
         'mcp_servers_env_vars',
-        'mcp_identities_pat_hashes', 'mcp_identities_idp_info',
         'certificates_dns_credentials',
     ]
 
@@ -679,14 +705,13 @@ class TestSecretPlaceholderFormat:
             assert f'{var_name} = {{' in secrets, \
                 f"{var_name} should have map placeholder in dev.secrets.tfvars"
         # Verify actual resource names are pre-populated (not just generic comment)
-        assert '"admin" = "change-me"' in secrets, \
-            "users_hashed_passwords should have 'admin' key pre-populated"
-        assert '"wildcard" = "change-me"' in secrets, \
-            "certificates_dns_credentials should have 'wildcard' key pre-populated"
+        # users_hashed_passwords is no longer exported (dead secret).
+        # mcp_identities_pat_hashes is no longer exported (dead secret).
+        # dns_credentials is map(map(string)) — placeholder is an empty map, not "change-me"
+        assert '"wildcard" = {}' in secrets, \
+            "certificates_dns_credentials should have 'wildcard' key pre-populated with empty map"
         assert '"tools" = "change-me"' in secrets, \
             "mcp_servers_auth_secrets should have 'tools' key pre-populated"
-        assert '"bot" = "change-me"' in secrets, \
-            "mcp_identities_pat_hashes should have 'bot' key pre-populated"
 
     def test_string_secret_placeholders_in_secrets_tfvars(self, db):
         """String secrets should have scalar placeholders in dev.secrets.tfvars."""
@@ -765,14 +790,11 @@ class TestSecretPlaceholderFormat:
             assert f'{var_name} = {{' in example, \
                 f"{var_name} missing map placeholder in tfvars.example"
         # Verify actual resource names are pre-populated
-        assert '"admin" = "change-me"' in example, \
-            "tfvars.example should have 'admin' key in users_hashed_passwords"
+        # users_hashed_passwords and mcp_identities_pat_hashes are no longer exported.
         assert '"wildcard" = "change-me"' in example, \
             "tfvars.example should have 'wildcard' key in certificates_dns_credentials"
         assert '"tools" = "change-me"' in example, \
             "tfvars.example should have 'tools' key in mcp_servers secrets"
-        assert '"bot" = "change-me"' in example, \
-            "tfvars.example should have 'bot' key in mcp_identities secrets"
 
     def test_tfvars_example_has_string_placeholders(self, db):
         """terraform.tfvars.example should have string placeholders for singleton secrets."""
@@ -851,14 +873,19 @@ class TestSecretPlaceholderFormat:
             assert s not in tv, f"Secret '{s}' leaked with certs-only flag"
 
     def test_users_identities_only_user_secrets_inlined(self, db):
-        """include_users_identities=True: only user/identity secrets inlined."""
+        """include_users_identities=True: only user/identity secrets inlined.
+
+        Note: hashed_password, totp_secret, and pat_hash are not in the provider
+        schema, so they're skipped entirely even with include_users_identities=True.
+        """
         self._populate_all_secret_categories(db)
         zf = _export(db, include_secrets=False, include_certs=False,
                      include_users_identities=True, include_system_secrets=False)
         tv = _tfvars(zf)
-        assert "SECRET_HASHED_PASSWORD" in tv
-        assert "SECRET_TOTP" in tv
-        assert "SECRET_PAT_HASH" in tv
+        # hashed_password, totp_secret, pat_hash are not in the provider schema — skipped
+        assert "SECRET_HASHED_PASSWORD" not in tv
+        assert "SECRET_TOTP" not in tv
+        assert "SECRET_PAT_HASH" not in tv
         non_user = ["SECRET_AUTH_TOKEN", "SECRET_OAUTH_TOKEN", "SECRET_ENV_VAR",
                     "SECRET_DNS_CREDENTIALS", "SECRET_MAXMIND_KEY",
                     "SECRET_CAP_SECRET", "SECRET_HA_PASSWORD"]
@@ -914,12 +941,13 @@ class TestSecretPlaceholderFormat:
             "turnstile_secret should not be in dev.tfvars"
 
     def test_ha_password_has_placeholder_when_off(self, db):
-        """keepalived_auth_password should show 'change-me' placeholder when system secrets off."""
+        """keepalived auth_password should show 'change-me' placeholder when system secrets off."""
         self._populate_all_secret_categories(db)
         zf = _export(db)  # all flags off
         tv = _tfvars(zf)
-        assert '"keepalived_auth_password" = "change-me"' in tv, \
-            "keepalived_auth_password should have 'change-me' placeholder in ha_config"
+        # keepalived fields are nested under keepalived, so key is auth_password
+        assert '"auth_password" = "change-me"' in tv, \
+            "keepalived auth_password should have 'change-me' placeholder in ha_config"
         assert "SECRET_HA_PASSWORD" not in tv
 
     def test_captcha_secrets_inlined_with_system_flag(self, db):
@@ -997,7 +1025,10 @@ class TestSecretPlaceholderFormat:
         for key in SENSITIVE_SETTING_KEYS:
             # maxmind_license_key is a singleton string var: key = "change-me"
             # captcha/HA secrets are inside maps: "key" = "change-me"
-            assert (f'{key} = "change-me"' in combined or f'"{key}" = "change-me"' in combined), \
+            # keepalived_auth_password is nested under keepalived: "auth_password" = "change-me"
+            nested_key = key.replace('keepalived_', '') if key.startswith('keepalived_') else key
+            assert (f'{key} = "change-me"' in combined or f'"{key}" = "change-me"' in combined
+                    or f'"{nested_key}" = "change-me"' in combined), \
                 f"Sensitive setting '{key}' missing 'change-me' placeholder"
 
     def test_no_dead_sensitive_setting_keys(self):
@@ -1461,11 +1492,13 @@ class TestHCLValidity:
             # Find all resource blocks
             resources = re.findall(r'resource "corex_\w+" "this" \{', content)
             # Singleton resources (captcha_settings, ha_config, api_armor_settings,
-            # global_options, maxmind_license_key) don't use for_each
+            # global_options, maxmind_license_key, page_protect_settings,
+            # mcp_alert_config) don't use for_each
             singleton_types = {
                 'corex_captcha_settings', 'corex_ha_config',
                 'corex_api_armor_settings', 'corex_global_options',
                 'corex_maxmind_license_key',
+                'corex_page_protect_settings', 'corex_mcp_alert_config',
             }
             for_each_resources = 0
             for match in re.finditer(r'resource "(corex_\w+)" "this" \{', content):
@@ -1513,7 +1546,11 @@ class TestHCLValidity:
 class TestFieldPreservation:
 
     def test_backend_all_fields_preserved(self, db):
-        """Backend model fields should be preserved in the export."""
+        """Backend model fields should be preserved in the export.
+
+        Only fields in the provider schema are exported; fields like
+        timeout_queue, http_reuse, fullconn are skipped (not in provider).
+        """
         be = Backend(name="web", mode="http", protocol="http", algorithm="roundrobin",
                      health_check_enabled=True, retries=3, redispatch=True,
                      timeout_queue=10000, timeout_check=5000, timeout_tunnel=60000,
@@ -1523,15 +1560,22 @@ class TestFieldPreservation:
         zf = _export(db)
         tv = _tfvars(zf)
         fields = _entry_fields(tv, 'backends', 'web')
-        # Check that non-None fields are preserved
+        # Check that provider-supported fields are preserved
         for expected_field in ['mode', 'protocol', 'algorithm', 'health_check_enabled',
-                               'retries', 'redispatch', 'timeout_queue', 'timeout_check',
-                               'timeout_tunnel', 'http_reuse', 'fullconn', 'host_header',
+                               'retries', 'redispatch', 'host_header',
                                'restore_client_ip', 'client_ip_header']:
             assert expected_field in fields, f"Backend field '{expected_field}' missing from tfvars"
+        # Fields not in the provider schema should be skipped
+        for skipped_field in ['timeout_queue', 'timeout_check', 'timeout_tunnel',
+                              'http_reuse', 'fullconn']:
+            assert skipped_field not in fields, f"Backend field '{skipped_field}' should be skipped (not in provider schema)"
 
     def test_waf_rule_all_fields_preserved(self, db):
-        """WAF rule model fields should be preserved in the module main.tf."""
+        """WAF rule model fields should be preserved in the module main.tf.
+
+        Only fields in the provider schema are exported; content_types,
+        sec_rules, rate_* are skipped (not in provider schema).
+        """
         be = make_backend(db, name="web")
         ln = make_listener(db, backend=be, name="https")
         make_waf_rule(db, name="rule", listener_id=ln.id, backend_id=be.id,
@@ -1541,12 +1585,16 @@ class TestFieldPreservation:
         db.commit()
         zf = _export(db)
         waf_tf = _module_tf(zf, 'waf')
-        # These fields should be referenced in the resource block
+        # These provider-supported fields should be referenced in the resource block
         for field in ['redirect_url', 'status_code', 'path_pattern',
-                      'http_methods', 'content_types', 'sec_rules',
+                      'http_methods',
                       'rule_set_version', 'rule_set_url', 'rule_set_sha256',
-                      'rate_header', 'siem_integration_id']:
+                      'siem_integration_id']:
             assert f'{field} = ' in waf_tf, f"WAF rule field '{field}' missing from module main.tf"
+        # Fields not in the provider schema should be skipped
+        for skipped in ['content_types', 'sec_rules', 'rate_header',
+                        'rate_enabled', 'rate_events', 'rate_window_seconds']:
+            assert f'{skipped} = ' not in waf_tf, f"WAF rule field '{skipped}' should be skipped (not in provider schema)"
 
     def test_none_values_omitted_from_tfvars(self, db):
         """None/null values should be omitted from tfvars entries."""
@@ -1598,8 +1646,8 @@ class TestFieldPreservation:
         zf = _export(db)
         ssl_tf = _module_tf(zf, 'ssl')
         # Should conditionally pass PEM only for custom provider
-        assert 'each.value.provider == "custom" ? var.cert_fullchains[each.key] : null' in ssl_tf
-        assert 'each.value.provider == "custom" ? var.cert_keys[each.key] : null' in ssl_tf
+        assert 'each.value.provider_name == "custom" ? var.cert_fullchains[each.key] : null' in ssl_tf
+        assert 'each.value.provider_name == "custom" ? var.cert_keys[each.key] : null' in ssl_tf
         # Should NOT unconditionally pass PEM
         assert 'fullchain = var.cert_fullchains[each.key]' not in ssl_tf
 
@@ -1721,6 +1769,8 @@ class TestTypedVariables:
             'settings', 'captcha_settings', 'ha_config',
             'haproxy_global_options', 'api_armor_settings',
             'maxmind_license_key',
+            'page_protect_settings', 'mcp_alert_config',
+            'ssl_labs_settings',
         }
         excluded = file_content_vars | singleton_vars
         collection_any_vars = [v for v in any_vars if v not in excluded]
@@ -1892,8 +1942,8 @@ class TestSingletonSchema:
         block = m.group(1)
         assert 'for_each' not in block, "Singleton should not use for_each"
 
-    def test_global_options_uses_jsondecode(self, db):
-        """haproxy_global_options is a JSON string; provider expects list of objects."""
+    def test_global_options_uses_list_object(self, db):
+        """haproxy_global_options is a list of objects; provider expects list, not JSON string."""
         db.add(Setting(key="haproxy_global_options",
                        value='[{"target":"global","directive":"log","value":"","enabled":true}]'))
         db.commit()
@@ -1903,9 +1953,16 @@ class TestSingletonSchema:
                       mgmt, re.DOTALL)
         assert m, "corex_global_options resource not found"
         block = m.group(1)
-        assert 'jsondecode(var.haproxy_global_options)' in block, \
-            "Should jsondecode() the JSON string into list of objects"
+        # Should pass the list variable directly, not jsondecode() a string
+        assert 'options = var.haproxy_global_options' in block, \
+            "Should pass the list variable directly (no jsondecode())"
+        assert 'jsondecode(' not in block, \
+            "Should not use jsondecode() — the tfvars already has a list"
         assert 'for_each' not in block
+        # Variable type should be list(object({...})), not string
+        var_tf = _read(zf, 'variables.tf')
+        assert 'list(object({' in var_tf and 'target = optional(string)' in var_tf, \
+            "Root variable should be list(object({...}))"
 
 
 # ─── Feed-managed lists ──────────────────────────────────────────────────────
@@ -2326,10 +2383,10 @@ class TestEnvironmentVariable:
 
 
 class TestHaproxyGlobalOptionsType:
-    """Tests that haproxy_global_options is typed as string at root and module."""
+    """Tests that haproxy_global_options is typed as list(object({...}))."""
 
-    def test_root_variable_typed_as_string(self, db):
-        """Root variables.tf should declare haproxy_global_options as string."""
+    def test_root_variable_typed_as_list_object(self, db):
+        """Root variables.tf should declare haproxy_global_options as list(object({...}))."""
         db.add(Setting(key="haproxy_global_options", value="[]"))
         db.commit()
         zf = _export(db)
@@ -2339,13 +2396,17 @@ class TestHaproxyGlobalOptionsType:
         m = re.search(r'variable "haproxy_global_options" \{(.*?)\n\}', var_tf, re.DOTALL)
         assert m, "haproxy_global_options variable not found in root variables.tf"
         block = m.group(1)
-        assert 'type        = string' in block, \
-            "haproxy_global_options should be typed as string at root"
-        assert 'default     = "[]"' in block, \
-            "haproxy_global_options should default to '[]' at root"
+        assert 'list(object({' in block, \
+            "haproxy_global_options should be typed as list(object({...})) at root"
+        assert 'target = optional(string)' in block
+        assert 'directive = optional(string)' in block
+        assert 'value = optional(string)' in block
+        assert 'enabled = optional(bool)' in block
+        assert 'default     = []' in block, \
+            "haproxy_global_options should default to [] at root"
 
-    def test_module_variable_typed_as_string(self, db):
-        """Management module variables.tf should declare haproxy_global_options as string."""
+    def test_module_variable_typed_as_list_object(self, db):
+        """Management module variables.tf should declare haproxy_global_options as list(object({...}))."""
         db.add(Setting(key="haproxy_global_options", value="[]"))
         db.commit()
         zf = _export(db)
@@ -2354,8 +2415,9 @@ class TestHaproxyGlobalOptionsType:
         m = re.search(r'variable "haproxy_global_options" \{(.*?)\n\}', mod_var_tf, re.DOTALL)
         assert m, "haproxy_global_options variable not found in management module"
         block = m.group(1)
-        assert 'type        = string' in block, \
-            "haproxy_global_options should be typed as string in management module"
+        assert 'list(object({' in block, \
+            "haproxy_global_options should be typed as list(object({...})) in management module"
+        assert 'target = optional(string)' in block
 
 
 class TestCaptchaSecretsSplit:
@@ -3248,3 +3310,865 @@ class TestApiKeyListType:
             "api_key_lists type should include entries field"
         assert 'value' in block, \
             "entries type should include value field"
+
+
+# ─── Provider Schema Compatibility (round 2) ──────────────────────────────
+
+class TestProviderSchemaCompatibility2:
+    """Tests for the second round of provider schema compatibility fixes."""
+
+    def test_cache_config_provider_field_names(self, db):
+        """Cache config should use provider field names, not DB column names."""
+        be = Backend(name="web", mode="http")
+        db.add(be); db.flush()
+        cc = CacheConfig(backend_id=be.id, haproxy_enabled=True,
+                        haproxy_total_max_size=1024, haproxy_max_age=3600,
+                        haproxy_rfc7234_compliance=True,
+                        disk_cache_ttl=86400)
+        db.add(cc); db.commit()
+        zf = _export(db)
+        tv = _tfvars(zf)
+        # Find the cache_configs block and get the first entry key
+        m = re.search(r'cache_configs = \{(.*?)\n\}', tv, re.DOTALL)
+        assert m is not None, "cache_configs not found in tfvars"
+        # Get the first key name
+        key_m = re.search(r'"([^"]+)"', m.group(1))
+        assert key_m is not None
+        entry_key = key_m.group(1)
+        fields = _entry_fields(tv, 'cache_configs', entry_key)
+        # Provider uses haproxy_cache_size, not haproxy_total_max_size
+        assert 'haproxy_cache_size' in fields, "haproxy_total_max_size should be renamed to haproxy_cache_size"
+        assert 'haproxy_total_max_size' not in fields, "haproxy_total_max_size should be renamed"
+        assert 'haproxy_cache_max_age' in fields, "haproxy_max_age should be renamed to haproxy_cache_max_age"
+        assert 'haproxy_max_age' not in fields
+        assert 'rfc7234_compliance' in fields, "haproxy_rfc7234_compliance should be renamed"
+        assert 'haproxy_rfc7234_compliance' not in fields
+        assert 'disk_cache_max_age' in fields, "disk_cache_ttl should be renamed to disk_cache_max_age"
+        assert 'disk_cache_ttl' not in fields
+        # Unsupported fields should be skipped
+        assert 'haproxy_max_object_size' not in fields
+        assert 'haproxy_process_vary' not in fields
+        assert 'disk_cache_grace' not in fields
+
+    def test_listener_no_options_field(self, db):
+        """Listener should not have options or haproxy_options (not in provider)."""
+        be = Backend(name="web", mode="http")
+        db.add(be); db.flush()
+        ln = Listener(name="https", bind_address="0.0.0.0", bind_port=443,
+                     mode="http", default_backend_id=be.id)
+        db.add(ln); db.commit()
+        zf = _export(db)
+        tv = _tfvars(zf)
+        fields = _entry_fields(tv, 'listeners', 'https')
+        assert 'options' not in fields, "listener should not have options (not in provider)"
+        assert 'haproxy_options' not in fields
+
+    def test_server_no_options_or_cert_ids(self, db):
+        """Server should not have options, ca_certificate_id, client_certificate_id."""
+        be = Backend(name="web", mode="http")
+        db.add(be); db.flush()
+        from app.models.models import Server
+        srv = Server(name="srv1", address="10.0.0.1", port=80, backend_id=be.id)
+        db.add(srv); db.commit()
+        zf = _export(db)
+        tv = _tfvars(zf)
+        fields = _entry_fields(tv, 'servers', 'srv1')
+        assert 'options' not in fields, "server should not have options (not in provider)"
+        assert 'ca_certificate_id' not in fields
+        assert 'client_certificate_id' not in fields
+
+    def test_mcp_server_renamed_fields(self, db):
+        """MCP server should use provider field names (auth_secret, args, env_vars).
+
+        The attribute name in the resource block uses the provider name.
+        The each.value reference may still use the DB field name (that's the
+        tfvars key), which is correct — the rename is on the provider side.
+        """
+        team = Team(name="dev", slug="dev")
+        db.add(team); db.flush()
+        srv = McpServer(name="tools", team_id=team.id, url="http://localhost",
+                       namespace="eng",
+                       auth_type="bearer", auth_secret_enc="SECRET",
+                       args_json='["--port", "8080"]',
+                       env_vars_json='{"FOO": "bar"}',
+                       oauth_client_secret_enc="OAUTH_SECRET")
+        db.add(srv); db.commit()
+        zf = _export(db)
+        mcp_tf = _module_tf(zf, 'mcp-gateway')
+        # Provider uses auth_secret, not auth_secret_enc — check the attribute name
+        assert '  auth_secret = ' in mcp_tf, "auth_secret_enc should be renamed to auth_secret"
+        # The attribute should be args, not args_json
+        assert '  args = ' in mcp_tf, "args_json should be renamed to args"
+        # The attribute should be env_vars, not env_vars_json
+        assert '  env_vars = ' in mcp_tf, "env_vars_json should be renamed to env_vars"
+        # The attribute should be oauth_client_secret, not oauth_client_secret_enc
+        assert '  oauth_client_secret = ' in mcp_tf
+        # The old attribute names should NOT appear as attribute names
+        assert '  auth_secret_enc = ' not in mcp_tf
+        assert '  args_json = ' not in mcp_tf
+        assert '  env_vars_json = ' not in mcp_tf
+        assert '  oauth_client_secret_enc = ' not in mcp_tf
+
+    def test_mcp_server_args_env_vars_type_overrides(self, db):
+        """MCP server args should be list(string), env_vars should be map(string).
+
+        args_json is not a secret field, so it appears in the variable type as 'args'.
+        env_vars_json IS a secret field (when secrets are off), so it's handled
+        via a separate var and appears in the resource block as 'env_vars'.
+        """
+        team = Team(name="dev", slug="dev")
+        db.add(team); db.flush()
+        srv = McpServer(name="tools", team_id=team.id, url="http://localhost",
+                       namespace="eng",
+                       args_json='["--port", "8080"]',
+                       env_vars_json='{"FOO": "bar"}')
+        db.add(srv); db.commit()
+        zf = _export(db)
+        var_tf = _read(zf, 'modules/mcp-gateway/variables.tf')
+        # Find the mcp_servers variable block
+        idx = var_tf.find('variable "mcp_servers"')
+        assert idx >= 0
+        block = var_tf[idx:idx + 2000]
+        # args_json is not a secret, so it should be in the variable type as 'args'
+        assert 'args' in block, "mcp_servers type should include args (renamed from args_json)"
+        # env_vars_json is a secret, so it's not in the variable type
+        # but it should be in the resource block
+        mcp_tf = _module_tf(zf, 'mcp-gateway')
+        assert '  env_vars = ' in mcp_tf, "resource block should have env_vars"
+
+    def test_mcp_team_member_no_name(self, db):
+        """MCP team member should not have name (not in provider)."""
+        from app.models.auth import User
+        team = Team(name="dev", slug="dev")
+        db.add(team); db.flush()
+        user = User(username="admin", role="admin", email="a@b.com",
+                   hashed_password="dummy")
+        db.add(user); db.flush()
+        ut = UserTeam(team_id=team.id, user_id=user.id)
+        db.add(ut); db.commit()
+        zf = _export(db)
+        mcp_tf = _module_tf(zf, 'mcp-gateway')
+        # The resource block should have team_id and user_id, but not name
+        assert 'team_id = ' in mcp_tf
+        assert 'user_id = ' in mcp_tf
+        # name should not appear in the team_member resource block
+        member_idx = mcp_tf.find('corex_mcp_team_member')
+        if member_idx >= 0:
+            block = mcp_tf[member_idx:member_idx + 300]
+            assert '  name = ' not in block, "team_member should not have name (not in provider)"
+
+    def test_mcp_skill_version_no_name_no_version(self, db):
+        """MCP skill version should not have name or version (computed-only)."""
+        team = Team(name="dev", slug="dev")
+        db.add(team); db.flush()
+        skill = McpSkill(name="my-skill", team_id=team.id)
+        db.add(skill); db.flush()
+        sv = McpSkillVersion(skill_id=skill.id, version=1,
+                            created_by="admin", body="content")
+        db.add(sv); db.commit()
+        zf = _export(db)
+        mcp_tf = _module_tf(zf, 'mcp-gateway')
+        # version is computed-only — should not be set in config
+        assert 'version = try(each.value.version' not in mcp_tf, \
+            "version is computed-only, should not be set"
+        # name and created_by are not in the provider schema
+        assert 'created_by' not in mcp_tf
+
+    def test_mcp_policy_no_priority(self, db):
+        """MCP policy should not have priority (computed-only in provider)."""
+        team = Team(name="dev", slug="dev")
+        db.add(team); db.flush()
+        pol = McpPolicy(name="allow-all", team_id=team.id, priority=5,
+                       expression="true", action="allow")
+        db.add(pol); db.commit()
+        zf = _export(db)
+        mcp_tf = _module_tf(zf, 'mcp-gateway')
+        # Find the mcp_policy resource block specifically
+        idx = mcp_tf.find('corex_mcp_policy')
+        assert idx >= 0, "mcp_policy resource block not found"
+        block = mcp_tf[idx:idx + 500]
+        # priority is computed-only — should not be set in config
+        assert 'priority = ' not in block, \
+            "priority is computed-only, should not be set in mcp_policy"
+
+    def test_maxmind_license_key_uses_value(self, db):
+        """MaxMind license key resource should use 'value', not 'license_key'."""
+        from app.services.terraform_export import get_maxmind_license_key
+        from app.models.models import Setting
+        db.add(Setting(key="maxmind_license_key", value="SECRET_MAXMIND"))
+        db.commit()
+        zf = _export(db, include_system_secrets=True)
+        mgmt_tf = _module_tf(zf, 'management')
+        assert 'value = var.maxmind_license_key' in mgmt_tf, \
+            "maxmind_license_key resource should use 'value', not 'license_key'"
+        assert 'license_key = ' not in mgmt_tf
+
+    def test_ha_config_keepalived_nested(self, db):
+        """HA config should nest keepalived fields under a keepalived attribute."""
+        from app.models.models import Setting
+        db.add(Setting(key="ha_enabled", value="true"))
+        db.add(Setting(key="keepalived_vip", value="10.0.0.100"))
+        db.add(Setting(key="keepalived_virtual_router_id", value="51"))
+        db.add(Setting(key="keepalived_priority", value="100"))
+        db.commit()
+        zf = _export(db)
+        mgmt_tf = _module_tf(zf, 'management')
+        # keepalived is a SingleNestedAttribute — use assignment, not a block
+        assert 'keepalived = try(var.ha_config["keepalived"], null)' in mgmt_tf, \
+            "HA config should use keepalived = assignment (SingleNestedAttribute)"
+        # Should NOT have top-level keepalived_* fields
+        assert 'keepalived_vip = ' not in mgmt_tf
+        assert 'keepalived_virtual_router_id = ' not in mgmt_tf
+
+    def test_ha_config_tfvars_keepalived_nested(self, db):
+        """HA config tfvars should nest keepalived under 'keepalived' key."""
+        from app.models.models import Setting
+        db.add(Setting(key="ha_enabled", value="true"))
+        db.add(Setting(key="keepalived_vip", value="10.0.0.100"))
+        db.add(Setting(key="keepalived_virtual_router_id", value="51"))
+        db.commit()
+        zf = _export(db)
+        tv = _tfvars(zf)
+        # ha_config should have a nested keepalived map
+        assert '"keepalived" = {' in tv, "tfvars should nest keepalived fields"
+        assert '"vip" = "10.0.0.100"' in tv
+        assert '"virtual_router_id" = 51' in tv  # int, not string
+        # Should NOT have top-level keepalived_* keys
+        assert '"keepalived_vip"' not in tv
+        assert '"keepalived_virtual_router_id"' not in tv
+
+    def test_singleton_bool_coercion(self, db):
+        """Singleton bool settings should be coerced to bool, not string."""
+        from app.models.models import Setting
+        db.add(Setting(key="ha_enabled", value="true"))
+        db.add(Setting(key="api_armor_enabled", value="true"))
+        db.commit()
+        zf = _export(db, include_system_secrets=True)
+        tv = _tfvars(zf)
+        # Should be native bool (no quotes), not string "true"
+        assert '"ha_enabled" = true' in tv, "ha_enabled should be bool true, not string 'true'"
+        assert '"api_armor_enabled" = true' in tv
+
+    def test_singleton_int_coercion(self, db):
+        """Singleton int settings should be coerced to int, not string."""
+        from app.models.models import Setting
+        db.add(Setting(key="haproxy_ha_replicas", value="3"))
+        db.add(Setting(key="api_armor_max_body_bytes", value="1048576"))
+        db.commit()
+        zf = _export(db, include_system_secrets=True)
+        tv = _tfvars(zf)
+        assert '"haproxy_ha_replicas" = 3' in tv, "haproxy_ha_replicas should be int 3, not string '3'"
+        assert '"api_armor_max_body_bytes" = 1048576' in tv
+
+    def test_singleton_list_coercion(self, db):
+        """Singleton list settings should be coerced to list, not string."""
+        from app.models.models import Setting
+        db.add(Setting(key="api_armor_backend_ids", value="[1, 2, 3]"))
+        db.add(Setting(key="valkey_sentinel_hosts", value='["host1", "host2"]'))
+        db.commit()
+        zf = _export(db, include_system_secrets=True)
+        tv = _tfvars(zf)
+        # Should be a list, not a string
+        assert '"api_armor_backend_ids" = [' in tv
+        assert '"valkey_sentinel_hosts" = [' in tv
+
+    def test_dns_credentials_secret_var_is_map_of_maps(self, db):
+        """certificates_dns_credentials should be map(map(string)), not map(string)."""
+        from app.models.models import Certificate
+        cert = Certificate(name="wildcard", provider="letsencrypt",
+                          dns_credentials='{"api_key": "secret"}')
+        db.add(cert); db.commit()
+        zf = _export(db)  # secrets off
+        var_tf = _read(zf, 'modules/ssl/variables.tf')
+        # Find the certificates_dns_credentials variable
+        idx = var_tf.find('variable "certificates_dns_credentials"')
+        assert idx >= 0
+        block = var_tf[idx:idx + 200]
+        assert 'map(map(string))' in block, \
+            "certificates_dns_credentials should be map(map(string))"
+
+    def test_dns_credentials_secret_placeholder_is_empty_map(self, db):
+        """certificates_dns_credentials placeholder should be empty map, not 'change-me'."""
+        from app.models.models import Certificate
+        cert = Certificate(name="wildcard", provider="letsencrypt")
+        db.add(cert); db.commit()
+        zf = _export(db)  # secrets off
+        secrets = _read(zf, 'environments/dev.secrets.tfvars')
+        # Should have "wildcard" = {} (empty map), not "wildcard" = "change-me"
+        assert '"wildcard" = {}' in secrets, \
+            "dns_credentials placeholder should be empty map, not 'change-me'"
+
+    def test_mcp_skill_frontmatter_is_string_not_object(self, db):
+        """MCP skill frontmatter should be a JSON string (file()), not jsondecode()."""
+        team = Team(name="dev", slug="dev")
+        db.add(team); db.flush()
+        skill = McpSkill(name="my-skill", team_id=team.id)
+        db.add(skill); db.flush()
+        sv = McpSkillVersion(skill_id=skill.id, version=1, body="content",
+                            frontmatter='{"name": "test"}')
+        db.add(sv); db.commit()
+        zf = _export(db)
+        locals_tf = _read(zf, 'locals.tf')
+        # Should use file() (returns string), not jsondecode() (returns object)
+        assert 'mcp_skill_frontmatters' in locals_tf
+        assert 'jsondecode' not in locals_tf.split('mcp_skill_frontmatters')[1].split('\n')[0], \
+            "frontmatter should use file() (string), not jsondecode() (object)"
+
+
+# ─── New resources & dead secret removal (round 3) ───────────────────────
+
+class TestNewResourcesAndDeadSecrets:
+    """Tests for newly exported resources and removed dead secrets."""
+
+    def test_page_protect_settings_exported(self, db):
+        """corex_page_protect_settings should be exported as a singleton."""
+        from app.models.models import Setting
+        db.add(Setting(key="page_protect_monitoring_enabled", value="true"))
+        db.add(Setting(key="page_protect_beacon_path", value="/_cx-assets"))
+        db.add(Setting(key="page_protect_beacon_content_types", value="text/html,application/json"))
+        db.add(Setting(key="page_protect_beacon_backend_ids", value="[1, 2, 3]"))
+        db.commit()
+        zf = _export(db)
+        pp_tf = _module_tf(zf, 'page-protect')
+        assert 'resource "corex_page_protect_settings" "this"' in pp_tf, \
+            "page_protect_settings should be exported"
+        # Should use provider field names
+        assert 'monitoring_enabled = ' in pp_tf
+        assert 'beacon_paths = ' in pp_tf, "beacon_path should be renamed to beacon_paths"
+        assert 'beacon_content_types = ' in pp_tf
+        assert 'backend_ids = ' in pp_tf, "beacon_backend_ids should be renamed to backend_ids"
+
+    def test_page_protect_settings_tfvars(self, db):
+        """page_protect_settings tfvars should have coerced types."""
+        from app.models.models import Setting
+        db.add(Setting(key="page_protect_monitoring_enabled", value="true"))
+        db.add(Setting(key="page_protect_beacon_path", value="/_cx-assets"))
+        db.add(Setting(key="page_protect_beacon_content_types", value="text/html,application/json"))
+        db.add(Setting(key="page_protect_beacon_backend_ids", value="[1, 2, 3]"))
+        db.commit()
+        zf = _export(db)
+        tv = _tfvars(zf)
+        # monitoring_enabled should be bool, not string
+        assert '"monitoring_enabled" = true' in tv
+        # beacon_paths should be a list (from string)
+        assert '"beacon_paths" = [' in tv
+        # beacon_content_types should be a list (from comma-separated string)
+        assert '"beacon_content_types" = [' in tv
+        # backend_ids should be a list of ints
+        assert '"backend_ids" = [' in tv
+
+    def test_page_protect_script_exported(self, db):
+        """corex_page_protect_script should be exported as a for_each collection."""
+        from app.models.page_protect import PageProtectScript
+        db.add(PageProtectScript(url="https://example.com/script.js",
+                                resource_type="script", ignored=False,
+                                source="manual"))
+        db.commit()
+        zf = _export(db)
+        pp_tf = _module_tf(zf, 'page-protect')
+        assert 'resource "corex_page_protect_script" "this"' in pp_tf, \
+            "page_protect_script should be exported"
+        # Should have url, resource_type, ignored (provider fields)
+        assert 'url = ' in pp_tf
+        assert 'resource_type = ' in pp_tf
+        assert 'ignored = ' in pp_tf
+        # Should NOT have runtime fields
+        assert 'first_seen' not in pp_tf
+        assert 'last_seen' not in pp_tf
+        assert 'occurrence_count' not in pp_tf
+        assert 'first_hash' not in pp_tf
+        assert 'content = ' not in pp_tf.split('corex_page_protect_script')[1].split('}')[0]
+
+    def test_page_protect_script_only_manual_exported(self, db):
+        """Only manually-added scripts (source='manual') should be exported."""
+        from app.models.page_protect import PageProtectScript
+        db.add(PageProtectScript(url="https://example.com/manual.js", source="manual"))
+        db.add(PageProtectScript(url="https://example.com/csp.js", source="csp"))
+        db.add(PageProtectScript(url="https://example.com/beacon.js", source="beacon"))
+        db.commit()
+        zf = _export(db)
+        tv = _tfvars(zf)
+        assert 'manual.js' in tv, "manual script should be in tfvars"
+        assert 'csp.js' not in tv, "csp-detected script should NOT be in tfvars"
+        assert 'beacon.js' not in tv, "beacon-detected script should NOT be in tfvars"
+
+    def test_ssl_labs_settings_exported(self, db):
+        """corex_ssl_labs_settings should be exported per certificate."""
+        from app.models.models import Certificate
+        cert = Certificate(name="wildcard", provider="letsencrypt")
+        db.add(cert); db.commit()
+        zf = _export(db)
+        ssl_tf = _module_tf(zf, 'ssl')
+        assert 'resource "corex_ssl_labs_settings" "this"' in ssl_tf, \
+            "ssl_labs_settings should be exported"
+        assert 'cert_id' in ssl_tf
+        assert 'max_scans_per_host' in ssl_tf
+
+    def test_ssl_labs_settings_tfvars(self, db):
+        """ssl_labs_settings tfvars should have max_scans_per_host (cert_id is wired in module)."""
+        from app.models.models import Certificate
+        cert = Certificate(name="wildcard", provider="letsencrypt")
+        db.add(cert); db.commit()
+        zf = _export(db)
+        tv = _tfvars(zf)
+        assert 'ssl_labs_settings' in tv
+        # cert_id is NOT in tfvars — it's wired to corex_certificate.this[each.key].id
+        assert '"cert_id"' not in tv
+        assert '"max_scans_per_host" = ' in tv
+
+    def test_mcp_alert_config_exported(self, db):
+        """corex_mcp_alert_config should be exported as a singleton."""
+        from app.models.models import Setting
+        db.add(Setting(key="mcp_alert_thresholds", value='{"failed_auth": 5, "rate_limit": 10}'))
+        db.commit()
+        zf = _export(db)
+        mcp_tf = _module_tf(zf, 'mcp-gateway')
+        assert 'resource "corex_mcp_alert_config" "this"' in mcp_tf, \
+            "mcp_alert_config should be exported"
+        assert 'webhook_url' in mcp_tf
+        assert 'thresholds' in mcp_tf
+
+    def test_mcp_alert_config_tfvars(self, db):
+        """mcp_alert_config tfvars should have webhook_url and thresholds."""
+        from app.models.models import Setting
+        db.add(Setting(key="mcp_alert_thresholds", value='{"failed_auth": 5}'))
+        db.commit()
+        zf = _export(db)
+        tv = _tfvars(zf)
+        assert 'mcp_alert_config' in tv
+        assert '"webhook_url"' in tv
+        assert '"thresholds"' in tv
+
+    def test_no_dead_user_secret_vars(self, db):
+        """users_hashed_passwords and users_totp_secrets should NOT be declared."""
+        from app.models.auth import User
+        db.add(User(username="admin", email="a@b.com", role="admin",
+                   hashed_password="dummy"))
+        db.commit()
+        zf = _export(db)  # all flags off
+        var_tf = _read(zf, 'variables.tf')
+        secrets = _read(zf, 'environments/dev.secrets.tfvars')
+        # These are dead secrets — the provider user resource has write-only password,
+        # not hashed_password or totp_secret.
+        assert 'variable "users_hashed_passwords"' not in var_tf, \
+            "users_hashed_passwords should not be declared (dead secret)"
+        assert 'variable "users_totp_secrets"' not in var_tf, \
+            "users_totp_secrets should not be declared (dead secret)"
+        assert 'users_hashed_passwords' not in secrets, \
+            "users_hashed_passwords should not be in secrets tfvars"
+        assert 'users_totp_secrets' not in secrets, \
+            "users_totp_secrets should not be in secrets tfvars"
+
+    def test_no_dead_mcp_identity_pat_hash_secret_var(self, db):
+        """mcp_identities_pat_hashes should NOT be declared (dead secret)."""
+        team = Team(name="Eng", slug="eng")
+        db.add(team); db.flush()
+        db.add(McpIdentity(name="bot", team_id=team.id, kind="pat",
+                          pat_hash="SECRET_PAT"))
+        db.commit()
+        zf = _export(db)  # all flags off
+        var_tf = _read(zf, 'variables.tf')
+        secrets = _read(zf, 'environments/dev.secrets.tfvars')
+        # pat_hash is not in the provider schema (provider has pat_prefix, computed)
+        assert 'variable "mcp_identities_pat_hashes"' not in var_tf, \
+            "mcp_identities_pat_hashes should not be declared (dead secret)"
+        assert 'mcp_identities_pat_hashes' not in secrets, \
+            "mcp_identities_pat_hashes should not be in secrets tfvars"
+
+    def test_user_resource_has_no_hashed_password_or_totp(self, db):
+        """User resource block should not have hashed_password or totp_secret."""
+        from app.models.auth import User
+        db.add(User(username="admin", email="a@b.com", role="admin",
+                   hashed_password="dummy", totp_secret="secret"))
+        db.commit()
+        zf = _export(db)
+        mgmt_tf = _module_tf(zf, 'management')
+        # Find the user resource block
+        idx = mgmt_tf.find('corex_user')
+        assert idx >= 0
+        block = mgmt_tf[idx:idx + 500]
+        assert 'hashed_password' not in block, \
+            "user resource should not have hashed_password (not in provider)"
+        assert 'totp_secret' not in block, \
+            "user resource should not have totp_secret (not in provider)"
+
+    def test_page_protect_settings_in_imports(self, db):
+        """page_protect_settings should have an import block."""
+        from app.models.models import Setting
+        db.add(Setting(key="page_protect_monitoring_enabled", value="true"))
+        db.commit()
+        zf = _export(db)
+        imports = _read(zf, 'imports.tf')
+        assert 'corex_page_protect_settings' in imports, \
+            "page_protect_settings should have import block"
+
+    def test_mcp_alert_config_in_imports(self, db):
+        """mcp_alert_config should have an import block."""
+        from app.models.models import Setting
+        db.add(Setting(key="mcp_alert_thresholds", value='{"failed_auth": 5}'))
+        db.commit()
+        zf = _export(db)
+        imports = _read(zf, 'imports.tf')
+        assert 'corex_mcp_alert_config' in imports, \
+            "mcp_alert_config should have import block"
+
+    def test_ssl_labs_settings_in_imports(self, db):
+        """ssl_labs_settings should have import blocks per cert."""
+        from app.models.models import Certificate
+        cert = Certificate(name="wildcard", provider="letsencrypt")
+        db.add(cert); db.commit()
+        zf = _export(db)
+        imports = _read(zf, 'imports.tf')
+        assert 'corex_ssl_labs_settings' in imports, \
+            "ssl_labs_settings should have import block"
+
+    def test_page_protect_script_in_imports(self, db):
+        """page_protect_script should have import blocks by URL."""
+        from app.models.page_protect import PageProtectScript
+        db.add(PageProtectScript(url="https://example.com/script.js", source="manual"))
+        db.commit()
+        zf = _export(db)
+        imports = _read(zf, 'imports.tf')
+        assert 'corex_page_protect_script' in imports, \
+            "page_protect_script should have import block"
+        assert 'https://example.com/script.js' in imports, \
+            "page_protect_script import should use URL as ID"
+
+    def test_no_page_protect_settings_skip_comment(self, db):
+        """imports.tf should not have the old 'not yet exported' comment."""
+        zf = _export(db)
+        imports = _read(zf, 'imports.tf')
+        assert 'not yet exported' not in imports, \
+            "imports.tf should not say page_protect_settings is not yet exported"
+
+
+# ─── Schema mismatch fixes (round 4) ─────────────────────────────────────
+
+class TestSchemaMismatchFixes:
+    """Tests for the schema mismatch fixes: cache module, keepalived, ssl_labs
+    cert_id, MCP server types, replica name, computed attrs, cipher tls_options."""
+
+    def test_cache_module_uses_provider_names(self, db):
+        """Cache module main.tf should use provider-facing field names on both sides."""
+        from app.models.cache import CacheConfig
+        from app.models.proxy import Backend
+        be = Backend(name='web')
+        db.add(be); db.flush()
+        db.add(CacheConfig(backend_id=be.id, haproxy_enabled=True,
+                          haproxy_total_max_size=100, haproxy_max_age=300,
+                          haproxy_rfc7234_compliance=True, disk_cache_ttl=120))
+        db.commit()
+        zf = _export(db)
+        cache_tf = _module_tf(zf, 'cache')
+        # Provider-facing names on the left (attribute)
+        assert 'haproxy_cache_size = ' in cache_tf
+        assert 'haproxy_cache_max_age = ' in cache_tf
+        assert 'rfc7234_compliance = ' in cache_tf
+        assert 'disk_cache_max_age = ' in cache_tf
+        # Provider-facing names on the right (each.value)
+        assert 'each.value.haproxy_cache_size' in cache_tf
+        assert 'each.value.haproxy_cache_max_age' in cache_tf
+        assert 'each.value.rfc7234_compliance' in cache_tf
+        assert 'each.value.disk_cache_max_age' in cache_tf
+        # Old DB names should NOT appear on the right
+        assert 'each.value.haproxy_total_max_size' not in cache_tf
+        assert 'each.value.haproxy_max_age' not in cache_tf
+        assert 'each.value.haproxy_rfc7234_compliance' not in cache_tf
+        assert 'each.value.disk_cache_ttl' not in cache_tf
+
+    def test_cache_module_variable_type_uses_provider_names(self, db):
+        """Cache module variables.tf should use provider-facing field names."""
+        from app.models.cache import CacheConfig
+        from app.models.proxy import Backend
+        be = Backend(name='web')
+        db.add(be); db.flush()
+        db.add(CacheConfig(backend_id=be.id))
+        db.commit()
+        zf = _export(db)
+        cache_vars = _read(zf, 'modules/cache/variables.tf')
+        assert 'haproxy_cache_size = optional(number)' in cache_vars
+        assert 'haproxy_cache_max_age = optional(number)' in cache_vars
+        assert 'rfc7234_compliance = optional(bool)' in cache_vars
+        assert 'disk_cache_max_age = optional(number)' in cache_vars
+        # Old DB names should NOT be in the type
+        assert 'haproxy_total_max_size' not in cache_vars
+        assert 'haproxy_max_age' not in cache_vars
+        assert 'haproxy_rfc7234_compliance' not in cache_vars
+        assert 'disk_cache_ttl' not in cache_vars
+
+    def test_cache_config_no_name_attribute(self, db):
+        """Cache config resource should not have a name attribute (not in provider)."""
+        from app.models.cache import CacheConfig
+        from app.models.proxy import Backend
+        be = Backend(name='web')
+        db.add(be); db.flush()
+        db.add(CacheConfig(backend_id=be.id))
+        db.commit()
+        zf = _export(db)
+        cache_tf = _module_tf(zf, 'cache')
+        # Find the cache_config resource block
+        idx = cache_tf.find('corex_cache_config')
+        block = cache_tf[idx:idx + 500]
+        assert 'name = ' not in block, \
+            "cache_config should not have name attribute (not in provider schema)"
+
+    def test_cache_config_has_provider_only_fields(self, db):
+        """Cache config should include haproxy_cache_vary and disk_cache_max_size (provider-only)."""
+        from app.models.cache import CacheConfig
+        from app.models.proxy import Backend
+        be = Backend(name='web')
+        db.add(be); db.flush()
+        db.add(CacheConfig(backend_id=be.id))
+        db.commit()
+        zf = _export(db)
+        cache_tf = _module_tf(zf, 'cache')
+        cache_vars = _read(zf, 'modules/cache/variables.tf')
+        # Variable type should have these optional fields
+        assert 'haproxy_cache_vary = optional(list(string))' in cache_vars
+        assert 'disk_cache_max_size = optional(number)' in cache_vars
+        # Resource block should emit them (null when unset)
+        idx = cache_tf.find('corex_cache_config')
+        block = cache_tf[idx:idx + 800]
+        assert 'haproxy_cache_vary = try(each.value.haproxy_cache_vary, null)' in block
+        assert 'disk_cache_max_size = try(each.value.disk_cache_max_size, null)' in block
+
+    def test_ssl_labs_settings_typed_as_map_object(self, db):
+        """ssl_labs_settings should be typed as map(object({...})), not any."""
+        from app.models.models import Certificate
+        db.add(Certificate(name="wildcard", provider="letsencrypt"))
+        db.commit()
+        zf = _export(db)
+        # Module variable
+        sv = _read(zf, 'modules/ssl/variables.tf')
+        assert 'map(object({' in sv and 'max_scans_per_host = optional(number)' in sv, \
+            "ssl_labs_settings module variable should be map(object({...}))"
+        # Root variable
+        rv = _read(zf, 'variables.tf')
+        assert 'map(object({' in rv, \
+            "ssl_labs_settings root variable should be map(object({...}))"
+        # cert_id should NOT be in the type
+        assert 'cert_id' not in sv.split('ssl_labs_settings')[1].split('}')[0]
+
+    def test_ssl_labs_tfvars_no_cert_id(self, db):
+        """ssl_labs_settings tfvars should NOT contain cert_id (wired in module)."""
+        from app.models.models import Certificate
+        db.add(Certificate(name="wildcard", provider="letsencrypt"))
+        db.commit()
+        zf = _export(db)
+        tv = _tfvars(zf)
+        assert 'ssl_labs_settings' in tv
+        assert '"cert_id"' not in tv, \
+            "cert_id should not be in tfvars (wired to local cert resource)"
+
+    def test_keepalived_uses_assignment_not_block(self, db):
+        """keepalived should use assignment syntax (SingleNestedAttribute), not block."""
+        from app.models.models import Setting
+        db.add(Setting(key="ha_enabled", value="true"))
+        db.add(Setting(key="keepalived_vip", value="10.0.0.100"))
+        db.commit()
+        zf = _export(db)
+        mgmt_tf = _module_tf(zf, 'management')
+        # SingleNestedAttribute uses assignment
+        assert 'keepalived = try(var.ha_config["keepalived"], null)' in mgmt_tf
+        # Should NOT use block syntax
+        assert 'keepalived {' not in mgmt_tf
+
+    def test_ssl_labs_cert_id_wired_to_local_ref(self, db):
+        """ssl_labs_settings cert_id should reference local certificate resource, not snapshot int."""
+        from app.models.models import Certificate
+        db.add(Certificate(name="wildcard", provider="letsencrypt"))
+        db.commit()
+        zf = _export(db)
+        ssl_tf = _module_tf(zf, 'ssl')
+        assert 'corex_certificate.this[each.key].id' in ssl_tf, \
+            "cert_id should be wired to local certificate resource ID"
+        # Should NOT use a snapshot integer from tfvars
+        assert 'each.value.cert_id' not in ssl_tf
+
+    def test_mcp_server_env_vars_secret_is_map(self, db):
+        """mcp_servers_env_vars secret var should be map(map(string)), not map(string)."""
+        from app.models.mcp import McpServer, Team
+        team = Team(name="Eng", slug="eng")
+        db.add(team); db.flush()
+        db.add(McpServer(name="tools", team_id=team.id, namespace="eng",
+                        transport_type="stdio", env_vars_json='{"FOO": "bar"}'))
+        db.commit()
+        zf = _export(db, include_secrets=False, include_system_secrets=False)
+        var_tf = _read(zf, 'variables.tf')
+        # Should be map(map(string)) — each server has a map of env vars
+        assert 'map(map(string))' in var_tf, \
+            "mcp_servers_env_vars should be map(map(string))"
+        # Placeholder should be an empty map, not "change-me"
+        secrets = _read(zf, 'environments/dev.secrets.tfvars')
+        assert '"tools" = {}' in secrets, \
+            "env_vars placeholder should be empty map, not string"
+
+    def test_mcp_server_args_is_list_in_tfvars(self, db):
+        """MCP server args should be a list in tfvars, not a JSON string."""
+        from app.models.mcp import McpServer, Team
+        team = Team(name="Eng", slug="eng")
+        db.add(team); db.flush()
+        db.add(McpServer(name="tools", team_id=team.id, namespace="eng",
+                        transport_type="stdio", args_json='["--port", "8080"]'))
+        db.commit()
+        zf = _export(db, include_secrets=True)
+        tv = _tfvars(zf)
+        assert '"args" = ["--port", "8080"]' in tv, \
+            "args should be a list in tfvars, not a JSON string"
+
+    def test_mcp_server_env_vars_is_map_in_tfvars(self, db):
+        """MCP server env_vars should be a map in tfvars, not a JSON string."""
+        from app.models.mcp import McpServer, Team
+        team = Team(name="Eng", slug="eng")
+        db.add(team); db.flush()
+        db.add(McpServer(name="tools", team_id=team.id, namespace="eng",
+                        transport_type="stdio", env_vars_json='{"FOO": "bar"}'))
+        db.commit()
+        zf = _export(db, include_secrets=True)
+        tv = _tfvars(zf)
+        assert '"env_vars" = {"FOO" = "bar"}' in tv, \
+            "env_vars should be a map in tfvars, not a JSON string"
+
+    def test_mcp_server_replica_no_name(self, db):
+        """MCP server replica resource should not have a name attribute."""
+        from app.models.mcp import McpServer, McpServerReplica, Team
+        team = Team(name="Eng", slug="eng")
+        db.add(team); db.flush()
+        srv = McpServer(name="tools", team_id=team.id, namespace="eng",
+                       transport_type="stdio")
+        db.add(srv); db.flush()
+        db.add(McpServerReplica(server_id=srv.id, url="http://replica:8080"))
+        db.commit()
+        zf = _export(db)
+        mcp_tf = _module_tf(zf, 'mcp-gateway')
+        idx = mcp_tf.find('corex_mcp_server_replica')
+        block = mcp_tf[idx:idx + 400]
+        assert 'name = ' not in block, \
+            "mcp_server_replica should not have name (provider only has server_id, url, enabled, verify_tls)"
+
+    def test_mcp_dlp_rule_no_priority(self, db):
+        """MCP DLP rule should not have priority (computed-only in provider)."""
+        from app.models.mcp import McpDlpRule, Team
+        team = Team(name="Eng", slug="eng")
+        db.add(team); db.flush()
+        db.add(McpDlpRule(team_id=team.id, name="rule1", direction="request",
+                        detector="regex", find_regex="test", action="block"))
+        db.commit()
+        zf = _export(db)
+        mcp_tf = _module_tf(zf, 'mcp-gateway')
+        idx = mcp_tf.find('corex_mcp_dlp_rule')
+        block = mcp_tf[idx:idx + 500]
+        assert 'priority = ' not in block, \
+            "mcp_dlp_rule should not have priority (computed-only)"
+
+    def test_mcp_guardrail_no_priority(self, db):
+        """MCP guardrail should not have priority (computed-only in provider)."""
+        from app.models.mcp import McpGuardrail, Team
+        team = Team(name="Eng", slug="eng")
+        db.add(team); db.flush()
+        db.add(McpGuardrail(team_id=team.id, name="g1", direction="both",
+                          find_regex="test", action="block"))
+        db.commit()
+        zf = _export(db)
+        mcp_tf = _module_tf(zf, 'mcp-gateway')
+        idx = mcp_tf.find('corex_mcp_guardrail')
+        block = mcp_tf[idx:idx + 500]
+        assert 'priority = ' not in block, \
+            "mcp_guardrail should not have priority (computed-only)"
+
+    def test_mcp_skill_no_enable_when_ast(self, db):
+        """MCP skill should not have enable_when_ast (computed-only in provider)."""
+        from app.models.mcp import McpSkill, Team
+        team = Team(name="Eng", slug="eng")
+        db.add(team); db.flush()
+        db.add(McpSkill(team_id=team.id, name="skill1"))
+        db.commit()
+        zf = _export(db)
+        mcp_tf = _module_tf(zf, 'mcp-gateway')
+        idx = mcp_tf.find('corex_mcp_skill"')
+        block = mcp_tf[idx:idx + 500]
+        assert 'enable_when_ast = ' not in block, \
+            "mcp_skill should not have enable_when_ast (computed-only)"
+
+    def test_cipher_suite_tls_options_is_list(self, db):
+        """Cipher suite tls_options should be a list in tfvars, not a string."""
+        from app.models.proxy import CipherSuite
+        db.add(CipherSuite(name="modern", baseline="modern", ciphers="ECDHE",
+                          tls_options="no-sslv3 no-tlsv10"))
+        db.commit()
+        zf = _export(db)
+        tv = _tfvars(zf)
+        # Should be a list, not a string
+        assert '"tls_options" = ["no-sslv3", "no-tlsv10"]' in tv, \
+            "tls_options should be a list in tfvars"
+
+    def test_cipher_suite_tls_options_variable_type(self, db):
+        """Cipher suite variable type should have tls_options as list(string)."""
+        from app.models.proxy import CipherSuite
+        db.add(CipherSuite(name="modern", baseline="modern", ciphers="ECDHE"))
+        db.commit()
+        zf = _export(db)
+        ssl_vars = _read(zf, 'modules/ssl/variables.tf')
+        assert 'tls_options = optional(list(string))' in ssl_vars, \
+            "tls_options should be list(string) in variable type"
+
+
+# ─── Schema-driven overrides ────────────────────────────────────────────────
+
+class TestSchemaDrivenOverrides:
+    """Tests that the exporter derives field skips from the provider schema JSON,
+    not just from manual PROVIDER_FIELD_OVERRIDES. This prevents drift when the
+    provider schema changes."""
+
+    def test_schema_computed_fields_are_skipped(self):
+        """The provider schema JSON should mark computed-only fields, and the
+        exporter should skip them even if PROVIDER_FIELD_OVERRIDES doesn't list them."""
+        from app.services.provider_schema import get_computed_fields
+        # These are computed-only in the provider schema (not optional+computed)
+        assert 'priority' in get_computed_fields('mcp_dlp_rule')
+        assert 'priority' in get_computed_fields('mcp_guardrail')
+        assert 'enable_when_ast' in get_computed_fields('mcp_skill')
+        assert 'published_version_id' in get_computed_fields('mcp_skill')
+
+    def test_resolve_provider_overrides_merges_schema_and_manual(self):
+        """_resolve_provider_overrides should merge manual overrides with schema-derived skips."""
+        from app.services.terraform_export import _resolve_provider_overrides
+        from app.models.mcp import McpDlpRule, McpServerReplica
+        from app.models.cache import CacheConfig
+
+        # mcp_dlp_rule: manual override doesn't list 'priority', but schema says it's computed
+        dlp = _resolve_provider_overrides('mcp_dlp_rule', McpDlpRule)
+        assert 'priority' in dlp['skip'], "schema-derived computed fields should be in skip"
+
+        # mcp_server_replica: manual override lists 'name', schema adds 'id'
+        rep = _resolve_provider_overrides('mcp_server_replica', McpServerReplica)
+        assert 'name' in rep['skip'], "manual skip should be preserved"
+        assert 'id' in rep['skip'], "schema-derived computed 'id' should be in skip"
+
+        # cache_config: manual override has renames, schema adds computed 'id'
+        cc = _resolve_provider_overrides('cache_config', CacheConfig)
+        assert 'name' in cc['skip'], "manual skip should be preserved"
+        assert 'id' in cc['skip'], "schema-derived computed 'id' should be in skip"
+        assert cc['rename']['haproxy_total_max_size'] == 'haproxy_cache_size'
+
+    def test_schema_unsupported_fields_are_skipped(self):
+        """DB fields not in the provider schema should be skipped."""
+        from app.services.terraform_export import _resolve_provider_overrides
+        from app.models.cache import CacheConfig
+        cc = _resolve_provider_overrides('cache_config', CacheConfig)
+        # These DB columns don't exist in the provider schema
+        assert 'haproxy_max_object_size' in cc['skip']
+        assert 'haproxy_max_secondary_entries' in cc['skip']
+        assert 'disk_cache_grace' in cc['skip']
+        assert 'disk_cache_purge_enabled' in cc['skip']
+
+    def test_schema_file_exists(self):
+        """The provider schema JSON file should exist and be loadable."""
+        import os
+        from app.services.provider_schema import _SCHEMA_PATH
+        assert os.path.exists(_SCHEMA_PATH), "corex_provider_schema.json should exist"
+        from app.services.provider_schema import _resource_schemas
+        schemas = _resource_schemas()
+        assert 'cache_config' in schemas
+        assert 'mcp_server' in schemas
+        assert len(schemas) >= 50, "Should have 50+ resource schemas"
