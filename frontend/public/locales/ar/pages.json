@@ -1303,7 +1303,6 @@
     "tabs": {
       "rules": "القواعد",
       "exceptions": "الاستثناءات",
-      "siem": "SIEM",
       "versions": "الإصدارات",
       "crs": "CRS",
       "logs": "السجلات",
@@ -1355,7 +1354,6 @@
         "inboundAnomalyThreshold": "حد الشذوذ الوارد",
         "outboundAnomalyThreshold": "حد الشذوذ الصادر",
         "action": "الإجراء",
-        "siemIntegration": "تكامل SIEM",
         "none": "لا شيء",
         "redirectUrl": "عنوان URL لإعادة التوجيه",
         "statusCode": "رمز الحالة",
@@ -1440,35 +1438,6 @@
         "preview": "التوجيهات المُنشأة"
       },
       "previewEmpty": "لن يتم إنشاء أي شيء بعد — حدد القواعد أو هدف المتغير أو الشرط لمعاينة النتيجة."
-    },
-    "siem": {
-      "title": "تكاملات SIEM",
-      "addSiem": "إضافة SIEM",
-      "tableHeaders": {
-        "name": "الاسم",
-        "type": "النوع",
-        "target": "الهدف",
-        "format": "التنسيق",
-        "enabled": "مفعّل",
-        "actions": "إجراءات"
-      },
-      "editTitle": "تعديل تكامل SIEM",
-      "addTitle": "إضافة تكامل SIEM",
-      "fields": {
-        "name": "الاسم",
-        "type": "النوع",
-        "typeWebhook": "Webhook",
-        "typeSyslog": "Syslog",
-        "typeElastic": "Elastic",
-        "target": "الهدف",
-        "format": "التنسيق",
-        "formatJson": "JSON",
-        "formatSyslog": "Syslog",
-        "formatCef": "CEF",
-        "authHeader": "ترويسة المصادقة",
-        "enabled": "مفعّل",
-        "save": "حفظ"
-      }
     },
     "versions": {
       "title": "لقطات القواعد",
@@ -1558,7 +1527,6 @@
       "inboundAnomalyThreshold": "درجة الشذوذ الوارد التي تطلق الإجراء المحدد.",
       "outboundAnomalyThreshold": "درجة الشذوذ الصادر (الاستجابة) التي تطلق الإجراء.",
       "action": "الإجراء الافتراضي للقواعد المطلقة: حظر، سماح، تسجيل، إعادة توجيه، تحدي.",
-      "siemIntegration": "نقطة نهاية SIEM لإرسال أحداث WAF إليها.",
       "redirectUrl": "عنوان URL لإعادة توجيه العميل إليه عندما يكون الإجراء إعادة توجيه أو تحدي.",
       "captchaValidSeconds": "مدة صلاحية جلسة التحدي.",
       "statusCode": "رمز حالة HTTP المرتجع عندما تطلق قاعدة والإجراء يستخدمه.",
@@ -1591,13 +1559,7 @@
       "exConditionVariable": "اختياري — تطبيق هذا الاستثناء فقط عندما يتطابق متغير الطلب هذا، مثل REQUEST_URI أو REQUEST_HEADERS:Host.",
       "exConditionOperator": "كيفية مقارنة متغير الشرط بالقيمة.",
       "exConditionValue": "القيمة التي يجب أن يطابقها متغير الشرط، مثل /api/ أو عنوان IP.",
-      "exDescription": "ملاحظة مقروءة بشريًا حول هذا الاستثناء.",
-      "siemName": "اسم العرض لهذا التكامل.",
-      "siemIntegrationType": "آلية التسليم: webhook، أو syslog، أو Elastic.",
-      "siemTarget": "عنوان URL، أو مضيف syslog، أو نقطة نهاية Elastic.",
-      "siemFormat": "تنسيق الإخراج: JSON، أو Syslog، أو CEF.",
-      "siemAuthHeader": "ترويسة تفويض اختيارية ترسل مع طلبات webhook.",
-      "siemEnabled": "ما إذا كان هذا التكامل نشطًا."
+      "exDescription": "ملاحظة مقروءة بشريًا حول هذا الاستثناء."
     },
     "errors": {
       "exportFailed": "فشل تصدير قواعد WAF",

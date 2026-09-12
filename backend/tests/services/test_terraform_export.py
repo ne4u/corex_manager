@@ -32,7 +32,6 @@ from app.models.models import (
     PageProtectPolicy, PatternList, RateLimit, Redirect, RequestHeader,
     ResponseHeader, ResponseTransform, Rewrite, RiskRule, RiskRuleset,
     SecurityRule, Server, Setting, User, WafException, WafRule,
-    WafSiemIntegration,
 )
 from app.models.api_armor import ApiKeyList, ApiKeyListEntry, ApiSchema, AuthPolicy
 from app.models.mcp import (
@@ -41,7 +40,7 @@ from app.models.mcp import (
 )
 from tests.factories import (
     make_backend, make_listener, make_server, make_waf_rule,
-    make_waf_exception, make_siem_integration, make_rate_limit,
+    make_waf_exception, make_rate_limit,
     make_security_rule, make_rewrite, make_request_header,
     make_page_protect_policy, make_cache_config, make_cache_rule,
     make_response_transform,
@@ -146,9 +145,7 @@ def _populate_full_config(db):
                        expression='hdr(user-agent) -m sub bot')
 
     # WAF
-    siem = make_siem_integration(db, name="splunk")
-    wr = make_waf_rule(db, name="sqli_rule", listener_id=ln.id, backend_id=be.id,
-                       siem_integration_id=siem.id)
+    wr = make_waf_rule(db, name="sqli_rule", listener_id=ln.id, backend_id=be.id)
     make_waf_exception(db, waf_rule_id=wr.id, name="allow_admin", rule_id="942100")
 
     # Cache
@@ -438,26 +435,6 @@ class TestFKResolution:
         m = re.search(r'security_rules = \{(.*?)\n\}', tv, re.DOTALL)
         assert m is not None
         assert '"https"' in m.group(1)
-
-    def test_waf_siem_integration_id_is_raw_int(self, db):
-        """WAF rule's siem_integration_id is a raw int (no waf_siem_integration resource)."""
-        be = make_backend(db, name="web")
-        ln = make_listener(db, backend=be, name="https")
-        siem = make_siem_integration(db, name="splunk")
-        make_waf_rule(db, name="rule", listener_id=ln.id, backend_id=be.id,
-                      siem_integration_id=siem.id)
-        db.commit()
-        zf = _export(db)
-        tv = _tfvars(zf)
-        m = re.search(r'waf_rules = \{(.*?)\n\}', tv, re.DOTALL)
-        assert m is not None
-        # siem_integration_id is a raw int, not resolved to a name
-        assert '"siem_integration_id" = 1' in m.group(1)
-        waf_tf = _module_tf(zf, 'waf')
-        # The resource block should emit it as a raw int, not a FK reference
-        assert 'siem_integration_id = try(each.value.siem_integration_id, null)' in waf_tf
-        # No waf_siem_integration resource should be emitted
-        assert 'corex_waf_siem_integration' not in waf_tf
 
 
 # ─── Secret flag behavior ──────────────────────────────────────────────────
@@ -1588,8 +1565,7 @@ class TestFieldPreservation:
         # These provider-supported fields should be referenced in the resource block
         for field in ['redirect_url', 'status_code', 'path_pattern',
                       'http_methods',
-                      'rule_set_version', 'rule_set_url', 'rule_set_sha256',
-                      'siem_integration_id']:
+                      'rule_set_version', 'rule_set_url', 'rule_set_sha256']:
             assert f'{field} = ' in waf_tf, f"WAF rule field '{field}' missing from module main.tf"
         # Fields not in the provider schema should be skipped
         for skipped in ['content_types', 'sec_rules', 'rate_header',

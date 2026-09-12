@@ -1303,7 +1303,6 @@
     "tabs": {
       "rules": "ルール",
       "exceptions": "例外",
-      "siem": "SIEM",
       "versions": "バージョン",
       "crs": "CRS",
       "logs": "ログ",
@@ -1355,7 +1354,6 @@
         "inboundAnomalyThreshold": "インバウンド異常しきい値",
         "outboundAnomalyThreshold": "アウトバウンド異常しきい値",
         "action": "アクション",
-        "siemIntegration": "SIEM統合",
         "none": "なし",
         "redirectUrl": "リダイレクトURL",
         "statusCode": "ステータスコード",
@@ -1440,35 +1438,6 @@
         "preview": "生成されるディレクティブ"
       },
       "previewEmpty": "まだ何も生成されません — ルール、変数ターゲット、条件を選択するとプレビューが表示されます。"
-    },
-    "siem": {
-      "title": "SIEM統合",
-      "addSiem": "SIEMを追加",
-      "tableHeaders": {
-        "name": "名前",
-        "type": "タイプ",
-        "target": "ターゲット",
-        "format": "フォーマット",
-        "enabled": "有効",
-        "actions": "アクション"
-      },
-      "editTitle": "SIEM統合を編集",
-      "addTitle": "SIEM統合を追加",
-      "fields": {
-        "name": "名前",
-        "type": "タイプ",
-        "typeWebhook": "Webhook",
-        "typeSyslog": "Syslog",
-        "typeElastic": "Elastic",
-        "target": "ターゲット",
-        "format": "フォーマット",
-        "formatJson": "JSON",
-        "formatSyslog": "Syslog",
-        "formatCef": "CEF",
-        "authHeader": "認証ヘッダー",
-        "enabled": "有効",
-        "save": "保存"
-      }
     },
     "versions": {
       "title": "ルールスナップショット",
@@ -1558,7 +1527,6 @@
       "inboundAnomalyThreshold": "設定されたアクションをトリガーするインバウンド異常スコア。",
       "outboundAnomalyThreshold": "アクションをトリガーするアウトバウンド (レスポンス) 異常スコア。",
       "action": "トリガーされたルールのデフォルトアクション: block、allow、log、redirect、challenge。",
-      "siemIntegration": "WAFイベントを送信するSIEMエンドポイント。",
       "redirectUrl": "アクションがredirectまたはchallengeの場合にクライアントをリダイレクトするURL。",
       "captchaValidSeconds": "チャレンジセッションが有効な期間。",
       "statusCode": "ルールがトリガーされアクションがそれを使用する場合に返されるHTTPステータス。",
@@ -1591,13 +1559,7 @@
       "exConditionVariable": "任意 — このリクエスト変数が一致する場合のみ例外を適用（例: REQUEST_URI、REQUEST_HEADERS:Host）。",
       "exConditionOperator": "条件変数と値の比較方法。",
       "exConditionValue": "条件変数が一致すべき値（例: /api/ や IP アドレス）。",
-      "exDescription": "この例外に関する人間が読めるメモ。",
-      "siemName": "この統合の表示名。",
-      "siemIntegrationType": "配信メカニズム: webhook、syslog、またはElastic。",
-      "siemTarget": "URL、syslogホスト、またはElasticエンドポイント。",
-      "siemFormat": "出力フォーマット: JSON、Syslog、またはCEF。",
-      "siemAuthHeader": "webhookリクエストで送信されるオプションの認証ヘッダー。",
-      "siemEnabled": "この統合がアクティブかどうか。"
+      "exDescription": "この例外に関する人間が読めるメモ。"
     },
     "errors": {
       "exportFailed": "WAFルールのエクスポートに失敗しました",

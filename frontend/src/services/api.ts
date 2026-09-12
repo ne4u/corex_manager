@@ -300,12 +300,6 @@ export const wafExceptions = {
 export const waf = {
   logs: (limit = 100) => api.get(`/waf/logs?limit=${limit}`),
   health: () => api.get('/waf/health'),
-  siem: {
-    list: () => api.get('/waf/siem-integrations'),
-    create: (data: Record<string, unknown>) => api.post('/waf/siem-integrations', data),
-    update: (id: number, data: Record<string, unknown>) => api.put(`/waf/siem-integrations/${id}`, data),
-    remove: (id: number) => api.delete(`/waf/siem-integrations/${id}`),
-  },
   ruleVersions: {
     list: (waf_rule_id?: number) => api.get('/waf/rule-versions', { params: { waf_rule_id } }),
     snapshot: (id: number, version: string) => api.post(`/waf/rules/${id}/snapshot?version=${encodeURIComponent(version)}`),

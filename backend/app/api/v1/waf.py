@@ -494,7 +494,6 @@ def get_waf_health(user=Depends(get_current_user), _=Depends(rate_limit)):
         counts = {
             "waf_rules": db.query(WafRule).filter(WafRule.enabled == True).count(),
             "waf_exceptions": db.query(WafException).count(),
-            "siem_integrations": db.query(WafSiemIntegration).filter(WafSiemIntegration.enabled == True).count(),
             "waf_rules_fail_open": db.query(WafRule).filter(WafRule.fail_open == True).count(),
         }
     except Exception as e:
@@ -592,6 +591,8 @@ def import_waf_rules(data: dict, db: Session = Depends(get_db), user=Depends(req
         r.pop("created_at", None)
         r.pop("updated_at", None)
         r.pop("_sa_instance_state", None)
+        # Removed feature: old exports may still carry this field.
+        r.pop("siem_integration_id", None)
         obj = WafRule(**r)
         db.merge(obj)
     db.commit()
@@ -600,42 +601,6 @@ def import_waf_rules(data: dict, db: Session = Depends(get_db), user=Depends(req
         e.pop("_sa_instance_state", None)
         obj = WafException(**e)
         db.merge(obj)
-    db.commit()
-    return {"status": "ok"}
-
-
-@router.get("/waf/siem-integrations", response_model=List[WafSiemIntegrationResponse])
-def list_waf_siem(db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
-    return db.query(WafSiemIntegration).all()
-
-
-@router.post("/waf/siem-integrations", response_model=WafSiemIntegrationResponse)
-def create_waf_siem(s: WafSiemIntegrationCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
-    obj = WafSiemIntegration(**s.model_dump())
-    db.add(obj)
-    db.commit()
-    db.refresh(obj)
-    return obj
-
-
-@router.put("/waf/siem-integrations/{sid}", response_model=WafSiemIntegrationResponse)
-def update_waf_siem(sid: int, s_in: WafSiemIntegrationUpdate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
-    obj = db.get(WafSiemIntegration, sid)
-    if not obj:
-        raise HTTPException(status_code=404, detail="SIEM integration not found")
-    for k, v in s_in.model_dump(exclude_unset=True).items():
-        setattr(obj, k, v)
-    db.commit()
-    db.refresh(obj)
-    return obj
-
-
-@router.delete("/waf/siem-integrations/{sid}")
-def delete_waf_siem(sid: int, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
-    obj = db.get(WafSiemIntegration, sid)
-    if not obj:
-        raise HTTPException(status_code=404, detail="SIEM integration not found")
-    db.delete(obj)
     db.commit()
     return {"status": "ok"}
 

@@ -45,7 +45,6 @@ class WafRuleBase(BaseModel):
     rate_action: str = "block"
     rate_duration_seconds: int = 0
     fail_open: bool = False
-    siem_integration_id: Optional[int] = None
 
     @field_validator("action")
     @classmethod
@@ -168,30 +167,6 @@ class WafExceptionOptionsResponse(BaseModel):
     condition_variables: List[str]
 
 
-class WafSiemIntegrationBase(BaseModel):
-    name: str
-    integration_type: str = Field(default="webhook", pattern="^(webhook|syslog|elastic)$")
-    target: str
-    format: str = Field(default="json", pattern="^(json|syslog|cef)$")
-    auth_header: Optional[str] = None
-    enabled: bool = True
-
-
-class WafSiemIntegrationCreate(WafSiemIntegrationBase):
-    pass
-
-
-WafSiemIntegrationUpdate = _optional_update(WafSiemIntegrationBase)
-
-
-class WafSiemIntegrationResponse(WafSiemIntegrationBase):
-    id: int
-    created_at: datetime
-    updated_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
-
-
 class WafRuleVersionBase(BaseModel):
     waf_rule_id: int
     version: str
@@ -213,4 +188,4 @@ class WafRuleVersionResponse(WafRuleVersionBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-__all__ = ['WafExceptionBase', 'WafExceptionCreate', 'WafExceptionMsgOption', 'WafExceptionOptionsResponse', 'WafExceptionPreviewRequest', 'WafExceptionPreviewResponse', 'WafExceptionResponse', 'WafExceptionRuleOption', 'WafExceptionUpdate', 'WafExceptionVariableOption', 'WafRuleBase', 'WafRuleCreate', 'WafRuleResponse', 'WafRuleUpdate', 'WafRuleVersionBase', 'WafRuleVersionCreate', 'WafRuleVersionResponse', 'WafRuleVersionUpdate', 'WafSiemIntegrationBase', 'WafSiemIntegrationCreate', 'WafSiemIntegrationResponse', 'WafSiemIntegrationUpdate']
+__all__ = ['WafExceptionBase', 'WafExceptionCreate', 'WafExceptionMsgOption', 'WafExceptionOptionsResponse', 'WafExceptionPreviewRequest', 'WafExceptionPreviewResponse', 'WafExceptionResponse', 'WafExceptionRuleOption', 'WafExceptionUpdate', 'WafExceptionVariableOption', 'WafRuleBase', 'WafRuleCreate', 'WafRuleResponse', 'WafRuleUpdate', 'WafRuleVersionBase', 'WafRuleVersionCreate', 'WafRuleVersionResponse', 'WafRuleVersionUpdate']

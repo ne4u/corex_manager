@@ -1488,7 +1488,6 @@
     "tabs": {
       "rules": "Rules",
       "exceptions": "Exceptions",
-      "siem": "SIEM",
       "versions": "Versions",
       "crs": "CRS",
       "logs": "Logs",
@@ -1540,7 +1539,6 @@
         "inboundAnomalyThreshold": "Inbound Anomaly Threshold",
         "outboundAnomalyThreshold": "Outbound Anomaly Threshold",
         "action": "Action",
-        "siemIntegration": "SIEM Integration",
         "none": "None",
         "redirectUrl": "Redirect URL",
         "statusCode": "Status Code",
@@ -1625,35 +1623,6 @@
         "preview": "Generated directives"
       },
       "previewEmpty": "Nothing will be generated yet — select rules, a variable target, or a condition to preview the result."
-    },
-    "siem": {
-      "title": "SIEM Integrations",
-      "addSiem": "Add SIEM",
-      "tableHeaders": {
-        "name": "Name",
-        "type": "Type",
-        "target": "Target",
-        "format": "Format",
-        "enabled": "Enabled",
-        "actions": "Actions"
-      },
-      "editTitle": "Edit SIEM Integration",
-      "addTitle": "Add SIEM Integration",
-      "fields": {
-        "name": "Name",
-        "type": "Type",
-        "typeWebhook": "Webhook",
-        "typeSyslog": "Syslog",
-        "typeElastic": "Elastic",
-        "target": "Target",
-        "format": "Format",
-        "formatJson": "JSON",
-        "formatSyslog": "Syslog",
-        "formatCef": "CEF",
-        "authHeader": "Auth Header",
-        "enabled": "Enabled",
-        "save": "Save"
-      }
     },
     "versions": {
       "title": "Rule Snapshots",
@@ -1743,7 +1712,6 @@
       "inboundAnomalyThreshold": "Inbound anomaly score that triggers the configured action.",
       "outboundAnomalyThreshold": "Outbound (response) anomaly score that triggers the action.",
       "action": "Default action for triggered rules: block, allow, log, redirect, challenge.",
-      "siemIntegration": "SIEM endpoint to send WAF events to.",
       "redirectUrl": "URL to redirect the client to when the action is redirect or challenge.",
       "captchaValidSeconds": "How long a challenge session remains valid.",
       "statusCode": "HTTP status returned when a rule triggers and the action uses it.",
@@ -1776,13 +1744,7 @@
       "exConditionVariable": "Optional — only apply this exception when this request variable matches, e.g. REQUEST_URI or REQUEST_HEADERS:Host.",
       "exConditionOperator": "How to compare the condition variable to the value.",
       "exConditionValue": "The value the condition variable must match, e.g. /api/ or an IP address.",
-      "exDescription": "Human-readable note about this exception.",
-      "siemName": "Display name for this integration.",
-      "siemIntegrationType": "Delivery mechanism: webhook, syslog, or Elastic.",
-      "siemTarget": "URL, syslog host, or Elastic endpoint.",
-      "siemFormat": "Output format: JSON, Syslog, or CEF.",
-      "siemAuthHeader": "Optional authorization header sent with webhook requests.",
-      "siemEnabled": "Whether this integration is active."
+      "exDescription": "Human-readable note about this exception."
     },
     "errors": {
       "exportFailed": "Failed to export WAF rules",

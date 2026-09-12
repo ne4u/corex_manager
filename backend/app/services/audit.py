@@ -143,9 +143,6 @@ _NON_CONFIG_PATHS: list[tuple[str, str]] = [
     ("POST", r"^/captcha/keys/[^/]+/rotate-secret$"),
     # --- WAF operational / metadata (not config-generating) ---
     ("POST", r"^/waf/verify-captcha$"),
-    ("POST", r"^/waf/siem-integrations$"),
-    ("PUT", r"^/waf/siem-integrations/\d+$"),
-    ("DELETE", r"^/waf/siem-integrations/\d+$"),
     ("POST", r"^/waf/rules/\d+/snapshot$"),
     ("PUT", r"^/waf/rule-versions/max$"),
     ("DELETE", r"^/waf/rule-versions/\d+$"),
@@ -228,7 +225,6 @@ _SINGULAR_OVERRIDES = {
     "fcgi-apps": "fcgi_app",
     "waf-rules": "waf_rule",
     "waf-exceptions": "waf_exception",
-    "waf-siem-integrations": "waf_siem_integration",
     "rule-versions": "waf_rule_version",
     "backend-rules": "backend_rule",
     "rate-limits": "rate_limit",

@@ -101,10 +101,6 @@ class Settings(BaseSettings):
     CUSTOM_RULES_DIR: str = "data/custom-rules"
     RULE_SET_DOWNLOAD_INTERVAL_SECONDS: int = 300
 
-    # WAF SIEM forwarder
-    SIEM_FORWARDER_POLL_INTERVAL_SECONDS: int = 5
-    SIEM_FORWARDER_BATCH_SIZE: int = 100
-
     # WAF CRS downloader
     CRS_DIR: str = "data/crs"
     CRS_GITHUB_API: str = "https://api.github.com/repos/coreruleset/coreruleset/releases/latest"

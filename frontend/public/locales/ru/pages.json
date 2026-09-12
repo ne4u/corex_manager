@@ -1303,7 +1303,6 @@
     "tabs": {
       "rules": "Правила",
       "exceptions": "Исключения",
-      "siem": "SIEM",
       "versions": "Версии",
       "crs": "CRS",
       "logs": "Журналы",
@@ -1355,7 +1354,6 @@
         "inboundAnomalyThreshold": "Порог входящей аномалии",
         "outboundAnomalyThreshold": "Порог исходящей аномалии",
         "action": "Действие",
-        "siemIntegration": "Интеграция SIEM",
         "none": "Нет",
         "redirectUrl": "URL перенаправления",
         "statusCode": "Код статуса",
@@ -1440,35 +1438,6 @@
         "preview": "Сгенерированные директивы"
       },
       "previewEmpty": "Пока ничего не будет сгенерировано — выберите правила, целевую переменную или условие для предпросмотра."
-    },
-    "siem": {
-      "title": "Интеграции SIEM",
-      "addSiem": "Добавить SIEM",
-      "tableHeaders": {
-        "name": "Имя",
-        "type": "Тип",
-        "target": "Цель",
-        "format": "Формат",
-        "enabled": "Включено",
-        "actions": "Действия"
-      },
-      "editTitle": "Изменить интеграцию SIEM",
-      "addTitle": "Добавить интеграцию SIEM",
-      "fields": {
-        "name": "Имя",
-        "type": "Тип",
-        "typeWebhook": "Webhook",
-        "typeSyslog": "Syslog",
-        "typeElastic": "Elastic",
-        "target": "Цель",
-        "format": "Формат",
-        "formatJson": "JSON",
-        "formatSyslog": "Syslog",
-        "formatCef": "CEF",
-        "authHeader": "Заголовок аутентификации",
-        "enabled": "Включено",
-        "save": "Сохранить"
-      }
     },
     "versions": {
       "title": "Снимки правил",
@@ -1558,7 +1527,6 @@
       "inboundAnomalyThreshold": "Оценка входящей аномалии, запускающая настроенное действие.",
       "outboundAnomalyThreshold": "Оценка исходящей (ответной) аномалии, запускающая действие.",
       "action": "Действие по умолчанию для сработавших правил: block, allow, log, redirect, challenge.",
-      "siemIntegration": "Endpoint SIEM для отправки событий WAF.",
       "redirectUrl": "URL для перенаправления клиента, когда действие — redirect или challenge.",
       "captchaValidSeconds": "Как долго сеанс вызова остаётся действительным.",
       "statusCode": "HTTP-статус, возвращаемый при срабатывании правила и использовании этого действия.",
@@ -1591,13 +1559,7 @@
       "exConditionVariable": "Необязательно — применять исключение только при совпадении этой переменной запроса, напр. REQUEST_URI или REQUEST_HEADERS:Host.",
       "exConditionOperator": "Как сравнивать переменную условия со значением.",
       "exConditionValue": "Значение, которому должна соответствовать переменная условия, напр. /api/ или IP-адрес.",
-      "exDescription": "Человекочитаемая заметка об этом исключении.",
-      "siemName": "Отображаемое имя для этой интеграции.",
-      "siemIntegrationType": "Механизм доставки: webhook, syslog или Elastic.",
-      "siemTarget": "URL, хост syslog или endpoint Elastic.",
-      "siemFormat": "Формат вывода: JSON, Syslog или CEF.",
-      "siemAuthHeader": "Необязательный заголовок авторизации, отправляемый с запросами webhook.",
-      "siemEnabled": "Активна ли эта интеграция."
+      "exDescription": "Человекочитаемая заметка об этом исключении."
     },
     "errors": {
       "exportFailed": "Не удалось экспортировать правила WAF",

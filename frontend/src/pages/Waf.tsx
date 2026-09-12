@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Shield, FileText, Ban, Activity, GitBranch, Download, Upload, Heart, Pencil, Trash2, RefreshCw, Camera, RotateCcw, FileCode } from 'lucide-react'
+import { Shield, FileText, Ban, GitBranch, Download, Upload, Heart, Pencil, Trash2, RefreshCw, Camera, RotateCcw, FileCode } from 'lucide-react'
 import { wafRules, wafExceptions, listeners, waf, backends, settings } from '../services/api'
 import useApiList from '../hooks/useApiList'
 import Modal from '../components/Modal'
@@ -32,7 +32,6 @@ const wafRuleTooltips = {
   paranoiaLevel: 'waf.tooltips.paranoiaLevel',
   inboundAnomalyThreshold: 'waf.tooltips.inboundAnomalyThreshold',
   action: 'waf.tooltips.action',
-  siemIntegration: 'waf.tooltips.siemIntegration',
   redirectUrl: 'waf.tooltips.redirectUrl',
   statusCode: 'waf.tooltips.statusCode',
   pathPattern: 'waf.tooltips.pathPattern',
@@ -70,15 +69,6 @@ const wafExceptionTooltips = {
   description: 'waf.tooltips.exDescription',
 }
 
-const wafSiemTooltips = {
-  name: 'waf.tooltips.siemName',
-  integrationType: 'waf.tooltips.siemIntegrationType',
-  target: 'waf.tooltips.siemTarget',
-  format: 'waf.tooltips.siemFormat',
-  authHeader: 'waf.tooltips.siemAuthHeader',
-  enabled: 'waf.tooltips.siemEnabled',
-}
-
 function emptyRule() {
   return {
     name: '', listener_id: null as number | null, backend_id: null as number | null,
@@ -91,7 +81,7 @@ function emptyRule() {
     status_code: 403,
     path_pattern: '', http_methods: '', content_types: '',
     rate_enabled: false, rate_events: 100, rate_window_seconds: 60, rate_key: 'src',
-    rate_header: '', rate_action: 'block', rate_duration_seconds: 0, fail_open: false, siem_integration_id: null as number | null,
+    rate_header: '', rate_action: 'block', rate_duration_seconds: 0, fail_open: false,
   }
 }
 
@@ -111,7 +101,6 @@ export default function Waf() {
   const { items: exceptions, reload: re } = useApiList(wafExceptions.list)
   const { items: listenerList } = useApiList(listeners.list)
   const { items: backendList } = useApiList(backends.list)
-  const { items: siemIntegrations, reload: rSiem } = useApiList(waf.siem.list)
   const { items: ruleVersions, reload: rVersions } = useApiList(waf.ruleVersions.list)
 
   const [tab, setTab] = useState('rules')
@@ -127,10 +116,6 @@ export default function Waf() {
   const [exForm, setExForm] = useState<any>(emptyException())
   const [exOptions, setExOptions] = useState<any>(null)
   const [exPreview, setExPreview] = useState<{ conditional: string[]; unconditional: string[] } | null>(null)
-
-  const [siemOpen, setSiemOpen] = useState(false)
-  const [siemEditing, setSiemEditing] = useState<number | null>(null)
-  const [siemForm, setSiemForm] = useState<any>({ name: '', integration_type: 'webhook', target: '', format: 'json', auth_header: '', enabled: true })
 
   const [versionOpen, setVersionOpen] = useState(false)
   const [versionRuleId, setVersionRuleId] = useState<number | null>(null)
@@ -303,14 +288,6 @@ export default function Waf() {
     setExForm(emptyException()); setExEditing(null); setExOpen(false); re()
   }
 
-  const siemSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (siemEditing) await waf.siem.update(siemEditing, siemForm)
-    else await waf.siem.create(siemForm)
-    setSiemForm({ name: '', integration_type: 'webhook', target: '', format: 'json', auth_header: '', enabled: true })
-    setSiemEditing(null); setSiemOpen(false); rSiem()
-  }
-
   const snapshotRule = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!versionRuleId || !versionName) return
@@ -386,7 +363,6 @@ export default function Waf() {
         tabs={[
           { id: 'rules', label: t('waf.tabs.rules'), icon: FileText },
           { id: 'exceptions', label: t('waf.tabs.exceptions'), icon: Ban },
-          { id: 'siem', label: t('waf.tabs.siem'), icon: Activity },
           { id: 'versions', label: t('waf.tabs.versions'), icon: GitBranch },
           { id: 'crs', label: t('waf.tabs.crs'), icon: Download },
           { id: 'logs', label: t('waf.tabs.logs'), icon: FileCode },
@@ -447,32 +423,6 @@ export default function Waf() {
                       <div className="flex gap-1">
                         <IconButton icon={Pencil} aria-label={t('common:actions.edit')} onClick={() => openExEdit(e)} />
                         <IconButton icon={Trash2} variant="danger" aria-label={t('common:actions.delete')} onClick={() => wafExceptions.remove(e.id).then(re)} />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {tab === 'siem' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between"><h3 className="text-xl font-bold">{t('waf.siem.title')}</h3>
-            <button onClick={() => { setSiemEditing(null); setSiemForm({ name: '', integration_type: 'webhook', target: '', format: 'json', auth_header: '', enabled: true }); setSiemOpen(true) }} className="btn-primary">{t('waf.siem.addSiem')}</button>
-          </div>
-          <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
-            <table className="w-full text-sm text-start">
-              <thead className="text-muted-foreground border-b border-border"><tr><th>{t('waf.siem.tableHeaders.name')}</th><th>{t('waf.siem.tableHeaders.type')}</th><th>{t('waf.siem.tableHeaders.target')}</th><th>{t('waf.siem.tableHeaders.format')}</th><th>{t('waf.siem.tableHeaders.enabled')}</th><th></th></tr></thead>
-              <tbody>
-                {siemIntegrations.map((s: any) => (
-                  <tr key={s.id} className="border-b border-border last:border-0">
-                    <td className="py-2">{s.name}</td><td>{s.integration_type}</td><td>{s.target}</td><td>{s.format}</td><td>{s.enabled ? t('waf.rules.yes') : t('waf.rules.no')}</td>
-                    <td>
-                      <div className="flex gap-1">
-                        <IconButton icon={Pencil} aria-label={t('common:actions.edit')} onClick={() => { setSiemEditing(s.id); setSiemForm(s); setSiemOpen(true) }} />
-                        <IconButton icon={Trash2} variant="danger" aria-label={t('common:actions.delete')} onClick={() => waf.siem.remove(s.id).then(rSiem)} />
                       </div>
                     </td>
                   </tr>
@@ -702,7 +652,6 @@ export default function Waf() {
               // so the checkbox doesn't stay checked for an unsupported action.
               setForm({ ...form, action: next, rate_enabled: RATE_ENABLED_ACTIONS.includes(next) ? form.rate_enabled : false })
             }}>{actionOptions.map(a => <option key={a} value={a}>{a}</option>)}</select></div>
-            <div><LabelWithTooltip tooltip={t(wafRuleTooltips.siemIntegration)} className="label">{t('waf.rules.fields.siemIntegration')}</LabelWithTooltip><select className="input" value={form.siem_integration_id || ''} onChange={e => setForm({ ...form, siem_integration_id: e.target.value ? Number(e.target.value) : null })}><option value="">{t('waf.rules.fields.none')}</option>{siemIntegrations.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
           </div>
           {form.action === 'redirect' && (
             <div><LabelWithTooltip tooltip={t(wafRuleTooltips.redirectUrl)} className="label">{t('waf.rules.fields.redirectUrl')}</LabelWithTooltip><input className="input" value={form.redirect_url || ''} onChange={e => setForm({ ...form, redirect_url: e.target.value })} /></div>
@@ -813,20 +762,6 @@ export default function Waf() {
           </div>
 
           <button className="btn-primary w-full">{t('waf.exceptions.fields.save')}</button>
-        </form>
-      </Modal>
-
-      <Modal open={siemOpen} onClose={() => setSiemOpen(false)} title={siemEditing ? t('waf.siem.editTitle') : t('waf.siem.addTitle')}>
-        <form onSubmit={siemSubmit} className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div><LabelWithTooltip tooltip={t(wafSiemTooltips.name)} className="label">{t('waf.siem.fields.name')}</LabelWithTooltip><input className="input" value={siemForm.name} onChange={e => setSiemForm({ ...siemForm, name: e.target.value })} /></div>
-            <div><LabelWithTooltip tooltip={t(wafSiemTooltips.integrationType)} className="label">{t('waf.siem.fields.type')}</LabelWithTooltip><select className="input" value={siemForm.integration_type} onChange={e => setSiemForm({ ...siemForm, integration_type: e.target.value })}><option value="webhook">{t('waf.siem.fields.typeWebhook')}</option><option value="syslog">{t('waf.siem.fields.typeSyslog')}</option><option value="elastic">{t('waf.siem.fields.typeElastic')}</option></select></div>
-            <div><LabelWithTooltip tooltip={t(wafSiemTooltips.target)} className="label">{t('waf.siem.fields.target')}</LabelWithTooltip><input className="input" value={siemForm.target} onChange={e => setSiemForm({ ...siemForm, target: e.target.value })} /></div>
-            <div><LabelWithTooltip tooltip={t(wafSiemTooltips.format)} className="label">{t('waf.siem.fields.format')}</LabelWithTooltip><select className="input" value={siemForm.format} onChange={e => setSiemForm({ ...siemForm, format: e.target.value })}><option value="json">{t('waf.siem.fields.formatJson')}</option><option value="syslog">{t('waf.siem.fields.formatSyslog')}</option><option value="cef">{t('waf.siem.fields.formatCef')}</option></select></div>
-            <div><LabelWithTooltip tooltip={t(wafSiemTooltips.authHeader)} className="label">{t('waf.siem.fields.authHeader')}</LabelWithTooltip><input className="input" value={siemForm.auth_header || ''} onChange={e => setSiemForm({ ...siemForm, auth_header: e.target.value })} /></div>
-          </div>
-          <label className="flex items-center gap-2"><input type="checkbox" checked={siemForm.enabled} onChange={e => setSiemForm({ ...siemForm, enabled: e.target.checked })} /> <span>{t('waf.siem.fields.enabled')}</span><InfoTooltip content={t(wafSiemTooltips.enabled)} /></label>
-          <button className="btn-primary w-full">{t('waf.siem.fields.save')}</button>
         </form>
       </Modal>
 

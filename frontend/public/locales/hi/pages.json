@@ -1303,7 +1303,6 @@
     "tabs": {
       "rules": "नियम",
       "exceptions": "अपवाद",
-      "siem": "SIEM",
       "versions": "संस्करण",
       "crs": "CRS",
       "logs": "लॉग",
@@ -1355,7 +1354,6 @@
         "inboundAnomalyThreshold": "इनबाउंड विसंगति सीमा",
         "outboundAnomalyThreshold": "आउटबाउंड विसंगति सीमा",
         "action": "क्रिया",
-        "siemIntegration": "SIEM एकीकरण",
         "none": "कोई नहीं",
         "redirectUrl": "पुनर्निर्देशन URL",
         "statusCode": "स्थिति कोड",
@@ -1440,35 +1438,6 @@
         "preview": "उत्पन्न निर्देश"
       },
       "previewEmpty": "अभी कुछ भी उत्पन्न नहीं होगा — परिणाम का पूर्वावलोकन करने के लिए नियम, वेरिएबल लक्ष्य या शर्त चुनें।"
-    },
-    "siem": {
-      "title": "SIEM एकीकरण",
-      "addSiem": "SIEM जोड़ें",
-      "tableHeaders": {
-        "name": "नाम",
-        "type": "प्रकार",
-        "target": "लक्ष्य",
-        "format": "प्रारूप",
-        "enabled": "सक्षम",
-        "actions": "क्रियाएँ"
-      },
-      "editTitle": "SIEM एकीकरण संपादित करें",
-      "addTitle": "SIEM एकीकरण जोड़ें",
-      "fields": {
-        "name": "नाम",
-        "type": "प्रकार",
-        "typeWebhook": "Webhook",
-        "typeSyslog": "Syslog",
-        "typeElastic": "Elastic",
-        "target": "लक्ष्य",
-        "format": "प्रारूप",
-        "formatJson": "JSON",
-        "formatSyslog": "Syslog",
-        "formatCef": "CEF",
-        "authHeader": "प्रमाणीकरण हेडर",
-        "enabled": "सक्षम",
-        "save": "सहेजें"
-      }
     },
     "versions": {
       "title": "नियम स्नैपशॉट",
@@ -1558,7 +1527,6 @@
       "inboundAnomalyThreshold": "इनबाउंड विसंगति स्कोर जो कॉन्फ़िगर की गई क्रिया को ट्रिगर करता है।",
       "outboundAnomalyThreshold": "आउटबाउंड (प्रतिक्रिया) विसंगति स्कोर जो क्रिया को ट्रिगर करता है।",
       "action": "ट्रिगर किए गए नियमों के लिए डिफ़ॉल्ट क्रिया: ब्लॉक, अनुमति, लॉग, पुनर्निर्देशन, चुनौती।",
-      "siemIntegration": "WAF घटनाओं को भेजने के लिए SIEM एंडपॉइंट।",
       "redirectUrl": "जब क्रिया पुनर्निर्देशन या चुनौती हो तो क्लाइंट को पुनर्निर्देशित करने के लिए URL।",
       "captchaValidSeconds": "चुनौती सत्र कितने समय तक वैध रहता है।",
       "statusCode": "HTTP स्थिति जो लौटाई जाती है जब नियम ट्रिगर होता है और क्रिया इसका उपयोग करती है।",
@@ -1591,13 +1559,7 @@
       "exConditionVariable": "वैकल्पिक — इस अपवाद को तभी लागू करें जब यह अनुरोध वेरिएबल मेल खाए, जैसे REQUEST_URI या REQUEST_HEADERS:Host।",
       "exConditionOperator": "शर्त वेरिएबल की तुलना मान से कैसे करें।",
       "exConditionValue": "शर्त वेरिएबल को जिस मान से मेल खाना चाहिए, जैसे /api/ या कोई IP पता।",
-      "exDescription": "इस अपवाद के बारे में मानव-पठनीय नोट।",
-      "siemName": "इस एकीकरण के लिए प्रदर्शन नाम।",
-      "siemIntegrationType": "डिलीवरी तंत्र: webhook, syslog, या Elastic।",
-      "siemTarget": "URL, syslog होस्ट, या Elastic एंडपॉइंट।",
-      "siemFormat": "आउटपुट प्रारूप: JSON, Syslog, या CEF।",
-      "siemAuthHeader": "webhook अनुरोधों के साथ भेजा गया वैकल्पिक प्रमाणीकरण हेडर।",
-      "siemEnabled": "क्या यह एकीकरण सक्रिय है।"
+      "exDescription": "इस अपवाद के बारे में मानव-पठनीय नोट।"
     },
     "errors": {
       "exportFailed": "WAF नियम निर्यात करने में विफल",

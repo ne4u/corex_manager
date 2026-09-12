@@ -44,12 +44,10 @@ class WafRule(Base):
     rate_duration_seconds = Column(Integer, default=0)  # 0 = no block duration (sliding window only)
     # Fail mode
     fail_open = Column(Boolean, default=False)
-    siem_integration_id = Column(Integer, ForeignKey("waf_siem_integrations.id"), nullable=True)
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
     listener = relationship("Listener")
     backend = relationship("Backend")
-    siem_integration = relationship("WafSiemIntegration")
 
 
 class WafException(Base):
@@ -90,20 +88,6 @@ class WafMetric(Base):
     uri = Column(String, nullable=True)
 
 
-class WafSiemIntegration(Base):
-    __tablename__ = "waf_siem_integrations"
-
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, unique=True, index=True, nullable=False)
-    integration_type = Column(String, default="webhook")  # webhook, syslog, elastic
-    target = Column(String, nullable=False)
-    format = Column(String, default="json")  # json, syslog, cef
-    auth_header = Column(String, nullable=True)
-    enabled = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=utcnow)
-    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
-
-
 class WafRuleVersion(Base):
     __tablename__ = "waf_rule_versions"
 
@@ -131,4 +115,4 @@ class ChallengeEvent(Base):
     request_id = Column(String, nullable=True, index=True)  # HAProxy unique-id for cross-system correlation
 
 
-__all__ = ['ChallengeEvent', 'WafException', 'WafMetric', 'WafRule', 'WafRuleVersion', 'WafSiemIntegration']
+__all__ = ['ChallengeEvent', 'WafException', 'WafMetric', 'WafRule', 'WafRuleVersion']

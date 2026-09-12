@@ -25,7 +25,6 @@ from .services.audit import start_audit_worker
 from .services.geoip import GeoIpDownloader
 from .services.security_list_feeds import DynamicFeedUpdater
 from .services.rule_set_downloader import RuleSetUpdater
-from .services.siem_forwarder import SiemForwarder
 from .services.page_protect_sampler import start_page_protect_sampler
 from .services.page_protect_hasher import start_page_protect_hasher
 from .services.cache_metrics import start_sampler as start_cache_metrics_sampler
@@ -37,7 +36,6 @@ from .services import coraza_config
 _geoip_downloader = GeoIpDownloader(interval_hours=_settings.GEOIP_DOWNLOAD_INTERVAL_HOURS)
 _security_list_feed_updater = DynamicFeedUpdater()
 _rule_set_updater = RuleSetUpdater()
-_siem_forwarder = SiemForwarder()
 _auto_renew_scheduler = AutoRenewScheduler()
 
 
@@ -142,7 +140,6 @@ async def lifespan(app: FastAPI):
     _security_list_feed_updater.start()
     if _settings.CORAZA_SPOA_ENABLED:
         _rule_set_updater.start()
-        _siem_forwarder.start()
     # Page Protect — start sampler + hasher if enabled in settings
     from .services.page_protect import is_page_protect_enabled, is_page_protect_hashing_enabled
     pp_db = SessionLocal()
@@ -168,7 +165,6 @@ async def lifespan(app: FastAPI):
     yield
     stop_api_armor_profiler()
     stop_schema_learner()
-    _siem_forwarder.stop()
     _rule_set_updater.stop()
     _security_list_feed_updater.stop()
     _geoip_downloader.stop()

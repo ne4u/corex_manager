@@ -17,7 +17,6 @@ from app.models.models import (
     WafMetric,
     WafRule,
     WafRuleVersion,
-    WafSiemIntegration,
     PageProtectPolicy,
     CspReport,
     PageProtectScript,
@@ -129,7 +128,6 @@ def make_waf_rule(
     rate_header: Optional[str] = None,
     rate_duration_seconds: int = 0,
     fail_open: bool = False,
-    siem_integration_id: Optional[int] = None,
     sec_rules: Optional[str] = None,
     export_rule_ids: bool = False,
 ) -> WafRule:
@@ -159,7 +157,6 @@ def make_waf_rule(
         rate_header=rate_header,
         rate_duration_seconds=rate_duration_seconds,
         fail_open=fail_open,
-        siem_integration_id=siem_integration_id,
         sec_rules=sec_rules,
         export_rule_ids=export_rule_ids,
     )
@@ -206,26 +203,6 @@ def make_waf_exception(
     db.add(ex)
     db.flush()
     return ex
-
-
-def make_siem_integration(
-    db: Session,
-    name: str = "siem",
-    integration_type: str = "webhook",
-    target: str = "http://x",
-    format: str = "json",
-    enabled: bool = True,
-) -> WafSiemIntegration:
-    siem = WafSiemIntegration(
-        name=name,
-        integration_type=integration_type,
-        target=target,
-        format=format,
-        enabled=enabled,
-    )
-    db.add(siem)
-    db.flush()
-    return siem
 
 
 def make_rule_version(db: Session, waf_rule_id: int, version: str = "v1", snapshot: Optional[dict] = None) -> WafRuleVersion:

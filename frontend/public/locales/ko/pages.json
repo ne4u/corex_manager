@@ -1303,7 +1303,6 @@
     "tabs": {
       "rules": "규칙",
       "exceptions": "예외",
-      "siem": "SIEM",
       "versions": "버전",
       "crs": "CRS",
       "logs": "로그",
@@ -1355,7 +1354,6 @@
         "inboundAnomalyThreshold": "인바운드 이상 임계값",
         "outboundAnomalyThreshold": "아웃바운드 이상 임계값",
         "action": "작업",
-        "siemIntegration": "SIEM 통합",
         "none": "없음",
         "redirectUrl": "리디렉션 URL",
         "statusCode": "상태 코드",
@@ -1440,35 +1438,6 @@
         "preview": "생성될 지시문"
       },
       "previewEmpty": "아직 생성될 내용이 없습니다 — 규칙, 변수 대상 또는 조건을 선택하면 결과를 미리 볼 수 있습니다."
-    },
-    "siem": {
-      "title": "SIEM 통합",
-      "addSiem": "SIEM 추가",
-      "tableHeaders": {
-        "name": "이름",
-        "type": "유형",
-        "target": "대상",
-        "format": "형식",
-        "enabled": "활성화",
-        "actions": "작업"
-      },
-      "editTitle": "SIEM 통합 편집",
-      "addTitle": "SIEM 통합 추가",
-      "fields": {
-        "name": "이름",
-        "type": "유형",
-        "typeWebhook": "Webhook",
-        "typeSyslog": "Syslog",
-        "typeElastic": "Elastic",
-        "target": "대상",
-        "format": "형식",
-        "formatJson": "JSON",
-        "formatSyslog": "Syslog",
-        "formatCef": "CEF",
-        "authHeader": "인증 헤더",
-        "enabled": "활성화",
-        "save": "저장"
-      }
     },
     "versions": {
       "title": "규칙 스냅샷",
@@ -1558,7 +1527,6 @@
       "inboundAnomalyThreshold": "구성된 작업을 트리거하는 인바운드 이상 점수입니다.",
       "outboundAnomalyThreshold": "작업을 트리거하는 아웃바운드 (응답) 이상 점수입니다.",
       "action": "트리거된 규칙의 기본 작업: block, allow, log, redirect, challenge.",
-      "siemIntegration": "WAF 이벤트를 전송할 SIEM 엔드포인트입니다.",
       "redirectUrl": "작업이 redirect 또는 challenge일 때 클라이언트를 리디렉션할 URL입니다.",
       "captchaValidSeconds": "챌린지 세션이 유효한 기간입니다.",
       "statusCode": "규칙이 트리거되고 작업이 이를 사용할 때 반환되는 HTTP 상태입니다.",
@@ -1591,13 +1559,7 @@
       "exConditionVariable": "선택 사항 — 이 요청 변수가 일치할 때만 예외 적용(예: REQUEST_URI, REQUEST_HEADERS:Host).",
       "exConditionOperator": "조건 변수를 값과 비교하는 방법.",
       "exConditionValue": "조건 변수가 일치해야 하는 값(예: /api/ 또는 IP 주소).",
-      "exDescription": "이 예외에 대한 사람이 읽을 수 있는 메모입니다.",
-      "siemName": "이 통합의 표시 이름입니다.",
-      "siemIntegrationType": "전달 메커니즘: webhook, syslog 또는 Elastic.",
-      "siemTarget": "URL, syslog 호스트 또는 Elastic 엔드포인트입니다.",
-      "siemFormat": "출력 형식: JSON, Syslog 또는 CEF.",
-      "siemAuthHeader": "webhook 요청과 함께 전송되는 선택적 인증 헤더입니다.",
-      "siemEnabled": "이 통합이 활성 상태인지 여부입니다."
+      "exDescription": "이 예외에 대한 사람이 읽을 수 있는 메모입니다."
     },
     "errors": {
       "exportFailed": "WAF 규칙 내보내기 실패",

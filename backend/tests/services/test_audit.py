@@ -388,11 +388,8 @@ def test_is_config_change_captcha_keys():
 
 
 def test_is_config_change_waf_operational():
-    """WAF operational endpoints (verify, SIEM, rule versions) don't affect config."""
+    """WAF operational endpoints (verify, rule versions) don't affect config."""
     assert is_config_change("POST", "/api/v1/waf/verify-captcha") is False
-    assert is_config_change("POST", "/api/v1/waf/siem-integrations") is False
-    assert is_config_change("PUT", "/api/v1/waf/siem-integrations/3") is False
-    assert is_config_change("DELETE", "/api/v1/waf/siem-integrations/3") is False
     assert is_config_change("POST", "/api/v1/waf/rules/5/snapshot") is False
     assert is_config_change("PUT", "/api/v1/waf/rule-versions/max") is False
     assert is_config_change("DELETE", "/api/v1/waf/rule-versions/7") is False

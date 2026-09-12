@@ -36,7 +36,7 @@ from ..models.security import (
     Ja4List, NetworkList,
     PatternList, RiskRule, RiskRuleset, SecurityRule,
 )
-from ..models.waf import WafException, WafRule, WafSiemIntegration
+from ..models.waf import WafException, WafRule
 from ..models.routing import (
     RateLimit, Redirect, RequestHeader, ResponseHeader, ResponseTransform, Rewrite,
 )
@@ -80,8 +80,6 @@ PROVIDER_FIELD_OVERRIDES: Dict[str, Dict[str, Any]] = {
                  'content_types', 'export_rule_ids',
                  'rate_enabled', 'rate_events', 'rate_window_seconds',
                  'rate_key', 'rate_header', 'rate_action', 'rate_duration_seconds'},
-        # siem_integration_id stays as raw int — no waf_siem_integration resource
-        'raw_int': {'siem_integration_id'},
     },
     'cache_config': {
         'skip': {'name', 'haproxy_max_object_size', 'haproxy_max_secondary_entries',
@@ -1982,7 +1980,6 @@ class TerraformExporter:
         mod.add_variable('backend_ids', 'map(number)', 'Map of backend name to ID from the routing module', '{}')
 
         # WAF rules - listener_id and backend_id are nullable cross-module FKs.
-        # siem_integration_id is a raw int (no waf_siem_integration resource in provider).
         # http_methods is a comma-separated string in the DB but a list in the provider.
         self._add_for_each_collection(
             mod, 'waf_rule', 'waf_rules', WafRule,

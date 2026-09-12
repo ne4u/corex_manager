@@ -15,7 +15,7 @@ from app.services.backup import (
     SECRET_FIELDS,
     SECRET_SETTING_KEYS,
 )
-from app.models.models import Backend, Certificate, Setting, User, WafSiemIntegration
+from app.models.models import Backend, Certificate, Setting, User
 from tests.factories import make_backend, make_server
 
 
@@ -271,25 +271,3 @@ def test_restore_replaces_config(db):
     assert db.query(Backend).count() == 1
     assert db.query(Backend).filter(Backend.name == "web1").first() is not None
     assert db.query(Backend).filter(Backend.name == "web2").first() is None
-
-
-# ---------------------------------------------------------------------------
-# SIEM auth_header redaction
-# ---------------------------------------------------------------------------
-
-def test_siem_auth_header_redacted_without_secrets(db):
-    db.add(WafSiemIntegration(name="siem1", target="http://siem", auth_header="Bearer secret-token"))
-    db.commit()
-    snapshot = _serialize_db(db, include_secrets=False, include_metrics=False)
-    siem_rows = snapshot.get("waf_siem_integrations", [])
-    assert len(siem_rows) == 1
-    assert siem_rows[0]["auth_header"] is None
-
-
-def test_siem_auth_header_preserved_with_secrets(db):
-    db.add(WafSiemIntegration(name="siem1", target="http://siem", auth_header="Bearer secret-token"))
-    db.commit()
-    snapshot = _serialize_db(db, include_secrets=True, include_metrics=False)
-    siem_rows = snapshot.get("waf_siem_integrations", [])
-    assert len(siem_rows) == 1
-    assert siem_rows[0]["auth_header"] == "Bearer secret-token"

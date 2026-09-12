@@ -8,7 +8,6 @@ from app.services import coraza_config
 from tests.factories import (
     make_backend,
     make_listener,
-    make_siem_integration,
     make_waf_exception,
     make_waf_rule,
 )
@@ -116,25 +115,6 @@ def test_waf_exception_crud(client, db):
     assert res.json()["name"] == "updated"
 
     res = client.delete(f"/api/v1/waf-exceptions/{ex_id}")
-    assert res.status_code == 200
-
-
-def test_waf_siem_integration_crud(client, db):
-    payload = {
-        "name": "siem",
-        "integration_type": "webhook",
-        "target": "http://example.com/webhook",
-        "format": "json",
-    }
-    res = client.post("/api/v1/waf/siem-integrations", json=payload)
-    assert res.status_code == 200
-    siem_id = res.json()["id"]
-
-    res = client.put(f"/api/v1/waf/siem-integrations/{siem_id}", json={"target": "http://example.com/new"})
-    assert res.status_code == 200
-    assert res.json()["target"] == "http://example.com/new"
-
-    res = client.delete(f"/api/v1/waf/siem-integrations/{siem_id}")
     assert res.status_code == 200
 
 

@@ -45,12 +45,6 @@ vi.mock('../../services/api', () => ({
   waf: {
     health: vi.fn(() => Promise.resolve({ data: { status: 'ok', coraza_spoa_reachable: true, config_present: true } })),
     logs: vi.fn(() => Promise.resolve({ data: [] })),
-    siem: {
-      list: vi.fn(() => Promise.resolve({ data: [] })),
-      create: vi.fn(() => Promise.resolve({ data: {} })),
-      update: vi.fn(() => Promise.resolve({ data: {} })),
-      remove: vi.fn(() => Promise.resolve({ data: {} })),
-    },
     ruleVersions: {
       list: vi.fn(() => Promise.resolve({ data: [] })),
       snapshot: vi.fn(() => Promise.resolve({ data: {} })),

@@ -1303,7 +1303,6 @@
     "tabs": {
       "rules": "规则",
       "exceptions": "例外",
-      "siem": "SIEM",
       "versions": "版本",
       "crs": "CRS",
       "logs": "日志",
@@ -1355,7 +1354,6 @@
         "inboundAnomalyThreshold": "入站异常阈值",
         "outboundAnomalyThreshold": "出站异常阈值",
         "action": "操作",
-        "siemIntegration": "SIEM集成",
         "none": "无",
         "redirectUrl": "重定向URL",
         "statusCode": "状态码",
@@ -1440,35 +1438,6 @@
         "preview": "生成的指令"
       },
       "previewEmpty": "尚不会生成任何内容——请选择规则、变量目标或条件以预览结果。"
-    },
-    "siem": {
-      "title": "SIEM集成",
-      "addSiem": "添加SIEM",
-      "tableHeaders": {
-        "name": "名称",
-        "type": "类型",
-        "target": "目标",
-        "format": "格式",
-        "enabled": "已启用",
-        "actions": "操作"
-      },
-      "editTitle": "编辑SIEM集成",
-      "addTitle": "添加SIEM集成",
-      "fields": {
-        "name": "名称",
-        "type": "类型",
-        "typeWebhook": "Webhook",
-        "typeSyslog": "Syslog",
-        "typeElastic": "Elastic",
-        "target": "目标",
-        "format": "格式",
-        "formatJson": "JSON",
-        "formatSyslog": "Syslog",
-        "formatCef": "CEF",
-        "authHeader": "认证头部",
-        "enabled": "已启用",
-        "save": "保存"
-      }
     },
     "versions": {
       "title": "规则快照",
@@ -1558,7 +1527,6 @@
       "inboundAnomalyThreshold": "触发配置操作的入站异常分数。",
       "outboundAnomalyThreshold": "触发操作的出站（响应）异常分数。",
       "action": "触发规则的默认操作：block、allow、log、redirect、challenge。",
-      "siemIntegration": "发送WAF事件的SIEM端点。",
       "redirectUrl": "当操作为redirect或challenge时将客户端重定向到的URL。",
       "captchaValidSeconds": "挑战会话保持有效的时间。",
       "statusCode": "规则触发且操作使用它时返回的HTTP状态。",
@@ -1591,13 +1559,7 @@
       "exConditionVariable": "可选——仅当此请求变量匹配时才应用例外，例如 REQUEST_URI 或 REQUEST_HEADERS:Host。",
       "exConditionOperator": "如何将条件变量与值进行比较。",
       "exConditionValue": "条件变量必须匹配的值，例如 /api/ 或 IP 地址。",
-      "exDescription": "关于此例外的人类可读备注。",
-      "siemName": "此集成的显示名称。",
-      "siemIntegrationType": "交付机制：webhook、syslog或Elastic。",
-      "siemTarget": "URL、syslog主机或Elastic端点。",
-      "siemFormat": "输出格式：JSON、Syslog或CEF。",
-      "siemAuthHeader": "随webhook请求发送的可选授权头部。",
-      "siemEnabled": "此集成是否处于活跃状态。"
+      "exDescription": "关于此例外的人类可读备注。"
     },
     "errors": {
       "exportFailed": "导出WAF规则失败",

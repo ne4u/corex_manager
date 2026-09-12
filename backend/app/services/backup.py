@@ -37,7 +37,6 @@ _ALWAYS_EXCLUDED = set()
 SECRET_FIELDS: Dict[str, List[str]] = {
     "users": ["hashed_password", "totp_secret"],
     "certificates": ["dns_credentials"],
-    "waf_siem_integrations": ["auth_header"],
 }
 
 # Setting keys that are secret — filtered out when include_secrets=False.
