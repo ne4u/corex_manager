@@ -484,6 +484,23 @@ export const systemBackup = {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
   },
+  terraformExport: (
+    includeSecrets: boolean,
+    options?: {
+      includeCerts?: boolean
+      includeUsersIdentities?: boolean
+      includeSystemSecrets?: boolean
+    },
+  ) =>
+    api.get('/system/export-terraform', {
+      params: {
+        include_secrets: includeSecrets,
+        include_certs: options?.includeCerts ?? false,
+        include_users_identities: options?.includeUsersIdentities ?? false,
+        include_system_secrets: options?.includeSystemSecrets ?? false,
+      },
+      responseType: 'blob',
+    }),
 }
 
 export const pageProtect = {

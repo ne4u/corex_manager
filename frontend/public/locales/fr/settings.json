@@ -99,5 +99,15 @@
     "save": "Enregistrer la Politique de Mot de Passe",
     "saved": "Politique de mot de passe enregistrée.",
     "saveFailed": "Échec de l'enregistrement de la politique de mot de passe."
+  },
+  "terraform": {
+    "title": "Exporter Terraform",
+    "description": "Exportez toute la configuration coreX en tant que projet Terraform structuré basé sur des modules — un point de départ pour construire des configurations Terraform de production depuis votre environnement actuel.",
+    "includeSecrets": "Inclure les secrets (mots de passe, clés, certificats)",
+    "includeSecretsHint": "Lorsque décoché, les secrets sont exportés en tant qu'espaces réservés de variables que vous remplirez.",
+    "button": "Exporter Terraform",
+    "exporting": "Génération...",
+    "success": "Configuration Terraform téléchargée avec succès.",
+    "failed": "Échec de l'exportation."
   }
 }

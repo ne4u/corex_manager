@@ -99,5 +99,15 @@
     "save": "パスワードポリシーを保存",
     "saved": "パスワードポリシーを保存しました。",
     "saveFailed": "パスワードポリシーの保存に失敗しました。"
+  },
+  "terraform": {
+    "title": "Terraformエクスポート",
+    "description": "現在の環境から本番環境用のTerraform設定を構築するための出発点として、すべてのcoreX設定を構造化されたモジュールベースのTerraformプロジェクトとしてエクスポートします。",
+    "includeSecrets": "シークレットを含める（パスワード、キー、証明書）",
+    "includeSecretsHint": "チェックを外すと、シークレットは変数プレースホルダーとしてエクスポートされ、後で入力します。",
+    "button": "Terraformエクスポート",
+    "exporting": "生成中...",
+    "success": "Terraform設定が正常にダウンロードされました。",
+    "failed": "エクスポートに失敗しました。"
   }
 }

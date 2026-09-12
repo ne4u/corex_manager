@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Globe, Clock, AlertTriangle, Download, Upload, Package, FileArchive, Radar, KeyRound } from 'lucide-react'
+import { Globe, Clock, AlertTriangle, Download, Upload, Package, FileArchive, Radar, KeyRound, FileCode2 } from 'lucide-react'
 import { settings, systemBackup } from '../services/api'
 import Modal from '../components/Modal'
 import { useDateTime } from '../contexts/DateTimeContext'
@@ -56,6 +56,14 @@ export default function SystemSettings() {
   const [restoreMessage, setRestoreMessage] = useState('')
   const [confirmRestore, setConfirmRestore] = useState(false)
   const [confirmText, setConfirmText] = useState('')
+
+  // Export Terraform state
+  const [tfIncludeSecrets, setTfIncludeSecrets] = useState(false)
+  const [tfIncludeCerts, setTfIncludeCerts] = useState(false)
+  const [tfIncludeUsersIdentities, setTfIncludeUsersIdentities] = useState(false)
+  const [tfIncludeSystemSecrets, setTfIncludeSystemSecrets] = useState(false)
+  const [tfExporting, setTfExporting] = useState(false)
+  const [tfExportMessage, setTfExportMessage] = useState('')
 
   useEffect(() => {
     setLoading(true)
@@ -283,6 +291,33 @@ export default function SystemSettings() {
       setRestoreMessage(formatError(err, t('settings:backup.restore.failed')))
     } finally {
       setRestoring(false)
+    }
+  }
+
+  const handleTfExport = async () => {
+    setTfExporting(true)
+    setTfExportMessage('')
+    try {
+      const res = await systemBackup.terraformExport(tfIncludeSecrets, {
+        includeCerts: tfIncludeCerts,
+        includeUsersIdentities: tfIncludeUsersIdentities,
+        includeSystemSecrets: tfIncludeSystemSecrets,
+      })
+      const blob = new Blob([res.data])
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const ts = new Date().toISOString().replace(/[:.]/g, '').slice(0, 14)
+      a.download = `corex-terraform-${ts}.zip`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+      setTfExportMessage(t('settings:terraform.success'))
+    } catch (err: any) {
+      setTfExportMessage(formatError(err, t('settings:terraform.failed')))
+    } finally {
+      setTfExporting(false)
     }
   }
 
@@ -522,6 +557,70 @@ export default function SystemSettings() {
           </p>
         )}
       </form>
+
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4 max-w-2xl">
+        <h2 className="text-lg font-semibold flex items-center gap-2"><FileCode2 className="h-5 w-5 text-primary" /> {t('settings:terraform.title')}</h2>
+        <p className="text-sm text-muted-foreground">
+          {t('settings:terraform.description')}
+        </p>
+        <div className="space-y-2">
+          <label className="flex items-center gap-2 text-sm text-secondary-foreground">
+            <input
+              type="checkbox"
+              className="rounded border-subtle bg-muted text-primary"
+              checked={tfIncludeSecrets}
+              onChange={(e) => setTfIncludeSecrets(e.target.checked)}
+              disabled={tfExporting}
+            />
+            {t('settings:terraform.includeSecrets')}
+          </label>
+          <p className="text-xs text-muted-foreground">{t('settings:terraform.includeSecretsHint')}</p>
+        </div>
+        <div className="space-y-2 pt-2 border-t border-border-subtle">
+          <p className="text-sm font-medium text-secondary-foreground">{t('settings:terraform.granularOptions')}</p>
+          <label className="flex items-center gap-2 text-sm text-secondary-foreground">
+            <input
+              type="checkbox"
+              className="rounded border-subtle bg-muted text-primary"
+              checked={tfIncludeCerts}
+              onChange={(e) => setTfIncludeCerts(e.target.checked)}
+              disabled={tfExporting}
+            />
+            {t('settings:terraform.includeCerts')}
+          </label>
+          <p className="text-xs text-muted-foreground">{t('settings:terraform.includeCertsHint')}</p>
+          <label className="flex items-center gap-2 text-sm text-secondary-foreground">
+            <input
+              type="checkbox"
+              className="rounded border-subtle bg-muted text-primary"
+              checked={tfIncludeUsersIdentities}
+              onChange={(e) => setTfIncludeUsersIdentities(e.target.checked)}
+              disabled={tfExporting}
+            />
+            {t('settings:terraform.includeUsersIdentities')}
+          </label>
+          <p className="text-xs text-muted-foreground">{t('settings:terraform.includeUsersIdentitiesHint')}</p>
+          <label className="flex items-center gap-2 text-sm text-secondary-foreground">
+            <input
+              type="checkbox"
+              className="rounded border-subtle bg-muted text-primary"
+              checked={tfIncludeSystemSecrets}
+              onChange={(e) => setTfIncludeSystemSecrets(e.target.checked)}
+              disabled={tfExporting}
+            />
+            {t('settings:terraform.includeSystemSecrets')}
+          </label>
+          <p className="text-xs text-muted-foreground">{t('settings:terraform.includeSystemSecretsHint')}</p>
+        </div>
+        <button className="btn-primary" type="button" onClick={handleTfExport} disabled={tfExporting}>
+          {tfExporting ? t('settings:terraform.exporting') : t('settings:terraform.button')}
+        </button>
+        {tfExportMessage && (
+          <p className={`text-sm ${tfExportMessage.startsWith(t('settings:terraform.failed')) || tfExportMessage.startsWith(t('common:errors.saveFailed')) ? 'text-red-400' : 'text-green-400'}`}>
+            {tfExportMessage}
+          </p>
+        )}
+      </div>
 
       <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4 max-w-2xl">
         <h2 className="text-lg font-semibold flex items-center gap-2"><Package className="h-5 w-5 text-primary" /> {t('settings:backup.title')}</h2>

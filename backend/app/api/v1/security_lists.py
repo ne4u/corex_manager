@@ -35,6 +35,7 @@ def _network_list_response(lst) -> NetworkListResponse:
         name=lst.name,
         description=lst.description,
         entry_count=len(lst.entries),
+        entries=[NetworkListEntryResponse.model_validate(e) for e in lst.entries],
         created_at=lst.created_at,
         updated_at=lst.updated_at,
     )
@@ -46,6 +47,7 @@ def _asn_list_response(lst) -> AsnListResponse:
         name=lst.name,
         description=lst.description,
         entry_count=len(lst.entries),
+        entries=[AsnListEntryResponse.model_validate(e) for e in lst.entries],
         created_at=lst.created_at,
         updated_at=lst.updated_at,
     )
@@ -57,6 +59,7 @@ def _geo_list_response(lst) -> GeoListResponse:
         name=lst.name,
         description=lst.description,
         entry_count=len(lst.entries),
+        entries=[GeoListEntryResponse.model_validate(e) for e in lst.entries],
         created_at=lst.created_at,
         updated_at=lst.updated_at,
     )
@@ -68,6 +71,7 @@ def _ja4_list_response(lst) -> Ja4ListResponse:
         name=lst.name,
         description=lst.description,
         entry_count=len(lst.entries),
+        entries=[Ja4ListEntryResponse.model_validate(e) for e in lst.entries],
         created_at=lst.created_at,
         updated_at=lst.updated_at,
     )
@@ -79,9 +83,30 @@ def _pattern_list_response(lst) -> PatternListResponse:
         name=lst.name,
         description=lst.description,
         entry_count=len(lst.entries),
+        entries=[PatternListEntryResponse.model_validate(e) for e in lst.entries],
         created_at=lst.created_at,
         updated_at=lst.updated_at,
     )
+
+
+def _replace_entries(db: Session, lst, entry_cls, entries, validator=None):
+    """Replace all entries on a list with the provided inline entries.
+
+    Args:
+        db: SQLAlchemy session
+        lst: the list model instance
+        entry_cls: the entry model class
+        entries: list of EntryInline schemas (value, note)
+        validator: optional function to validate each value
+    """
+    # Delete existing entries
+    for existing in list(lst.entries):
+        db.delete(existing)
+    db.flush()
+    # Create new entries
+    for e in entries:
+        value = validator(e.value) if validator else e.value
+        db.add(entry_cls(list_id=lst.id, value=value, note=e.note))
 
 
 def _touch_list(db: Session, model_cls, lid: int):
@@ -103,6 +128,15 @@ def create_network_list(a: NetworkListCreate, db: Session = Depends(get_db), use
     db.add(obj)
     db.commit()
     db.refresh(obj)
+    if a.entries is not None:
+        try:
+            _replace_entries(db, obj, NetworkListEntry, a.entries, validate_network_value)
+        except ValueError as exc:
+            db.delete(obj)
+            db.commit()
+            raise HTTPException(status_code=400, detail=str(exc))
+        db.commit()
+        db.refresh(obj)
     return _network_list_response(obj)
 
 
@@ -111,8 +145,15 @@ def update_network_list(lid: int, a_in: NetworkListUpdate, db: Session = Depends
     obj = db.get(NetworkList, lid)
     if not obj:
         raise HTTPException(status_code=404, detail="Network list not found")
-    for k, v in a_in.model_dump(exclude_unset=True).items():
+    data = a_in.model_dump(exclude_unset=True)
+    entries = data.pop("entries", None)
+    for k, v in data.items():
         setattr(obj, k, v)
+    if entries is not None:
+        try:
+            _replace_entries(db, obj, NetworkListEntry, a_in.entries, validate_network_value)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
     db.commit()
     db.refresh(obj)
     return _network_list_response(obj)
@@ -203,6 +244,15 @@ def create_asn_list(a: AsnListCreate, db: Session = Depends(get_db), user=Depend
     db.add(obj)
     db.commit()
     db.refresh(obj)
+    if a.entries is not None:
+        try:
+            _replace_entries(db, obj, AsnListEntry, a.entries, validate_asn_value)
+        except ValueError as exc:
+            db.delete(obj)
+            db.commit()
+            raise HTTPException(status_code=400, detail=str(exc))
+        db.commit()
+        db.refresh(obj)
     return _asn_list_response(obj)
 
 
@@ -211,8 +261,15 @@ def update_asn_list(lid: int, a_in: AsnListUpdate, db: Session = Depends(get_db)
     obj = db.get(AsnList, lid)
     if not obj:
         raise HTTPException(status_code=404, detail="ASN list not found")
-    for k, v in a_in.model_dump(exclude_unset=True).items():
+    data = a_in.model_dump(exclude_unset=True)
+    entries = data.pop("entries", None)
+    for k, v in data.items():
         setattr(obj, k, v)
+    if entries is not None:
+        try:
+            _replace_entries(db, obj, AsnListEntry, a_in.entries, validate_asn_value)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
     db.commit()
     db.refresh(obj)
     return _asn_list_response(obj)
@@ -312,6 +369,15 @@ def create_geo_list(a: GeoListCreate, db: Session = Depends(get_db), user=Depend
     db.add(obj)
     db.commit()
     db.refresh(obj)
+    if a.entries is not None:
+        try:
+            _replace_entries(db, obj, GeoListEntry, a.entries, validate_country_code)
+        except ValueError as exc:
+            db.delete(obj)
+            db.commit()
+            raise HTTPException(status_code=400, detail=str(exc))
+        db.commit()
+        db.refresh(obj)
     return _geo_list_response(obj)
 
 
@@ -320,8 +386,15 @@ def update_geo_list(lid: int, a_in: GeoListUpdate, db: Session = Depends(get_db)
     obj = db.get(GeoList, lid)
     if not obj:
         raise HTTPException(status_code=404, detail="GeoIP list not found")
-    for k, v in a_in.model_dump(exclude_unset=True).items():
+    data = a_in.model_dump(exclude_unset=True)
+    entries = data.pop("entries", None)
+    for k, v in data.items():
         setattr(obj, k, v)
+    if entries is not None:
+        try:
+            _replace_entries(db, obj, GeoListEntry, a_in.entries, validate_country_code)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
     db.commit()
     db.refresh(obj)
     return _geo_list_response(obj)
@@ -411,6 +484,15 @@ def create_ja4_list(a: Ja4ListCreate, db: Session = Depends(get_db), user=Depend
     db.add(obj)
     db.commit()
     db.refresh(obj)
+    if a.entries is not None:
+        try:
+            _replace_entries(db, obj, Ja4ListEntry, a.entries, validate_ja4_value)
+        except ValueError as exc:
+            db.delete(obj)
+            db.commit()
+            raise HTTPException(status_code=400, detail=str(exc))
+        db.commit()
+        db.refresh(obj)
     return _ja4_list_response(obj)
 
 
@@ -419,8 +501,15 @@ def update_ja4_list(lid: int, a_in: Ja4ListUpdate, db: Session = Depends(get_db)
     obj = db.get(Ja4List, lid)
     if not obj:
         raise HTTPException(status_code=404, detail="JA4 list not found")
-    for k, v in a_in.model_dump(exclude_unset=True).items():
+    data = a_in.model_dump(exclude_unset=True)
+    entries = data.pop("entries", None)
+    for k, v in data.items():
         setattr(obj, k, v)
+    if entries is not None:
+        try:
+            _replace_entries(db, obj, Ja4ListEntry, a_in.entries, validate_ja4_value)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
     db.commit()
     db.refresh(obj)
     return _ja4_list_response(obj)
@@ -510,6 +599,15 @@ def create_pattern_list(a: PatternListCreate, db: Session = Depends(get_db), use
     db.add(obj)
     db.commit()
     db.refresh(obj)
+    if a.entries is not None:
+        try:
+            _replace_entries(db, obj, PatternListEntry, a.entries, validate_pattern_value)
+        except ValueError as exc:
+            db.delete(obj)
+            db.commit()
+            raise HTTPException(status_code=400, detail=str(exc))
+        db.commit()
+        db.refresh(obj)
     return _pattern_list_response(obj)
 
 
@@ -518,8 +616,15 @@ def update_pattern_list(lid: int, a_in: PatternListUpdate, db: Session = Depends
     obj = db.get(PatternList, lid)
     if not obj:
         raise HTTPException(status_code=404, detail="Pattern list not found")
-    for k, v in a_in.model_dump(exclude_unset=True).items():
+    data = a_in.model_dump(exclude_unset=True)
+    entries = data.pop("entries", None)
+    for k, v in data.items():
         setattr(obj, k, v)
+    if entries is not None:
+        try:
+            _replace_entries(db, obj, PatternListEntry, a_in.entries, validate_pattern_value)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
     db.commit()
     db.refresh(obj)
     return _pattern_list_response(obj)

@@ -99,5 +99,15 @@
     "save": "Salvar Política de Senha",
     "saved": "Política de senha salva.",
     "saveFailed": "Falha ao salvar a política de senha."
+  },
+  "terraform": {
+    "title": "Exportar Terraform",
+    "description": "Exporte toda a configuração do coreX como um projeto Terraform estruturado baseado em módulos — um ponto de partida para construir configurações Terraform de produção a partir do seu ambiente atual.",
+    "includeSecrets": "Incluir segredos (senhas, chaves, certificados)",
+    "includeSecretsHint": "Quando desmarcado, os segredos são exportados como espaços reservados de variáveis para você preencher.",
+    "button": "Exportar Terraform",
+    "exporting": "Gerando...",
+    "success": "Configuração Terraform baixada com sucesso.",
+    "failed": "Falha na exportação."
   }
 }

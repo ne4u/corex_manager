@@ -99,5 +99,15 @@
     "save": "保存密码策略",
     "saved": "密码策略已保存。",
     "saveFailed": "保存密码策略失败。"
+  },
+  "terraform": {
+    "title": "导出 Terraform",
+    "description": "将所有 coreX 配置导出为结构化的、基于模块的 Terraform 项目 — 作为从当前环境构建生产 Terraform 配置的起点。",
+    "includeSecrets": "包含密钥（密码、密钥、证书）",
+    "includeSecretsHint": "未勾选时，密钥将导出为变量占位符，供您稍后填写。",
+    "button": "导出 Terraform",
+    "exporting": "生成中...",
+    "success": "Terraform 配置下载成功。",
+    "failed": "导出失败。"
   }
 }

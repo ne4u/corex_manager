@@ -429,6 +429,47 @@ def system_export(
     )
 
 
+@router.get("/system/export-terraform")
+def export_terraform(
+    include_secrets: bool = Query(False),
+    include_certs: bool = Query(False),
+    include_users_identities: bool = Query(False),
+    include_system_secrets: bool = Query(False),
+    db: Session = Depends(get_db),
+    user=Depends(require_admin),
+    _=Depends(rate_limit),
+):
+    """Export all coreX configuration as a structured Terraform project ZIP.
+
+    Generates a module-based Terraform configuration compatible with the
+    terraform-provider-corex provider. Resources are always exported; secret
+    values become variable placeholders unless the corresponding flag is set.
+
+    Granular options control which secret categories are included inline:
+    - include_secrets: master override — include all secrets inline
+    - include_certs: include cert PEM files and dns credentials inline
+    - include_users_identities: include user passwords and MCP identity secrets inline
+    - include_system_secrets: include MaxMind key, captcha secrets, MCP server secrets, HA passwords inline
+    """
+    from ...services.terraform_export import generate_terraform_export
+
+    zip_bytes = generate_terraform_export(
+        db,
+        include_secrets=include_secrets,
+        include_certs=include_certs,
+        include_users_identities=include_users_identities,
+        include_system_secrets=include_system_secrets,
+    )
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    return Response(
+        content=zip_bytes,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="corex-terraform-{timestamp}.zip"',
+        },
+    )
+
+
 @router.post("/system/restore")
 async def system_restore(
     file: UploadFile = File(...),

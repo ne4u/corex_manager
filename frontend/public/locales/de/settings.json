@@ -99,5 +99,15 @@
     "save": "Passwortrichtlinie speichern",
     "saved": "Passwortrichtlinie gespeichert.",
     "saveFailed": "Speichern der Passwortrichtlinie fehlgeschlagen."
+  },
+  "terraform": {
+    "title": "Terraform exportieren",
+    "description": "Exportieren Sie die gesamte coreX-Konfiguration als strukturiertes, modulbasiertes Terraform-Projekt — ein Ausgangspunkt für den Aufbau von Terraform-Konfigurationen für die Produktion aus Ihrer aktuellen Umgebung.",
+    "includeSecrets": "Geheimnisse einschließen (Passwörter, Schlüssel, Zertifikate)",
+    "includeSecretsHint": "Wenn deaktiviert, werden Geheimnisse als Variablen-Platzhalter exportiert, die Sie ausfüllen müssen.",
+    "button": "Terraform exportieren",
+    "exporting": "Wird generiert...",
+    "success": "Terraform-Konfiguration erfolgreich heruntergeladen.",
+    "failed": "Export fehlgeschlagen."
   }
 }

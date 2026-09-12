@@ -99,5 +99,15 @@
     "save": "Salva Criteri Password",
     "saved": "Criteri password salvati.",
     "saveFailed": "Salvataggio dei criteri password non riuscito."
+  },
+  "terraform": {
+    "title": "Esporta Terraform",
+    "description": "Esporta tutta la configurazione di coreX come progetto Terraform strutturato basato su moduli — un punto di partenza per costruire configurazioni Terraform di produzione dal tuo ambiente attuale.",
+    "includeSecrets": "Includi segreti (password, chiavi, certificati)",
+    "includeSecretsHint": "Quando deselezionato, i segreti vengono esportati come segnaposto di variabili da compilare.",
+    "button": "Esporta Terraform",
+    "exporting": "Generazione...",
+    "success": "Configurazione Terraform scaricata con successo.",
+    "failed": "Esportazione fallita."
   }
 }

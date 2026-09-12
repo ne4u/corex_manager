@@ -99,5 +99,22 @@
     "save": "Save Password Policy",
     "saved": "Password policy saved.",
     "saveFailed": "Failed to save password policy."
+  },
+  "terraform": {
+    "title": "Export Terraform",
+    "description": "Export all coreX configuration as a structured, module-based Terraform project — a starting point for building production Terraform configs from your current environment.",
+    "includeSecrets": "Include all secrets",
+    "includeSecretsHint": "Export all secrets, keys, passwords, and certificates inline. When unchecked, secrets become variable placeholders.",
+    "granularOptions": "Secret categories to include inline:",
+    "includeCerts": "Include certificates",
+    "includeCertsHint": "Include actual cert/key PEM files inline. When unchecked, placeholder dummy certs are generated.",
+    "includeUsersIdentities": "Include users & identities",
+    "includeUsersIdentitiesHint": "Include user passwords and MCP identity secrets inline. Other secrets become variable placeholders.",
+    "includeSystemSecrets": "Include system secrets",
+    "includeSystemSecretsHint": "Include MaxMind key, captcha secrets, DNS credentials, MCP server auth secrets, and HA passwords inline. Other secrets become variable placeholders.",
+    "button": "Export Terraform",
+    "exporting": "Generating...",
+    "success": "Terraform configuration downloaded successfully.",
+    "failed": "Export failed."
   }
 }

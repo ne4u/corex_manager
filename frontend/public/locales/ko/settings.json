@@ -99,5 +99,15 @@
     "save": "비밀번호 정책 저장",
     "saved": "비밀번호 정책이 저장되었습니다.",
     "saveFailed": "비밀번호 정책 저장에 실패했습니다."
+  },
+  "terraform": {
+    "title": "Terraform 내보내기",
+    "description": "현재 환경에서 프로덕션 Terraform 구성을 구축하기 위한 시작점으로 모든 coreX 구성을 구조화된 모듈 기반 Terraform 프로젝트로 내보냅니다.",
+    "includeSecrets": "비밀 포함 (비밀번호, 키, 인증서)",
+    "includeSecretsHint": "선택 해제 시, 비밀은 변수 자리표시자로 내보내지며 나중에 채웁니다.",
+    "button": "Terraform 내보내기",
+    "exporting": "생성 중...",
+    "success": "Terraform 구성이 성공적으로 다운로드되었습니다.",
+    "failed": "내보내기 실패."
   }
 }
