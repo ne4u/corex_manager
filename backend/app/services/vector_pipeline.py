@@ -639,7 +639,7 @@ if ts_str != "" {
 del(.ts)
 
 if exists(.request_id) && .request_id != null && .request_id != "" {
-  ._doc_id = to_string(.request_id)
+  ._doc_id, _ = to_string(.request_id)
 } else {
   ._doc_id = uuid_v4()
 }
