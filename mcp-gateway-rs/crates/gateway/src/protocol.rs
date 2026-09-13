@@ -255,10 +255,14 @@ pub async fn handle_post(
 ) -> Response {
     state.metrics.inc_requests();
 
+    // Generate a request ID for event logging (used across all paths below).
+    let req_id = EventLogger::generate_request_id();
+
     // Check gateway is configured.
     let config = match state.config() {
         Some(c) => c,
         None => {
+            log_event_unauth(&state, &req_id, "", "gateway_disabled", "error", "MCP gateway disabled or not configured");
             return error_response(
                 &Value::Null,
                 MCP_GATEWAY_ERROR,
@@ -271,6 +275,7 @@ pub async fn handle_post(
     // Validate Origin.
     let origin = headers.get("origin").and_then(|v| v.to_str().ok()).unwrap_or("");
     if !origin.is_empty() && !check_origin(&config, origin) {
+        log_event_unauth(&state, &req_id, "", "invalid_origin", "error", "Invalid Origin");
         return error_response(
             &Value::Null,
             MCP_GATEWAY_ERROR,
@@ -287,12 +292,14 @@ pub async fn handle_post(
     let ip_decision = state.rate_limiter.check_ip_rate_limit(&client_ip, Some(ip_limit)).await;
     if !ip_decision.allowed {
         state.metrics.inc_rate_limited();
+        log_event_unauth(&state, &req_id, "", "ip_rate_limited", "rate_limited", "IP rate limit exceeded");
         return error_response(&Value::Null, MCP_RATE_LIMITED, "IP rate limit exceeded", StatusCode::OK);
     }
 
     // Authenticate.
     let auth_header = headers.get("authorization").and_then(|v| v.to_str().ok()).unwrap_or("");
     if !auth_header.starts_with("Bearer ") {
+        log_event_unauth(&state, &req_id, "", "auth_failed", "auth_failed", "Missing or invalid Authorization header");
         return unauthorized_response(&headers);
     }
     let token = &auth_header[7..];
@@ -313,6 +320,7 @@ pub async fn handle_post(
         Err(_) => {
             state.metrics.inc_auth_failure();
             state.alerter.record_event("auth_failed");
+            log_event_unauth(&state, &req_id, "", "auth_failed", "auth_failed", "Authentication failed");
             return unauthorized_response(&headers);
         }
     };
@@ -328,11 +336,19 @@ pub async fn handle_post(
         if !session_id.is_empty() && !method.is_empty() {
             handle_notification(&state, session_id, method, &params, &auth_ctx).await;
         }
+        log_event(
+            &state, &req_id, "", &auth_ctx, None, method,
+            "", "", "notification", "accepted", "", None, None, None,
+        );
         return StatusCode::ACCEPTED.into_response();
     }
 
     // It's a request — must have method.
     if method.is_empty() {
+        log_event(
+            &state, &req_id, "", &auth_ctx, None, "",
+            "", "", "invalid_request", "error", "Missing method", None, None, None,
+        );
         return error_response(&msg_id, JSONRPC_INVALID_REQUEST, "Invalid Request", StatusCode::BAD_REQUEST);
     }
 
@@ -341,11 +357,23 @@ pub async fn handle_post(
 
     // initialize creates the session.
     if method == "initialize" {
-        return handle_initialize(&state, &msg_id, &params, &auth_ctx).await;
+        let t0 = std::time::Instant::now();
+        let resp = handle_initialize(&state, &msg_id, &params, &auth_ctx).await;
+        let latency_ms = t0.elapsed().as_millis() as u64;
+        log_event(
+            &state, &req_id, "", &auth_ctx, None, "initialize",
+            "", "", "allow", "ok", "", Some(latency_ms), None, None,
+        );
+        return resp;
     }
 
     // All other requests require a valid session.
     if session_id.is_empty() {
+        log_event(
+            &state, &req_id, "", &auth_ctx, None, method,
+            "", "", "error", "no_session", "Invalid or missing session. Call initialize first.",
+            None, None, None,
+        );
         return error_response(
             &msg_id,
             MCP_GATEWAY_ERROR,
@@ -356,6 +384,11 @@ pub async fn handle_post(
     let session_data = match state.sessions.get(session_id).await {
         Some(d) => d,
         None => {
+            log_event(
+                &state, &req_id, session_id, &auth_ctx, None, method,
+                "", "", "error", "invalid_session", "Invalid or missing session. Call initialize first.",
+                None, None, None,
+            );
             return error_response(
                 &msg_id,
                 MCP_GATEWAY_ERROR,
@@ -365,29 +398,96 @@ pub async fn handle_post(
         }
     };
     if session_data.identity_id != auth_ctx.identity_id {
+        log_event(
+            &state, &req_id, session_id, &auth_ctx, None, method,
+            "", "", "error", "session_mismatch", "Session identity mismatch",
+            None, None, None,
+        );
         return error_response(&msg_id, MCP_GATEWAY_ERROR, "Session identity mismatch", StatusCode::FORBIDDEN);
     }
     state.sessions.refresh(session_id).await;
 
     // Route to handler.
     match method {
-        "ping" | "logging/setLevel" => success_response(&msg_id, serde_json::json!({})),
-        "tools/list" => handle_tools_list(&state, &msg_id, &auth_ctx).await,
-        "resources/list" => handle_resources_list(&state, &msg_id, &auth_ctx).await,
-        "resources/templates/list" => handle_resources_templates_list(&state, &msg_id, &auth_ctx).await,
-        "prompts/list" => handle_prompts_list(&state, &msg_id, &auth_ctx).await,
+        "ping" | "logging/setLevel" => {
+            log_event(
+                &state, &req_id, session_id, &auth_ctx, None, method,
+                "", "", "allow", "ok", "", None, None, None,
+            );
+            success_response(&msg_id, serde_json::json!({}))
+        }
+        "tools/list" => {
+            let resp = handle_tools_list(&state, &msg_id, &auth_ctx).await;
+            log_event(
+                &state, &req_id, session_id, &auth_ctx, None, "tools/list",
+                "", "", "allow", "ok", "", None, None, None,
+            );
+            resp
+        }
+        "resources/list" => {
+            let resp = handle_resources_list(&state, &msg_id, &auth_ctx).await;
+            log_event(
+                &state, &req_id, session_id, &auth_ctx, None, "resources/list",
+                "", "", "allow", "ok", "", None, None, None,
+            );
+            resp
+        }
+        "resources/templates/list" => {
+            let resp = handle_resources_templates_list(&state, &msg_id, &auth_ctx).await;
+            log_event(
+                &state, &req_id, session_id, &auth_ctx, None, "resources/templates/list",
+                "", "", "allow", "ok", "", None, None, None,
+            );
+            resp
+        }
+        "prompts/list" => {
+            let resp = handle_prompts_list(&state, &msg_id, &auth_ctx).await;
+            log_event(
+                &state, &req_id, session_id, &auth_ctx, None, "prompts/list",
+                "", "", "allow", "ok", "", None, None, None,
+            );
+            resp
+        }
         "tools/call" => handle_call(&state, session_id, &msg_id, &params, &auth_ctx, "tool").await,
         "resources/read" => handle_call(&state, session_id, &msg_id, &params, &auth_ctx, "resource").await,
         "prompts/get" => handle_call(&state, session_id, &msg_id, &params, &auth_ctx, "prompt").await,
-        "resources/subscribe" => handle_resource_subscribe(&state, &msg_id, &params, &auth_ctx).await,
-        "resources/unsubscribe" => handle_resource_unsubscribe(&state, &msg_id, &params, &auth_ctx).await,
-        "completion/complete" => handle_completion(&state, &msg_id, &params, &auth_ctx).await,
-        _ => error_response(
-            &msg_id,
-            JSONRPC_METHOD_NOT_FOUND,
-            &format!("Method not found: {method}"),
-            StatusCode::OK,
-        ),
+        "resources/subscribe" => {
+            let resp = handle_resource_subscribe(&state, &msg_id, &params, &auth_ctx).await;
+            log_event(
+                &state, &req_id, session_id, &auth_ctx, None, "resources/subscribe",
+                "", "", "allow", "ok", "", None, None, None,
+            );
+            resp
+        }
+        "resources/unsubscribe" => {
+            let resp = handle_resource_unsubscribe(&state, &msg_id, &params, &auth_ctx).await;
+            log_event(
+                &state, &req_id, session_id, &auth_ctx, None, "resources/unsubscribe",
+                "", "", "allow", "ok", "", None, None, None,
+            );
+            resp
+        }
+        "completion/complete" => {
+            let resp = handle_completion(&state, &msg_id, &params, &auth_ctx).await;
+            log_event(
+                &state, &req_id, session_id, &auth_ctx, None, "completion/complete",
+                "", "", "allow", "ok", "", None, None, None,
+            );
+            resp
+        }
+        _ => {
+            log_event(
+                &state, &req_id, session_id, &auth_ctx, None, method,
+                "", "", "error", "method_not_found", &format!("Method not found: {method}"),
+                None, None, None,
+            );
+            error_response(
+                &msg_id,
+                JSONRPC_METHOD_NOT_FOUND,
+                &format!("Method not found: {method}"),
+                StatusCode::OK,
+            )
+        }
     }
 }
 
@@ -709,7 +809,13 @@ async fn handle_call(
 
     // Handle meta-tools.
     if kind == "tool" && is_meta_tool(name) {
-        return handle_meta_tool_call(state, msg_id, params, auth).await;
+        let meta_req_id = EventLogger::generate_request_id();
+        let resp = handle_meta_tool_call(state, msg_id, params, auth).await;
+        log_event(
+            state, &meta_req_id, session_id, auth, None, "tools/call",
+            name, "tool", "allow", "ok", "", None, bytes_in, None,
+        );
+        return resp;
     }
 
     // Determine namespace and original name.
@@ -1178,6 +1284,45 @@ fn log_event(
         error: if error.is_empty() { None } else { Some(error.to_string()) },
         bytes_in,
         bytes_out,
+        dlp_hits: None,
+        guardrail_hits: None,
+        params: None,
+        result: None,
+    };
+    state.events.log(event);
+}
+
+/// Log an event for a pre-auth request (no AuthContext available).
+/// Used for auth failures, missing tokens, and gateway-disabled errors.
+#[allow(clippy::too_many_arguments)]
+fn log_event_unauth(
+    state: &GatewayState,
+    req_id: &str,
+    method: &str,
+    action: &str,
+    status: &str,
+    error: &str,
+) {
+    let event = Event {
+        ts: chrono::Utc::now().to_rfc3339(),
+        request_id: req_id.to_string(),
+        session_id: String::new(),
+        identity_id: None,
+        identity_name: None,
+        team_id: None,
+        team_name: None,
+        server_id: None,
+        server_name: None,
+        method: method.to_string(),
+        tool: None,
+        resource_uri: None,
+        prompt: None,
+        action: action.to_string(),
+        status: status.to_string(),
+        latency_ms: None,
+        error: if error.is_empty() { None } else { Some(error.to_string()) },
+        bytes_in: None,
+        bytes_out: None,
         dlp_hits: None,
         guardrail_hits: None,
         params: None,
