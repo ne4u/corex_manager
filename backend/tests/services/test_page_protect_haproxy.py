@@ -214,6 +214,7 @@ def test_generate_global_section_managed_vector_log(db):
     full = generate_config(db)
     assert "ring vector_tcp" in full
     assert "server vector vector:601" in full
+    assert "init-addr none" in full
 
     # Delete the sink — source auto-disables, ring section disappears
     db.delete(sink)

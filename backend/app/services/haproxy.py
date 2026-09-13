@@ -4326,7 +4326,11 @@ def generate_config(
     # A `ring` section buffers logs for reliability and supports hostnames
     # in `server` lines (unlike the `log` directive which only accepts IPs).
     # The global `log ring@vector_tcp` references this ring. The server line
-    # resolves the Docker/k8s service name at startup via the system resolver.
+    # resolves the Docker/k8s service name at runtime via the system resolver.
+    # `init-addr none` defers DNS resolution to runtime so HAProxy config
+    # validation passes even when the vector container is down (e.g. crash
+    # loop from a bad vector.toml) — without this, a broken vector config
+    # would block the apply flow that fixes it.
     # `format rfc5424` + `log-proto octet-count` ensure Vector's TCP syslog
     # source can parse the frames (non-transparent/legacy framing causes
     # "unable to parse input as valid syslog message" errors in Vector).
@@ -4339,7 +4343,7 @@ def generate_config(
             f"    size 32764\n"
             f"    timeout connect 5s\n"
             f"    timeout server 10s\n"
-            f"    server vector {target} log-proto octet-count\n\n"
+            f"    server vector {target} log-proto octet-count init-addr none\n\n"
         )
 
     return config

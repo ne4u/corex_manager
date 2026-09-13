@@ -278,7 +278,7 @@ if err == null {
   # Extract [timestamp] (HAProxy's %t format: 13/Sep/2026:01:55:49.531)
   ts_match, ts_err = parse_regex(raw, r'\[(?P<ts>[^\]]+)\]')
   if ts_err == null {
-    ts_raw = to_string(ts_match.ts) ?? ""
+    ts_raw = to_string(ts_match.ts)
     parsed_ts, pt_err = parse_timestamp(ts_raw, format: "%d/%b/%Y:%H:%M:%S%.3f")
     if pt_err == null {
       .@timestamp = to_string(parsed_ts)
@@ -288,7 +288,7 @@ if err == null {
   be_match, be_err = parse_regex(raw, r'\]\s+(?P<backend>[^\s]+):\s+(?P<message>.+)$')
   if be_err == null {
     .backend = be_match.backend
-    .message = to_string(be_match.message) ?? ""
+    .message = to_string(be_match.message)
   }
   # Mark as an internal HAProxy log (not a request log)
   .haproxy_internal = true
