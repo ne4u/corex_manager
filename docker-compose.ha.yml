@@ -59,8 +59,6 @@ services:
     build:
       context: .
       dockerfile: haproxy/Dockerfile
-      args:
-        DATAPLANEAPI_ARCH: ${DATAPLANEAPI_ARCH:-}
     ports:
       - "8081:80"
       - "8444:443"

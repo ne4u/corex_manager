@@ -1,18 +1,21 @@
-FROM python:3.14-slim
+FROM python:3.14-alpine
 
 WORKDIR /app
 
 # Pin acme.sh to a specific release (3.1.4) and verify the download instead of
 # piping an unversioned install script directly to a shell.
+# certbot comes from requirements.txt (pinned + DNS plugins); Alpine's certbot
+# apk would pull in a second system Python. cron is unused — renewals are
+# driven by the app's task loop, and busybox crond is built in if ever needed.
+# tzdata is required for zoneinfo.available_timezones() (Alpine ships none).
 ARG ACME_SH_VERSION=3.1.4
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apk add --no-cache \
     curl \
     netcat-openbsd \
-    certbot \
     socat \
-    cron \
     openssl \
-    && rm -rf /var/lib/apt/lists/* \
+    tzdata \
+    && apk upgrade --no-cache \
     && set -e; url="https://github.com/acmesh-official/acme.sh/archive/refs/tags/${ACME_SH_VERSION}.tar.gz"; \
         for attempt in 1 2 3 4 5; do \
             echo "Downloading acme.sh (attempt $attempt/5)..."; \
@@ -33,7 +36,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /tmp/acme.sh.tar.gz /tmp/acme.sh-src
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# PyYAML 6.0.1 and maxminddb publish no musllinux wheels, so they build from
+# source — install a throwaway toolchain, then remove it. Note: do NOT add
+# python3-dev — that's Alpine's system Python 3.12 headers, not this image's
+# Python 3.14.
+RUN apk add --no-cache --virtual .build-deps \
+    build-base \
+    yaml-dev \
+    && pip install --no-cache-dir -r requirements.txt \
+    && apk del .build-deps
 
 COPY backend/app /app/app
 COPY shared /app/shared

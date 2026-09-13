@@ -1,5 +1,7 @@
+name: corex
 services:
   api:
+    container_name: api
     build:
       context: .
       dockerfile: backend/Dockerfile
@@ -67,11 +69,6 @@ services:
     build:
       context: .
       dockerfile: haproxy/Dockerfile
-      # dataplaneapi arch is auto-detected from the build platform
-      # (TARGETARCH). Set DATAPLANEAPI_ARCH in .env (e.g. linux_arm64)
-      # to override.
-      args:
-        DATAPLANEAPI_ARCH: ${DATAPLANEAPI_ARCH:-}
     ports:
       - "80:80"
       - "443:443"
@@ -111,6 +108,7 @@ services:
       - net.ipv4.tcp_max_syn_backlog=65535
 
   coraza-spoa-init:
+    container_name: coraza-spoa-init
     image: busybox:1.37
     command: ["sh", "/init/init.sh"]
     volumes:
@@ -121,6 +119,7 @@ services:
       - corex-net
 
   coraza-spoa:
+    container_name: coraza-spoa
     image: ghcr.io/corazawaf/coraza-spoa:0.7.2
     # The distroless image has no shell; run the binary directly.
     command: ["/coraza-spoa", "--config", "/app/data/coraza-spoa.yaml"]
@@ -161,6 +160,7 @@ services:
       - corex-net
 
   postgres:
+    container_name: postgres
     image: postgres:16-alpine
     ports:
       - "5432:5432"
@@ -180,6 +180,7 @@ services:
       - corex-net
 
   valkey:
+    container_name: valkey
     image: valkey/valkey:9-alpine
     volumes:
       - ${DATA_DIR:-./data}/valkey:/data
@@ -197,6 +198,7 @@ services:
       - corex-net
 
   cap:
+    container_name: cap
     image: tiago2/cap:latest
     # For production hardening, bind to 127.0.0.1 (e.g. "127.0.0.1:3001:3000")
     ports:
@@ -238,6 +240,7 @@ services:
         hard: 131072
 
   frontend:
+    container_name: frontend
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -257,6 +260,7 @@ services:
   # "rust"). The api container still bind-mounts ./mcp-gateway because the
   # backend imports mcp-gateway.upstream for catalog fetching.
   mcp-gateway-rs:
+    container_name: mcp-gateway-rs
     build:
       context: ./mcp-gateway-rs
       dockerfile: Dockerfile
@@ -285,6 +289,7 @@ services:
       - corex-net
 
   mcp-server:
+    container_name: mcp-server
     build:
       context: .
       dockerfile: mcp-server/Dockerfile

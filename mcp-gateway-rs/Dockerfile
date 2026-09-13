@@ -1,4 +1,4 @@
-FROM rust:1.98-slim AS builder
+FROM rust:1.98-slim-trixie AS builder
 
 WORKDIR /build
 

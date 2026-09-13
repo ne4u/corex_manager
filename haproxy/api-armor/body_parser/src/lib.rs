@@ -122,6 +122,10 @@ fn api_armor_dir() -> String {
     std::env::var("API_ARMOR_DIR").unwrap_or_else(|_| "/app/data/api-armor".to_string())
 }
 
+// The *File structs mirror the JSON written by the backend's api_armor_writer.
+// Some fields are consumed by other pipeline stages (generated haproxy.cfg,
+// backend UI) rather than this module, so unused-field warnings are expected.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 struct SchemaEntry {
     id: i64,
@@ -136,6 +140,7 @@ struct SchemaIndex {
     schemas: Vec<SchemaEntry>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 struct AuthPolicy {
     id: i64,
@@ -157,6 +162,7 @@ struct AuthPoliciesFile {
     policies: Vec<AuthPolicy>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 struct Profile {
     id: i64,

@@ -1,7 +1,7 @@
 # Stage 1: Build the haproxy-geoip2 Rust Lua module
 # The module is a cdylib (.so) that HAProxy loads via lua-load-per-thread.
 # Built against musl (alpine) so the ABI matches the HAProxy runtime image.
-FROM rust:1.91-alpine AS geoip2-builder
+FROM rust:1.98-alpine AS geoip2-builder
 RUN apk add --no-cache musl-dev
 WORKDIR /build
 COPY haproxy/geoip2/ ./
@@ -10,7 +10,7 @@ RUN cargo build --release -p haproxy-geoip2-module
 # Stage 1b: Build the haproxy-compression Rust Lua module (brotli + zstd).
 # Same musl/alpine toolchain as geoip2; produces a cdylib loaded via
 # lua-load-per-thread when brotli or zstd compression is enabled.
-FROM rust:1.91-alpine AS compression-builder
+FROM rust:1.98-alpine AS compression-builder
 RUN apk add --no-cache musl-dev
 WORKDIR /build
 COPY haproxy/compression/ ./
@@ -19,7 +19,7 @@ RUN cargo build --release -p haproxy-compression-module
 # Stage 1c: Build the haproxy-resp-transform Rust Lua module (response body
 # rewrite/inject/mask). Same musl/alpine toolchain; produces a cdylib loaded
 # via the combined modules.lua loader when response transforms are enabled.
-FROM rust:1.91-alpine AS resp-transform-builder
+FROM rust:1.98-alpine AS resp-transform-builder
 RUN apk add --no-cache musl-dev
 WORKDIR /build
 COPY haproxy/resp_transform/ ./
@@ -29,7 +29,7 @@ RUN cargo build --release -p haproxy_resp_transform_module
 # analysis, schema validation, JWT validation). Shared workspace with 4 crates
 # (body_parser, graphql, schema_validator, jwt_validator) + a combined module
 # cdylib. Loaded via the combined modules.lua loader when API Armor is enabled.
-FROM rust:1.91-alpine AS api-armor-builder
+FROM rust:1.98-alpine AS api-armor-builder
 RUN apk add --no-cache musl-dev
 WORKDIR /build
 COPY haproxy/api-armor/ ./
@@ -40,7 +40,7 @@ RUN cargo build --release -p haproxy-api-armor-module
 # cdylib loaded via the combined modules.lua loader when image conversion is
 # enabled in Global Options. The image and webp crates require a C compiler
 # and make for libwebp-sys; musl-dev + build-base cover this.
-FROM rust:1.91-alpine AS img-2-webp-builder
+FROM rust:1.98-alpine AS img-2-webp-builder
 RUN apk add --no-cache musl-dev build-base make
 WORKDIR /build
 COPY haproxy/img_2_webp/ ./
@@ -50,37 +50,31 @@ RUN cargo build --release -p haproxy-img-2-webp-module
 # fingerprinting). Same musl/alpine toolchain; produces a cdylib loaded via
 # the combined modules.lua loader when request fingerprinting is enabled in
 # Global Options. API Armor depends on this module's txn subfields.
-FROM rust:1.91-alpine AS req-fp-builder
+FROM rust:1.98-alpine AS req-fp-builder
 RUN apk add --no-cache musl-dev
 WORKDIR /build
 COPY haproxy/req_fp/ ./
 RUN cargo build --release -p haproxy-req-fp-module
 
 # Stage 2: HAProxy runtime
-FROM haproxytech/haproxy-alpine:3.4
+FROM haproxytech/haproxy-alpine:3.5
 
 USER root
-ARG DATAPLANEAPI_VERSION=3.4.2
+ARG DATAPLANEAPI_VERSION=3.4.3
 # dataplaneapi release arch is auto-detected from BuildKit's TARGETARCH
-# (amd64->x86_64, 386->i386; arm64/arm/ppc64le/s390x match as-is). Set
-# DATAPLANEAPI_ARCH (e.g. linux_arm64) to override. Requires BuildKit
-# (DOCKER_BUILDKIT=1, default on modern Docker) for TARGETARCH injection;
-# falls back to linux_x86_64 when TARGETARCH is unavailable.
+# (amd64->x86_64, 386->i386; arm64/arm/ppc64le/s390x match as-is).
+# Requires BuildKit (DOCKER_BUILDKIT=1, default on modern Docker); the
+# build fails if TARGETARCH is unavailable.
 ARG TARGETARCH
-ARG DATAPLANEAPI_ARCH=
 
 RUN apk add --no-cache ca-certificates curl tar util-linux lua5.4 openssl keepalived \
     && apk upgrade --no-cache \
     && mkdir -p /tmp/dataplaneapi /usr/local/bin \
-    && if [ -n "$DATAPLANEAPI_ARCH" ]; then \
-         dp_arch="$DATAPLANEAPI_ARCH"; \
-       else \
-         case "${TARGETARCH:-amd64}" in \
-           amd64) dp_arch=linux_x86_64 ;; \
-           386) dp_arch=linux_i386 ;; \
-           *) dp_arch="linux_${TARGETARCH:-amd64}" ;; \
-         esac; \
-       fi \
+    && case "${TARGETARCH:?BuildKit required (DOCKER_BUILDKIT=1)}" in \
+         amd64) dp_arch=linux_x86_64 ;; \
+         386) dp_arch=linux_i386 ;; \
+         *) dp_arch="linux_${TARGETARCH}" ;; \
+       esac \
     && curl -L -o /tmp/dataplaneapi/dataplaneapi.tar.gz \
         "https://github.com/haproxytech/dataplaneapi/releases/download/v${DATAPLANEAPI_VERSION}/dataplaneapi_${DATAPLANEAPI_VERSION}_${dp_arch}.tar.gz" \
     && tar -xzf /tmp/dataplaneapi/dataplaneapi.tar.gz -C /tmp/dataplaneapi \
