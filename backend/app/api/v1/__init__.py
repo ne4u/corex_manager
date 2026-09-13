@@ -14,7 +14,7 @@ from .fcgi import router as fcgi_router
 from .ha import router as ha_router
 from .headers import router as headers_router
 from .listeners import router as listeners_router
-from .logging import router as logging_router
+from .vector import router as vector_router
 from .page_protect import router as page_protect_router
 from .rate_limits import router as rate_limits_router
 from .redirects import router as redirects_router
@@ -49,7 +49,7 @@ def build_v1_router() -> APIRouter:
     router.include_router(ha_router)
     router.include_router(headers_router)
     router.include_router(listeners_router)
-    router.include_router(logging_router)
+    router.include_router(vector_router)
     router.include_router(page_protect_router)
     router.include_router(rate_limits_router)
     router.include_router(redirects_router)

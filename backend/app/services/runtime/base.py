@@ -68,6 +68,22 @@ class RuntimeBackend(ABC):
         """Restart the Coraza SPOA workload. Returns True on success."""
 
     # ------------------------------------------------------------------
+    # Vector operations
+    # ------------------------------------------------------------------
+
+    @abstractmethod
+    def restart_vector(self) -> bool:
+        """Restart the Vector workload. Returns True on success."""
+
+    @abstractmethod
+    def vector_exec(self, command: list, timeout: int = 60) -> tuple[bool, str]:
+        """Exec a command inside the Vector container.
+
+        Returns (ok, combined output). Used for ``vector validate`` and the
+        staged sink check (``vector --config <staging>``).
+        """
+
+    # ------------------------------------------------------------------
     # Varnish operations
     # ------------------------------------------------------------------
 
@@ -122,3 +138,12 @@ class RuntimeBackend(ABC):
         Expected keys: ``available`` (bool), ``error`` (str or None),
         ``type`` (str: "docker" / "kubernetes" / "none").
         """
+
+    def describe_vector(self) -> dict:
+        """Return a dict describing the Vector container status.
+
+        Expected keys: ``available`` (bool), ``running`` (bool),
+        ``error`` (str or None), ``type`` (str).
+        Default implementation delegates to ``describe()``.
+        """
+        return self.describe()

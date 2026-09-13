@@ -75,6 +75,10 @@ class KubernetesRuntime(RuntimeBackend):
     def _varnish_container(self) -> str:
         return getattr(settings, "K8S_VARNISH_CONTAINER", "varnish")
 
+    @property
+    def _vector_container(self) -> str:
+        return getattr(settings, "K8S_VECTOR_CONTAINER", "vector")
+
     def _ready(self) -> bool:
         """Return True if the K8s client is initialized and pod info is available."""
         return self._api is not None and bool(self._pod_name)
@@ -272,6 +276,56 @@ class KubernetesRuntime(RuntimeBackend):
             return False
 
     # ------------------------------------------------------------------
+    # Vector operations
+    # ------------------------------------------------------------------
+
+    def restart_vector(self) -> bool:
+        """Restart the vector sidecar within the Pod.
+
+        Mirrors restart_coraza: SIGTERM to PID 1 in the vector container
+        (requires shareProcessNamespace), with pod deletion as fallback.
+        """
+        if not self._ready():
+            return False
+        try:
+            ec, output = self._exec_with_exit_code(
+                self._vector_container,
+                ["kill", "-TERM", "1"],
+                timeout=10,
+            )
+            if ec == 0:
+                logger.info("vector container signaled to restart (SIGTERM to PID 1)")
+                return True
+            logger.warning("kill -TERM 1 in vector container failed (ec=%s): %s", ec, output)
+        except Exception as exc:
+            logger.warning("kill -TERM 1 in vector container failed: %s", exc)
+
+        try:
+            logger.info("Falling back to pod deletion for vector restart")
+            self._api.delete_namespaced_pod(
+                name=self._pod_name,
+                namespace=self._namespace,
+                body=k8s_client.V1DeleteOptions(),
+            )
+            return True
+        except Exception as exc:
+            logger.error("Failed to delete pod for vector restart: %s", exc)
+            return False
+
+    def vector_exec(self, command: list, timeout: int = 60) -> tuple[bool, str]:
+        """Exec a command inside the vector sidecar."""
+        if not self._ready():
+            return False, f"vector container not available: {self._init_error or 'Kubernetes runtime not ready'}"
+        ec, output = self._exec_with_exit_code(
+            self._vector_container,
+            list(command),
+            timeout=timeout,
+        )
+        if ec == -1:
+            return False, f"vector exec failed: {output}"
+        return ec == 0, output
+
+    # ------------------------------------------------------------------
     # Varnish operations
     # ------------------------------------------------------------------
 
@@ -432,3 +486,22 @@ class KubernetesRuntime(RuntimeBackend):
             return {"available": True, "error": None, "type": "kubernetes"}
         except Exception as exc:
             return {"available": False, "error": str(exc), "type": "kubernetes"}
+
+    def describe_vector(self) -> dict:
+        """Return a dict describing the Vector container status (k8s sidecar)."""
+        if k8s_client is None:
+            return {"available": False, "running": False, "error": "Kubernetes SDK not installed", "type": "kubernetes"}
+        if self._init_error:
+            return {"available": False, "running": False, "error": self._init_error, "type": "kubernetes"}
+        if not self._pod_name:
+            return {"available": False, "running": False, "error": "COREX_POD_NAME not set", "type": "kubernetes"}
+        try:
+            pod = self._api.read_namespaced_pod(name=self._pod_name, namespace=self._namespace)
+            for cs in pod.status.container_statuses or []:
+                if cs.name == "vector":
+                    running = cs.state and cs.state.running is not None
+                    err = None if running else "container not running"
+                    return {"available": True, "running": running, "error": err, "type": "kubernetes"}
+            return {"available": False, "running": False, "error": "vector sidecar not found in pod", "type": "kubernetes"}
+        except Exception as exc:
+            return {"available": False, "running": False, "error": str(exc), "type": "kubernetes"}

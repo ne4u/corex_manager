@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FileCode, List, Activity, Terminal, ChevronRight, Search } from 'lucide-react'
-import { logDestinations, loggedFields, listeners, logs, geoip } from '../services/api'
+import { FileCode, Activity, Terminal, ChevronRight, Search } from 'lucide-react'
+import { logs, geoip } from '../services/api'
+import LogPipeline from './LogPipeline'
 import { decodeUniqueId } from '../lib/uniqueId'
 import { decodeReqFp } from '../lib/reqFp'
 import { decodeJa4 } from '../lib/ja4'
 import { computePopoverPosition } from '../lib/popover'
-import useApiList from '../hooks/useApiList'
-import Modal from '../components/Modal'
 import { Tabs } from '../components/ui'
 import { useDateTime } from '../contexts/DateTimeContext'
 
@@ -53,19 +52,6 @@ export default function Logs() {
     const key = TERMINATION_CODE_KEYS[code]
     return key ? `${code} — ${t(`pages:logs.terminationCodes.${key}`)}` : code
   }
-  const { items: dests, reload: rd } = useApiList(logDestinations.list)
-  const { items: fields, reload: rf } = useApiList(loggedFields.list)
-  const { items: listenerList } = useApiList(listeners.list)
-  const [open, setOpen] = useState(false)
-  const [editing, setEditing] = useState<number | null>(null)
-  const initialForm = { name: '', listener_id: null as number | null, target: '', facility: 'local0', level: 'info', format: '', enabled: true }
-  const [form, setForm] = useState<any>(initialForm)
-
-  const [fOpen, setFOpen] = useState(false)
-  const [fEditing, setFEditing] = useState<number | null>(null)
-  const initialFform = { name: '', listener_id: null as number | null, field: '', enabled: true }
-  const [fform, setFform] = useState<any>(initialFform)
-
   // Live logs state
   const [logLines, setLogLines] = useState<LogLine[]>([])
   const [logLimit, setLogLimit] = useState(100)
@@ -96,15 +82,6 @@ export default function Logs() {
   const [ja4Popover, setJa4Popover] = useState<{ rowIndex: number; ja4: string; rect: DOMRect } | null>(null)
   const [ja4Decoded, setJa4Decoded] = useState<{ decoded?: ReturnType<typeof decodeJa4>['decoded']; error?: string } | null>(null)
   const ja4PopoverRef = useRef<HTMLDivElement>(null)
-
-  const openAdd = () => { setEditing(null); setForm(initialForm); setOpen(true) }
-  const openEdit = (d: any) => { setEditing(d.id); setForm({ ...d }); setOpen(true) }
-
-  const openFAdd = () => { setFEditing(null); setFform(initialFform); setFOpen(true) }
-  const openFEdit = (f: any) => { setFEditing(f.id); setFform({ ...f }); setFOpen(true) }
-
-  const submit = async (e: React.FormEvent) => { e.preventDefault(); if (editing) await logDestinations.update(editing, form); else await logDestinations.create(form); setEditing(null); setForm(initialForm); setOpen(false); rd() }
-  const fsubmit = async (e: React.FormEvent) => { e.preventDefault(); if (fEditing) await loggedFields.update(fEditing, fform); else await loggedFields.create(fform); setFEditing(null); setFform(initialFform); setFOpen(false); rf() }
 
   const loadLogs = async () => {
     setLogLoading(true)
@@ -261,51 +238,7 @@ export default function Logs() {
         onChange={(id) => setTab(id as 'config' | 'live')}
       />
 
-      {tab === 'config' && (
-        <>
-          <div className="flex items-center justify-between"><h2 className="text-2xl font-bold flex items-center gap-2"><FileCode className="h-5 w-5 text-primary" /> {t('pages:logs.logDestinations')}</h2><button onClick={openAdd} className="btn-primary">{t('pages:logs.addDestination')}</button></div>
-          <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
-            <table className="w-full text-sm text-start"><thead className="text-muted-foreground border-b border-border"><tr><th>{t('pages:logs.modal.name')}</th><th>{t('pages:logs.modal.listener')}</th><th>{t('pages:logs.modal.target')}</th><th>{t('pages:logs.modal.facility')}</th><th>{t('pages:logs.modal.level')}</th><th>{t('pages:logs.modal.enabled')}</th><th></th></tr></thead>
-              <tbody>{dests.map((d: any) => (<tr key={d.id} className="border-b border-border last:border-0"><td className="py-2">{d.name}</td><td>{d.listener_id ? listenerList.find((l: any) => l.id === d.listener_id)?.name : t('pages:logs.all')}</td><td>{d.target}</td><td>{d.facility}</td><td>{d.level}</td><td>{d.enabled ? t('common:actions.yes') : t('common:actions.no')}</td>
-                <td className="space-x-2">
-                  <button onClick={() => openEdit(d)} className="text-primary hover:underline">{t('common:actions.edit')}</button>
-                  <button onClick={() => logDestinations.remove(d.id).then(rd)} className="text-red-400 hover:underline">{t('common:actions.delete')}</button>
-                </td></tr>))}</tbody>
-            </table>
-          </div>
-          <div className="flex items-center justify-between"><h2 className="text-2xl font-bold flex items-center gap-2"><List className="h-5 w-5 text-primary" /> {t('pages:logs.loggedFields')}</h2><button onClick={openFAdd} className="btn-primary">{t('pages:logs.addField')}</button></div>
-          <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
-            <table className="w-full text-sm text-start"><thead className="text-muted-foreground border-b border-border"><tr><th>{t('pages:logs.modal.name')}</th><th>{t('pages:logs.modal.listener')}</th><th>{t('pages:logs.modal.field')}</th><th>{t('pages:logs.modal.enabled')}</th><th></th></tr></thead>
-              <tbody>{fields.map((f: any) => (<tr key={f.id} className="border-b border-border last:border-0"><td className="py-2">{f.name}</td><td>{f.listener_id ? listenerList.find((l: any) => l.id === f.listener_id)?.name : t('pages:logs.all')}</td><td className="font-mono">{f.field}</td><td>{f.enabled ? t('common:actions.yes') : t('common:actions.no')}</td>
-                <td className="space-x-2">
-                  <button onClick={() => openFEdit(f)} className="text-primary hover:underline">{t('common:actions.edit')}</button>
-                  <button onClick={() => loggedFields.remove(f.id).then(rf)} className="text-red-400 hover:underline">{t('common:actions.delete')}</button>
-                </td></tr>))}</tbody>
-            </table>
-          </div>
-          <Modal open={open} onClose={() => setOpen(false)} title={editing ? t('pages:logs.modal.editLogDestination') : t('pages:logs.modal.addLogDestination')}>
-            <form onSubmit={submit} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div><label className="label">{t('pages:logs.modal.name')}</label><input className="input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
-                <div><label className="label">{t('pages:logs.modal.listener')}</label><select className="input" value={form.listener_id || ''} onChange={e => setForm({ ...form, listener_id: e.target.value ? Number(e.target.value) : null })}><option value="">{t('pages:logs.modal.selectListener')}</option>{listenerList.map((l: any) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></div>
-                <div><label className="label">{t('pages:logs.modal.target')}</label><input className="input" value={form.target} onChange={e => setForm({ ...form, target: e.target.value })} placeholder={t('pages:logs.modal.targetPlaceholder')} /></div>
-                <div><label className="label">{t('pages:logs.modal.facility')}</label><input className="input" value={form.facility} onChange={e => setForm({ ...form, facility: e.target.value })} /></div>
-                <div><label className="label">{t('pages:logs.modal.level')}</label><select className="input" value={form.level} onChange={e => setForm({ ...form, level: e.target.value })}><option>emerg</option><option>alert</option><option>crit</option><option>err</option><option>warning</option><option>notice</option><option>info</option><option>debug</option></select></div>
-              </div>
-              <div><label className="label">{t('pages:logs.modal.format')}</label><textarea className="input opacity-50" rows={2} value={form.format} onChange={e => setForm({ ...form, format: e.target.value })} disabled /></div>
-              <label className="flex items-center gap-2"><input type="checkbox" checked={form.enabled} onChange={e => setForm({ ...form, enabled: e.target.checked })} /> {t('pages:logs.modal.enabled')}</label>
-              <button className="btn-primary w-full">{t('common:actions.save')}</button>
-            </form>
-          </Modal>
-          <Modal open={fOpen} onClose={() => setFOpen(false)} title={fEditing ? t('pages:logs.modal.editLoggedField') : t('pages:logs.modal.addLoggedField')}>
-            <form onSubmit={fsubmit} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3"><div><label className="label">{t('pages:logs.modal.name')}</label><input className="input" value={fform.name} onChange={e => setFform({ ...fform, name: e.target.value })} /></div><div><label className="label">{t('pages:logs.modal.listener')}</label><select className="input" value={fform.listener_id || ''} onChange={e => setFform({ ...fform, listener_id: e.target.value ? Number(e.target.value) : null })}><option value="">{t('pages:logs.modal.selectListener')}</option>{listenerList.map((l: any) => <option key={l.id} value={l.id}>{l.name}</option>)}</select></div><div><label className="label">{t('pages:logs.modal.field')}</label><input className="input" value={fform.field} onChange={e => setFform({ ...fform, field: e.target.value })} placeholder={t('pages:logs.modal.fieldPlaceholder')} /></div></div>
-              <label className="flex items-center gap-2"><input type="checkbox" checked={fform.enabled} onChange={e => setFform({ ...fform, enabled: e.target.checked })} /> {t('pages:logs.modal.enabled')}</label>
-              <button className="btn-primary w-full">{t('common:actions.save')}</button>
-            </form>
-          </Modal>
-        </>
-      )}
+      {tab === 'config' && <LogPipeline />}
 
       {tab === 'live' && (
         <>

@@ -28,11 +28,12 @@ from app.services.terraform_export import (
 from app.models.models import (
     AsnList, Backend, BackendRule, CacheConfig, CacheRule, Certificate, CipherSuite,
     CustomErrorPage, DynamicFeed, FcgiApp, GeoList, Ja4List, Listener,
-    LogDestination, LoggedField, NetworkList, NetworkListEntry, OpenApiSpec,
+    NetworkList, NetworkListEntry, OpenApiSpec,
     PageProtectPolicy, PatternList, RateLimit, Redirect, RequestHeader,
     ResponseHeader, ResponseTransform, Rewrite, RiskRule, RiskRuleset,
     SecurityRule, Server, Setting, User, WafException, WafRule,
 )
+from app.models.logging import VectorSink
 from app.models.api_armor import ApiKeyList, ApiKeyListEntry, ApiSchema, AuthPolicy
 from app.models.mcp import (
     McpDlpRule, McpGuardrail, McpIdentity, McpPolicy, McpServer,
@@ -153,8 +154,10 @@ def _populate_full_config(db):
     make_cache_rule(db, cache_config_id=cc.id)
 
     # Observability
-    db.add(LogDestination(name="syslog", listener_id=ln.id, target="127.0.0.1:514"))
-    db.add(LoggedField(name="custom", listener_id=ln.id, field="X-Custom"))
+    db.add(VectorSink(name="s3", type="aws_s3", source="corex",
+                      options={"bucket": "logs", "region": "us-east-1",
+                               "access_key_id": "AKIA...",
+                               "secret_access_key": "shh"}))
 
     # Page protect
     make_page_protect_policy(db, backend_ids=[be.id])
@@ -237,7 +240,7 @@ class TestCollectionCompleteness:
             'security_rules',
             'waf_rules', 'waf_exceptions',
             'cache_configs',  # cache_rules are nested under cache_configs
-            'log_destinations', 'logged_fields',
+            'vector_sinks',
             'page_protect_policies',
             'auth_policies', 'api_key_lists', 'openapi_specs', 'api_schemas',
             'risk_rulesets', 'risk_rules',
@@ -1476,6 +1479,7 @@ class TestHCLValidity:
                 'corex_api_armor_settings', 'corex_global_options',
                 'corex_maxmind_license_key',
                 'corex_page_protect_settings', 'corex_mcp_alert_config',
+                'corex_vector_sources',
             }
             for_each_resources = 0
             for match in re.finditer(r'resource "(corex_\w+)" "this" \{', content):
@@ -1746,7 +1750,7 @@ class TestTypedVariables:
             'haproxy_global_options', 'api_armor_settings',
             'maxmind_license_key',
             'page_protect_settings', 'mcp_alert_config',
-            'ssl_labs_settings',
+            'ssl_labs_settings', 'vector_sources',
         }
         excluded = file_content_vars | singleton_vars
         collection_any_vars = [v for v in any_vars if v not in excluded]
@@ -2138,8 +2142,8 @@ class TestImportBlocks:
             'corex_rewrite.this',
             'corex_response_transform.this',
             'corex_error_page.this',
-            'corex_log_destination.this',
-            'corex_logged_field.this',
+            'corex_vector_sink.this',
+            'corex_vector_sources.this',
             'corex_page_protect_policy.this',
             'corex_api_armor_auth_policy.this',
             'corex_api_armor_api_key_list.this',
@@ -2241,16 +2245,15 @@ class TestImportBlocks:
         assert f'id = "{we.id}"' in imports, \
             "WafException should be imported by numeric row ID"
 
-    def test_import_logged_field_uses_numeric_id(self, db):
-        """LoggedField import ID should be the numeric row ID."""
-        be = make_backend(db, name="web")
-        ln = make_listener(db, backend=be, name="https")
-        lf = LoggedField(listener_id=ln.id, name="custom", field="X-Custom")
-        db.add(lf); db.commit()
+    def test_import_vector_sink_uses_name(self, db):
+        """VectorSink import ID should be the sink name."""
+        db.add(VectorSink(name="s3", type="aws_s3", source="corex",
+                          options={"bucket": "logs", "region": "us-east-1"}))
+        db.commit()
         zf = _export(db)
         imports = _read(zf, 'imports.tf')
-        assert f'id = "{lf.id}"' in imports, \
-            "LoggedField should be imported by numeric row ID"
+        assert 'id = "s3"' in imports, \
+            "VectorSink should be imported by name"
 
     def test_import_mcp_server_replica_uses_numeric_id(self, db):
         """McpServerReplica import ID should be the numeric row ID."""

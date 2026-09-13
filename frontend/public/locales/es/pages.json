@@ -62,13 +62,9 @@
   },
   "logs": {
     "tabs": {
-      "configuration": "Configuración",
+      "configuration": "Canalización de registros",
       "liveLogs": "Logs en vivo"
     },
-    "logDestinations": "Destinos de logs",
-    "addDestination": "Añadir destino",
-    "loggedFields": "Campos registrados",
-    "addField": "Añadir campo",
     "liveHaproxyLogs": "Logs de coreX en vivo",
     "last50": "Últimos 50",
     "last100": "Últimos 100",
@@ -128,20 +124,7 @@
       "wafRuleIds": "IDs de Reglas WAF:"
     },
     "modal": {
-      "editLogDestination": "Editar destino de log",
-      "addLogDestination": "Añadir destino de log",
-      "editLoggedField": "Editar campo registrado",
-      "addLoggedField": "Añadir campo registrado",
       "name": "Nombre",
-      "listener": "Listener",
-      "selectListener": "Seleccionar un listener",
-      "target": "Destino",
-      "targetPlaceholder": "stdout o 127.0.0.1:514",
-      "facility": "Instalación",
-      "level": "Nivel",
-      "format": "Formato (obsoleto — use Campos registrados en su lugar)",
-      "field": "Campo",
-      "fieldPlaceholder": "%ci o %[var(txn.sec.action)]",
       "enabled": "Habilitado"
     },
     "all": "Todos",
@@ -178,6 +161,34 @@
       "organization": "Organización:",
       "network": "Red:",
       "ip": "IP:"
+    },
+    "pipeline": {
+      "validate": "Validar configuración",
+      "preview": "Vista previa de vector.toml",
+      "restart": "Reiniciar Vector",
+      "checking": "Comprobando…",
+      "sources": "Fuentes de registros",
+      "sourcesHint": "Seleccione qué fuentes de registros consume Vector.",
+      "source_corex": "coreX (HAProxy)",
+      "source_waf": "WAF (Coraza)",
+      "source_mcp": "Puerta de enlace MCP",
+      "applyHint": "Los cambios se aplican tras la próxima aplicación de configuración.",
+      "sinks": "Destinos",
+      "addSink": "Añadir destino",
+      "editSink": "Editar destino",
+      "type": "Tipo",
+      "check": "Comprobar",
+      "checkSink": "Comprobar destino",
+      "checkOk": "Comprobación superada",
+      "checkFailed": "Comprobación fallida",
+      "sendTestEvent": "Enviar un evento de prueba (verifica la entrega completa)",
+      "secret": "secreto",
+      "keepSecret": "dejar enmascarado para conservar el valor actual",
+      "default": "predeterminado",
+      "vectorRunning": "Vector en ejecución",
+      "vectorNotRunning": "Contenedor Vector no en ejecución",
+      "vectorNotFound": "Contenedor Vector no encontrado",
+      "source": "Fuente"
     }
   },
   "metrics": {

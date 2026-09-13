@@ -49,6 +49,10 @@ services:
       - MCP_SERVER_INTERNAL_HOST=mcp-server
       - MCP_SERVER_INTERNAL_PORT=8082
       - MCP_SERVICE_TOKEN=${MCP_SERVICE_TOKEN:-}
+      - VECTOR_CONFIG_PATH=/app/data/vector/vector.toml
+      - VECTOR_SYSLOG_TARGET=${VECTOR_SYSLOG_TARGET:-vector:601}
+      - VECTOR_SECRETS_KEY=${VECTOR_SECRETS_KEY:-}
+      - VECTOR_CONTAINER_NAME=vector
     depends_on:
       postgres:
         condition: service_healthy
@@ -131,6 +135,30 @@ services:
       corex-net:
         aliases:
           - coraza-spoa
+
+  # Vector — log pipeline. Reads the generated vector.toml and the WAF/MCP
+  # log files from the shared haproxy-data volume (read-only); file-source
+  # checkpoints live in the dedicated vector-data volume. HAProxy streams
+  # coreX request logs to tcp://vector:601 when the coreX source is enabled.
+  vector:
+    image: ${VECTOR_IMAGE:-timberio/vector:0.58.0-alpine}
+    container_name: vector
+    user: "0:0"
+    # The timberio/vector image sets ENTRYPOINT ["vector"], so we clear it
+    # here to run our wait-loop shell script as the main process.
+    entrypoint: []
+    volumes:
+      - ${DATA_DIR:-./data}/haproxy:/app/data:ro
+      - vector-data:/vector-data
+    # Wait for the API to generate vector.toml on first boot, then run with
+    # --watch-config so config Applies reload the pipeline without a restart.
+    command: sh -c 'for i in $$(seq 1 120); do [ -f /app/data/vector/vector.toml ] && break; sleep 1; done; exec vector --config /app/data/vector/vector.toml --watch-config'
+    depends_on:
+      api:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - corex-net
 
   postgres:
     image: postgres:16-alpine
@@ -298,3 +326,4 @@ networks:
 
 volumes:
   haproxy-run:
+  vector-data:

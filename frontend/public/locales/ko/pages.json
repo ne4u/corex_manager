@@ -62,13 +62,9 @@
   },
   "logs": {
     "tabs": {
-      "configuration": "설정",
+      "configuration": "로그 파이프라인",
       "liveLogs": "실시간 로그"
     },
-    "logDestinations": "로그 대상",
-    "addDestination": "대상 추가",
-    "loggedFields": "기록 필드",
-    "addField": "필드 추가",
     "liveHaproxyLogs": "실시간 coreX 로그",
     "last50": "최근 50",
     "last100": "최근 100",
@@ -128,20 +124,7 @@
       "wafRuleIds": "WAF 규칙 ID:"
     },
     "modal": {
-      "editLogDestination": "로그 대상 편집",
-      "addLogDestination": "로그 대상 추가",
-      "editLoggedField": "기록 필드 편집",
-      "addLoggedField": "기록 필드 추가",
       "name": "이름",
-      "listener": "리스너",
-      "selectListener": "리스너 선택",
-      "target": "대상",
-      "targetPlaceholder": "stdout 또는 127.0.0.1:514",
-      "facility": "시설",
-      "level": "레벨",
-      "format": "형식 (더 이상 사용되지 않음 — 대신 기록 필드를 사용하세요)",
-      "field": "필드",
-      "fieldPlaceholder": "%ci 또는 %[var(txn.sec.action)]",
       "enabled": "활성화"
     },
     "all": "전체",
@@ -178,6 +161,34 @@
       "organization": "조직:",
       "network": "네트워크:",
       "ip": "IP:"
+    },
+    "pipeline": {
+      "validate": "구성 검증",
+      "preview": "vector.toml 미리보기",
+      "restart": "Vector 재시작",
+      "checking": "확인 중…",
+      "sources": "로그 소스",
+      "sourcesHint": "Vector가 수집할 로그 피드를 선택합니다.",
+      "source_corex": "coreX (HAProxy)",
+      "source_waf": "WAF (Coraza)",
+      "source_mcp": "MCP 게이트웨이",
+      "applyHint": "변경 사항은 다음 구성 적용 후에 적용됩니다.",
+      "sinks": "싱크",
+      "addSink": "싱크 추가",
+      "editSink": "싱크 편집",
+      "type": "유형",
+      "check": "확인",
+      "checkSink": "싱크 확인",
+      "checkOk": "확인 성공",
+      "checkFailed": "확인 실패",
+      "sendTestEvent": "테스트 이벤트 전송(종단 간 전달 확인)",
+      "secret": "비밀",
+      "keepSecret": "마스킹된 상태로 두면 현재 값 유지",
+      "default": "기본값",
+      "vectorRunning": "Vector 실행 중",
+      "vectorNotRunning": "Vector 컨테이너가 실행되지 않음",
+      "vectorNotFound": "Vector 컨테이너를 찾을 수 없음",
+      "source": "소스"
     }
   },
   "metrics": {

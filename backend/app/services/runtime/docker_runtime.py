@@ -70,7 +70,7 @@ class DockerRuntime(RuntimeBackend):
             executor.shutdown(wait=True)
             print(f"[DOCKER_CHECK] result: ec={ec}", flush=True)
             return ec == 0, output
-        except concurrent.futures.TimeoutExpired:
+        except concurrent.futures.TimeoutError:
             executor.shutdown(wait=False)
             print("[DOCKER_CHECK] TIMED OUT after 30s", flush=True)
             return False, "haproxy -c timed out after 30s in container"
@@ -148,6 +148,72 @@ class DockerRuntime(RuntimeBackend):
         except Exception as exc:
             logger.warning("Could not list containers: %s", exc)
         return None
+
+    # ------------------------------------------------------------------
+    # Vector operations
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _find_vector_container(client):
+        """Locate the vector container by compose service label or name."""
+        name = os.environ.get("VECTOR_CONTAINER_NAME",
+                              getattr(settings, "VECTOR_CONTAINER_NAME", "vector"))
+        try:
+            for container in client.containers.list():
+                labels = container.labels or {}
+                if labels.get("com.docker.compose.service") == "vector":
+                    return container
+                if container.name == name or "vector" in container.name:
+                    return container
+        except Exception as exc:
+            logger.warning("Could not list containers: %s", exc)
+        return None
+
+    def restart_vector(self) -> bool:
+        """Restart the vector container via the Docker API if available."""
+        if docker is None:
+            return False
+        try:
+            client = docker.from_env()
+            container = self._find_vector_container(client)
+            if not container:
+                logger.warning("vector container not found")
+                return False
+            logger.info("Restarting vector container: %s", container.name)
+            container.restart(timeout=10)
+            return True
+        except Exception as exc:
+            logger.error("Failed to restart vector: %s", exc)
+            return False
+
+    def vector_exec(self, command: list, timeout: int = 60) -> tuple[bool, str]:
+        """Exec a command inside the vector container (exec_run + timeout)."""
+        if docker is None:
+            return False, "vector container not available: docker SDK not installed"
+
+        def _run() -> tuple[int, str]:
+            client = docker.from_env()
+            container = self._find_vector_container(client)
+            if not container:
+                return -1, "vector container not found"
+            ec, output = container.exec_run(command)
+            return ec, (output or b"").decode("utf-8", errors="replace").strip()
+
+        import concurrent.futures
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        future = executor.submit(_run)
+        try:
+            ec, output = future.result(timeout=timeout)
+            executor.shutdown(wait=True)
+            if ec == -1:
+                return False, output
+            return ec == 0, output
+        except concurrent.futures.TimeoutError:
+            executor.shutdown(wait=False)
+            return False, f"vector exec timed out after {timeout}s"
+        except Exception as e:
+            executor.shutdown(wait=False)
+            return False, f"vector exec failed: {e}"
 
     # ------------------------------------------------------------------
     # Varnish operations
@@ -303,3 +369,19 @@ class DockerRuntime(RuntimeBackend):
             return {"available": True, "error": None, "type": "docker"}
         except Exception as exc:
             return {"available": False, "error": str(exc), "type": "docker"}
+
+    def describe_vector(self) -> dict:
+        """Return a dict describing the Vector container status."""
+        if docker is None:
+            return {"available": False, "running": False, "error": "Docker SDK not installed", "type": "docker"}
+        try:
+            client = docker.from_env()
+            container = self._find_vector_container(client)
+            if not container:
+                return {"available": False, "running": False, "error": "vector container not found", "type": "docker"}
+            # Refresh status from the daemon
+            container.reload()
+            running = container.status == "running"
+            return {"available": True, "running": running, "error": None if running else "container not running", "type": "docker"}
+        except Exception as exc:
+            return {"available": False, "running": False, "error": str(exc), "type": "docker"}

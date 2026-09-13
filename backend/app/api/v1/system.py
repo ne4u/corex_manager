@@ -11,7 +11,7 @@ from starlette.background import BackgroundTask
 from sqlalchemy.orm import Session
 from ..deps import get_current_user, get_db, require_admin, rate_limit
 from ...core.config import get_settings
-from ...models.models import LogDestination, LoggedField, MetricSnapshot, Setting
+from ...models.models import MetricSnapshot, Setting
 from ...schemas.haproxy_options import HaproxyOption
 from ...schemas.settings import AsnLookupResponse, GeoIpDownloadResponse, GeoIpStatusResponse, SettingCreate, SettingResponse
 from ...schemas.stats import (
@@ -251,13 +251,13 @@ def get_recent_logs(limit: int = Query(100, le=1000), user=Depends(get_current_u
 
 @router.get("/logs/health")
 def get_logs_health(db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
-    """Return logging health/status: destinations, format, and Docker SDK reachability."""
-    enabled_dests = db.query(LogDestination).filter(LogDestination.enabled == True).all()
-    enabled_fields = db.query(LoggedField).filter(LoggedField.enabled == True).all()
+    """Return logging health/status: vector pipeline summary + runtime reachability."""
+    from ...models.logging import VectorSink
+    from ...services.vector_pipeline import get_vector_sources
 
-    # Determine if the default stdout destination is active
-    has_stdout = any(d.target in ("stdout", "stderr") for d in enabled_dests)
-    default_stdout_active = len(enabled_dests) == 0 and getattr(settings, "HAPROXY_LOG_DEFAULT_STDOUT", True)
+    sources = get_vector_sources(db)
+    sinks = db.query(VectorSink).all()
+    enabled_sinks = [s for s in sinks if s.enabled]
 
     # Check runtime backend reachability
     runtime = get_runtime()
@@ -265,23 +265,19 @@ def get_logs_health(db: Session = Depends(get_db), user=Depends(get_current_user
     docker_reachable = rt_desc.get("available", False)
     docker_error = rt_desc.get("error")
 
-    # Determine current log-format mode
-    log_format_mode = "json_default"
-    if enabled_fields:
-        log_format_mode = "custom"
-
     return {
-        "enabled_destinations": len(enabled_dests),
-        "has_stdout_target": has_stdout or default_stdout_active,
-        "default_stdout_active": default_stdout_active,
-        "custom_log_format": len(enabled_fields) > 0,
-        "log_format_mode": log_format_mode,
+        "sources": sources,
+        "enabled_sources": sum(1 for v in sources.values() if v),
+        "enabled_sinks": len(enabled_sinks),
+        "sinks": [
+            {"name": s.name, "type": s.type, "enabled": bool(s.enabled)}
+            for s in sinks
+        ],
+        # stdout is always emitted (managed) so the live log viewer keeps working
+        "has_stdout_target": getattr(settings, "HAPROXY_LOG_DEFAULT_STDOUT", True),
+        "log_format_mode": "json_default",
         "docker_reachable": docker_reachable,
         "docker_error": docker_error,
-        "destinations": [
-            {"name": d.name, "target": d.target, "facility": d.facility, "level": d.level}
-            for d in enabled_dests
-        ],
     }
 
 

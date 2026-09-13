@@ -40,7 +40,7 @@ from ..models.waf import WafException, WafRule
 from ..models.routing import (
     RateLimit, Redirect, RequestHeader, ResponseHeader, ResponseTransform, Rewrite,
 )
-from ..models.logging import CustomErrorPage, LogDestination, LoggedField
+from ..models.logging import CustomErrorPage, VectorSink
 from ..models.cache import CacheConfig, CacheRule
 from ..models.page_protect import PageProtectPolicy, PageProtectScript
 from ..services.page_protect import get_page_protect_settings
@@ -298,6 +298,8 @@ SKIP_SETTING_KEYS: Set[str] = {
     "crs_active_version",
     # API Armor settings (exported as corex_api_armor_settings singleton)
     "api_armor_enabled", "api_armor_max_body_bytes", "api_armor_module_enabled",
+    # Vector log pipeline sources (exported as corex_vector_sources singleton)
+    "vector_sources",
     "api_armor_schema_learning_enabled", "api_armor_profiling_learning_enabled",
     "api_armor_profile_retention_days", "api_armor_scope", "api_armor_backend_ids",
     "api_armor_path_patterns",
@@ -1240,6 +1242,74 @@ class TerraformExporter:
             data[key] = entry
         tfvars[var_name] = data
 
+    def _add_vector_tfvars(self, tfvars: dict) -> None:
+        """Export the Vector log pipeline to tfvars.
+
+        ``vector_sources`` is a flat {corex/waf/mcp: bool} map. Sinks export
+        non-secret options inside ``vector_sinks``; secret options go to
+        ``vector_sink_secrets`` (emitted to *.secrets.tfvars as "change-me"
+        placeholders when secrets are excluded, decrypted plaintext when
+        ``include_secrets`` is set).
+        """
+        from ..schemas.vector import SECRET_OPTIONS
+        from .vector_pipeline import decrypt_sink_options, get_vector_sources, is_encrypted
+
+        tfvars['vector_sources'] = get_vector_sources(self.db)
+
+        include_secrets = self.include_secrets or self.include_system_secrets
+        sink_data: Dict[str, Any] = {}
+        secrets_data: Dict[str, Any] = {}
+        for row in self._query_all(VectorSink):
+            key = _sanitize_name(str(row.name))
+            options = dict(row.options or {})
+
+            secret_opts: Dict[str, str] = {}
+            secret_keys = SECRET_OPTIONS.get(row.type, [])
+            if include_secrets:
+                try:
+                    options, _ = decrypt_sink_options(row.type, options)
+                except Exception:
+                    pass  # leave enc: values out of the export
+            for k in secret_keys:
+                v = options.pop(k, None)
+                if v is None or (isinstance(v, str) and not v):
+                    continue
+                if include_secrets and not is_encrypted(v):
+                    options[k] = v  # merge decrypted secret back into options
+                else:
+                    secret_opts[k] = "change-me"
+
+            # Non-secret options must be scalars for map(string) — serialize
+            # lists as comma-joined strings and dicts as JSON.
+            clean_options: Dict[str, str] = {}
+            for k, v in options.items():
+                if is_encrypted(v):
+                    continue
+                if isinstance(v, (list, tuple)):
+                    clean_options[k] = ",".join(str(x) for x in v)
+                elif isinstance(v, dict):
+                    clean_options[k] = json.dumps(v)
+                elif isinstance(v, bool):
+                    clean_options[k] = "true" if v else "false"
+                elif v is not None:
+                    clean_options[k] = str(v)
+
+            entry: Dict[str, Any] = {
+                'name': row.name,
+                'type': row.type,
+                'source': row.source or 'corex',
+                'enabled': bool(row.enabled),
+            }
+            if clean_options:
+                entry['options'] = clean_options
+            sink_data[key] = entry
+            if secret_opts:
+                secrets_data[key] = secret_opts
+
+        tfvars['vector_sinks'] = sink_data
+        if secrets_data:
+            tfvars['vector_sink_secrets'] = secrets_data
+
     @staticmethod
     def _read_file(path: str) -> Optional[str]:
         """Read a file from disk, returning None if it doesn't exist or is empty."""
@@ -2125,23 +2195,55 @@ class TerraformExporter:
         return mod
 
     def _build_observability_module(self) -> Module:
-        mod = Module('observability', 'Log destinations and logged fields')
-        mod.add_variable('listener_ids', 'map(number)', 'Map of listener name to ID from the routing module', '{}')
+        mod = Module('observability', 'Vector log pipeline: sources and sinks')
 
-        self._add_for_each_collection(
-            mod, 'log_destination', 'log_destinations', LogDestination,
-            'Map of log destination name to configuration',
-            optional_cross_module_fks={'listener_id': 'listener_ids'},
-            add_output=False,
+        # Sources singleton — which log feeds Vector consumes.
+        mod.add_variable('vector_sources', 'any',
+                         'Vector log sources (corex/waf/mcp booleans)', '{}')
+
+        # Sinks — non-secret options live in the map object; secret options
+        # (API keys, passwords, tokens) are split into a sensitive map so
+        # they land in *.secrets.tfvars.
+        sink_type = ('map(object({'
+                     ' type = string'
+                     ' source = optional(string)'
+                     ' options = optional(map(string))'
+                     ' enabled = optional(bool)'
+                     ' }))')
+        self.collection_types['vector_sinks'] = sink_type
+        mod.add_collection_variable('vector_sinks',
+                                    'Map of vector sink name to configuration',
+                                    var_type=sink_type)
+        self._add_secret_map_var(
+            mod, 'vector_sink_secrets',
+            'Per-sink secret options keyed by sink name (API keys, passwords, tokens)',
+            name_map_key='vector_sinks',
+            var_type='map(map(string))')
+
+        rows = self._query_all(VectorSink)
+        self._register_names('vector_sinks', rows, 'name')
+
+        mod.add_section('Vector Log Sources')
+        mod.blocks.append(
+            'resource "corex_vector_sources" "this" {\n'
+            '  corex = try(var.vector_sources["corex"], false)\n'
+            '  waf   = try(var.vector_sources["waf"], false)\n'
+            '  mcp   = try(var.vector_sources["mcp"], false)\n'
+            '}'
         )
 
-        self._add_for_each_collection(
-            mod, 'logged_field', 'logged_fields', LoggedField,
-            'Map of logged field name to configuration',
-            optional_cross_module_fks={'listener_id': 'listener_ids'},
-            add_output=False,
+        mod.add_section('Vector Sinks')
+        mod.blocks.append(
+            'resource "corex_vector_sink" "this" {\n'
+            '  for_each = var.vector_sinks\n'
+            '  name     = each.key\n'
+            '  type     = each.value.type\n'
+            '  source   = try(each.value.source, "corex")\n'
+            '  enabled  = try(each.value.enabled, true)\n'
+            '  options  = try(each.value.options, {})\n'
+            '  secrets  = try(var.vector_sink_secrets[each.key], {})\n'
+            '}'
         )
-
         return mod
 
     def _build_page_protect_module(self) -> Module:
@@ -3271,11 +3373,8 @@ replace the `"change-me"` values with real secrets or secrets manager references
                 cc_data[key] = entry
             tfvars['cache_configs'] = cc_data
         
-        # Observability
-        self._add_tfvars_collection(tfvars, 'log_destinations', LogDestination,
-            cross_module_fks={'listener_id': 'listeners'})
-        self._add_tfvars_collection(tfvars, 'logged_fields', LoggedField,
-            cross_module_fks={'listener_id': 'listeners'})
+        # Observability — Vector log pipeline
+        self._add_vector_tfvars(tfvars)
         
         # Page protect
         self._add_tfvars_collection(tfvars, 'page_protect_policies', PageProtectPolicy,
@@ -3647,8 +3746,9 @@ provider "corex" {
             # Cache module
             'cache_configs': 'Cache configurations per backend',
             # Observability module
-            'log_destinations': 'Log destinations',
-            'logged_fields': 'Custom logged fields',
+            'vector_sinks': 'Vector log sinks',
+            'vector_sink_secrets': 'Vector sink secret options',
+            'vector_sources': 'Vector log sources (singleton)',
             # Page protect module
             'page_protect_policies': 'Page protect CSP policies',
             'page_protect_scripts': 'Page protect scripts',
@@ -3698,7 +3798,7 @@ provider "corex" {
             'security-rules': ['security_rules'],
             'waf': ['waf_rules', 'waf_exceptions'],
             'cache': ['cache_configs'],
-            'observability': ['log_destinations', 'logged_fields'],
+            'observability': ['vector_sinks', 'vector_sources', 'vector_sink_secrets'],
             'page-protect': ['page_protect_policies', 'page_protect_scripts', 'page_protect_settings'],
             'api-armor': ['api_armor_settings', 'auth_policies', 'api_key_lists', 'openapi_specs', 'api_schemas'],
             'risk-scoring': ['risk_rulesets', 'risk_rules'],
@@ -3925,7 +4025,7 @@ provider "corex" {
             '#   waf ← routing (listener IDs, backend IDs)',
             '#   security-rules ← routing (listener IDs)',
             '#   security-lists → (internal list refs only)',
-            '#   observability ← routing (listener IDs)',
+            '#   observability → (no cross-module deps)',
             '#   page-protect ← routing (backend IDs)',
             '#   api-armor ← routing (listener IDs, backend IDs)',
             '#   cache ← routing (backend IDs)',
@@ -3945,7 +4045,7 @@ provider "corex" {
             'security-rules': ['security_rules'],
             'waf': ['waf_rules', 'waf_exceptions'],
             'cache': ['cache_configs'],
-            'observability': ['log_destinations', 'logged_fields'],
+            'observability': ['vector_sinks', 'vector_sources', 'vector_sink_secrets'],
             'page-protect': ['page_protect_policies', 'page_protect_scripts', 'page_protect_settings'],
             'api-armor': ['api_armor_settings', 'auth_policies', 'api_key_lists', 'openapi_specs', 'api_schemas'],
             'risk-scoring': ['risk_rulesets', 'risk_rules'],
@@ -3971,9 +4071,7 @@ provider "corex" {
                 'listener_ids': 'module.routing.listener_ids',
                 'backend_ids': 'module.routing.backend_ids',
             },
-            'observability': {
-                'listener_ids': 'module.routing.listener_ids',
-            },
+            'observability': {},
             'page-protect': {
                 'backend_ids': 'module.routing.backend_ids',
             },
@@ -4053,7 +4151,7 @@ provider "corex" {
         - 'name':      provider tries name first, then numeric ID (most resources)
         - 'numeric':   provider accepts numeric row ID only (server, backend_rule,
                        cache_rule, waf_exception, error_page, response_header,
-                       request_header, response_transform, logged_field,
+                       request_header, response_transform,
                        mcp_skill_version, mcp_server_replica)
         - 'backend_id': cache_config imported by backend name (provider resolves
                        via ListBackends, falls back to numeric backend_id)
@@ -4115,9 +4213,9 @@ provider "corex" {
             # Cache
             ('cache_configs', 'cache_config', 'cache', 'backend_id', CacheConfig),
             ('cache_rules', 'cache_rule', 'cache', 'cache_rule', CacheRule),
-            # Observability
-            ('log_destinations', 'log_destination', 'observability', 'name', None),
-            ('logged_fields', 'logged_field', 'observability', 'numeric', LoggedField),
+            # Observability — Vector log pipeline
+            ('vector_sinks', 'vector_sink', 'observability', 'name', None),
+            ('vector_sources', 'vector_sources', 'observability', 'singleton', None),
             # Page protect — by name/URL
             ('page_protect_policies', 'page_protect_policy', 'page-protect', 'name', None),
             ('page_protect_scripts', 'page_protect_script', 'page-protect', 'url', None),

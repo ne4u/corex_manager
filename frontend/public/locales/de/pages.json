@@ -62,13 +62,9 @@
   },
   "logs": {
     "tabs": {
-      "configuration": "Konfiguration",
+      "configuration": "Log-Pipeline",
       "liveLogs": "Live-Logs"
     },
-    "logDestinations": "Log-Ziele",
-    "addDestination": "Ziel hinzufügen",
-    "loggedFields": "Protokollierte Felder",
-    "addField": "Feld hinzufügen",
     "liveHaproxyLogs": "Live coreX-Logs",
     "last50": "Letzte 50",
     "last100": "Letzte 100",
@@ -128,20 +124,7 @@
       "wafRuleIds": "WAF-Regel-IDs:"
     },
     "modal": {
-      "editLogDestination": "Log-Ziel bearbeiten",
-      "addLogDestination": "Log-Ziel hinzufügen",
-      "editLoggedField": "Protokolliertes Feld bearbeiten",
-      "addLoggedField": "Protokolliertes Feld hinzufügen",
       "name": "Name",
-      "listener": "Listener",
-      "selectListener": "Listener auswählen",
-      "target": "Ziel",
-      "targetPlaceholder": "stdout oder 127.0.0.1:514",
-      "facility": "Einrichtung",
-      "level": "Stufe",
-      "format": "Format (veraltet — stattdessen Protokollierte Felder verwenden)",
-      "field": "Feld",
-      "fieldPlaceholder": "%ci oder %[var(txn.sec.action)]",
       "enabled": "Aktiviert"
     },
     "all": "Alle",
@@ -178,6 +161,34 @@
       "organization": "Organisation:",
       "network": "Netzwerk:",
       "ip": "IP:"
+    },
+    "pipeline": {
+      "validate": "Konfiguration validieren",
+      "preview": "vector.toml-Vorschau",
+      "restart": "Vector neu starten",
+      "checking": "Wird geprüft…",
+      "sources": "Protokollquellen",
+      "sourcesHint": "Wählen Sie aus, welche Protokollfeeds Vector verarbeitet.",
+      "source_corex": "coreX (HAProxy)",
+      "source_waf": "WAF (Coraza)",
+      "source_mcp": "MCP-Gateway",
+      "applyHint": "Änderungen werden nach dem nächsten Anwenden der Konfiguration wirksam.",
+      "sinks": "Sinks",
+      "addSink": "Sink hinzufügen",
+      "editSink": "Sink bearbeiten",
+      "type": "Typ",
+      "check": "Prüfen",
+      "checkSink": "Sink prüfen",
+      "checkOk": "Prüfung bestanden",
+      "checkFailed": "Prüfung fehlgeschlagen",
+      "sendTestEvent": "Testereignis senden (prüft die End-to-End-Zustellung)",
+      "secret": "geheim",
+      "keepSecret": "maskiert lassen, um aktuellen Wert zu behalten",
+      "default": "Standard",
+      "vectorRunning": "Vector läuft",
+      "vectorNotRunning": "Vector-Container läuft nicht",
+      "vectorNotFound": "Vector-Container nicht gefunden",
+      "source": "Quelle"
     }
   },
   "metrics": {

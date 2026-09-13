@@ -351,10 +351,17 @@ class Settings(BaseSettings):
     API_ARMOR_PROFILER_INTERVAL_SECONDS: int = 30
 
     # Platform Logging
-    HAPROXY_LOG_DEFAULT_STDOUT: bool = True  # emit log stdout format raw daemon if no LogDestination configured
+    HAPROXY_LOG_DEFAULT_STDOUT: bool = True  # emit log stdout format raw daemon in the global section
     HAPROXY_LOG_VIEWER_ENABLED: bool = True  # enable the /logs/recent Docker SDK log tailing endpoint
     HAPROXY_LOG_MAX_LEN: int = 65535  # max HAProxy log line length (HAProxy default 1024 truncates CSP report bodies)
     HAPROXY_CONTAINER_NAME: str = "corex"  # container name for Docker SDK log retrieval
+
+    # Vector log pipeline (managed vector.dev sidecar/service)
+    VECTOR_CONFIG_PATH: str = "data/vector/vector.toml"  # generated config on the shared haproxy data volume
+    VECTOR_SYSLOG_TARGET: str = "vector:601"  # HAProxy `log` target (used in `server vector <target>` line of the `ring vector_tcp` section). Helm overrides to 127.0.0.1:601 (same-pod sidecar). The ring uses TCP (HAProxy default for server lines); the Vector syslog source listens on TCP to match.
+    VECTOR_SECRETS_KEY: Optional[str] = None  # Fernet key material for vector sink secrets; falls back to SECRET_KEY
+    VECTOR_CONTAINER_NAME: str = "vector"  # container name/compose service for the vector sidecar
+    VECTOR_CONTAINER_CONFIG_PATH: str = "/app/data/vector/vector.toml"  # config path as seen inside the vector container (shared volume mount)
 
     # Runtime backend selection — controls how the backend interacts with
     # sibling containers (HAProxy, Coraza, Varnish) for config validation,
@@ -372,6 +379,7 @@ class Settings(BaseSettings):
     K8S_HAPROXY_CONTAINER: str = "corex"
     K8S_CORAZA_CONTAINER: str = "coraza-spoa"
     K8S_VARNISH_CONTAINER: str = "varnish"
+    K8S_VECTOR_CONTAINER: str = "vector"
 
     # HAProxy DNS resolver — emitted in generated haproxy.cfg as
     #   resolvers <name>

@@ -38,7 +38,7 @@ The script only rebuilds/restarts services whose files changed. The mapping is:
 | `frontend` | `frontend/` (Dockerfile, src, nginx.conf, entrypoint) | — |
 | `coraza-spoa-init` | — (no build) | `coraza-spoa/` (bind-mounted init.sh + config) |
 | `coraza-spoa` | — (prebuilt image) | Restarted when coraza-spoa-init is recreated |
-| `valkey`, `cap`, `varnish` | — (prebuilt images, no project files) | — |
+| `valkey`, `cap`, `varnish`, `vector` | — (prebuilt images, no project files) | — |
 
 ### Special cases
 

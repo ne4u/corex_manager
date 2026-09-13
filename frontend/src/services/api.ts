@@ -362,18 +362,25 @@ export const requestHeaders = {
   remove: (id: number) => api.delete(`/request-headers/${id}`),
 }
 
-export const logDestinations = {
-  list: () => api.get('/log-destinations'),
-  create: (data: Record<string, unknown>) => api.post('/log-destinations', data),
-  update: (id: number, data: Record<string, unknown>) => api.put(`/log-destinations/${id}`, data),
-  remove: (id: number) => api.delete(`/log-destinations/${id}`),
+export interface VectorSink {
+  id: number
+  name: string
+  type: string
+  sources: string[]
+  options: Record<string, unknown>
+  enabled: boolean
 }
 
-export const loggedFields = {
-  list: () => api.get('/logged-fields'),
-  create: (data: Record<string, unknown>) => api.post('/logged-fields', data),
-  update: (id: number, data: Record<string, unknown>) => api.put(`/logged-fields/${id}`, data),
-  remove: (id: number) => api.delete(`/logged-fields/${id}`),
+export const vector = {
+  pipeline: () => api.get('/vector/pipeline'),
+  listSinks: () => api.get('/vector/sinks'),
+  createSink: (data: Record<string, unknown>) => api.post('/vector/sinks', data),
+  updateSink: (id: number, data: Record<string, unknown>) => api.put(`/vector/sinks/${id}`, data),
+  removeSink: (id: number) => api.delete(`/vector/sinks/${id}`),
+  testSink: (data: Record<string, unknown>) => api.post('/vector/sinks/test', data),
+  preview: () => api.get('/vector/preview'),
+  validate: () => api.post('/vector/validate'),
+  restart: () => api.post('/vector/restart'),
 }
 
 export const logs = {

@@ -43,6 +43,10 @@ spec:
           {{- end }}
         - name: coraza-log
           emptyDir: {}
+        {{- if .Values.vector.enabled }}
+        - name: vector-data
+          emptyDir: {}
+        {{- end }}
         {{- if .Values.diskCache.enabled }}
         - name: varnish-data
           emptyDir: {}
@@ -173,6 +177,34 @@ spec:
               mountPath: /app/data
           resources:
             {{- toYaml .Values.corexPod.coraza.resources | nindent 12 }}
+
+        {{- if .Values.vector.enabled }}
+        # ── Vector (log pipeline) ────────────────────────────────────
+        - name: vector
+          image: {{ include "corex-manager.image" .Values.image.vector }}
+          imagePullPolicy: {{ .Values.image.vector.pullPolicy }}
+          command:
+            - sh
+            - -c
+            - |
+              for i in $(seq 1 120); do
+                [ -f /app/data/vector/vector.toml ] && break
+                sleep 1
+              done
+              exec vector --config /app/data/vector/vector.toml --watch-config
+          ports:
+            - name: vector-syslog
+              containerPort: 601
+              protocol: TCP
+          volumeMounts:
+            - name: haproxy-data
+              mountPath: /app/data
+              readOnly: true
+            - name: vector-data
+              mountPath: /vector-data
+          resources:
+            {{- toYaml .Values.corexPod.vector.resources | nindent 12 }}
+        {{- end }}
 
         {{- if .Values.diskCache.enabled }}
         # ── Varnish (disk cache) ─────────────────────────────────────

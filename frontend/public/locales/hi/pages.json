@@ -62,13 +62,9 @@
   },
   "logs": {
     "tabs": {
-      "configuration": "कॉन्फ़िगरेशन",
+      "configuration": "लॉग पाइपलाइन",
       "liveLogs": "लाइव लॉग"
     },
-    "logDestinations": "लॉग गंतव्य",
-    "addDestination": "गंतव्य जोड़ें",
-    "loggedFields": "लॉग किए गए फ़ील्ड",
-    "addField": "फ़ील्ड जोड़ें",
     "liveHaproxyLogs": "लाइव coreX लॉग",
     "last50": "अंतिम 50",
     "last100": "अंतिम 100",
@@ -128,20 +124,7 @@
       "wafRuleIds": "WAF नियम ID:"
     },
     "modal": {
-      "editLogDestination": "लॉग गंतव्य संपादित करें",
-      "addLogDestination": "लॉग गंतव्य जोड़ें",
-      "editLoggedField": "लॉग किए गए फ़ील्ड को संपादित करें",
-      "addLoggedField": "लॉग किए गए फ़ील्ड जोड़ें",
       "name": "नाम",
-      "listener": "लिसनर",
-      "selectListener": "एक लिसनर चुनें",
-      "target": "लक्ष्य",
-      "targetPlaceholder": "stdout या 127.0.0.1:514",
-      "facility": "सुविधा",
-      "level": "स्तर",
-      "format": "प्रारूप (अप्रचलित — इसके बजाय लॉग किए गए फ़ील्ड का उपयोग करें)",
-      "field": "फ़ील्ड",
-      "fieldPlaceholder": "%ci या %[var(txn.sec.action)]",
       "enabled": "सक्षम"
     },
     "all": "सभी",
@@ -178,6 +161,34 @@
       "organization": "संगठन:",
       "network": "नेटवर्क:",
       "ip": "IP:"
+    },
+    "pipeline": {
+      "validate": "कॉन्फ़िग सत्यापित करें",
+      "preview": "vector.toml पूर्वावलोकन",
+      "restart": "Vector पुनः आरंभ करें",
+      "checking": "जाँच हो रही है…",
+      "sources": "लॉग स्रोत",
+      "sourcesHint": "चुनें कि Vector कौन-से लॉग फ़ीड उपभोग करता है।",
+      "source_corex": "coreX (HAProxy)",
+      "source_waf": "WAF (Coraza)",
+      "source_mcp": "MCP गेटवे",
+      "applyHint": "परिवर्तन अगले कॉन्फ़िग लागू करने के बाद प्रभावी होंगे।",
+      "sinks": "सिंक",
+      "addSink": "सिंक जोड़ें",
+      "editSink": "सिंक संपादित करें",
+      "type": "प्रकार",
+      "check": "जाँचें",
+      "checkSink": "सिंक जाँचें",
+      "checkOk": "जाँच सफल",
+      "checkFailed": "जाँच विफल",
+      "sendTestEvent": "परीक्षण ईवेंट भेजें (एंड-टू-एंड डिलीवरी सत्यापित करता है)",
+      "secret": "गुप्त",
+      "keepSecret": "वर्तमान मान रखने के लिए मास्क किया छोड़ें",
+      "default": "डिफ़ॉल्ट",
+      "vectorRunning": "Vector चल रहा है",
+      "vectorNotRunning": "Vector कंटेनर नहीं चल रहा",
+      "vectorNotFound": "Vector कंटेनर नहीं मिला",
+      "source": "Source"
     }
   },
   "metrics": {

@@ -20,7 +20,7 @@ from .runtime import get_runtime
 from ..models.models import (
     Listener, Backend, Server, Certificate, CipherSuite,
     WafRule, WafException, RateLimit, Redirect, Rewrite,
-    ResponseHeader, RequestHeader, LogDestination, LoggedField, CustomErrorPage, BackendRule,
+    ResponseHeader, RequestHeader, CustomErrorPage, BackendRule,
     FcgiApp, ConfigSnapshot, PageProtectPolicy, CacheConfig, NetworkList
 )
 
@@ -736,39 +736,14 @@ def _default_json_log_format(ja4_enabled: bool, page_protect_enabled: bool = Fal
 def _build_json_log_format(
     ja4_enabled: bool,
     page_protect_enabled: bool = False,
-    custom_fields: Optional[List[LoggedField]] = None,
 ) -> str:
-    """Build a JSON log-format string, merging default fields with custom
-    LoggedField overrides.
+    """Build a JSON log-format string from the default field set.
 
-    Custom fields are merged into the default field set:
-      - If a custom field's name matches an existing default key, its
-        expression overrides the default (e.g., change "client" to use a
-        different sample fetch).
-      - If a custom field's name is new, it is appended to the JSON object.
-
-    This preserves all default fields (unique_id, ja4, req_fp, asn_org, etc.)
-    so the logging pipeline (Vector → OpenSearch) always receives the full
-    structured log line, even when a user customizes individual fields.
+    The default fields (unique_id, ja4, req_fp, asn_org, etc.) are always
+    present so the logging pipeline (Vector) receives the full structured
+    log line.
     """
     fields = _default_json_log_fields(ja4_enabled, page_protect_enabled)
-
-    for f in (custom_fields or []):
-        if not f.enabled:
-            continue
-        # Sanitize the JSON key — strip quotes/backslashes/control chars
-        key = re.sub(r'["\\\r\n]', "", f.name).strip()
-        if not key:
-            continue
-        # Sanitize the expression — wrap bare field names in %[...], pass
-        # through full %[...] expressions, and sanitize free-form tokens
-        expr = f.field.strip()
-        if not expr:
-            continue
-        if not expr.startswith("%"):
-            expr = f"%[{_safe_token(expr)}]"
-        fields[key] = expr
-
     return _serialize_json_log_format(fields)
 
 
@@ -857,8 +832,6 @@ def _effective_tune_bufsize_from_db(db: Optional[Session]) -> int:
 
 def generate_global_section(
     ciphers: Optional[List[CipherSuite]] = None,
-    logs: Optional[List[LogDestination]] = None,
-    logged_fields: Optional[List[LoggedField]] = None,
     global_options: Optional[List[dict]] = None,
     ja4_enabled: bool = True,
     compression_enabled: bool = False,
@@ -1058,36 +1031,23 @@ def generate_global_section(
             lines.append(f"    tune.h2.max-frame-size {user_h2_max_frame}")
 
     # Log destinations (global).
-    # User-configured LogDestination rows are emitted first. A stdout target is
-    # always retained (when HAPROXY_LOG_DEFAULT_STDOUT is true) so the live log
-    # viewer — which tails the HAProxy container's stdout via the Docker SDK —
-    # keeps working even when the user adds non-stdout destinations (e.g. a
-    # remote syslog server). It is only skipped if the user already configured
-    # a stdout/stderr destination themselves, to avoid duplicate log lines.
-    # For stdout/stderr targets, use `format raw` to emit the log-format string
-    # as-is (no syslog framing) — ideal for JSON logging in containers.
-    # `len` is raised above HAProxy's 1024 default so CSP report bodies are not
+    # The stdout target uses `format raw` to emit the log-format string as-is
+    # (no syslog framing) — ideal for JSON logging in containers. `len` is
+    # raised above HAProxy's 1024 default so CSP report bodies are not
     # truncated in the log line before the sampler can parse them.
     log_max_len = getattr(settings, "HAPROXY_LOG_MAX_LEN", 65535)
-    enabled_logs = [log for log in (logs or []) if log.enabled]
-    has_stdout_target = False
-    if enabled_logs:
-        for log in enabled_logs:
-            target = _safe_token(log.target)
-            facility = _safe_token(log.facility)
-            level = _safe_token(log.level)
-            if target in ("stdout", "stderr"):
-                has_stdout_target = True
-                lines.append(f"    log {target} len {log_max_len} format raw {facility}")
-            else:
-                lines.append(f"    log {target} len {log_max_len} {facility} {level}")
-    # Always keep a stdout target so the live log viewer (which tails the
-    # HAProxy container's stdout via the Docker SDK) keeps working even when
-    # the user adds non-stdout destinations (e.g. a remote syslog server).
-    # Skip if the user already configured a stdout/stderr destination to
-    # avoid emitting duplicate log lines.
-    if not has_stdout_target and getattr(settings, "HAPROXY_LOG_DEFAULT_STDOUT", True):
+    if getattr(settings, "HAPROXY_LOG_DEFAULT_STDOUT", True):
         lines.append(f"    log stdout len {log_max_len} format raw daemon")
+
+    # Managed Vector syslog destination — emitted when the coreX log source
+    # is enabled on the Logging page. HAProxy streams the JSON log-format to
+    # the vector container over TCP. A `ring` section is used because it
+    # supports hostnames in `server` lines (the `log` directive only accepts
+    # IP addresses directly) and provides a buffer for reliability if the
+    # vector container is temporarily unavailable.
+    from .vector_pipeline import corex_source_enabled
+    if corex_source_enabled(db):
+        lines.append(f"    log ring@vector_tcp len {log_max_len} local0 info")
 
     # TLS session cache
     lines.append("    ssl-default-bind-ciphersuites TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256")
@@ -1306,7 +1266,6 @@ def generate_global_section(
 
 def generate_defaults_section(headers: Optional[List[ResponseHeader]] = None,
                                 error_pages: Optional[List[CustomErrorPage]] = None,
-                                logged_fields: Optional[List[LoggedField]] = None,
                                 ja4_enabled: bool = True,
                                 page_protect_enabled: bool = False) -> str:
     lines = ["defaults"]
@@ -2185,7 +2144,6 @@ def generate_frontend(
     ja4_enabled: bool = True,
     disk_cache_enabled: bool = False,
     server_timing_metrics_enabled: bool = False,
-    logged_fields: Optional[List[LoggedField]] = None,
 ) -> str:
     cert_ids = (listener.certificate_ids or []) if listener.certificate_ids else []
     if not cert_ids and listener.certificate_id:
@@ -2228,40 +2186,18 @@ def generate_frontend(
         lines.append(f"    {quic_bind}")
     lines.append(f"    mode {effective_mode}")
 
-    # Inherit global log destinations (so the default stdout target or any
-    # global LogDestination applies to this frontend).
+    # Inherit the global log destinations (stdout + the managed Vector syslog
+    # target when the coreX source is enabled).
     lines.append("    log global")
-
-    # Per-listener logging destinations (override/augment global)
-    log_max_len = getattr(settings, "HAPROXY_LOG_MAX_LEN", 65535)
-    for log in db.query(LogDestination).filter(LogDestination.enabled == True).all():
-        if _matches_listener(log, listener):
-            target = _safe_token(log.target)
-            facility = _safe_token(log.facility)
-            level = _safe_token(log.level)
-            if target in ("stdout", "stderr"):
-                lines.append(f"    log {target} len {log_max_len} format raw {facility}")
-            else:
-                lines.append(f"    log {target} len {log_max_len} {facility} {level}")
 
     # Log format: TCP listeners emit option tcplog (overrides the defaults
     # log-format with TCP-specific fields). HTTP listeners get a per-frontend
     # log-format (not inherited from defaults) because HAProxy 3.4+ rejects
     # req.hdr sample fetches in the defaults log-format.
-    #
-    # LoggedField rows for this listener (or global, listener_id=None) are
-    # MERGED into the default JSON log-format — custom fields override
-    # matching keys or add new ones, but all default fields (unique_id, ja4,
-    # req_fp, asn_org, etc.) are preserved so the logging pipeline always
-    # receives structured JSON.
     if effective_mode == "tcp":
         lines.append("    option tcplog")
     else:
-        listener_fields = [
-            f for f in (logged_fields or [])
-            if f.enabled and (f.listener_id is None or f.listener_id == listener.id)
-        ]
-        lines.append(f"    log-format {_build_json_log_format(ja4_enabled, page_protect_enabled=page_protect_enabled, custom_fields=listener_fields)}")
+        lines.append(f"    log-format {_build_json_log_format(ja4_enabled, page_protect_enabled=page_protect_enabled)}")
 
     # Initialized here so it's always defined (TCP listeners skip the HTTP
     # block below but the content-switching section at the end references it).
@@ -4206,8 +4142,6 @@ def generate_config(
     ciphers = db.query(CipherSuite).all()
     listeners = db.query(Listener).all()
     backends = db.query(Backend).all()
-    logs = db.query(LogDestination).all()
-    logged_fields = db.query(LoggedField).all()
     headers = db.query(ResponseHeader).all()
     error_pages = db.query(CustomErrorPage).all()
     fcgi_apps = db.query(FcgiApp).all()
@@ -4309,7 +4243,7 @@ def generate_config(
         frontend_names, backend_names, stats_name, coraza_name = _get_section_names(db)
 
     config = "# Generated by coreX Manager\n# Do not edit manually\n\n"
-    config += generate_global_section(ciphers, logs, logged_fields, global_options, ja4_enabled=ja4_enabled, compression_enabled=compression_enabled, disk_cache_enabled=disk_cache_enabled, resp_transform_enabled=resp_transform_enabled, img_2_webp_enabled=img_2_webp_enabled, captcha_challenge_enabled=_any_listener_has_challenge(db), api_armor_enabled=api_armor_enabled, req_fp_enabled=req_fp_enabled, quic_enabled=_any_listener_has_quic(db), db=db)
+    config += generate_global_section(ciphers, global_options, ja4_enabled=ja4_enabled, compression_enabled=compression_enabled, disk_cache_enabled=disk_cache_enabled, resp_transform_enabled=resp_transform_enabled, img_2_webp_enabled=img_2_webp_enabled, captcha_challenge_enabled=_any_listener_has_challenge(db), api_armor_enabled=api_armor_enabled, req_fp_enabled=req_fp_enabled, quic_enabled=_any_listener_has_quic(db), db=db)
     # HA peers section (stick-table replication) — only emitted when HA is
     # enabled and ≥2 HAProxy instances are configured. Empty string otherwise.
     config += ha_service.generate_peers_section(db)
@@ -4338,7 +4272,7 @@ def generate_config(
                 page_protect_enabled=page_protect_enabled, page_protect_report_path=page_protect_report_path, page_protect_beacon=page_protect_beacon,
                 api_armor_enabled=api_armor_enabled, api_armor_max_body_bytes=api_armor_max_body_bytes,
                 api_armor_scope=api_armor_scope, api_armor_backend_ids=api_armor_backend_ids, api_armor_path_patterns=api_armor_path_patterns,
-                ja4_enabled=ja4_enabled, disk_cache_enabled=disk_cache_enabled, server_timing_metrics_enabled=server_timing_metrics_enabled, logged_fields=logged_fields,
+                ja4_enabled=ja4_enabled, disk_cache_enabled=disk_cache_enabled, server_timing_metrics_enabled=server_timing_metrics_enabled,
             )
 
     for app in fcgi_apps:
@@ -4387,6 +4321,26 @@ def generate_config(
     if mcp_enabled:
         config += generate_mcp_gateway_backend(db)
         config += generate_mcp_upstreams(db)
+
+    # Vector log ring — emitted when the coreX log source is enabled.
+    # A `ring` section buffers logs for reliability and supports hostnames
+    # in `server` lines (unlike the `log` directive which only accepts IPs).
+    # The global `log ring@vector_tcp` references this ring. The server line
+    # resolves the Docker/k8s service name at startup via the system resolver.
+    # `format rfc5424` + `log-proto octet-count` ensure Vector's TCP syslog
+    # source can parse the frames (non-transparent/legacy framing causes
+    # "unable to parse input as valid syslog message" errors in Vector).
+    from .vector_pipeline import corex_source_enabled, vector_syslog_target
+    if corex_source_enabled(db):
+        target = vector_syslog_target()
+        config += (
+            f"ring vector_tcp\n"
+            f"    format rfc5424\n"
+            f"    size 32764\n"
+            f"    timeout connect 5s\n"
+            f"    timeout server 10s\n"
+            f"    server vector {target} log-proto octet-count\n\n"
+        )
 
     return config
 
@@ -4838,6 +4792,13 @@ def write_config(
         ):
             with open(f"{path}.applied", "w") as f:
                 f.write(waf_configs[label])
+
+    logger.info("write_config: step 7b — vector.toml")
+    try:
+        from .vector_pipeline import write_vector_config
+        write_vector_config(db)
+    except Exception as e:
+        logger.warning("Failed to write vector.toml: %s", e)
 
     print("[WRITE_CONFIG] step 8 — varnish VCL", flush=True)
     logger.info("write_config: step 8 — varnish VCL")

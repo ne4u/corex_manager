@@ -62,13 +62,9 @@
   },
   "logs": {
     "tabs": {
-      "configuration": "Configuration",
+      "configuration": "Pipeline de journaux",
       "liveLogs": "Logs en direct"
     },
-    "logDestinations": "Destinations de logs",
-    "addDestination": "Ajouter une destination",
-    "loggedFields": "Champs enregistrés",
-    "addField": "Ajouter un champ",
     "liveHaproxyLogs": "Logs coreX en direct",
     "last50": "50 derniers",
     "last100": "100 derniers",
@@ -128,20 +124,7 @@
       "wafRuleIds": "IDs de Règles WAF :"
     },
     "modal": {
-      "editLogDestination": "Modifier la destination de log",
-      "addLogDestination": "Ajouter une destination de log",
-      "editLoggedField": "Modifier le champ enregistré",
-      "addLoggedField": "Ajouter un champ enregistré",
       "name": "Nom",
-      "listener": "Listener",
-      "selectListener": "Sélectionner un listener",
-      "target": "Cible",
-      "targetPlaceholder": "stdout ou 127.0.0.1:514",
-      "facility": "Facilité",
-      "level": "Niveau",
-      "format": "Format (obsolète — utilisez les champs enregistrés à la place)",
-      "field": "Champ",
-      "fieldPlaceholder": "%ci ou %[var(txn.sec.action)]",
       "enabled": "Activé"
     },
     "all": "Tous",
@@ -178,6 +161,34 @@
       "organization": "Organisation :",
       "network": "Réseau :",
       "ip": "IP:"
+    },
+    "pipeline": {
+      "validate": "Valider la configuration",
+      "preview": "Aperçu de vector.toml",
+      "restart": "Redémarrer Vector",
+      "checking": "Vérification…",
+      "sources": "Sources de journaux",
+      "sourcesHint": "Sélectionnez les flux de journaux consommés par Vector.",
+      "source_corex": "coreX (HAProxy)",
+      "source_waf": "WAF (Coraza)",
+      "source_mcp": "Passerelle MCP",
+      "applyHint": "Les modifications prennent effet après la prochaine application de la configuration.",
+      "sinks": "Destinations",
+      "addSink": "Ajouter une destination",
+      "editSink": "Modifier la destination",
+      "type": "Type",
+      "check": "Vérifier",
+      "checkSink": "Vérifier la destination",
+      "checkOk": "Vérification réussie",
+      "checkFailed": "Vérification échouée",
+      "sendTestEvent": "Envoyer un événement de test (vérifie la livraison de bout en bout)",
+      "secret": "secret",
+      "keepSecret": "laisser masqué pour conserver la valeur actuelle",
+      "default": "par défaut",
+      "vectorRunning": "Vector en cours d exécution",
+      "vectorNotRunning": "Conteneur Vector non en cours d exécution",
+      "vectorNotFound": "Conteneur Vector introuvable",
+      "source": "Source"
     }
   },
   "metrics": {

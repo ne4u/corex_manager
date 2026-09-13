@@ -87,6 +87,25 @@ def _config_status_data(db: Session) -> Tuple[bool, Dict[str, str], Dict[str, st
         except Exception:
             mcp_failed = True
 
+    # Vector log pipeline — compared on full text for the unapplied flag (a
+    # changed credential still triggers the banner), but only the redacted
+    # text is surfaced in diffs/previews so secrets never leak. Skipped
+    # entirely when the pipeline is not configured (no sources enabled and
+    # no sinks) so the banner doesn't fire on installs that never use it.
+    v_current_raw = ""
+    v_generated_raw = ""
+    vector_failed = False
+    vector_active = False
+    try:
+        from ..services.vector_pipeline import (
+            generate_vector_toml, redact_vector_text, vector_pipeline_active)
+        vector_active = vector_pipeline_active(db)
+        if vector_active:
+            v_generated_raw, _v_secrets = generate_vector_toml(db)
+            v_current_raw = _read_current_config(cfg.VECTOR_CONFIG_PATH)
+    except Exception:
+        vector_failed = True
+
     current: Dict[str, str] = {}
     generated: Dict[str, str] = {}
     unapplied = False
@@ -96,6 +115,12 @@ def _config_status_data(db: Session) -> Tuple[bool, Dict[str, str], Dict[str, st
         cur = _read_current_config(path)
         current[label] = cur
         if cur != gen:
+            unapplied = True
+
+    if vector_active and not vector_failed:
+        current["vector.toml"] = redact_vector_text(v_current_raw)
+        generated["vector.toml"] = redact_vector_text(v_generated_raw)
+        if v_current_raw != v_generated_raw:
             unapplied = True
 
     # MCP bundle comparison (decrypted plaintext). If bundle generation failed,
@@ -280,6 +305,11 @@ def preview_all_configs(db: Session) -> Dict[str, str]:
             configs["mcp-bundle.json"] = generate_mcp_bundle_text(db)
         except Exception:
             pass  # MCP bundle generation failed — skip it
+    try:
+        from ..services.vector_pipeline import generate_vector_toml, redact_vector_text
+        configs["vector.toml"] = redact_vector_text(generate_vector_toml(db)[0])
+    except Exception:
+        pass
     return configs
 
 

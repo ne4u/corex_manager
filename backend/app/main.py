@@ -53,6 +53,14 @@ async def lifespan(app: FastAPI):
         from .services.page_protect import resolve_pp_hasher_token
         resolve_pp_hasher_token(db)
         coraza_config.write_coraza_spoa_config(db)
+        # Seed vector.toml on first boot so the vector container has a valid
+        # config; don't overwrite an existing file — pending DB changes stay
+        # unapplied until the user applies them (config diff banner).
+        try:
+            from .services.vector_pipeline import write_vector_config
+            write_vector_config(db, restart=False, only_if_missing=True)
+        except Exception as _v_exc:
+            logging.getLogger(__name__).warning("vector.toml startup write failed: %s", _v_exc)
         migrate_cert_bundles(db)
         # Regenerate the Varnish VCL on every startup. The VCL lives on the
         # shared haproxy-data volume, which survives container rebuilds, so a

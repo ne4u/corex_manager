@@ -89,6 +89,10 @@ services:
       - VALKEY_SENTINEL_ENABLED=${VALKEY_SENTINEL_ENABLED:-false}
       - VALKEY_SENTINEL_HOSTS=${VALKEY_SENTINEL_HOSTS:-valkey-sentinel:26379}
       - VALKEY_SENTINEL_SERVICE=${VALKEY_SENTINEL_SERVICE:-mymaster}
+      - VECTOR_CONFIG_PATH=/app/data/vector/vector.toml
+      - VECTOR_SYSLOG_TARGET=${VECTOR_SYSLOG_TARGET:-vector:601}
+      - VECTOR_SECRETS_KEY=${VECTOR_SECRETS_KEY:-}
+      - VECTOR_CONTAINER_NAME=vector
     healthcheck:
       test: ["CMD-SHELL", "curl -sk https://localhost:8000/health | grep -q ok || exit 1"]
       interval: 10s
@@ -190,6 +194,34 @@ services:
     deploy:
       replicas: ${SWARM_CORAZA_REPLICAS:-1}
       endpoint_mode: dnsrr
+      update_config:
+        parallelism: 1
+        order: start-first
+        failure_action: rollback
+      restart_policy:
+        condition: any
+        max_attempts: 3
+    networks:
+      - corex-net
+
+  # -------------------------------------------------------------------------
+  # vector — log pipeline (1 replica; reads generated vector.toml from the
+  # shared data volume, tails WAF/MCP logs, receives coreX syslog on :601)
+  # -------------------------------------------------------------------------
+  vector:
+    image: ${VECTOR_IMAGE:-timberio/vector:0.58.0-alpine}
+    user: "0:0"
+    # The timberio/vector image sets ENTRYPOINT ["vector"], so we clear it
+    # here to run our wait-loop shell script as the main process.
+    entrypoint: []
+    volumes:
+      - ${DATA_DIR:-./data}/haproxy:/app/data:ro
+      - vector-data:/vector-data
+    # Wait for the API to generate vector.toml on first boot, then run with
+    # --watch-config so config Applies reload the pipeline without a restart.
+    command: sh -c 'for i in $$(seq 1 120); do [ -f /app/data/vector/vector.toml ] && break; sleep 1; done; exec vector --config /app/data/vector/vector.toml --watch-config'
+    deploy:
+      replicas: 1
       update_config:
         parallelism: 1
         order: start-first
@@ -449,4 +481,6 @@ networks:
 
 volumes:
   haproxy-run:
+    driver: local
+  vector-data:
     driver: local

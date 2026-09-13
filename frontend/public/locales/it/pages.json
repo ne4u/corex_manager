@@ -62,13 +62,9 @@
   },
   "logs": {
     "tabs": {
-      "configuration": "Configurazione",
+      "configuration": "Pipeline dei log",
       "liveLogs": "Log in Diretta"
     },
-    "logDestinations": "Destinazioni Log",
-    "addDestination": "Aggiungi Destinazione",
-    "loggedFields": "Campi Registrati",
-    "addField": "Aggiungi Campo",
     "liveHaproxyLogs": "Log coreX in Diretta",
     "last50": "Ultimi 50",
     "last100": "Ultimi 100",
@@ -128,20 +124,7 @@
       "wafRuleIds": "ID Regole WAF:"
     },
     "modal": {
-      "editLogDestination": "Modifica Destinazione Log",
-      "addLogDestination": "Aggiungi Destinazione Log",
-      "editLoggedField": "Modifica Campo Registrato",
-      "addLoggedField": "Aggiungi Campo Registrato",
       "name": "Nome",
-      "listener": "Listener",
-      "selectListener": "Seleziona un listener",
-      "target": "Destinazione",
-      "targetPlaceholder": "stdout o 127.0.0.1:514",
-      "facility": "Struttura",
-      "level": "Livello",
-      "format": "Formato (deprecato — usa Campi Registrati)",
-      "field": "Campo",
-      "fieldPlaceholder": "%ci o %[var(txn.sec.action)]",
       "enabled": "Abilitato"
     },
     "all": "Tutti",
@@ -178,6 +161,34 @@
       "organization": "Organizzazione:",
       "network": "Rete:",
       "ip": "IP:"
+    },
+    "pipeline": {
+      "validate": "Convalida configurazione",
+      "preview": "Anteprima vector.toml",
+      "restart": "Riavvia Vector",
+      "checking": "Verifica in corso…",
+      "sources": "Origini log",
+      "sourcesHint": "Seleziona quali flussi di log Vector consuma.",
+      "source_corex": "coreX (HAProxy)",
+      "source_waf": "WAF (Coraza)",
+      "source_mcp": "Gateway MCP",
+      "applyHint": "Le modifiche avranno effetto dopo la prossima applicazione della configurazione.",
+      "sinks": "Destinazioni",
+      "addSink": "Aggiungi destinazione",
+      "editSink": "Modifica destinazione",
+      "type": "Tipo",
+      "check": "Verifica",
+      "checkSink": "Verifica destinazione",
+      "checkOk": "Verifica riuscita",
+      "checkFailed": "Verifica non riuscita",
+      "sendTestEvent": "Invia un evento di test (verifica la consegna end-to-end)",
+      "secret": "segreto",
+      "keepSecret": "lascia mascherato per mantenere il valore corrente",
+      "default": "predefinito",
+      "vectorRunning": "Vector in esecuzione",
+      "vectorNotRunning": "Contenitore Vector non in esecuzione",
+      "vectorNotFound": "Contenitore Vector non trovato",
+      "source": "Sorgente"
     }
   },
   "metrics": {

@@ -62,13 +62,9 @@
   },
   "logs": {
     "tabs": {
-      "configuration": "設定",
+      "configuration": "ログパイプライン",
       "liveLogs": "ライブログ"
     },
-    "logDestinations": "ログ出力先",
-    "addDestination": "出力先を追加",
-    "loggedFields": "記録フィールド",
-    "addField": "フィールドを追加",
     "liveHaproxyLogs": "ライブcoreXログ",
     "last50": "最新50件",
     "last100": "最新100件",
@@ -128,20 +124,7 @@
       "wafRuleIds": "WAFルールID:"
     },
     "modal": {
-      "editLogDestination": "ログ出力先を編集",
-      "addLogDestination": "ログ出力先を追加",
-      "editLoggedField": "記録フィールドを編集",
-      "addLoggedField": "記録フィールドを追加",
       "name": "名前",
-      "listener": "リスナー",
-      "selectListener": "リスナーを選択",
-      "target": "ターゲット",
-      "targetPlaceholder": "stdout または 127.0.0.1:514",
-      "facility": "ファシリティ",
-      "level": "レベル",
-      "format": "フォーマット（非推奨 — 記録フィールドを使用してください）",
-      "field": "フィールド",
-      "fieldPlaceholder": "%ci または %[var(txn.sec.action)]",
       "enabled": "有効"
     },
     "all": "すべて",
@@ -178,6 +161,34 @@
       "organization": "組織:",
       "network": "ネットワーク:",
       "ip": "IP:"
+    },
+    "pipeline": {
+      "validate": "設定を検証",
+      "preview": "vector.toml をプレビュー",
+      "restart": "Vector を再起動",
+      "checking": "確認中…",
+      "sources": "ログソース",
+      "sourcesHint": "Vector が取り込むログフィードを選択します。",
+      "source_corex": "coreX (HAProxy)",
+      "source_waf": "WAF (Coraza)",
+      "source_mcp": "MCP ゲートウェイ",
+      "applyHint": "変更は次回の設定適用後に有効になります。",
+      "sinks": "シンク",
+      "addSink": "シンクを追加",
+      "editSink": "シンクを編集",
+      "type": "タイプ",
+      "check": "確認",
+      "checkSink": "シンクを確認",
+      "checkOk": "確認成功",
+      "checkFailed": "確認失敗",
+      "sendTestEvent": "テストイベントを送信（エンドツーエンドの配信を検証）",
+      "secret": "シークレット",
+      "keepSecret": "マスクのままにすると現在の値を保持",
+      "default": "デフォルト",
+      "vectorRunning": "Vector実行中",
+      "vectorNotRunning": "Vectorコンテナが実行されていません",
+      "vectorNotFound": "Vectorコンテナが見つかりません",
+      "source": "ソース"
     }
   },
   "metrics": {

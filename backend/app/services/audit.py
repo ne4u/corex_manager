@@ -31,7 +31,16 @@ _PAYLOAD_SKIP_PATHS = {
     # MCP Gateway — server secrets and PAT issuance
     "/mcp/servers",
     "/mcp/identities",
+    # Vector log pipeline — sink create/test payloads contain plaintext secrets
+    "/vector/sinks",
+    "/vector/sinks/test",
 }
+
+# Payload path prefixes that are always skipped (regex-free startswith match
+# after the /api/v1 strip) — covers parameterized paths like PUT /vector/sinks/7.
+_PAYLOAD_SKIP_PREFIXES = (
+    "/vector/sinks",
+)
 
 # Special-case action mapping for non-REST or ambiguous paths.
 # Maps (method, path_pattern) -> (action, resource_type, resource_id_group_index)
@@ -146,6 +155,10 @@ _NON_CONFIG_PATHS: list[tuple[str, str]] = [
     ("POST", r"^/waf/rules/\d+/snapshot$"),
     ("PUT", r"^/waf/rule-versions/max$"),
     ("DELETE", r"^/waf/rule-versions/\d+$"),
+    # --- Vector operational endpoints (no DB write) ---
+    ("POST", r"^/vector/sinks/test$"),
+    ("POST", r"^/vector/validate$"),
+    ("POST", r"^/vector/restart$"),
     # --- Validation-only endpoints (no DB write) ---
     ("POST", r"^/security-rules/validate$"),
     ("POST", r"^/risk-rules/validate$"),
@@ -228,8 +241,7 @@ _SINGULAR_OVERRIDES = {
     "rule-versions": "waf_rule_version",
     "backend-rules": "backend_rule",
     "rate-limits": "rate_limit",
-    "log-destinations": "log_destination",
-    "logged-fields": "logged_field",
+    "sinks": "vector_sink",
     "response-headers": "response_header",
     "error-pages": "error_page",
     "security-lists": "security_list",
@@ -350,6 +362,9 @@ def should_capture_payload(path: str, content_type: Optional[str]) -> bool:
     # Check exact skip paths
     for skip in _PAYLOAD_SKIP_PATHS:
         if clean == skip:
+            return False
+    for prefix in _PAYLOAD_SKIP_PREFIXES:
+        if clean.startswith(prefix):
             return False
     # Skip all /auth/* paths
     if clean.startswith("/auth/"):

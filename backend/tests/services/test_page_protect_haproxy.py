@@ -184,14 +184,41 @@ def test_generate_config_sets_log_len_for_csp_reports(db):
     assert "log stdout len 65535 format raw daemon" in config
 
 
-def test_generate_frontend_inherits_log_len_for_csp_reports(db):
-    """Per-listener log targets must also use the raised len limit."""
-    from app.models.logging import LogDestination
-
+def test_generate_frontend_inherits_log_global(db):
+    """Frontends inherit the global log targets (stdout + managed Vector sink)."""
     listener = make_listener(db, name="http_in", bind_port=80)
-    db.add(LogDestination(name="stdout-test", target="stdout", facility="local0", enabled=True))
-    db.add(LogDestination(name="syslog-test", target="127.0.0.1:514", facility="local0", level="info", enabled=True))
     db.commit()
     config = generate_frontend(listener, db)
-    assert "log stdout len 65535 format raw local0" in config
-    assert "log 127.0.0.1:514 len 65535 local0 info" in config
+    assert "    log global" in config
+
+
+def test_generate_global_section_managed_vector_log(db):
+    """The global section emits the managed Vector log target only when
+    the coreX log source is enabled (i.e. at least one enabled sink has
+    source=corex). Uses ring@vector_tcp (HAProxy 3.4 log directive only
+    accepts IP addresses, not hostnames)."""
+    from app.services.haproxy import generate_global_section, generate_config
+    from app.models.logging import VectorSink
+    from app.services import vector_pipeline as vp
+
+    # Create an enabled sink with source=corex — this auto-enables the source
+    sink = VectorSink(name="s3", type="aws_s3", source="corex",
+                      options=vp.encrypt_sink_options("aws_s3",
+                        {"bucket": "b", "region": "r"}), enabled=True)
+    db.add(sink)
+    db.commit()
+    cfg = generate_global_section(db=db)
+    assert "log ring@vector_tcp len 65535 local0 info" in cfg
+    # The ring section with the server line is in generate_config, not
+    # generate_global_section.
+    full = generate_config(db)
+    assert "ring vector_tcp" in full
+    assert "server vector vector:601" in full
+
+    # Delete the sink — source auto-disables, ring section disappears
+    db.delete(sink)
+    db.commit()
+    cfg = generate_global_section(db=db)
+    assert "ring@vector_tcp" not in cfg
+    full = generate_config(db)
+    assert "ring vector_tcp" not in full

@@ -12,6 +12,11 @@ data:
   COREX_RUNTIME: "kubernetes"
   HAPROXY_CONTAINER_NAME: "corex"
   VARNISH_CONTAINER_NAME: "varnish"
+  VECTOR_CONTAINER_NAME: "vector"
+  K8S_VECTOR_CONTAINER: "vector"
+  VECTOR_CONFIG_PATH: "/app/data/vector/vector.toml"
+  # Vector is a sidecar in the same pod — HAProxy logs to localhost.
+  VECTOR_SYSLOG_TARGET: "127.0.0.1:601"
   CORAZA_SPOA_HOST: "127.0.0.1"
   VARNISH_PORT: "6081"
   DATAPLANE_API_URL: "https://127.0.0.1:5555/v3"

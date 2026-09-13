@@ -109,6 +109,51 @@ def test_serialize_db_includes_secret_settings_with_secrets(db):
     assert "maxmind_license_key" in setting_keys
 
 
+def test_serialize_db_redacts_vector_sink_secrets(db):
+    """enc:-prefixed options in vector_sinks must be stripped when secrets
+    are excluded, but the sink row itself is kept (topology preserved)."""
+    from app.models.logging import VectorSink
+    from app.services import vector_pipeline as vp
+    opts = vp.encrypt_sink_options("splunk_hec_logs", {
+        "endpoint": "https://splunk:8088", "token": "hec-secret"})
+    assert opts["token"].startswith("enc:")
+    db.add(VectorSink(name="hec", type="splunk_hec_logs", source="corex",
+                      options=opts))
+    db.commit()
+
+    snapshot = _serialize_db(db, include_secrets=False, include_metrics=False)
+    rows = snapshot.get("vector_sinks", [])
+    assert len(rows) == 1
+    assert rows[0]["name"] == "hec"
+    assert "token" not in rows[0]["options"]
+    assert rows[0]["options"]["endpoint"] == "https://splunk:8088"
+
+    snapshot = _serialize_db(db, include_secrets=True, include_metrics=False)
+    rows = snapshot.get("vector_sinks", [])
+    assert rows[0]["options"]["token"].startswith("enc:")
+
+
+def test_export_without_secrets_excludes_vector_toml(db, tmp_path, monkeypatch):
+    """vector.toml embeds plaintext sink credentials — it must not appear in
+    a backup that excludes secrets."""
+    from app.core.config import get_settings
+    s = get_settings()
+    vpath = tmp_path / "vector" / "vector.toml"
+    vpath.parent.mkdir(parents=True)
+    vpath.write_text('default_token = "plaintext-secret"')
+    (vpath.parent / "vector.toml.applied").write_text("x")
+    monkeypatch.setattr(s, "VECTOR_CONFIG_PATH", str(vpath))
+
+    archive = _export_to_bytes(db, include_secrets=False, include_metrics=False)
+    names = zipfile.ZipFile(io.BytesIO(archive)).namelist()
+    assert "config/vector.toml" not in names
+    assert "config/vector.toml.applied" not in names
+
+    archive = _export_to_bytes(db, include_secrets=True, include_metrics=False)
+    zf = zipfile.ZipFile(io.BytesIO(archive))
+    assert "config/vector.toml" in zf.namelist()
+
+
 def test_serialize_db_excludes_metrics_by_default(db):
     from app.models.models import MetricSnapshot, WafMetric, AuditEvent
     db.add(MetricSnapshot(process_info={}, stats=[]))

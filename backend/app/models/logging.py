@@ -3,29 +3,17 @@ from sqlalchemy.orm import relationship
 from .base import Base, utcnow
 
 
-class LogDestination(Base):
-    __tablename__ = "log_destinations"
+class VectorSink(Base):
+    __tablename__ = "vector_sinks"
 
     id = Column(Integer, primary_key=True, index=True)
-    listener_id = Column(Integer, ForeignKey("listeners.id"), nullable=True)
     name = Column(String, unique=True, index=True, nullable=False)
-    target = Column(String, nullable=False)
-    facility = Column(String, default="local0")
-    level = Column(String, default="info")
-    format = Column(String, nullable=True)
+    type = Column(String, nullable=False)
+    source = Column(String, nullable=False, default="corex")
+    options = Column(JSON, default=dict, nullable=False)
     enabled = Column(Boolean, default=True)
-    listener = relationship("Listener")
-
-
-class LoggedField(Base):
-    __tablename__ = "logged_fields"
-
-    id = Column(Integer, primary_key=True, index=True)
-    listener_id = Column(Integer, ForeignKey("listeners.id"), nullable=True)
-    name = Column(String, nullable=False)
-    field = Column(String, nullable=False)
-    enabled = Column(Boolean, default=True)
-    listener = relationship("Listener")
+    created_at = Column(DateTime, default=utcnow)
+    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
 
 class CustomErrorPage(Base):
@@ -40,4 +28,4 @@ class CustomErrorPage(Base):
     listener = relationship("Listener")
 
 
-__all__ = ['CustomErrorPage', 'LogDestination', 'LoggedField']
+__all__ = ['CustomErrorPage', 'VectorSink']

@@ -62,13 +62,9 @@
   },
   "logs": {
     "tabs": {
-      "configuration": "Configuration",
+      "configuration": "Log Pipeline",
       "liveLogs": "Live Logs"
     },
-    "logDestinations": "Log Destinations",
-    "addDestination": "Add Destination",
-    "loggedFields": "Logged Fields",
-    "addField": "Add Field",
     "liveHaproxyLogs": "Live coreX Logs",
     "last50": "Last 50",
     "last100": "Last 100",
@@ -133,20 +129,7 @@
       "riskHitDensity": "Risk Hit Density:"
     },
     "modal": {
-      "editLogDestination": "Edit Log Destination",
-      "addLogDestination": "Add Log Destination",
-      "editLoggedField": "Edit Logged Field",
-      "addLoggedField": "Add Logged Field",
       "name": "Name",
-      "listener": "Listener",
-      "selectListener": "Select a listener",
-      "target": "Target",
-      "targetPlaceholder": "stdout or 127.0.0.1:514",
-      "facility": "Facility",
-      "level": "Level",
-      "format": "Format (deprecated — use Logged Fields instead)",
-      "field": "Field",
-      "fieldPlaceholder": "%ci or %[var(txn.sec.action)]",
       "enabled": "Enabled"
     },
     "all": "All",
@@ -183,6 +166,34 @@
       "organization": "Organization:",
       "network": "Network:",
       "ip": "IP:"
+    },
+    "pipeline": {
+      "validate": "Validate config",
+      "preview": "Preview vector.toml",
+      "restart": "Restart Vector",
+      "checking": "Checking…",
+      "sources": "Log Sources",
+      "sourcesHint": "Select which log feeds Vector consumes.",
+      "source_corex": "coreX (HAProxy)",
+      "source_waf": "WAF (Coraza)",
+      "source_mcp": "MCP Gateway",
+      "applyHint": "Changes take effect after the next config Apply.",
+      "sinks": "Sinks",
+      "addSink": "Add sink",
+      "editSink": "Edit sink",
+      "type": "Type",
+      "check": "Check",
+      "checkSink": "Check sink",
+      "checkOk": "Check passed",
+      "checkFailed": "Check failed",
+      "sendTestEvent": "Send a test event (verifies end-to-end delivery)",
+      "secret": "secret",
+      "keepSecret": "leave masked to keep current",
+      "default": "default",
+      "vectorRunning": "Vector running",
+      "vectorNotRunning": "Vector container not running",
+      "vectorNotFound": "Vector container not found",
+      "source": "Source"
     }
   },
   "metrics": {

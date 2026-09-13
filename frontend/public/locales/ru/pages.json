@@ -62,13 +62,9 @@
   },
   "logs": {
     "tabs": {
-      "configuration": "Конфигурация",
+      "configuration": "Конвейер журналов",
       "liveLogs": "Журнал в реальном времени"
     },
-    "logDestinations": "Назначения журналов",
-    "addDestination": "Добавить назначение",
-    "loggedFields": "Записываемые поля",
-    "addField": "Добавить поле",
     "liveHaproxyLogs": "Журнал coreX в реальном времени",
     "last50": "Последние 50",
     "last100": "Последние 100",
@@ -128,20 +124,7 @@
       "wafRuleIds": "ID правил WAF:"
     },
     "modal": {
-      "editLogDestination": "Редактировать назначение журнала",
-      "addLogDestination": "Добавить назначение журнала",
-      "editLoggedField": "Редактировать записываемое поле",
-      "addLoggedField": "Добавить записываемое поле",
       "name": "Имя",
-      "listener": "Слушатель",
-      "selectListener": "Выберите слушатель",
-      "target": "Цель",
-      "targetPlaceholder": "stdout или 127.0.0.1:514",
-      "facility": "Средство",
-      "level": "Уровень",
-      "format": "Формат (устарело — используйте «Записываемые поля»)",
-      "field": "Поле",
-      "fieldPlaceholder": "%ci или %[var(txn.sec.action)]",
       "enabled": "Включено"
     },
     "all": "Все",
@@ -178,6 +161,34 @@
       "organization": "Организация:",
       "network": "Сеть:",
       "ip": "IP:"
+    },
+    "pipeline": {
+      "validate": "Проверить конфигурацию",
+      "preview": "Просмотр vector.toml",
+      "restart": "Перезапустить Vector",
+      "checking": "Проверка…",
+      "sources": "Источники журналов",
+      "sourcesHint": "Выберите, какие потоки журналов обрабатывает Vector.",
+      "source_corex": "coreX (HAProxy)",
+      "source_waf": "WAF (Coraza)",
+      "source_mcp": "Шлюз MCP",
+      "applyHint": "Изменения вступят в силу после следующего применения конфигурации.",
+      "sinks": "Приёмники",
+      "addSink": "Добавить приёмник",
+      "editSink": "Изменить приёмник",
+      "type": "Тип",
+      "check": "Проверить",
+      "checkSink": "Проверить приёмник",
+      "checkOk": "Проверка пройдена",
+      "checkFailed": "Проверка не пройдена",
+      "sendTestEvent": "Отправить тестовое событие (проверяет сквозную доставку)",
+      "secret": "секрет",
+      "keepSecret": "оставьте маскированным, чтобы сохранить текущее значение",
+      "default": "по умолчанию",
+      "vectorRunning": "Vector работает",
+      "vectorNotRunning": "Контейнер Vector не запущен",
+      "vectorNotFound": "Контейнер Vector не найден",
+      "source": "Источник"
     }
   },
   "metrics": {

@@ -62,13 +62,9 @@
   },
   "logs": {
     "tabs": {
-      "configuration": "التهيئة",
+      "configuration": "خط أنابيب السجلات",
       "liveLogs": "السجلات المباشرة"
     },
-    "logDestinations": "وجهات السجلات",
-    "addDestination": "إضافة وجهة",
-    "loggedFields": "الحقول المسجّلة",
-    "addField": "إضافة حقل",
     "liveHaproxyLogs": "سجلات coreX المباشرة",
     "last50": "آخر 50",
     "last100": "آخر 100",
@@ -128,20 +124,7 @@
       "wafRuleIds": "معرفات قواعد WAF:"
     },
     "modal": {
-      "editLogDestination": "تعديل وجهة السجل",
-      "addLogDestination": "إضافة وجهة سجل",
-      "editLoggedField": "تعديل الحقل المسجّل",
-      "addLoggedField": "إضافة حقل مسجّل",
       "name": "الاسم",
-      "listener": "المستمع",
-      "selectListener": "اختر مستمعاً",
-      "target": "الهدف",
-      "targetPlaceholder": "stdout أو 127.0.0.1:514",
-      "facility": "المنشأة",
-      "level": "المستوى",
-      "format": "التنسيق (مهمل — استخدم الحقول المسجّلة بدلاً من ذلك)",
-      "field": "الحقل",
-      "fieldPlaceholder": "%ci أو %[var(txn.sec.action)]",
       "enabled": "مُفعّل"
     },
     "all": "الكل",
@@ -178,6 +161,34 @@
       "organization": "المؤسسة:",
       "network": "الشبكة:",
       "ip": "IP:"
+    },
+    "pipeline": {
+      "validate": "التحقق من التكوين",
+      "preview": "معاينة vector.toml",
+      "restart": "إعادة تشغيل Vector",
+      "checking": "جارٍ الفحص…",
+      "sources": "مصادر السجلات",
+      "sourcesHint": "حدد تدفقات السجلات التي يستهلكها Vector.",
+      "source_corex": "coreX (HAProxy)",
+      "source_waf": "WAF (Coraza)",
+      "source_mcp": "بوابة MCP",
+      "applyHint": "تسري التغييرات بعد التطبيق التالي للتكوين.",
+      "sinks": "الوجهات",
+      "addSink": "إضافة وجهة",
+      "editSink": "تحرير الوجهة",
+      "type": "النوع",
+      "check": "فحص",
+      "checkSink": "فحص الوجهة",
+      "checkOk": "نجح الفحص",
+      "checkFailed": "فشل الفحص",
+      "sendTestEvent": "إرسال حدث اختباري (يتحقق من التسليم الكامل)",
+      "secret": "سرّي",
+      "keepSecret": "اتركه مقنّعًا للاحتفاظ بالقيمة الحالية",
+      "default": "الافتراضي",
+      "vectorRunning": "Vector يعمل",
+      "vectorNotRunning": "حاوية Vector لا تعمل",
+      "vectorNotFound": "لم يتم العثور على حاوية Vector",
+      "source": "Source"
     }
   },
   "metrics": {

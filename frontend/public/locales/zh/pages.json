@@ -62,13 +62,9 @@
   },
   "logs": {
     "tabs": {
-      "configuration": "配置",
+      "configuration": "日志管道",
       "liveLogs": "实时日志"
     },
-    "logDestinations": "日志目标",
-    "addDestination": "添加目标",
-    "loggedFields": "记录字段",
-    "addField": "添加字段",
     "liveHaproxyLogs": "实时 coreX 日志",
     "last50": "最近 50 条",
     "last100": "最近 100 条",
@@ -128,20 +124,7 @@
       "wafRuleIds": "WAF 规则 ID:"
     },
     "modal": {
-      "editLogDestination": "编辑日志目标",
-      "addLogDestination": "添加日志目标",
-      "editLoggedField": "编辑记录字段",
-      "addLoggedField": "添加记录字段",
       "name": "名称",
-      "listener": "监听器",
-      "selectListener": "选择监听器",
-      "target": "目标",
-      "targetPlaceholder": "stdout 或 127.0.0.1:514",
-      "facility": "设施",
-      "level": "级别",
-      "format": "格式（已弃用 — 请改用记录字段）",
-      "field": "字段",
-      "fieldPlaceholder": "%ci 或 %[var(txn.sec.action)]",
       "enabled": "已启用"
     },
     "all": "全部",
@@ -178,6 +161,34 @@
       "organization": "组织:",
       "network": "网络:",
       "ip": "IP:"
+    },
+    "pipeline": {
+      "validate": "验证配置",
+      "preview": "预览 vector.toml",
+      "restart": "重启 Vector",
+      "checking": "检查中…",
+      "sources": "日志源",
+      "sourcesHint": "选择 Vector 消费的日志流。",
+      "source_corex": "coreX (HAProxy)",
+      "source_waf": "WAF (Coraza)",
+      "source_mcp": "MCP 网关",
+      "applyHint": "更改将在下次应用配置后生效。",
+      "sinks": "输出目标",
+      "addSink": "添加目标",
+      "editSink": "编辑目标",
+      "type": "类型",
+      "check": "检查",
+      "checkSink": "检查目标",
+      "checkOk": "检查通过",
+      "checkFailed": "检查失败",
+      "sendTestEvent": "发送测试事件（验证端到端投递）",
+      "secret": "密钥",
+      "keepSecret": "保持掩码以保留当前值",
+      "default": "默认",
+      "vectorRunning": "Vector 运行中",
+      "vectorNotRunning": "Vector 容器未运行",
+      "vectorNotFound": "未找到 Vector 容器",
+      "source": "来源"
     }
   },
   "metrics": {

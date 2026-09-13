@@ -48,6 +48,12 @@ class _NullRuntime(RuntimeBackend):
     def restart_coraza(self) -> bool:
         return False
 
+    def restart_vector(self) -> bool:
+        return False
+
+    def vector_exec(self, command: list, timeout: int = 60) -> tuple[bool, str]:
+        return False, "vector container not available (no runtime backend)"
+
     def validate_vcl(self, vcl_container_path: str) -> tuple[bool, str]:
         return False, "Varnish container not available (no runtime backend)"
 
