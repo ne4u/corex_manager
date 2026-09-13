@@ -281,7 +281,7 @@ if err == null {
     ts_raw = to_string(ts_match.ts)
     parsed_ts, pt_err = parse_timestamp(ts_raw, format: "%d/%b/%Y:%H:%M:%S%.3f")
     if pt_err == null {
-      .@timestamp = to_string(parsed_ts)
+      .@timestamp = parsed_ts
     }
   }
   # Extract backend/conn and message (after the timestamp)
@@ -343,7 +343,7 @@ if !exists(.haproxy_internal) || .haproxy_internal != true {
   if ts_raw != "" {
     parsed_ts, parse_err = parse_timestamp(ts_raw, format: "%d/%b/%Y:%H:%M:%S%.3f")
     if parse_err == null {
-      .@timestamp = to_string(parsed_ts)
+      .@timestamp = parsed_ts
     } else {
       .@timestamp = now()
     }
@@ -608,7 +608,12 @@ if ts_str == "" {
   ts_str = to_string(.timestamp) ?? ""
 }
 if ts_str != "" {
-  .@timestamp = ts_str
+  parsed_ts, pt_err = parse_timestamp(ts_str, format: "%+")
+  if pt_err == null {
+    .@timestamp = parsed_ts
+  } else {
+    .@timestamp = now()
+  }
 } else {
   .@timestamp = now()
 }
@@ -632,7 +637,12 @@ if err == null {
 # The event struct emits "ts" as an ISO-8601/RFC3339 string.
 ts_str = to_string(.ts) ?? ""
 if ts_str != "" {
-  .@timestamp = ts_str
+  parsed_ts, pt_err = parse_timestamp(ts_str, format: "%+")
+  if pt_err == null {
+    .@timestamp = parsed_ts
+  } else {
+    .@timestamp = now()
+  }
 } else {
   .@timestamp = now()
 }
