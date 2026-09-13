@@ -101,6 +101,7 @@
       "fullPath": "पूरा पाथ:",
       "queryString": "क्वेरी स्ट्रिंग:",
       "userAgent": "यूज़र एजेंट:",
+      "referer": "रेफ़रर:",
       "xForwardedFor": "X-Forwarded-For:",
       "ja4Fingerprint": "JA4 फिंगरप्रिंट:",
       "requestFingerprint": "अनुरोध फिंगरप्रिंट:",
@@ -121,7 +122,11 @@
       "wafStatus": "WAF स्थिति:",
       "wafAnomalyScore": "WAF विसंगति स्कोर:",
       "wafRulesHit": "WAF नियम हिट:",
-      "wafRuleIds": "WAF नियम ID:"
+      "wafRuleIds": "WAF नियम ID:",
+      "riskScore": "जोखिम स्कोर:",
+      "riskRulesHit": "जोखिम नियम हिट:",
+      "riskRulesHitCount": "जोखिम नियम हिट संख्या:",
+      "riskHitDensity": "जोखिम हिट घनत्व:"
     },
     "modal": {
       "name": "नाम",

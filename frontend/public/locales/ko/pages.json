@@ -101,6 +101,7 @@
       "fullPath": "전체 경로:",
       "queryString": "쿼리 문자열:",
       "userAgent": "사용자 에이전트:",
+      "referer": "리퍼러:",
       "xForwardedFor": "X-Forwarded-For:",
       "ja4Fingerprint": "JA4 핑거프린트:",
       "requestFingerprint": "요청 핑거프린트:",
@@ -121,7 +122,11 @@
       "wafStatus": "WAF 상태:",
       "wafAnomalyScore": "WAF 이상 점수:",
       "wafRulesHit": "WAF 규칙 적중:",
-      "wafRuleIds": "WAF 규칙 ID:"
+      "wafRuleIds": "WAF 규칙 ID:",
+      "riskScore": "위험 점수:",
+      "riskRulesHit": "위험 규칙 적중:",
+      "riskRulesHitCount": "위험 규칙 적중 수:",
+      "riskHitDensity": "위험 적중 밀도:"
     },
     "modal": {
       "name": "이름",

@@ -101,6 +101,7 @@
       "fullPath": "フルパス:",
       "queryString": "クエリ文字列:",
       "userAgent": "ユーザーエージェント:",
+      "referer": "リファラー:",
       "xForwardedFor": "X-Forwarded-For:",
       "ja4Fingerprint": "JA4フィンガープリント:",
       "requestFingerprint": "リクエストフィンガープリント:",
@@ -121,7 +122,11 @@
       "wafStatus": "WAFステータス:",
       "wafAnomalyScore": "WAF異常スコア:",
       "wafRulesHit": "WAFルールヒット:",
-      "wafRuleIds": "WAFルールID:"
+      "wafRuleIds": "WAFルールID:",
+      "riskScore": "リスクスコア:",
+      "riskRulesHit": "リスクルールヒット:",
+      "riskRulesHitCount": "リスクルールヒット数:",
+      "riskHitDensity": "リスクヒット密度:"
     },
     "modal": {
       "name": "名前",

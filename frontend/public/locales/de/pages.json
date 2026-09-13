@@ -101,6 +101,7 @@
       "fullPath": "Vollständiger Pfad:",
       "queryString": "Query-String:",
       "userAgent": "User-Agent:",
+      "referer": "Referer:",
       "xForwardedFor": "X-Forwarded-For:",
       "ja4Fingerprint": "JA4-Fingerabdruck:",
       "requestFingerprint": "Anfrage-Fingerabdruck:",
@@ -121,7 +122,11 @@
       "wafStatus": "WAF-Status:",
       "wafAnomalyScore": "WAF-Anomalie-Score:",
       "wafRulesHit": "WAF-Regel-Treffer:",
-      "wafRuleIds": "WAF-Regel-IDs:"
+      "wafRuleIds": "WAF-Regel-IDs:",
+      "riskScore": "Risiko-Score:",
+      "riskRulesHit": "Risk-Regeln getroffen:",
+      "riskRulesHitCount": "Anzahl getroffener Risk-Regeln:",
+      "riskHitDensity": "Risk-Treffer-Dichte:"
     },
     "modal": {
       "name": "Name",

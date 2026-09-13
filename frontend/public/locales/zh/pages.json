@@ -101,6 +101,7 @@
       "fullPath": "完整路径：",
       "queryString": "查询字符串：",
       "userAgent": "用户代理：",
+      "referer": "引用来源：",
       "xForwardedFor": "X-Forwarded-For：",
       "ja4Fingerprint": "JA4 指纹：",
       "requestFingerprint": "请求指纹：",
@@ -121,7 +122,11 @@
       "wafStatus": "WAF 状态:",
       "wafAnomalyScore": "WAF 异常评分:",
       "wafRulesHit": "WAF 规则命中:",
-      "wafRuleIds": "WAF 规则 ID:"
+      "wafRuleIds": "WAF 规则 ID:",
+      "riskScore": "风险评分：",
+      "riskRulesHit": "风险规则命中：",
+      "riskRulesHitCount": "风险规则命中数：",
+      "riskHitDensity": "风险命中密度："
     },
     "modal": {
       "name": "名称",

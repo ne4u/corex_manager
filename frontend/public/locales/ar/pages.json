@@ -101,6 +101,7 @@
       "fullPath": "المسار الكامل:",
       "queryString": "سلسلة الاستعلام:",
       "userAgent": "وكيل المستخدم:",
+      "referer": "المرجع:",
       "xForwardedFor": "X-Forwarded-For:",
       "ja4Fingerprint": "بصمة JA4:",
       "requestFingerprint": "بصمة الطلب:",
@@ -121,7 +122,11 @@
       "wafStatus": "حالة WAF:",
       "wafAnomalyScore": "درجة شذوذ WAF:",
       "wafRulesHit": "قواعد WAF المطابقة:",
-      "wafRuleIds": "معرفات قواعد WAF:"
+      "wafRuleIds": "معرفات قواعد WAF:",
+      "riskScore": "درجة المخاطر:",
+      "riskRulesHit": "قواعد المخاطر المصابة:",
+      "riskRulesHitCount": "عدد قواعد المخاطر المصابة:",
+      "riskHitDensity": "كثافة الإصابة بالمخاطر:"
     },
     "modal": {
       "name": "الاسم",

@@ -101,6 +101,7 @@
       "fullPath": "Полный путь:",
       "queryString": "Строка запроса:",
       "userAgent": "Пользовательский агент:",
+      "referer": "Реферер:",
       "xForwardedFor": "X-Forwarded-For:",
       "ja4Fingerprint": "Отпечаток JA4:",
       "requestFingerprint": "Отпечаток запроса:",
@@ -121,7 +122,11 @@
       "wafStatus": "Статус WAF:",
       "wafAnomalyScore": "Оценка аномалии WAF:",
       "wafRulesHit": "Срабатывания правил WAF:",
-      "wafRuleIds": "ID правил WAF:"
+      "wafRuleIds": "ID правил WAF:",
+      "riskScore": "Оценка риска:",
+      "riskRulesHit": "Сработавшие правила риска:",
+      "riskRulesHitCount": "Количество сработавших правил риска:",
+      "riskHitDensity": "Плотность срабатываний риска:"
     },
     "modal": {
       "name": "Имя",
