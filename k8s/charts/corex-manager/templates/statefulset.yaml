@@ -281,8 +281,9 @@ spec:
               containerPort: 8082
               protocol: TCP
           volumeMounts:
-            - name: haproxy-data
-              mountPath: /app/data
+            - name: certs
+              mountPath: /app/certs
+              readOnly: true
           resources:
             {{- toYaml .Values.mcpServer.resources | nindent 12 }}
         {{- end }}

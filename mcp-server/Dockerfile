@@ -1,24 +1,15 @@
-FROM python:3.14-slim
-
-WORKDIR /app
-
-# The MCP server imports the backend app package for in-process tool
-# execution, so it needs the backend's full dependency set in addition to its
-# own slim requirements.
-COPY requirements.txt /tmp/requirements-backend.txt
-COPY mcp-server/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt -r /tmp/requirements-backend.txt
-
-# The backend app package is mounted at runtime (shares the same code as the
-# api container) so the MCP server can import it for in-process tool execution.
-COPY mcp-server /app/mcp-server
-COPY backend/app /app/app
-COPY shared /app/shared
+FROM python:3.14-alpine
 
 WORKDIR /app/mcp-server
 
-# /app must be importable for `from app...` (backend package) and `shared`.
-ENV PYTHONPATH=/app
+# The MCP server is a thin proxy: tools are discovered from the backend's
+# OpenAPI spec and forwarded to the api service over internal HTTPS, so only
+# its own slim requirements are needed (no backend dependency tree).
+COPY mcp-server/requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt \
+    && pip uninstall -y pip setuptools
+
+COPY mcp-server /app/mcp-server
 
 EXPOSE 8082
 

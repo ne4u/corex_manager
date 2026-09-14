@@ -1,23 +1,32 @@
-"""Tool discovery and execution — auto-generates MCP tools from the backend v1 router.
+"""Tool discovery and execution — proxies MCP tools to the backend API over HTTP.
 
-Introspects the backend FastAPI app's routes and builds one MCP tool per
-APIRoute+method. Tools are executed in-process via an httpx ASGI transport
-with a service admin JWT, so all route logic, validation, and audit
-middleware run exactly as they would for a normal HTTP request.
+Tools are generated from the backend's OpenAPI spec (GET {backend}/openapi.json)
+and executed by forwarding requests to the api service over its internal HTTPS
+endpoint with a service admin JWT. All route logic, validation, and middleware
+run in the api container exactly as they would for a normal HTTP request.
 """
 import json
 import logging
 import os
+import re
 import time
-import typing
 from typing import Any, Optional
 
-from fastapi.datastructures import UploadFile
-
 import httpx
-from fastapi.routing import APIRoute
+import jwt
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Backend connection
+# ---------------------------------------------------------------------------
+
+# The api service serves HTTPS internally with a self-signed cert
+# (SANs: api, localhost, 127.0.0.1 — see backend/entrypoint.sh). The cert is
+# written to the shared certs volume, so it doubles as its own CA bundle.
+_BACKEND_URL = os.environ.get("MCP_BACKEND_URL", "https://api:8000").rstrip("/")
+_BACKEND_CA = os.environ.get("MCP_BACKEND_CA", "/app/certs/internal/api.crt")
+_SECRET_KEY = os.environ.get("SECRET_KEY", "")
 
 # ---------------------------------------------------------------------------
 # Service JWT management
@@ -29,16 +38,19 @@ _JWT_TTL = 20 * 3600  # 20 hours — refresh before the 24h expiry
 
 
 def _get_service_jwt() -> str:
-    """Mint (or return cached) a service admin JWT for in-process calls."""
+    """Mint (or return cached) a service admin JWT.
+
+    Matches backend core.security.create_access_token: HS256 signed with
+    SECRET_KEY, {"sub": "admin", "exp": ...}.
+    """
     global _service_jwt, _service_jwt_at
     now = time.time()
     if _service_jwt and (now - _service_jwt_at) < _JWT_TTL:
         return _service_jwt
-    from app.core.security import create_access_token
-    from datetime import timedelta
-    _service_jwt = create_access_token(
-        {"sub": "admin"},
-        expires_delta=timedelta(hours=24),
+    _service_jwt = jwt.encode(
+        {"sub": "admin", "exp": int(now) + 24 * 3600},
+        _SECRET_KEY,
+        algorithm="HS256",
     )
     _service_jwt_at = now
     return _service_jwt
@@ -50,26 +62,50 @@ def _get_service_token() -> Optional[str]:
 
 
 # ---------------------------------------------------------------------------
-# Route introspection
+# HTTP client (to the api service)
 # ---------------------------------------------------------------------------
 
-def _walk_routes(routes, prefix=""):
-    """Recursively walk app routes, yielding (full_path, APIRoute) pairs.
+_client: Optional[httpx.AsyncClient] = None
 
-    Handles FastAPI 0.141+ _IncludedRouter wrappers which nest sub-routers.
+
+def _tls_verify():
+    """Resolve TLS verification for the backend client.
+
+    Uses the internal self-signed cert as CA when present; explicit
+    off/false/none disables verification. A missing CA file falls back to
+    disabled with a warning (dev setups where MCP_BACKEND_URL is plain http
+    or the api cert isn't shared).
     """
-    out = []
-    for x in routes:
-        t = type(x).__name__
-        if isinstance(x, APIRoute):
-            out.append((prefix + x.path, x))
-        elif t == "_IncludedRouter":
-            p = getattr(x.include_context, "prefix", "") or ""
-            out += _walk_routes(x.original_router.routes, prefix + p)
-        elif hasattr(x, "routes"):
-            out += _walk_routes(x.routes, prefix)
-    return out
+    ca = _BACKEND_CA.strip()
+    if ca.lower() in ("", "off", "false", "none", "disabled"):
+        return False
+    if os.path.isfile(ca):
+        return ca
+    logger.warning("MCP_BACKEND_CA %s not found — TLS verification disabled", ca)
+    return False
 
+
+def _get_client() -> httpx.AsyncClient:
+    global _client
+    if _client is None:
+        _client = httpx.AsyncClient(
+            base_url=_BACKEND_URL,
+            verify=_tls_verify(),
+            timeout=60.0,
+        )
+    return _client
+
+
+async def _fetch_openapi() -> dict:
+    """Fetch the backend's OpenAPI spec (public endpoint)."""
+    resp = await _get_client().get("/openapi.json")
+    resp.raise_for_status()
+    return resp.json()
+
+
+# ---------------------------------------------------------------------------
+# OpenAPI → MCP tool transform
+# ---------------------------------------------------------------------------
 
 # Paths to exclude from tool generation
 _EXCLUDE_PATHS = {
@@ -78,6 +114,8 @@ _EXCLUDE_PATHS = {
     "/redoc",
     "/healthz",
 }
+
+_HTTP_METHODS = ("GET", "POST", "PUT", "DELETE", "PATCH")
 
 
 def _clean_tool_name(endpoint_name: str) -> str:
@@ -90,89 +128,122 @@ def _clean_tool_name(endpoint_name: str) -> str:
     return name
 
 
-def _build_body_schema(annotation) -> dict | None:
-    """Build a JSON Schema for a body parameter annotation.
+def _tool_name(operation_id: str, path: str, method: str) -> str:
+    """Recover the endpoint function name from a FastAPI operationId.
 
-    Handles Pydantic models, lists of models, primitives, and dicts.
-    Returns None if the body can't be represented as JSON (e.g. UploadFile).
+    FastAPI builds operationId as re.sub(r"\\W", "_", f"{name}{path}") plus
+    "_{method}", so stripping the path+method suffix recovers the name.
+    Falls back to the full operationId if the pattern doesn't match.
     """
-    # Pydantic model
-    if hasattr(annotation, "model_json_schema"):
-        try:
-            schema = annotation.model_json_schema()
-            # Sanitize: model_json_schema() can contain non-JSON-serializable
-            # objects (e.g. ModelField instances in $defs for some models).
-            # Round-trip through JSON with default=str to coerce any stragglers.
-            schema = json.loads(json.dumps(schema, default=str))
-            schema["description"] = f"Request body ({annotation.__name__})"
-            return schema
-        except Exception as e:
-            logger.warning("Failed to get schema for %s: %s", annotation, e)
-            return {"type": "object", "description": f"Request body ({annotation.__name__})"}
-
-    origin = typing.get_origin(annotation)
-    args = typing.get_args(annotation)
-
-    # List of Pydantic models
-    if origin is list and args and hasattr(args[0], "model_json_schema"):
-        try:
-            item_schema = args[0].model_json_schema()
-            item_schema = json.loads(json.dumps(item_schema, default=str))
-            return {
-                "type": "array",
-                "items": item_schema,
-                "description": f"Request body (list of {args[0].__name__})",
-            }
-        except Exception:
-            return {"type": "array", "description": "Request body (list)"}
-
-    # Optional[X] — unwrap to inner type
-    if origin is typing.Union:
-        non_none = [a for a in args if a is not type(None)]
-        if len(non_none) == 1:
-            return _build_body_schema(non_none[0])
-
-    # Primitives
-    if annotation is str:
-        return {"type": "string", "description": "Request body (string)"}
-    if annotation is int:
-        return {"type": "integer", "description": "Request body (integer)"}
-    if annotation is float:
-        return {"type": "number", "description": "Request body (number)"}
-    if annotation is bool:
-        return {"type": "boolean", "description": "Request body (boolean)"}
-    if annotation is dict:
-        return {"type": "object", "description": "Request body (object)"}
-
-    # Fallback
-    return {"type": "object", "description": f"Request body ({annotation})"}
+    if operation_id:
+        suffix = re.sub(r"\W", "_", path) + "_" + method.lower()
+        if operation_id.endswith(suffix):
+            name = operation_id[: -len(suffix)]
+            if name:
+                return name
+        return operation_id
+    # No operationId — derive from method + path
+    return re.sub(r"_+", "_", re.sub(r"\W", "_", f"{method.lower()}_{path}")).strip("_")
 
 
-def discover_tools() -> list[dict]:
-    """Introspect the backend app and return a list of MCP tool definitions.
+def _rewrite_component_refs(node: Any) -> Any:
+    """Copy the schema, rewriting #/components/schemas/X refs to #/$defs/X."""
+    if isinstance(node, dict):
+        out = {}
+        for k, v in node.items():
+            if k == "$ref" and isinstance(v, str) and v.startswith("#/components/schemas/"):
+                out[k] = "#/$defs/" + v.rsplit("/", 1)[-1]
+            else:
+                out[k] = _rewrite_component_refs(v)
+        return out
+    if isinstance(node, list):
+        return [_rewrite_component_refs(v) for v in node]
+    return node
+
+
+def _collect_component_refs(node: Any, out: set) -> None:
+    if isinstance(node, dict):
+        ref = node.get("$ref")
+        if isinstance(ref, str) and ref.startswith("#/components/schemas/"):
+            out.add(ref.rsplit("/", 1)[-1])
+        for v in node.values():
+            _collect_component_refs(v, out)
+    elif isinstance(node, list):
+        for v in node:
+            _collect_component_refs(v, out)
+
+
+def _standalone_schema(schema: dict, components: dict) -> dict:
+    """Return a self-contained copy of an OpenAPI schema.
+
+    Referenced #/components/schemas entries (transitively) are attached under
+    $defs so the result is usable as a JSON Schema without the full spec —
+    matching the shape of Pydantic's model_json_schema output.
+    """
+    needed: set = set()
+    _collect_component_refs(schema, needed)
+    resolved: set = set()
+    queue = list(needed)
+    while queue:
+        name = queue.pop()
+        if name in resolved:
+            continue
+        resolved.add(name)
+        comp = components.get(name)
+        if isinstance(comp, dict):
+            nested: set = set()
+            _collect_component_refs(comp, nested)
+            queue.extend(nested - resolved)
+
+    out = _rewrite_component_refs(schema)
+    if resolved:
+        defs = {n: _rewrite_component_refs(components[n]) for n in resolved if n in components}
+        if defs:
+            out["$defs"] = defs
+    return out
+
+
+def _has_file_field(schema: dict, components: dict, _depth: int = 0) -> bool:
+    """True if a form schema (or its $ref'd components) contains a binary field."""
+    if _depth > 10 or not isinstance(schema, dict):
+        return False
+    ref = schema.get("$ref")
+    if isinstance(ref, str) and ref.startswith("#/components/schemas/"):
+        comp = components.get(ref.rsplit("/", 1)[-1])
+        return _has_file_field(comp, components, _depth + 1) if isinstance(comp, dict) else False
+    if schema.get("format") == "binary" or schema.get("contentMediaType"):
+        return True
+    for v in schema.values():
+        if _has_file_field(v, components, _depth + 1):
+            return True
+    return False
+
+
+async def discover_tools(spec: Optional[dict] = None) -> list[dict]:
+    """Build MCP tool definitions from the backend OpenAPI spec.
 
     Each tool dict has: name, description, inputSchema, and private fields
-    (_method, _path, _has_body) used by call_tool.
+    (_method, _path, _body_kind, _path_params, _query_params) used by call_tool.
+    Pass `spec` to inject a spec document (tests); otherwise it is fetched
+    from the backend.
     """
-    from app.main import app
+    if spec is None:
+        spec = await _fetch_openapi()
 
-    all_routes = _walk_routes(app.routes)
+    components = spec.get("components", {}).get("schemas", {})
     tools: list[dict] = []
     seen_names: dict[str, int] = {}
 
-    for full_path, route in all_routes:
-        # Skip excluded paths
-        if full_path in _EXCLUDE_PATHS:
-            continue
-        # Skip non-API routes (static mounts have no methods)
-        if not route.methods:
+    for path, path_item in (spec.get("paths") or {}).items():
+        if path in _EXCLUDE_PATHS or not isinstance(path_item, dict):
             continue
 
-        for method in sorted(route.methods):
-            if method in ("HEAD", "OPTIONS"):
+        for method, operation in path_item.items():
+            method = method.upper()
+            if method not in _HTTP_METHODS or not isinstance(operation, dict):
                 continue
 
-            name = _clean_tool_name(route.endpoint.__name__)
+            name = _clean_tool_name(_tool_name(operation.get("operationId", ""), path, method))
             # Dedup: if the same name appears for different routes, suffix with method
             if name in seen_names:
                 seen_names[name] += 1
@@ -180,86 +251,84 @@ def discover_tools() -> list[dict]:
             else:
                 seen_names[name] = 1
 
-            d = route.dependant
-            description = (
-                route.summary
-                or route.description
-                or f"{method} {full_path}"
-            )
-            if route.description and route.summary:
-                description = f"{route.summary}: {route.description[:200]}"
+            summary = operation.get("summary") or ""
+            op_desc = operation.get("description") or ""
+            if summary and op_desc:
+                description = f"{summary}: {op_desc[:200]}"
+            else:
+                description = summary or op_desc or f"{method} {path}"
 
-            # Build input schema
+            # Parameters (path + query)
             properties: dict[str, Any] = {}
             required: list[str] = []
+            path_params: list[str] = []
+            query_params: list[str] = []
 
-            # Path params
-            for p in d.path_params:
-                prop = {"type": "string", "description": f"Path parameter: {p.name}"}
-                properties[p.name] = prop
-                required.append(p.name)
-
-            # Query params
-            for q in d.query_params:
-                prop: dict[str, Any] = {"description": f"Query parameter: {q.name}"}
-                # Infer type from default. Pydantic uses a sentinel (PydanticUndefined)
-                # for "no default" — treat it like None.
-                default = q.default
-                _is_undefined = default is None or callable(default) or \
-                    type(default).__name__ == "PydanticUndefinedType"
-                if not _is_undefined:
-                    if isinstance(default, bool):
-                        prop["type"] = "boolean"
-                    elif isinstance(default, int):
-                        prop["type"] = "integer"
-                    elif isinstance(default, float):
-                        prop["type"] = "number"
-                    else:
-                        prop["type"] = "string"
-                    prop["default"] = default
-                else:
+            for p in operation.get("parameters", []) or []:
+                if not isinstance(p, dict):
+                    continue
+                loc = p.get("in")
+                pname = p.get("name")
+                if not pname or loc not in ("path", "query"):
+                    continue
+                pschema = p.get("schema") or {}
+                prop: dict[str, Any] = {
+                    "description": p.get("description") or f"{'Path' if loc == 'path' else 'Query'} parameter: {pname}"
+                }
+                for key in ("type", "default", "enum", "format", "items"):
+                    if key in pschema:
+                        prop[key] = pschema[key]
+                if "type" not in prop:
                     prop["type"] = "string"
-                if q.field_info.is_required():
-                    required.append(q.name)
-                properties[q.name] = prop
-
-            # Body param (first body model)
-            has_body = bool(d.body_params)
-            if has_body:
-                bp = d.body_params[0]
-                model_cls = bp.field_info.annotation
-
-                # Skip file-upload tools (can't be sent as JSON)
-                if model_cls is UploadFile or (
-                    typing.get_origin(model_cls) is list
-                    and UploadFile in (typing.get_args(model_cls) or ())
-                ):
-                    continue  # Skip this method — can't represent file upload as JSON
-
-                body_schema = _build_body_schema(model_cls)
-                if body_schema is not None:
-                    properties["body"] = body_schema
-                    if bp.field_info.is_required():
-                        required.append("body")
-                    has_body = True
+                properties[pname] = prop
+                if loc == "path":
+                    path_params.append(pname)
+                    required.append(pname)
                 else:
-                    has_body = False
+                    query_params.append(pname)
+                    if p.get("required"):
+                        required.append(pname)
 
-            input_schema = {
-                "type": "object",
-                "properties": properties,
-                "required": required,
-            }
+            # Request body
+            body_kind: Optional[str] = None
+            request_body = operation.get("requestBody") or {}
+            content = request_body.get("content") or {}
+            if "application/json" in content:
+                body_schema = _standalone_schema(content["application/json"].get("schema") or {}, components)
+                body_schema.setdefault("description", "Request body")
+                properties["body"] = body_schema
+                body_kind = "json"
+            else:
+                form_ct = next(
+                    (ct for ct in ("application/x-www-form-urlencoded", "multipart/form-data") if ct in content),
+                    None,
+                )
+                if form_ct:
+                    form_schema = content[form_ct].get("schema") or {}
+                    if _has_file_field(form_schema, components):
+                        continue  # File uploads can't be represented as JSON tool args
+                    body_schema = _standalone_schema(form_schema, components)
+                    body_schema.setdefault("type", "object")
+                    body_schema.setdefault("description", "Form fields")
+                    properties["body"] = body_schema
+                    body_kind = "form"
+
+            if body_kind and request_body.get("required", False):
+                required.append("body")
 
             tools.append({
                 "name": name,
                 "description": description,
-                "inputSchema": input_schema,
+                "inputSchema": {
+                    "type": "object",
+                    "properties": properties,
+                    "required": required,
+                },
                 "_method": method,
-                "_path": full_path,
-                "_has_body": has_body,
-                "_path_params": [p.name for p in d.path_params],
-                "_query_params": [q.name for q in d.query_params],
+                "_path": path,
+                "_body_kind": body_kind,
+                "_path_params": path_params,
+                "_query_params": query_params,
             })
 
     return tools
@@ -269,24 +338,8 @@ def discover_tools() -> list[dict]:
 # Tool execution
 # ---------------------------------------------------------------------------
 
-# Lazily-created ASGI client (in-process)
-_asgi_client: Optional[httpx.AsyncClient] = None
-
-
-def _get_client() -> httpx.AsyncClient:
-    global _asgi_client
-    if _asgi_client is None:
-        from app.main import app
-        _asgi_client = httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app),
-            base_url="http://in-process",
-            timeout=60.0,
-        )
-    return _asgi_client
-
-
 async def call_tool(tool: dict, args: dict) -> tuple[str, bool]:
-    """Execute a tool against the backend in-process.
+    """Execute a tool by forwarding the request to the backend API.
 
     Returns (text, is_error). text is the response body as a JSON string
     (or plain text). is_error is True when the backend returned >= 400.
@@ -296,7 +349,7 @@ async def call_tool(tool: dict, args: dict) -> tuple[str, bool]:
     path = tool["_path"]
     path_params = tool.get("_path_params", [])
     query_params = tool.get("_query_params", [])
-    has_body = tool.get("_has_body", False)
+    body_kind = tool.get("_body_kind")
 
     # Substitute path params
     url_path = path
@@ -314,8 +367,12 @@ async def call_tool(tool: dict, args: dict) -> tuple[str, bool]:
 
     # Body
     json_body = None
-    if has_body and "body" in args:
-        json_body = args["body"]
+    form_body = None
+    if body_kind and "body" in args:
+        if body_kind == "form":
+            form_body = args["body"]
+        else:
+            json_body = args["body"]
 
     # Headers
     headers = {
@@ -331,6 +388,7 @@ async def call_tool(tool: dict, args: dict) -> tuple[str, bool]:
             url_path,
             params=params or None,
             json=json_body,
+            data=form_body,
             headers=headers,
         )
     except Exception as e:
@@ -356,7 +414,7 @@ async def call_tool(tool: dict, args: dict) -> tuple[str, bool]:
 
 
 async def close_client() -> None:
-    global _asgi_client
-    if _asgi_client is not None:
-        await _asgi_client.aclose()
-        _asgi_client = None
+    global _client
+    if _client is not None:
+        await _client.aclose()
+        _client = None

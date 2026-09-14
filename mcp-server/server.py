@@ -42,7 +42,7 @@ async def lifespan(app: FastAPI):
     logger.info("coreX Manager MCP Server starting")
     # Pre-warm tool discovery so the first tools/list is fast
     try:
-        _tools_cache = tools.discover_tools()
+        _tools_cache = await tools.discover_tools()
         logger.info("Discovered %d tools", len(_tools_cache))
     except Exception as e:
         logger.warning("Tool discovery at startup failed (will retry on first call): %s", e)
@@ -115,15 +115,15 @@ INTERNAL_ERROR = -32603
 _tools_cache: list[dict] | None = None
 
 
-def _get_tools() -> list[dict]:
+async def _get_tools() -> list[dict]:
     global _tools_cache
     if _tools_cache is None:
-        _tools_cache = tools.discover_tools()
+        _tools_cache = await tools.discover_tools()
     return _tools_cache
 
 
-def _find_tool(name: str) -> dict | None:
-    return next((t for t in _get_tools() if t["name"] == name), None)
+async def _find_tool(name: str) -> dict | None:
+    return next((t for t in await _get_tools() if t["name"] == name), None)
 
 
 # ---------------------------------------------------------------------------
@@ -149,9 +149,9 @@ def _handle_initialize(params: dict, msg_id: Any) -> dict:
     return resp
 
 
-def _handle_tools_list(params: dict, msg_id: Any) -> dict:
+async def _handle_tools_list(params: dict, msg_id: Any) -> dict:
     tool_list = []
-    for t in _get_tools():
+    for t in await _get_tools():
         tool_list.append({
             "name": t["name"],
             "description": t["description"],
@@ -163,7 +163,7 @@ def _handle_tools_list(params: dict, msg_id: Any) -> dict:
 async def _handle_tools_call(params: dict, msg_id: Any) -> dict:
     name = params.get("name", "")
     args = params.get("arguments", {}) or {}
-    tool = _find_tool(name)
+    tool = await _find_tool(name)
     if not tool:
         return _error_response(msg_id, METHOD_NOT_FOUND, f"Unknown tool: {name}")
     try:
@@ -233,7 +233,7 @@ async def _handle_message(msg: dict) -> dict | None:
     if method == "ping":
         return _result_response(msg_id, {})
     if method == "tools/list":
-        return _handle_tools_list(params, msg_id)
+        return await _handle_tools_list(params, msg_id)
     if method == "tools/call":
         return await _handle_tools_call(params, msg_id)
     if method == "resources/list":

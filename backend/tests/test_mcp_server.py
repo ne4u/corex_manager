@@ -1,7 +1,8 @@
 """Tests for the coreX Manager MCP server (mcp-server/ package).
 
 Exercises:
-- Tool discovery (introspection of the backend v1 router).
+- Tool discovery (OpenAPI spec → MCP tool transform).
+- Tool execution forwarded over HTTP (tested via an ASGI-transport client).
 - Resource listing and reading.
 - Prompt listing and fetching.
 - The JSON-RPC dispatch over the FastAPI app (initialize, tools/list, tools/call).
@@ -23,19 +24,28 @@ if str(_MCP_SERVER_DIR) not in sys.path:
 
 
 # ---------------------------------------------------------------------------
-# Tool discovery
+# Tool discovery (OpenAPI spec → MCP tools)
 # ---------------------------------------------------------------------------
 
-def test_discover_tools_returns_non_empty_list():
+@pytest.fixture
+def openapi_spec():
+    """The backend app's real OpenAPI spec, injected into discover_tools."""
+    from app.main import app as backend_app
+    return backend_app.openapi()
+
+
+@pytest.mark.asyncio
+async def test_discover_tools_returns_non_empty_list(openapi_spec):
     import tools as mcp_tools  # noqa: F401  (the mcp-server module)
-    discovered = mcp_tools.discover_tools()
+    discovered = await mcp_tools.discover_tools(spec=openapi_spec)
     assert isinstance(discovered, list)
     assert len(discovered) > 0, "expected backend v1 routes to produce MCP tools"
 
 
-def test_discover_tools_have_required_fields():
+@pytest.mark.asyncio
+async def test_discover_tools_have_required_fields(openapi_spec):
     import tools as mcp_tools
-    for t in mcp_tools.discover_tools():
+    for t in await mcp_tools.discover_tools(spec=openapi_spec):
         assert "name" in t and isinstance(t["name"], str) and t["name"]
         assert "description" in t
         assert "inputSchema" in t and isinstance(t["inputSchema"], dict)
@@ -43,19 +53,124 @@ def test_discover_tools_have_required_fields():
         assert t["inputSchema"].get("type") == "object"
 
 
-def test_discover_tool_names_unique():
+@pytest.mark.asyncio
+async def test_discover_tool_names_unique(openapi_spec):
     import tools as mcp_tools
-    names = [t["name"] for t in mcp_tools.discover_tools()]
+    names = [t["name"] for t in await mcp_tools.discover_tools(spec=openapi_spec)]
     assert len(names) == len(set(names)), f"duplicate tool names: {names}"
 
 
-def test_discover_tools_include_core_endpoints():
+@pytest.mark.asyncio
+async def test_discover_tools_include_core_endpoints(openapi_spec):
     """A few well-known backend endpoints should be present as tools."""
     import tools as mcp_tools
-    names = {t["name"] for t in mcp_tools.discover_tools()}
+    names = {t["name"] for t in await mcp_tools.discover_tools(spec=openapi_spec)}
     # At least one tool should mention backends or listeners
     assert any("backend" in n for n in names), names
     assert any("listener" in n for n in names), names
+
+
+@pytest.mark.asyncio
+async def test_tool_names_match_operation_function_names(openapi_spec):
+    """operationId suffix stripping should recover clean function names."""
+    import tools as mcp_tools
+    discovered = await mcp_tools.discover_tools(spec=openapi_spec)
+    names = {t["name"] for t in discovered}
+    # These are endpoint function names; if suffix stripping regressed the
+    # names would look like list_backends_api_v1_backends_get.
+    assert "list_backends" in names
+    assert "list_listener_endpoints" in names
+    assert not any("_api_v1_" in n for n in names), \
+        [n for n in names if "_api_v1_" in n]
+
+
+@pytest.mark.asyncio
+async def test_tool_name_derivation_unit():
+    import tools as mcp_tools
+    assert mcp_tools._tool_name(
+        "list_backends_api_v1_backends_get", "/api/v1/backends", "GET"
+    ) == "list_backends"
+    # Fallback: non-matching operationId passes through
+    assert mcp_tools._tool_name("customOp", "/api/v1/x", "GET") == "customOp"
+    # Missing operationId derives from method+path
+    assert mcp_tools._tool_name("", "/api/v1/backends", "GET") == "get_api_v1_backends"
+
+
+@pytest.mark.asyncio
+async def test_path_and_query_params_mapped(openapi_spec):
+    import tools as mcp_tools
+    discovered = await mcp_tools.discover_tools(spec=openapi_spec)
+    by_key = {(t["_method"], t["_path"]): t for t in discovered}
+    tool = by_key.get(("GET", "/api/v1/backends/{bid}"))
+    assert tool is not None, "expected GET /api/v1/backends/{bid} tool"
+    props = tool["inputSchema"]["properties"]
+    assert "bid" in props and props["bid"]["type"] == "integer"
+    assert "bid" in tool["inputSchema"]["required"]
+    assert "bid" in tool["_path_params"]
+
+
+@pytest.mark.asyncio
+async def test_json_body_schema_inlines_defs(openapi_spec):
+    """Body schemas must be self-contained ($defs inlined, refs rewritten)."""
+    import tools as mcp_tools
+    discovered = await mcp_tools.discover_tools(spec=openapi_spec)
+    body_tools = [t for t in discovered if t["_body_kind"] == "json"]
+    assert body_tools, "expected at least one JSON-body tool"
+    import json as _json
+    for t in body_tools:
+        blob = _json.dumps(t["inputSchema"]["properties"]["body"])
+        assert "#/components/schemas/" not in blob, \
+            f"{t['name']}: unresolved component ref leaked into tool schema"
+
+
+@pytest.mark.asyncio
+async def test_form_body_tool_exists(openapi_spec):
+    """Form-encoded endpoints (e.g. /auth/token) are exposed with form bodies."""
+    import tools as mcp_tools
+    discovered = await mcp_tools.discover_tools(spec=openapi_spec)
+    by_key = {(t["_method"], t["_path"]): t for t in discovered}
+    token_tool = by_key.get(("POST", "/api/v1/auth/token"))
+    assert token_tool is not None, "expected POST /api/v1/auth/token tool"
+    assert token_tool["_body_kind"] == "form"
+
+
+@pytest.mark.asyncio
+async def test_file_upload_tools_skipped(openapi_spec):
+    """Operations whose only body is a file upload are not exposed as tools."""
+    import tools as mcp_tools
+    discovered = await mcp_tools.discover_tools(spec=openapi_spec)
+    for t in discovered:
+        props = t["inputSchema"]["properties"]
+        if "body" in props and t["_body_kind"] == "form":
+            import json as _json
+            assert '"binary"' not in _json.dumps(props["body"]), t["name"]
+
+
+@pytest.mark.asyncio
+async def test_call_tool_via_asgi_transport(db, monkeypatch, openapi_spec):
+    """call_tool forwards to the backend; test with an in-process ASGI client."""
+    import httpx
+    import tools as mcp_tools
+    from app.main import app as backend_app
+    from app.models.models import User
+
+    db.add(User(username="admin", hashed_password="x", role="admin", is_admin=True))
+    db.commit()
+
+    asgi_client = httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=backend_app), base_url="http://test"
+    )
+    monkeypatch.setattr(mcp_tools, "_client", asgi_client)
+
+    discovered = await mcp_tools.discover_tools(spec=openapi_spec)
+    tool = next(
+        t for t in discovered
+        if t["_method"] == "GET" and t["_path"] == "/api/v1/backends"
+    )
+    text, is_error = await mcp_tools.call_tool(tool, {})
+    assert not is_error, text
+    import json as _json
+    assert isinstance(_json.loads(text), list)
 
 
 # ---------------------------------------------------------------------------
@@ -120,9 +235,16 @@ def json_blob(messages):
 # ---------------------------------------------------------------------------
 
 @pytest.fixture
-def mcp_app_client(monkeypatch):
+def mcp_app_client(monkeypatch, openapi_spec):
     """Spin up the mcp-server FastAPI app with auth disabled and a fresh tool cache."""
     monkeypatch.delenv("COREX_MCP_TOKEN", raising=False)
+    # Stub the OpenAPI fetch — the spec comes from the backend app in-process.
+    import tools as mcp_tools
+
+    async def _fake_fetch():
+        return openapi_spec
+
+    monkeypatch.setattr(mcp_tools, "_fetch_openapi", _fake_fetch)
     # Reset the tools cache so a stale cache from another test doesn't leak.
     import server as mcp_server
     mcp_server._tools_cache = None
@@ -195,8 +317,14 @@ def test_healthz(mcp_app_client):
 # Auth gating
 # ---------------------------------------------------------------------------
 
-def test_auth_required_when_token_set(monkeypatch):
+def test_auth_required_when_token_set(monkeypatch, openapi_spec):
     monkeypatch.setenv("COREX_MCP_TOKEN", "secret-token-123")
+    import tools as mcp_tools
+
+    async def _fake_fetch():
+        return openapi_spec
+
+    monkeypatch.setattr(mcp_tools, "_fetch_openapi", _fake_fetch)
     import server as mcp_server
     importlib.reload(mcp_server)
     mcp_server._tools_cache = None

@@ -288,6 +288,10 @@ services:
     networks:
       - corex-net
 
+  # Thin MCP proxy — forwards tool calls to the api service over internal
+  # HTTPS. Needs SECRET_KEY (service JWT), the internal CA cert (shared certs
+  # volume, read-only), and MCP_SERVICE_TOKEN for rate-limit bypass. No direct
+  # Postgres/Valkey access — it no longer imports the backend app.
   mcp-server:
     container_name: mcp-server
     build:
@@ -298,27 +302,19 @@ services:
     env_file:
       - .env
     volumes:
-      - ${DATA_DIR:-./data}/haproxy:/app/data
-      - ./backend/app:/app/app
+      - ${DATA_DIR:-./data}/certs:/app/certs:ro
     environment:
-      - DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER:-haproxy}:${POSTGRES_PASSWORD:-haproxy}@postgres:5432/${POSTGRES_DB:-haproxy_manager}
       - SECRET_KEY=${SECRET_KEY}
-      - VALKEY_HOST=valkey
-      - VALKEY_PORT=6379
-      - VALKEY_PASSWORD=${VALKEY_PASSWORD:-}
+      - MCP_BACKEND_URL=${MCP_BACKEND_URL:-https://api:8000}
+      - MCP_BACKEND_CA=${MCP_BACKEND_CA:-/app/certs/internal/api.crt}
       - COREX_MCP_TOKEN=${COREX_MCP_TOKEN:-}
       - MCP_SERVICE_TOKEN=${MCP_SERVICE_TOKEN:-}
-      - MCP_GATEWAY_ENABLED=${MCP_GATEWAY_ENABLED:-false}
     depends_on:
-      postgres:
-        condition: service_healthy
-      valkey:
-        condition: service_healthy
       api:
         condition: service_started
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen(\\\"http://localhost:8082/healthz\\\")\""]
-      interval: 5s
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8082/healthz"]
+      interval: 30s
       timeout: 3s
       retries: 10
     restart: unless-stopped

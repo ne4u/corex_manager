@@ -25,3 +25,7 @@ data:
   MCP_GATEWAY_RS_INTERNAL_HOST: "{{ if .Values.mcpGateway.enabled }}127.0.0.1{{ end }}"
   MCP_GATEWAY_RS_INTERNAL_PORT: "{{ if .Values.mcpGateway.enabled }}8089{{ end }}"
   MCP_SERVER_INTERNAL_HOST: "{{ if .Values.mcpServer.enabled }}127.0.0.1{{ end }}"
+  # mcp-server proxies tool calls to the api sidecar (pod-local HTTPS; the
+  # internal cert is written to the shared certs volume and doubles as CA).
+  MCP_BACKEND_URL: "https://127.0.0.1:8000"
+  MCP_BACKEND_CA: "/app/certs/internal/api.crt"
