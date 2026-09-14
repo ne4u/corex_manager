@@ -32,6 +32,8 @@ logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
+_last_prune_at = 0.0  # throttle DB prune to once per hour
+
 
 def _offset_path() -> str:
     base = os.path.dirname(settings.HAPROXY_CONFIG_PATH) or "."
@@ -202,23 +204,27 @@ def sample_csp_reports(force_recent: bool = False) -> int:
             db.commit()
             logger.info("Stored %d CSP reports from HAProxy logs", stored)
 
-        # Prune old reports
-        try:
-            pruned = prune_csp_reports(db, retention_days)
-            if pruned:
-                logger.debug("Pruned %d old CSP reports", pruned)
-        except Exception:
-            pass
+        # Prune old reports (throttled to once per hour)
+        global _last_prune_at
+        now = time.monotonic()
+        if now - _last_prune_at >= 3600:
+            _last_prune_at = now
+            try:
+                pruned = prune_csp_reports(db, retention_days)
+                if pruned:
+                    logger.debug("Pruned %d old CSP reports", pruned)
+            except Exception:
+                pass
 
-        # Prune stale scripts (not seen in traffic or successfully hashed)
-        try:
-            stale_days = pp_settings.get("auto_prune_stale_days", 7)
-            if stale_days and stale_days > 0:
-                pruned_scripts = prune_stale_scripts(db, stale_days)
-                if pruned_scripts:
-                    logger.info("Pruned %d stale scripts (stale > %d days)", pruned_scripts, stale_days)
-        except Exception:
-            pass
+            # Prune stale scripts (not seen in traffic or successfully hashed)
+            try:
+                stale_days = pp_settings.get("auto_prune_stale_days", 7)
+                if stale_days and stale_days > 0:
+                    pruned_scripts = prune_stale_scripts(db, stale_days)
+                    if pruned_scripts:
+                        logger.info("Pruned %d stale scripts (stale > %d days)", pruned_scripts, stale_days)
+            except Exception:
+                pass
 
         # Update the watermark
         if max_ts is not None:
@@ -237,6 +243,9 @@ def sample_csp_reports(force_recent: bool = False) -> int:
 
 
 def _sampler_loop() -> None:
+    # Stagger: offset 3s within the 10s window so this doesn't fire
+    # simultaneously with the WAF metrics sampler or MCP catalog sync.
+    time.sleep(3)
     while True:
         try:
             time.sleep(settings.PAGE_PROTECT_SAMPLER_INTERVAL_SECONDS)

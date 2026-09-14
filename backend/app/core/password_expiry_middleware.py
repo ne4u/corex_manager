@@ -14,8 +14,8 @@ import re
 
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import JSONResponse
 
+from .orjson_response import OrjsonResponse
 from .security import decode_access_token
 
 # Endpoints always allowed even when the password is expired. Matched against
@@ -66,7 +66,7 @@ class PasswordExpiryMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         if payload.get("pwd_exp") is True:
-            return JSONResponse(
+            return OrjsonResponse(
                 status_code=403,
                 content={"detail": "password_change_required"},
             )

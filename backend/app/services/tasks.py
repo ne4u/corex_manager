@@ -9,7 +9,15 @@ logger = logging.getLogger(__name__)
 
 from ..core.config import get_settings
 from ..core.database import SessionLocal
-from ..core.valkey_client import dequeue, enqueue, is_available, queue_length
+from ..core.valkey_client import (
+    cache_delete,
+    cache_get,
+    cache_set,
+    dequeue,
+    enqueue,
+    is_available,
+    queue_length,
+)
 from ..models.models import Certificate, Task
 from . import certificates, haproxy
 from .scheduler import PeriodicTask
@@ -19,8 +27,19 @@ QUEUE_NAME = "haproxy_tasks"
 
 # Track task IDs that should be cancelled. The worker checks this set
 # before and after long-running operations (e.g. acme.sh subprocess).
+# The in-process set is a fast-path cache; the authoritative signal lives
+# in Valkey (key: task:cancel:{id}) so a cancel request landing on a
+# non-leader worker is still seen by the leader's task worker. When Valkey
+# is unavailable, tasks run synchronously on the same worker that received
+# the cancel request, so the in-process set alone suffices.
 _cancelled_tasks: set[int] = set()
 _cancelled_lock = threading.Lock()
+_CANCEL_KEY_PREFIX = "task:cancel"
+_CANCEL_TTL = 3600  # 1 hour — long enough for the task to check, auto-cleans
+
+
+def _cancel_key(task_id: int) -> str:
+    return f"{_CANCEL_KEY_PREFIX}:{task_id}"
 
 
 def _utcnow() -> str:
@@ -28,9 +47,14 @@ def _utcnow() -> str:
 
 
 def cancel_task(task_id: int) -> bool:
-    """Mark a task for cancellation. Returns True if the task was running."""
+    """Mark a task for cancellation. Returns True if the task was running.
+
+    Sets both an in-process flag (fast path for same-worker cancels) and a
+    Valkey key (cross-worker signal so the leader's task worker sees it).
+    """
     with _cancelled_lock:
         _cancelled_tasks.add(task_id)
+    cache_set(_cancel_key(task_id), "1", ttl=_CANCEL_TTL)
     db = SessionLocal()
     try:
         task = db.query(Task).filter(Task.id == task_id).first()
@@ -46,13 +70,30 @@ def cancel_task(task_id: int) -> bool:
 
 
 def _is_cancelled(task_id: int) -> bool:
+    """Check whether a task has been cancelled.
+
+    Checks the in-process set first (fast path). If not found locally,
+    checks Valkey — the cancel request may have landed on a different
+    worker. Caches a Valkey hit in the in-process set so subsequent
+    checks are fast. Returns False when Valkey is unavailable (in that
+    case tasks run synchronously on the same worker, so the in-process
+    set is authoritative).
+    """
     with _cancelled_lock:
-        return task_id in _cancelled_tasks
+        if task_id in _cancelled_tasks:
+            return True
+    if cache_get(_cancel_key(task_id)) is not None:
+        with _cancelled_lock:
+            _cancelled_tasks.add(task_id)
+        return True
+    return False
 
 
 def _clear_cancelled(task_id: int) -> None:
+    """Clear the cancellation flag for a task from both in-process and Valkey."""
     with _cancelled_lock:
         _cancelled_tasks.discard(task_id)
+    cache_delete(_cancel_key(task_id))
 
 
 def queue_task(task_type: str, payload: dict[str, Any] | None = None) -> int:

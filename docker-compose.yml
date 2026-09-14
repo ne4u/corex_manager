@@ -22,6 +22,7 @@ services:
       - ./mcp-gateway:/app/mcp-gateway
     environment:
       - DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER:-haproxy}:${POSTGRES_PASSWORD:-haproxy}@postgres:5432/${POSTGRES_DB:-haproxy_manager}
+      - UVICORN_WORKERS=${UVICORN_WORKERS:-1}
       - HAPROXY_CONFIG_PATH=/app/data/haproxy.cfg
       - HAPROXY_SOCKET_PATH=/var/run/haproxy.sock
       - HAPROXY_MASTER_SOCKET_PATH=/var/run/haproxy-master.sock

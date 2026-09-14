@@ -302,29 +302,55 @@ def get_metrics(
     start = start.replace(tzinfo=None) if start else (end - timedelta(minutes=5))
     step = step or _auto_step(start, end)
 
-    snapshots = (
-        db.query(MetricSnapshot)
+    # Two-query row reduction: each MetricSnapshot carries a large `stats` JSON
+    # blob (every HAProxy CSV stat row). Loading 20k+ blobs for a 7-day window
+    # is dominated by JSON transfer/deserialization. Instead:
+    #   1. Fetch only (id, captured_at) for every snapshot in range — cheap.
+    #   2. Bucket in Python and record the first and last id per bucket.
+    #   3. Bulk-fetch the full rows (with stats/process_info JSON) only for the
+    #      first/last ids — at most 2 × (number of buckets) blobs instead of
+    #      one per snapshot. The aggregation only ever uses the first and last
+    #      snapshot of each bucket, so this is lossless.
+    light_rows = (
+        db.query(MetricSnapshot.id, MetricSnapshot.captured_at)
         .filter(MetricSnapshot.captured_at >= start, MetricSnapshot.captured_at <= end)
         .order_by(MetricSnapshot.captured_at)
         .all()
     )
 
-    if not snapshots:
+    if not light_rows:
         logger.info("No metric snapshots found between %s and %s", start, end)
         return []
 
-    buckets: dict[datetime, list[MetricSnapshot]] = {}
-    for snap in snapshots:
-        ts = _bucket(snap.captured_at, step)
-        buckets.setdefault(ts, []).append(snap)
+    # bucket_ts -> {"first_id": int, "last_id": int}. Rows are ordered by
+    # captured_at, so the first row seen in a bucket is the earliest and the
+    # last row seen is the latest.
+    bucket_ids: dict[datetime, dict[str, int]] = {}
+    for sid, captured_at in light_rows:
+        ts = _bucket(captured_at, step)
+        entry = bucket_ids.get(ts)
+        if entry is None:
+            bucket_ids[ts] = {"first_id": sid, "last_id": sid}
+        else:
+            entry["last_id"] = sid
+
+    needed_ids = {e["first_id"] for e in bucket_ids.values()} | {
+        e["last_id"] for e in bucket_ids.values()
+    }
+    full_by_id = {
+        snap.id: snap
+        for snap in db.query(MetricSnapshot).filter(MetricSnapshot.id.in_(needed_ids)).all()
+    }
 
     points: list[dict[str, Any]] = []
     prev_snapshot: MetricSnapshot | None = None
-    for ts in sorted(buckets):
-        bucket_snaps = buckets[ts]
-        last = bucket_snaps[-1]
-        first = bucket_snaps[0]
-        duration = (last.captured_at - first.captured_at).total_seconds()
+    for ts in sorted(bucket_ids):
+        entry = bucket_ids[ts]
+        first = full_by_id.get(entry["first_id"])
+        last = full_by_id.get(entry["last_id"])
+        if last is None:
+            continue
+        duration = (last.captured_at - first.captured_at).total_seconds() if first else 0
         first_rows = first.stats if first else None
 
         if duration <= 0:
@@ -357,16 +383,20 @@ def get_metrics(
 
 
 def _sampler_loop() -> None:
+    _last_prune_at = 0.0
     while True:
         try:
             time.sleep(settings.METRICS_SAMPLE_INTERVAL_SECONDS)
             sample_metrics()
-            try:
-                db = SessionLocal()
-                prune_metrics(db)
-                db.close()
-            except Exception:
-                pass
+            now = time.monotonic()
+            if now - _last_prune_at >= 3600:
+                _last_prune_at = now
+                try:
+                    db = SessionLocal()
+                    prune_metrics(db)
+                    db.close()
+                except Exception:
+                    pass
         except Exception as exc:
             logger.exception("Metrics sampler loop error: %s", exc)
 

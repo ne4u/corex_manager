@@ -523,16 +523,20 @@ def get_cache_metrics(
 
 
 def _sampler_loop() -> None:
+    _last_prune_at = 0.0
     while True:
         try:
             time.sleep(settings.CACHE_METRICS_SAMPLE_INTERVAL_SECONDS)
             sample_cache_metrics()
-            try:
-                db = SessionLocal()
-                prune_cache_metrics(db)
-                db.close()
-            except Exception:
-                pass
+            now = time.monotonic()
+            if now - _last_prune_at >= 3600:
+                _last_prune_at = now
+                try:
+                    db = SessionLocal()
+                    prune_cache_metrics(db)
+                    db.close()
+                except Exception:
+                    pass
         except Exception as exc:
             logger.exception("Cache metrics sampler loop error: %s", exc)
 

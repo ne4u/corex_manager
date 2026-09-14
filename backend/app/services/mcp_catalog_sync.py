@@ -103,6 +103,9 @@ def _catalog_sync_loop() -> None:
     """Loop that periodically syncs Valkey catalog state to the DB."""
     settings = get_settings()
     interval = getattr(settings, "MCP_CATALOG_SYNC_INTERVAL_SECONDS", SYNC_INTERVAL_SECONDS)
+    # Stagger: offset 6s within the 10s window so this doesn't fire
+    # simultaneously with the WAF metrics sampler or Page Protect sampler.
+    time.sleep(6)
     while True:
         try:
             time.sleep(interval)

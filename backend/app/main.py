@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+import threading
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -9,6 +10,8 @@ from fastapi.staticfiles import StaticFiles
 
 from .core.config import get_settings
 from .core.database import init_db
+from .core.orjson_response import OrjsonResponse
+from .core.valkey_client import acquire_leader_lock, release_leader_lock, renew_leader_lock
 
 _settings = get_settings()
 logging.basicConfig(
@@ -43,7 +46,33 @@ _auto_renew_scheduler = AutoRenewScheduler()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
+    # Multi-worker safety: acquire the leader lock FIRST so only one worker
+    # runs init_db (Alembic migrations). Without this, N workers on a first
+    # boot all see "not at head" and all attempt alembic upgrade head
+    # concurrently → deadlocks/errors on PostgreSQL. Non-leader workers skip
+    # migrations and proceed to serve HTTP (on steady-state restarts the DB
+    # is already at head, so skipping is a no-op).
+    _LEADER_LOCK_TTL = 30
+    is_leader = acquire_leader_lock(_LEADER_LOCK_TTL)
+    _leader_renewer_stop: threading.Event | None = None
+    if is_leader:
+        logging.getLogger(__name__).info("Acquired leader lock; running migrations and background services")
+
+        def _renew_leader():
+            # Stagger: offset 8s so the renewal doesn't coincide with the
+            # WAF sampler (0s), Page Protect (3s), or MCP catalog sync (6s).
+            _leader_renewer_stop.wait(8)
+            while not _leader_renewer_stop.wait(_LEADER_LOCK_TTL / 3):
+                if not renew_leader_lock(_LEADER_LOCK_TTL):
+                    logging.getLogger(__name__).warning("Lost leader lock; a peer will take over")
+                    break
+
+        _leader_renewer_stop = threading.Event()
+        threading.Thread(target=_renew_leader, daemon=True).start()
+    else:
+        logging.getLogger(__name__).info("Another worker is the leader; serving HTTP only")
+    if is_leader:
+        init_db()
     from .core.database import SessionLocal
     from .services.certificates import migrate_cert_bundles
 
@@ -149,51 +178,61 @@ async def lifespan(app: FastAPI):
             _mcp_db.close()
     except Exception as _exc:
         logging.getLogger(__name__).warning("MCP startup catalog refresh failed: %s", _exc)
-    start_metrics_sampler()
-    start_cache_metrics_sampler()
-    start_mcp_sampler()
-    start_mcp_catalog_sync()
-    if _settings.CORAZA_SPOA_ENABLED:
-        start_waf_sampler()
-    start_task_worker()
-    start_audit_worker()
-    _auto_renew_scheduler.start()
-    _geoip_downloader.start()
-    _security_list_feed_updater.start()
-    if _settings.CORAZA_SPOA_ENABLED:
-        _rule_set_updater.start()
-    # Page Protect — start sampler + hasher if enabled in settings
-    from .services.page_protect import is_page_protect_enabled, is_page_protect_hashing_enabled
+    if is_leader:
+        start_metrics_sampler()
+        start_cache_metrics_sampler()
+        start_mcp_sampler()
+        start_mcp_catalog_sync()
+        if _settings.CORAZA_SPOA_ENABLED:
+            start_waf_sampler()
+        start_task_worker()
+        start_audit_worker()
+        _auto_renew_scheduler.start()
+        _geoip_downloader.start()
+        _security_list_feed_updater.start()
+        if _settings.CORAZA_SPOA_ENABLED:
+            _rule_set_updater.start()
+        # Page Protect — start sampler + hasher if enabled in settings
+        from .services.page_protect import is_page_protect_enabled, is_page_protect_hashing_enabled
 
-    pp_db = SessionLocal()
-    try:
-        if is_page_protect_enabled(pp_db):
-            start_page_protect_sampler()
-        if is_page_protect_hashing_enabled(pp_db):
-            start_page_protect_hasher()
-    finally:
-        pp_db.close()
-    # Beacon Trust — re-seed stick table from Valkey (survives HAProxy reload)
-    # and start the periodic export thread.
-    try:
-        seed_beacon_trust_table()
-    except Exception as _exc:
-        logging.getLogger(__name__).warning("beacon_trust re-seed on startup failed: %s", _exc)
-    start_beacon_trust_persist()
-    # API Armor — start profiler and schema learner if enabled
-    from .services.api_armor_profiler import start_profiler as start_api_armor_profiler
-    from .services.api_armor_profiler import stop_profiler as stop_api_armor_profiler
-    from .services.api_armor_schema_learner import start_schema_learner, stop_schema_learner
+        pp_db = SessionLocal()
+        try:
+            if is_page_protect_enabled(pp_db):
+                start_page_protect_sampler()
+            if is_page_protect_hashing_enabled(pp_db):
+                start_page_protect_hasher()
+        finally:
+            pp_db.close()
+        # Beacon Trust — re-seed stick table from Valkey (survives HAProxy reload)
+        # and start the periodic export thread.
+        try:
+            seed_beacon_trust_table()
+        except Exception as _exc:
+            logging.getLogger(__name__).warning("beacon_trust re-seed on startup failed: %s", _exc)
+        start_beacon_trust_persist()
+        # API Armor — start profiler and schema learner if enabled
+        from .services.api_armor_profiler import start_profiler as start_api_armor_profiler
+        from .services.api_armor_profiler import stop_profiler as stop_api_armor_profiler
+        from .services.api_armor_schema_learner import start_schema_learner, stop_schema_learner
 
-    start_api_armor_profiler()
-    start_schema_learner()
+        start_api_armor_profiler()
+        start_schema_learner()
+    else:
+        # Non-leader workers still need these imports resolved for the
+        # shutdown path below (which is guarded by is_leader).
+        from .services.api_armor_profiler import stop_profiler as stop_api_armor_profiler  # noqa: F401
+        from .services.api_armor_schema_learner import stop_schema_learner  # noqa: F401
     yield
-    stop_api_armor_profiler()
-    stop_schema_learner()
-    _rule_set_updater.stop()
-    _security_list_feed_updater.stop()
-    _geoip_downloader.stop()
-    _auto_renew_scheduler.stop()
+    if is_leader:
+        stop_api_armor_profiler()
+        stop_schema_learner()
+        _rule_set_updater.stop()
+        _security_list_feed_updater.stop()
+        _geoip_downloader.stop()
+        _auto_renew_scheduler.stop()
+    if _leader_renewer_stop is not None:
+        _leader_renewer_stop.set()
+    release_leader_lock()
 
 
 app = FastAPI(
@@ -201,6 +240,7 @@ app = FastAPI(
     description="Control plane API and data plane orchestration for HAProxy load balancing and WAF.",
     version="1.0.0",
     lifespan=lifespan,
+    default_response_class=OrjsonResponse,
 )
 
 cors_origins = os.environ.get("CORS_ALLOWED_ORIGINS", "http://localhost:3000")

@@ -1,4 +1,6 @@
 import difflib
+import fcntl
+import functools
 import json
 import os
 import re
@@ -6,6 +8,7 @@ import shutil
 import socket
 import subprocess
 import time
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from typing import Any
 
@@ -5124,6 +5127,38 @@ def _generate_beacon_trust_tables(db: Session | None = None) -> str:
     )
 
 
+@contextmanager
+def _config_write_lock():
+    """Acquire a cross-process exclusive lock for config file writes.
+
+    Prevents concurrent ``write_config`` calls from different uvicorn workers
+    interleaving file writes and corrupting haproxy.cfg or related files.
+    Uses ``fcntl.flock`` on a lock file in the config directory — all workers
+    share the same filesystem (same container), so this serializes correctly.
+    """
+    lock_path = os.path.join(os.path.dirname(os.path.abspath(settings.HAPROXY_CONFIG_PATH)), ".config_write.lock")
+    os.makedirs(os.path.dirname(lock_path), exist_ok=True)
+    lock_file = open(lock_path, "w")
+    try:
+        fcntl.flock(lock_file, fcntl.LOCK_EX)
+        yield
+    finally:
+        fcntl.flock(lock_file, fcntl.LOCK_UN)
+        lock_file.close()
+
+
+def _config_write_locked(func):
+    """Decorator: serialize the decorated function across processes via a file lock."""
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        with _config_write_lock():
+            return func(*args, **kwargs)
+
+    return wrapper
+
+
+@_config_write_locked
 def write_config(
     db: Session,
     created_by: str | None = None,

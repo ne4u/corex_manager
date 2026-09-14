@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from ...core.config import get_settings
 from ...models.models import *
@@ -115,7 +115,10 @@ def _touch_list(db: Session, model_cls, lid: int):
 # --- Network lists ---
 @router.get("/security-lists/network", response_model=list[NetworkListResponse])
 def list_network_lists(db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
-    return [_network_list_response(l) for l in db.query(NetworkList).all()]
+    return [
+        _network_list_response(l)
+        for l in db.query(NetworkList).options(selectinload(NetworkList.entries)).all()
+    ]
 
 
 @router.post("/security-lists/network", response_model=NetworkListResponse)
@@ -257,7 +260,7 @@ def delete_network_entry(
 # --- ASN lists ---
 @router.get("/security-lists/asn", response_model=list[AsnListResponse])
 def list_asn_lists(db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
-    return [_asn_list_response(l) for l in db.query(AsnList).all()]
+    return [_asn_list_response(l) for l in db.query(AsnList).options(selectinload(AsnList.entries)).all()]
 
 
 @router.post("/security-lists/asn", response_model=AsnListResponse)
@@ -392,7 +395,7 @@ def delete_asn_entry(
 # --- GeoIP lists ---
 @router.get("/security-lists/geo", response_model=list[GeoListResponse])
 def list_geo_lists(db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
-    return [_geo_list_response(l) for l in db.query(GeoList).all()]
+    return [_geo_list_response(l) for l in db.query(GeoList).options(selectinload(GeoList.entries)).all()]
 
 
 @router.get("/security-lists/geo/countries", response_model=list[GeoCountryOption])
@@ -537,7 +540,7 @@ def delete_geo_entry(
 # --- JA4 lists ---
 @router.get("/security-lists/ja4", response_model=list[Ja4ListResponse])
 def list_ja4_lists(db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
-    return [_ja4_list_response(l) for l in db.query(Ja4List).all()]
+    return [_ja4_list_response(l) for l in db.query(Ja4List).options(selectinload(Ja4List.entries)).all()]
 
 
 @router.post("/security-lists/ja4", response_model=Ja4ListResponse)
@@ -672,7 +675,10 @@ def delete_ja4_entry(
 # --- Pattern lists ---
 @router.get("/security-lists/pattern", response_model=list[PatternListResponse])
 def list_pattern_lists(db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
-    return [_pattern_list_response(l) for l in db.query(PatternList).all()]
+    return [
+        _pattern_list_response(l)
+        for l in db.query(PatternList).options(selectinload(PatternList.entries)).all()
+    ]
 
 
 @router.post("/security-lists/pattern", response_model=PatternListResponse)

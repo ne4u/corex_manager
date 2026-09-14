@@ -10,6 +10,19 @@ settings = get_settings()
 _is_sqlite = settings.DATABASE_URL.startswith("sqlite")
 
 if _is_sqlite:
+    # Python 3.12 deprecated sqlite3's built-in datetime/date/time adapters
+    # (they'll be removed in a future version). Register explicit adapters
+    # that produce the SAME format as the legacy defaults (space separator for
+    # datetime) so existing local-dev SQLite DBs remain readable, and the
+    # deprecation warning is silenced. This is SQLite-only; PostgreSQL uses
+    # psycopg2 which has its own datetime handling.
+    import sqlite3
+    from datetime import date, datetime, time
+
+    sqlite3.register_adapter(datetime, lambda d: d.isoformat(sep=" "))
+    sqlite3.register_adapter(date, lambda d: d.isoformat())
+    sqlite3.register_adapter(time, lambda t: t.isoformat())
+
     db_path = settings.DATABASE_URL.replace("sqlite:///", "")
     if db_path:
         os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)

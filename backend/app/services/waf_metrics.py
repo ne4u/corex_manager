@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import geoip2.database
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from ..core.config import get_settings
@@ -357,16 +358,21 @@ def prune_waf_log_file(max_lines: int | None = None) -> int:
 
 
 def _waf_sampler_loop() -> None:
+    # Stagger: no offset (baseline at t=0 within the 10s window)
+    _last_prune_at = 0.0
     while True:
         try:
             time.sleep(settings.WAF_METRICS_SAMPLE_INTERVAL_SECONDS)
             sample_waf_metrics()
-            try:
-                db = SessionLocal()
-                prune_waf_metrics(db)
-                db.close()
-            except Exception:
-                pass
+            now = time.monotonic()
+            if now - _last_prune_at >= 3600:
+                _last_prune_at = now
+                try:
+                    db = SessionLocal()
+                    prune_waf_metrics(db)
+                    db.close()
+                except Exception:
+                    pass
             # Prune the raw log file after sampling so we don't drop lines
             # the sampler hasn't ingested yet.
             try:
@@ -400,6 +406,12 @@ def _auto_step(start: datetime, end: datetime) -> int:
     return 86400
 
 
+# Whitelisted columns selectable as a breakdown. The value comes from a query
+# param and is interpolated into raw SQL (column names can't be parameterized),
+# so it must be validated against this set to prevent SQL injection.
+_ALLOWED_BREAKDOWN_COLS = {"action", "rule_id", "severity", "msg", "client", "country", "uri"}
+
+
 @cache(ttl=10, key_prefix="waf")
 def get_waf_metrics(
     db: Session,
@@ -412,52 +424,59 @@ def get_waf_metrics(
     start = start.replace(tzinfo=None) if start else (end - timedelta(minutes=5))
     step = step or _auto_step(start, end)
 
-    rows = (
-        db.query(WafMetric)
-        .filter(
-            WafMetric.captured_at >= start,
-            WafMetric.captured_at <= end,
-            WafMetric.action != "unknown",
-        )
-        .all()
-    )
+    if breakdown not in _ALLOWED_BREAKDOWN_COLS:
+        breakdown = "action"
 
-    if not rows:
+    # Push bucketing + per-breakdown counting into SQL so we return one row per
+    # (bucket, breakdown_value) group instead of loading every WafMetric row
+    # into Python and counting in a triple-nested loop. For a busy 7-day window
+    # this reduces the result set from potentially millions of rows to at most
+    # (buckets × distinct breakdown values).
+    dialect = db.get_bind().dialect.name
+    if dialect == "sqlite":
+        bucket_sql = "(CAST(strftime('%s', captured_at) AS INTEGER) / :step) * :step"
+    else:
+        bucket_sql = "FLOOR(EXTRACT(epoch FROM captured_at) / :step) * :step"
+
+    sql = text(
+        f"SELECT {bucket_sql} AS bucket, {breakdown} AS bval, COUNT(*) AS cnt "
+        "FROM waf_metrics "
+        "WHERE captured_at >= :start AND captured_at <= :end AND action <> 'unknown' "
+        "GROUP BY bucket, bval"
+    )
+    raw_rows = db.execute(sql, {"start": start, "end": end, "step": step}).fetchall()
+
+    if not raw_rows:
         return {"time": [], "series": [], "breakdown": breakdown, "totals": {}}
 
-    # Build time buckets and series by breakdown value
-    buckets: dict[datetime, list[WafMetric]] = {}
-    for row in rows:
-        ts = _bucket(row.captured_at, step)
-        buckets.setdefault(ts, []).append(row)
-
-    # Determine the set of breakdown keys and initialize series
-    series_keys: set = set()
-    for row in rows:
-        value = _normalize_breakdown_value(breakdown, getattr(row, breakdown) or "unknown")
-        series_keys.add(value)
-
-    # Count totals per breakdown key
+    # Merge groups that normalize to the same breakdown key (e.g. CRS anomaly
+    # score messages with varying totals collapse to one key), and aggregate
+    # totals. bucket_epoch -> {normalized_key -> count}
+    bucket_counts: dict[int, dict[str, int]] = {}
     totals: dict[str, int] = {}
-    for row in rows:
-        value = _normalize_breakdown_value(breakdown, getattr(row, breakdown) or "unknown")
-        totals[value] = totals.get(value, 0) + 1
+    for row in raw_rows:
+        bucket_epoch = int(row.bucket)
+        bval = row.bval
+        nval = _normalize_breakdown_value(breakdown, bval or "unknown")
+        d = bucket_counts.setdefault(bucket_epoch, {})
+        d[nval] = d.get(nval, 0) + int(row.cnt)
+        totals[nval] = totals.get(nval, 0) + int(row.cnt)
 
-    timestamps = sorted(buckets)
+    timestamps = sorted(bucket_counts)
+    series_keys = sorted({k for d in bucket_counts.values() for k in d})
     series: list[dict[str, Any]] = []
-    for key in sorted(series_keys):
-        data = []
-        for ts in timestamps:
-            count = sum(
-                1
-                for row in buckets[ts]
-                if _normalize_breakdown_value(breakdown, getattr(row, breakdown) or "unknown") == key
-            )
-            data.append({"time": ts.isoformat(), "count": count})
+    for key in series_keys:
+        data = [
+            {
+                "time": datetime.fromtimestamp(ts, tz=UTC).isoformat(),
+                "count": bucket_counts[ts].get(key, 0),
+            }
+            for ts in timestamps
+        ]
         series.append({"key": key, "data": data})
 
     return {
-        "time": [t.isoformat() for t in timestamps],
+        "time": [datetime.fromtimestamp(ts, tz=UTC).isoformat() for ts in timestamps],
         "series": series,
         "breakdown": breakdown,
         "totals": totals,

@@ -8,6 +8,26 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     APP_NAME: str = "coreX Manager"
     DATABASE_URL: str = "sqlite:///data/haproxy_manager.db"
+    # Number of uvicorn worker processes. Defaults to 1 (single process) for
+    # backward compatibility. Set to ~CPU cores on a multi-core Postgres
+    # deployment to use more capacity. A Valkey leader lock ensures only one
+    # worker runs the background samplers/schedulers; the rest serve HTTP.
+    # Note: multi-worker mode is intended for the PostgreSQL deployment —
+    # SQLite (local dev) contends on a single DB file across workers.
+    # The validator below and entrypoint.sh both force this to 1 when
+    # DATABASE_URL is SQLite, so misconfiguration can't cause file-lock
+    # deadlocks.
+    UVICORN_WORKERS: int = 1
+
+    @field_validator("UVICORN_WORKERS")
+    @classmethod
+    def _clamp_workers_for_sqlite(cls, v: int, info: Any) -> int:
+        """Force single-worker mode when using SQLite — multiple worker
+        processes contend on the database file and hit 'database is locked'."""
+        url = info.data.get("DATABASE_URL", "")
+        if url.startswith("sqlite") and v > 1:
+            return 1
+        return v
     HAPROXY_CONFIG_PATH: str = "data/haproxy.cfg"
     HAPROXY_SOCKET_PATH: str = "/var/run/haproxy.sock"
     HAPROXY_MASTER_SOCKET_PATH: str = "/var/run/haproxy-master.sock"
@@ -314,7 +334,9 @@ class Settings(BaseSettings):
     # Stick-table viewer (System → Tables tab). The full parsed entry list for a
     # table is cached in Valkey for this many seconds so repeated pagination
     # clicks on a 100k+ entry table don't re-dump the whole table over the socket.
-    STICK_TABLE_CACHE_TTL_SECONDS: int = 5
+    # The cache is invalidated on clear-entry/clear-all, so a longer TTL only
+    # risks stale entry counts on external mutations — acceptable for a viewer.
+    STICK_TABLE_CACHE_TTL_SECONDS: int = 10
     STICK_TABLE_MAX_PAGE_SIZE: int = 500
 
     # API Armor (Cloudflare API Shield-parity: GraphQL, schema validation, auth,

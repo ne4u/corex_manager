@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from ..models.models import Backend, BackendRule, Server
 from ..schemas.backends import (
@@ -13,7 +13,10 @@ from ..schemas.backends import (
 
 
 def list_backends(db: Session):
-    return db.query(Backend).all()
+    # Eager-load servers to avoid an N+1 query when BackendResponse serializes
+    # the `servers` collection for each backend. selectinload issues one extra
+    # query (SELECT ... WHERE backend_id IN (...)) instead of one per backend.
+    return db.query(Backend).options(selectinload(Backend.servers)).all()
 
 
 def get_backend(db: Session, bid: int):

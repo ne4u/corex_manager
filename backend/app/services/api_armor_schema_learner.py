@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import threading
+import time
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -38,6 +39,7 @@ class ApiArmorSchemaLearner:
         self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
         self._offset = 0
+        self._last_prune_at = 0.0  # throttle DB prune to once per hour
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -54,6 +56,10 @@ class ApiArmorSchemaLearner:
         logger.info("API Armor schema learner stopped")
 
     def _run(self) -> None:
+        # Stagger: offset 7.5s within the 10s window (5s default interval
+        # means this fires at 7.5, 12.5, 17.5... — interleaved with the
+        # profiler at 2.5, 7.5, 12.5...).
+        self._stop_event.wait(7.5)
         while not self._stop_event.is_set():
             try:
                 self._process_new_lines()
@@ -99,6 +105,10 @@ class ApiArmorSchemaLearner:
         return count
 
     def _prune_old_schemas(self) -> None:
+        now = time.monotonic()
+        if now - self._last_prune_at < 3600:
+            return
+        self._last_prune_at = now
         db = SessionLocal()
         try:
             retention_days = getattr(settings, "API_ARMOR_SCHEMA_LEARN_RETENTION_DAYS", 30)

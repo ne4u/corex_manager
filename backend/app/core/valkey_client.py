@@ -7,8 +7,11 @@ Replaces the former memcache.py module. Valkey provides:
 - Optional persistence (AOF/RDB) so the token denylist survives restarts.
 """
 
+import hashlib
 import json
 import logging
+import os
+import secrets
 import time
 from collections.abc import Callable
 from functools import wraps
@@ -117,26 +120,33 @@ def _reset_client() -> None:
 
 
 def _hash_key(args: tuple, kwargs: dict) -> str:
-    """Build a stable hash key, ignoring SQLAlchemy sessions and other ORM objects."""
+    """Build a stable, deterministic hash key for cached function results.
+
+    Uses sha256 over a JSON-serialized representation so the key is stable
+    across processes and restarts (Python's built-in ``hash()`` is salted per
+    process via ``PYTHONHASHSEED``, which would produce different keys in each
+    uvicorn worker and on every restart — defeating the shared Valkey cache).
+
+    SQLAlchemy sessions and other ORM objects are skipped (they are not part
+    of the cacheable identity). Unhashable args are stringified.
+    """
     clean_args = []
     for arg in args:
         if isinstance(arg, Session):
             continue
-        try:
-            hash(arg)
-            clean_args.append(arg)
-        except TypeError:
-            clean_args.append(str(arg))
+        clean_args.append(arg)
     clean_kwargs = []
     for k, v in sorted(kwargs.items()):
         if isinstance(v, Session):
             continue
-        try:
-            hash(v)
-            clean_kwargs.append((k, v))
-        except TypeError:
-            clean_kwargs.append((k, str(v)))
-    return str(hash((tuple(clean_args), tuple(clean_kwargs))))
+        clean_kwargs.append((k, v))
+    payload = json.dumps(
+        (clean_args, clean_kwargs),
+        default=str,
+        sort_keys=True,
+        ensure_ascii=False,
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def is_available() -> bool:
@@ -202,6 +212,19 @@ def cache_get(key: str) -> Any:
     except Exception:
         _reset_client()
         return None
+
+
+def cache_delete(key: str) -> bool:
+    """Delete a single cache key. Best-effort; returns False if Valkey is down."""
+    client = _get_client()
+    if not client:
+        return False
+    try:
+        client.delete(key)
+        return True
+    except Exception:
+        _reset_client()
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -353,3 +376,182 @@ def get_cv_token(token: str) -> str | None:
     except Exception:
         _reset_client()
         return None
+
+
+# ---------------------------------------------------------------------------
+# Cache invalidation (prefix scan + delete)
+# ---------------------------------------------------------------------------
+
+
+def invalidate(prefix: str, max_batches: int = 1000) -> int:
+    """Delete all cache keys matching ``{prefix}:*``.
+
+    Uses a bounded SCAN (capped by ``max_batches`` batches of ~200 keys) so a
+    large keyspace can't block Valkey. Returns the number of keys deleted.
+    Best-effort: returns 0 if Valkey is unavailable.
+    """
+    client = _get_client()
+    if not client:
+        return 0
+    pattern = f"{prefix}:*"
+    deleted = 0
+    try:
+        cursor = 0
+        batches = 0
+        while True:
+            cursor, keys = client.scan(cursor=cursor, match=pattern, count=200)
+            if keys:
+                deleted += client.delete(*keys)
+            batches += 1
+            if cursor == 0 or batches >= max_batches:
+                break
+        return deleted
+    except Exception:
+        _reset_client()
+        return deleted
+
+
+# ---------------------------------------------------------------------------
+# Leader election (multi-worker safety for background samplers/schedulers)
+# ---------------------------------------------------------------------------
+
+_LEADER_KEY = "corex:leader"
+# Unique per-process identifier (pid + a random salt so forked children differ).
+_LEADER_ID = f"{os.getpid()}:{secrets.token_hex(4)}"
+
+# PostgreSQL advisory lock fallback: when Valkey is unavailable, use a
+# session-level Postgres advisory lock to elect a single leader among
+# workers. This prevents all workers from becoming leader simultaneously
+# (which would start duplicate background services). The lock is held on a
+# dedicated connection for the process lifetime; on SQLite (no advisory
+# locks) we fall back to True (single-worker assumption).
+_PG_ADVISORY_KEY = 0x434F524558  # "COREX" as a bigint
+_pg_lock_conn = None
+
+
+def _pg_try_advisory_lock() -> bool:
+    """Try to acquire a PostgreSQL session-level advisory lock.
+
+    Returns True if acquired (or if the DB is SQLite — single-worker
+    fallback). Returns False if another process holds the lock. The lock
+    is held on a dedicated connection stored in ``_pg_lock_conn`` for the
+    process lifetime; it persists until the connection closes.
+    """
+    global _pg_lock_conn
+    if _pg_lock_conn is not None:
+        return True  # already holding it
+    try:
+        from .database import _is_sqlite, engine
+
+        if _is_sqlite:
+            return True  # no advisory locks on SQLite; single-worker fallback
+        from sqlalchemy import text
+
+        conn = engine.connect()
+        acquired = conn.execute(
+            text("SELECT pg_try_advisory_lock(:key)"), {"key": _PG_ADVISORY_KEY}
+        ).scalar()
+        if acquired:
+            _pg_lock_conn = conn
+            logger.info("Acquired PostgreSQL advisory lock for leader election")
+            return True
+        conn.close()
+        return False
+    except Exception as exc:
+        logger.debug("PostgreSQL advisory lock unavailable: %s", exc)
+        return False
+
+
+def _pg_release_advisory_lock() -> None:
+    """Release the PostgreSQL advisory lock if this process holds it."""
+    global _pg_lock_conn
+    if _pg_lock_conn is None:
+        return
+    try:
+        from sqlalchemy import text
+
+        _pg_lock_conn.execute(
+            text("SELECT pg_advisory_unlock(:key)"), {"key": _PG_ADVISORY_KEY}
+        )
+        _pg_lock_conn.close()
+        logger.info("Released PostgreSQL advisory lock")
+    except Exception as exc:
+        logger.debug("Failed to release PostgreSQL advisory lock: %s", exc)
+    finally:
+        _pg_lock_conn = None
+
+
+def acquire_leader_lock(ttl: int = 30) -> bool:
+    """Try to become the leader for this deployment.
+
+    Tries Valkey first (``SET NX EX``). If Valkey is unavailable, falls back
+    to a PostgreSQL session-level advisory lock (``pg_try_advisory_lock``)
+    so that exactly one worker becomes leader even without Valkey. If
+    neither is available (e.g. SQLite local dev), returns True — the
+    single-worker fallback so background work continues.
+    """
+    client = _get_client()
+    if client:
+        try:
+            ok = client.set(_LEADER_KEY, _LEADER_ID, nx=True, ex=ttl)
+            return bool(ok)
+        except Exception:
+            _reset_client()
+            # Fall through to PostgreSQL advisory lock
+    return _pg_try_advisory_lock()
+
+
+def renew_leader_lock(ttl: int = 30) -> bool:
+    """Renew the leader lock if this process still owns it.
+
+    Uses a Lua compare-and-swap on Valkey so a process that lost the lock
+    cannot silently re-seize it. When Valkey is unavailable, the PostgreSQL
+    advisory lock is session-level (persists until the connection closes),
+    so no renewal is needed — returns True if we hold it, otherwise tries
+    to acquire it (handles the case where the connection died).
+    """
+    client = _get_client()
+    if client:
+        _renew_script = """
+            if redis.call('get', KEYS[1]) == ARGV[1] then
+                return redis.call('expire', KEYS[1], ARGV[2])
+            else
+                return 0
+            end
+        """
+        try:
+            result = client.eval(_renew_script, 1, _LEADER_KEY, _LEADER_ID, ttl)
+            return bool(result)
+        except Exception:
+            _reset_client()
+            # Fall through to PostgreSQL advisory lock
+    # Valkey unavailable — the PG advisory lock is session-level, so if we
+    # hold it we're still the leader. If we don't (e.g. connection died),
+    # try to re-acquire.
+    return _pg_lock_conn is not None or _pg_try_advisory_lock()
+
+
+def release_leader_lock() -> None:
+    """Release the leader lock if this process owns it (best-effort).
+
+    Releases both the Valkey lock and the PostgreSQL advisory lock.
+    """
+    client = _get_client()
+    if client:
+        _release_script = """
+            if redis.call('get', KEYS[1]) == ARGV[1] then
+                return redis.call('del', KEYS[1])
+            else
+                return 0
+            end
+        """
+        try:
+            client.eval(_release_script, 1, _LEADER_KEY, _LEADER_ID)
+        except Exception:
+            _reset_client()
+    _pg_release_advisory_lock()
+
+
+def leader_id() -> str:
+    """Return this process's leader-election identifier (for diagnostics)."""
+    return _LEADER_ID

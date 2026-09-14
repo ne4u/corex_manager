@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from starlette.background import BackgroundTask
 
 from ...core.config import get_settings
+from ...core.valkey_client import cache_delete, cache_get, cache_set
 from ...models.models import MetricSnapshot, Setting
 from ...schemas.haproxy_options import HaproxyOption
 from ...schemas.settings import (
@@ -382,14 +383,25 @@ def lookup_asn(
     return result
 
 
+# Global options are read on page loads and change only via the PUT below.
+# Cache the parsed list for 10s and invalidate on write.
+_GLOBAL_OPTS_CACHE_KEY = "haproxy:global_options"
+_GLOBAL_OPTS_CACHE_TTL = 10
+
+
 @router.get("/haproxy/global-options", response_model=list[HaproxyOption])
 def get_haproxy_global_options(db: Session = Depends(get_db), user=Depends(require_admin), _=Depends(rate_limit)):
+    cached = cache_get(_GLOBAL_OPTS_CACHE_KEY)
+    if cached is not None:
+        return cached
     raw = get_setting(db, "haproxy_global_options", "[]")
     try:
         opts = json.loads(raw) if isinstance(raw, str) and raw else []
-    except json.JSONDecodeError, TypeError:
+    except (json.JSONDecodeError, TypeError):
         opts = []
-    return [HaproxyOption(**o) for o in opts if isinstance(o, dict)]
+    payload = [o.model_dump(mode="json") for o in [HaproxyOption(**o) for o in opts if isinstance(o, dict)]]
+    cache_set(_GLOBAL_OPTS_CACHE_KEY, payload, ttl=_GLOBAL_OPTS_CACHE_TTL)
+    return payload
 
 
 @router.put("/haproxy/global-options", response_model=list[HaproxyOption])
@@ -397,6 +409,7 @@ def update_haproxy_global_options(
     opts: list[HaproxyOption], db: Session = Depends(get_db), user=Depends(require_admin), _=Depends(rate_limit)
 ):
     set_setting(db, "haproxy_global_options", json.dumps([o.model_dump() for o in opts]))
+    cache_delete(_GLOBAL_OPTS_CACHE_KEY)
     return opts
 
 
