@@ -120,6 +120,92 @@ def test_invalidation_during_regen_is_not_cached(db, monkeypatch):
     assert config_service._config_status_cache is None
 
 
+def _baseline_configs(db, tmp_path, monkeypatch):
+    """Redirect generated-config paths to tmp_path and write .applied
+    snapshots so get_config_status starts False."""
+    import os
+
+    from app.core.config import get_settings
+    from app.services import haproxy
+
+    s = get_settings()
+    (tmp_path / "lists").mkdir()
+    (tmp_path / "resp-transform").mkdir()
+    monkeypatch.setattr(s, "SECURITY_LISTS_DIR", str(tmp_path / "lists"))
+    monkeypatch.setattr(s, "RESP_TRANSFORM_DIR", str(tmp_path / "resp-transform"))
+    monkeypatch.setattr(s, "HAPROXY_CONFIG_PATH", str(tmp_path / "haproxy.cfg"))
+    monkeypatch.setattr(s, "CORAZA_SPOA_ENABLED", False)
+    monkeypatch.setattr(s, "MCP_GATEWAY_ENABLED", False)
+
+    cfg_path = str(tmp_path / "haproxy.cfg")
+    baseline = haproxy.generate_config(db)
+    with open(cfg_path, "w") as f:
+        f.write(baseline)
+    with open(f"{cfg_path}.applied", "w") as f:
+        f.write(baseline)
+
+    try:
+        from app.services.risk_scoring import _risk_rules_data_path, generate_risk_rules_data
+
+        rrd_path = _risk_rules_data_path()
+        rrd = generate_risk_rules_data(db)
+        os.makedirs(os.path.dirname(rrd_path), exist_ok=True)
+        with open(rrd_path, "w") as f:
+            f.write(rrd)
+        with open(f"{rrd_path}.applied", "w") as f:
+            f.write(rrd)
+    except Exception:
+        pass
+
+    # Response transform file baselines (query_detokenize.json is always
+    # generated — without a matching .applied file it shows as unapplied).
+    try:
+        from app.services.resp_transform import generate_resp_transform_file_contents
+
+        rt_dir = tmp_path / "resp-transform"
+        for fname, content in generate_resp_transform_file_contents(db).items():
+            fpath = rt_dir / fname
+            with open(fpath, "w") as f:
+                f.write(content)
+            with open(f"{fpath}.applied", "w") as f:
+                f.write(content)
+    except Exception:
+        pass
+
+
+def test_reorder_detected_end_to_end(db, client, tmp_path, monkeypatch):
+    """User-reported regression: reordering security rules via the API must
+    flip /config/status to unapplied even though the status bool is cached.
+
+    Exercises the real path: GET /config/status primes the cache (False),
+    PUT /security-rules/reorder triggers middleware invalidation, and the
+    next GET must regenerate and report True."""
+    from tests.factories import make_backend, make_listener, make_security_rule
+
+    be = make_backend(db, name="be1")
+    listener = make_listener(db, backend=be, name="http_in")
+    r1 = make_security_rule(db, name="r1", priority=0, listener_ids=[listener.id])
+    r2 = make_security_rule(db, name="r2", priority=1, listener_ids=[listener.id])
+    db.commit()
+
+    _baseline_configs(db, tmp_path, monkeypatch)
+
+    # Prime the cache through the real endpoint.
+    resp = client.get("/api/v1/config/status")
+    assert resp.status_code == 200
+    assert resp.json()["unapplied"] is False
+    assert config_service._config_status_cache is not None
+
+    # Reorder via the real endpoint — middleware must invalidate the cache.
+    resp = client.put("/api/v1/security-rules/reorder", json={"ordered_ids": [r2.id, r1.id]})
+    assert resp.status_code == 200
+    assert config_service._config_status_cache is None
+
+    # Next poll regenerates and detects the diff.
+    resp = client.get("/api/v1/config/status")
+    assert resp.json()["unapplied"] is True
+
+
 def test_middleware_invalidates_on_config_change(db, client, monkeypatch):
     impl, calls = _fake_status(True)
     monkeypatch.setattr(config_service, "_config_status_data", impl)
