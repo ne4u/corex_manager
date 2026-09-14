@@ -4874,6 +4874,14 @@ def write_config(
     ha_service.write_keepalived_configs(db)
     print("[WRITE_CONFIG] done", flush=True)
     logger.info("write_config: done")
+    # Invalidate the cached /config/status flag — applied files were just
+    # rewritten, so a stale cached "unapplied" would linger until the TTL.
+    # Lazy import: services.config imports this module at top level.
+    try:
+        from .config import invalidate_config_status
+        invalidate_config_status()
+    except Exception:
+        pass
     return config
 
 

@@ -180,6 +180,8 @@ _NON_CONFIG_PATHS: list[tuple[str, str]] = [
     ("POST", r"^/api-armor/profiles/\d+/finalize$"),
     ("DELETE", r"^/api-armor/profiles/\d+$"),
     ("DELETE", r"^/api-armor/anomalies$"),
+    ("POST", r"^/api-armor/profiles/ingest$"),
+    ("POST", r"^/api-armor/anomalies/ingest$"),
     # --- Page protect observational data (not emitted by HAProxy/Varnish) ---
     ("PUT", r"^/page-protect/scripts/\d+$"),
     ("DELETE", r"^/page-protect/scripts/\d+$"),

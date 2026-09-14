@@ -1,7 +1,9 @@
 """Config lifecycle and preview helpers."""
 import difflib
 import os
-from typing import Any, Dict, List, Tuple
+import threading
+import time
+from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
@@ -313,9 +315,73 @@ def preview_all_configs(db: Session) -> Dict[str, str]:
     return configs
 
 
+# ---------------------------------------------------------------------------
+# In-process cache for the /config/status "unapplied" boolean.
+#
+# _config_status_data() regenerates every config artifact (haproxy.cfg,
+# coraza configs, VCL, MCP bundle, vector.toml, all security-list and
+# resp-transform files) and reads every .applied file from disk — far too
+# expensive for the per-tab 10s polling loop. The bool is cached for a few
+# seconds and invalidated eagerly on config-changing requests (audit
+# middleware) and after write_config() applies.
+#
+# Only the bool is cached — the current/generated dicts can be megabytes
+# (full .lst contents), so /config/diff and /config/preview stay on-demand.
+# Background writers (feed updater, rule-set downloader, cert renewals,
+# MCP catalog sync) bypass HTTP middleware entirely; the TTL bounds how
+# stale the flag can get for those paths.
+# ---------------------------------------------------------------------------
+_CONFIG_STATUS_TTL = 5.0  # seconds
+_config_status_lock = threading.Lock()
+_config_status_cache: Optional[Tuple[float, bool]] = None
+# Set by invalidate_config_status() while a regeneration is in flight: the
+# in-flight result may reflect pre-mutation state, so it must not be cached.
+_config_status_dirty = False
+
+
+def invalidate_config_status() -> None:
+    """Drop the cached unapplied flag so the next status check regenerates.
+
+    Never blocks: callers include async middleware where a blocking acquire
+    would stall the event loop while a regeneration holds the lock. If the
+    lock can't be taken immediately, a regeneration is in flight — the dirty
+    flag prevents its result from being cached.
+    """
+    global _config_status_cache, _config_status_dirty
+    _config_status_dirty = True
+    if _config_status_lock.acquire(blocking=False):
+        try:
+            _config_status_cache = None
+            _config_status_dirty = False
+        finally:
+            _config_status_lock.release()
+
+
 def get_config_status(db: Session) -> bool:
-    unapplied, _, _ = _config_status_data(db)
-    return unapplied
+    global _config_status_cache, _config_status_dirty
+    # Fast path without the lock: a fresh cached value that hasn't been
+    # dirtied by a mutation. Tuple reads/writes are atomic under the GIL.
+    cached = _config_status_cache
+    if cached is not None and not _config_status_dirty:
+        if time.monotonic() - cached[0] < _CONFIG_STATUS_TTL:
+            return cached[1]
+    with _config_status_lock:
+        # Regenerate while holding the lock (single-flight): concurrent
+        # status polls share one regeneration instead of stampeding.
+        cached = _config_status_cache
+        if cached is not None and not _config_status_dirty:
+            if time.monotonic() - cached[0] < _CONFIG_STATUS_TTL:
+                return cached[1]
+        _config_status_dirty = False
+        unapplied, _, _ = _config_status_data(db)
+        if _config_status_dirty:
+            # A mutation landed mid-regeneration — don't cache a result that
+            # may reflect pre-mutation state; the next call regenerates.
+            _config_status_dirty = False
+            _config_status_cache = None
+        else:
+            _config_status_cache = (time.monotonic(), unapplied)
+        return unapplied
 
 
 def get_config_diff(db: Session) -> dict:

@@ -91,7 +91,13 @@ class AuditEventMiddleware(BaseHTTPMiddleware):
         # and don't need per-request audit logging — the MCP server's own
         # event log captures tool invocations.
         if _is_service_call(request):
-            return await call_next(request)
+            response = await call_next(request)
+            # MCP tool calls can mutate config too — invalidate the cached
+            # /config/status flag even though the request skips auditing.
+            if is_config_change(method, path):
+                from ..services.config import invalidate_config_status
+                invalidate_config_status()
+            return response
 
         # Read request body before handler runs (Starlette caches it)
         body_bytes = await request.body()
@@ -136,6 +142,7 @@ class AuditEventMiddleware(BaseHTTPMiddleware):
         # Assemble the audit event data and enqueue for async writing.
         # Falls back to synchronous write when the worker isn't running
         # (e.g. in tests) or Valkey is unavailable.
+        config_change = is_config_change(method, path)
         audit_data = {
             "username": username,
             "action": action,
@@ -146,10 +153,18 @@ class AuditEventMiddleware(BaseHTTPMiddleware):
             "status_code": response.status_code,
             "ip_address": ip,
             "payload": audit_payload,
-            "config_change": is_config_change(method, path),
+            "config_change": config_change,
         }
         if not enqueue_audit_event(audit_data):
             write_audit_event(audit_data)
+
+        if config_change:
+            # Bust the cached /config/status flag so the next poll reflects
+            # this mutation instead of waiting out the TTL. Invalidation is
+            # unconditional — a failed request costs one extra regeneration,
+            # which is cheaper than a missed invalidation.
+            from ..services.config import invalidate_config_status
+            invalidate_config_status()
 
         # If we buffered the response body, re-wrap it
         if response_body_bytes is not None:

@@ -30,6 +30,14 @@ from app.core.database import Base, engine, get_db
 from app.core.dependencies import get_current_user, rate_limit, rate_limit_by_ip
 from app.main import app
 from app.models.models import User
+from app.services import config as _config_service
+
+# Disable the /config/status cache for the test session. Tests mutate the DB
+# directly (bypassing the audit middleware / write_config invalidation hooks),
+# so a live TTL would serve stale "unapplied" results between a mutation and
+# the next get_config_status call. tests/services/test_config_status_cache.py
+# covers the cache mechanics explicitly.
+_config_service._CONFIG_STATUS_TTL = 0
 
 
 class LifespanOff:
