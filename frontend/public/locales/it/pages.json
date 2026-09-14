@@ -1330,6 +1330,7 @@
       "title": "Regole WAF",
       "addRule": "Aggiungi Regola",
       "tableHeaders": {
+        "order": "Ordine",
         "name": "Nome",
         "listener": "Listener",
         "backend": "Backend",
@@ -1410,6 +1411,7 @@
       "title": "Eccezioni",
       "addException": "Aggiungi Eccezione",
       "tableHeaders": {
+        "order": "Ordine",
         "name": "Nome",
         "action": "Azione",
         "updated": "Aggiornata",
@@ -1750,6 +1752,7 @@
     "title": "Limiti di frequenza",
     "addRateLimit": "Aggiungi limite di frequenza",
     "tableHeaders": {
+      "order": "Ordine",
       "name": "Nome",
       "listener": "Listener",
       "type": "Tipo",

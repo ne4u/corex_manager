@@ -1330,6 +1330,7 @@
       "title": "قواعد WAF",
       "addRule": "إضافة قاعدة",
       "tableHeaders": {
+        "order": "الترتيب",
         "name": "الاسم",
         "listener": "المستمع",
         "backend": "الخلفية",
@@ -1410,6 +1411,7 @@
       "title": "الاستثناءات",
       "addException": "إضافة استثناء",
       "tableHeaders": {
+        "order": "الترتيب",
         "name": "الاسم",
         "action": "الإجراء",
         "updated": "تاريخ التحديث",
@@ -1750,6 +1752,7 @@
     "title": "حدود المعدل",
     "addRateLimit": "إضافة حد للمعدل",
     "tableHeaders": {
+      "order": "الترتيب",
       "name": "الاسم",
       "listener": "المستمع",
       "type": "النوع",

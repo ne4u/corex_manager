@@ -134,8 +134,7 @@ export default function Listeners() {
     if (from < 0 || to < 0) return
     const newGroup = [...groupRules]
     const [moved] = newGroup.splice(from, 1)
-    const insertAt = from < to ? to - 1 : to
-    newGroup.splice(insertAt, 0, moved)
+    newGroup.splice(to, 0, moved)
     for (let i = 0; i < newGroup.length; i++) {
       await backendRules.update(newGroup[i].id, { priority: i + 1 })
     }

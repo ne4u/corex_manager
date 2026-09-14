@@ -42,9 +42,14 @@ RateLimitUpdate = _optional_update(RateLimitBase)
 
 class RateLimitResponse(RateLimitBase):
     id: int
+    priority: int
     updated_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
 
-__all__ = ["RateLimitBase", "RateLimitCreate", "RateLimitResponse", "RateLimitUpdate"]
+class RateLimitReorder(BaseModel):
+    ordered_ids: list[int]
+
+
+__all__ = ["RateLimitBase", "RateLimitCreate", "RateLimitReorder", "RateLimitResponse", "RateLimitUpdate"]

@@ -1330,6 +1330,7 @@
       "title": "Правила WAF",
       "addRule": "Добавить правило",
       "tableHeaders": {
+        "order": "Порядок",
         "name": "Имя",
         "listener": "Слушатель",
         "backend": "Бэкенд",
@@ -1410,6 +1411,7 @@
       "title": "Исключения",
       "addException": "Добавить исключение",
       "tableHeaders": {
+        "order": "Порядок",
         "name": "Имя",
         "action": "Действие",
         "updated": "Обновлено",
@@ -1750,6 +1752,7 @@
     "title": "Ограничения скорости",
     "addRateLimit": "Добавить ограничение скорости",
     "tableHeaders": {
+      "order": "Порядок",
       "name": "Имя",
       "listener": "Слушатель",
       "type": "Тип",

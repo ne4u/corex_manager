@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Clock, Pencil, Trash2 } from 'lucide-react'
-import { rateLimits, listeners, settings } from '../services/api'
+import { Clock, GripVertical, Pencil, Trash2 } from 'lucide-react'
+import { rateLimits, listeners, settings, getErrorDetail } from '../services/api'
 import useApiList from '../hooks/useApiList'
 import Modal from '../components/Modal'
 import LabelWithTooltip from '../components/LabelWithTooltip'
@@ -17,6 +17,7 @@ export default function RateLimits() {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<number | null>(null)
   const [asnDbAvailable, setAsnDbAvailable] = useState(false)
+  const [dragOverId, setDragOverId] = useState<number | null>(null)
   const initialForm = { name: '', listener_id: null as number | null, enabled: true, limit_type: 'basic', events: 100, window_seconds: 60, burst: 0, action: 'block', duration_seconds: 300, expression: '', response_code: '', match_status_code: 404, url_path: '', user_agent: '', waf_event_threshold: 5, waf_window_seconds: 60, waf_block_duration: 900, rate_key: 'src', rate_header: '', log: true, no_log: false }
   const [form, setForm] = useState<any>(initialForm)
 
@@ -41,14 +42,38 @@ export default function RateLimits() {
     setOpen(false); reload()
   }
 
+  const reorder = async (draggedId: number, targetId: number) => {
+    if (draggedId === targetId) return
+    const newList = [...items]
+    const from = newList.findIndex((r: any) => r.id === draggedId)
+    const to = newList.findIndex((r: any) => r.id === targetId)
+    if (from < 0 || to < 0) return
+    const [moved] = newList.splice(from, 1)
+    newList.splice(to, 0, moved)
+    try {
+      await rateLimits.reorder(newList.map((r: any) => r.id))
+      reload()
+    } catch (err) {
+      alert(getErrorDetail(err))
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between"><h2 className="text-2xl font-bold flex items-center gap-2"><Clock className="h-5 w-5 text-primary" /> {t('pages:rateLimits.title')}</h2><button onClick={openAdd} className="btn-primary">{t('pages:rateLimits.addRateLimit')}</button></div>
       <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
-        <table className="w-full text-sm text-start"><thead className="text-muted-foreground border-b border-border"><tr><th>{t('pages:rateLimits.tableHeaders.name')}</th><th>{t('pages:rateLimits.tableHeaders.listener')}</th><th>{t('pages:rateLimits.tableHeaders.type')}</th><th>{t('pages:rateLimits.tableHeaders.events')}</th><th>{t('pages:rateLimits.tableHeaders.window')}</th><th>{t('pages:rateLimits.tableHeaders.action')}</th><th>{t('pages:rateLimits.tableHeaders.duration')}</th><th>{t('pages:rateLimits.tableHeaders.log')}</th><th className="w-40 whitespace-nowrap">{t('pages:rateLimits.tableHeaders.updated')}</th><th></th></tr></thead>
+        <table className="w-full text-sm text-start"><thead className="text-muted-foreground border-b border-border"><tr><th className="w-8"></th><th className="w-16">{t('pages:rateLimits.tableHeaders.order')}</th><th>{t('pages:rateLimits.tableHeaders.name')}</th><th>{t('pages:rateLimits.tableHeaders.listener')}</th><th>{t('pages:rateLimits.tableHeaders.type')}</th><th>{t('pages:rateLimits.tableHeaders.events')}</th><th>{t('pages:rateLimits.tableHeaders.window')}</th><th>{t('pages:rateLimits.tableHeaders.action')}</th><th>{t('pages:rateLimits.tableHeaders.duration')}</th><th>{t('pages:rateLimits.tableHeaders.log')}</th><th className="w-40 whitespace-nowrap">{t('pages:rateLimits.tableHeaders.updated')}</th><th></th></tr></thead>
           <tbody>
-            {items.map((r: any) => (
-              <tr key={r.id} className="border-b border-border last:border-0"><td className="py-2">{r.name}</td><td>{r.listener_id ? listenerList.find((l: any) => l.id === r.listener_id)?.name : t('pages:rateLimits.all')}</td><td>{r.limit_type}</td><td>{r.events}</td><td>{r.window_seconds}s</td><td>{r.action}</td><td>{r.duration_seconds}s</td><td>{r.no_log ? t('pages:rateLimits.suppressed') : (r.log ? t('common:actions.yes') : t('common:actions.no'))}</td><td className="py-2 text-xs text-muted-foreground whitespace-nowrap">{r.updated_at ? formatDateTime(r.updated_at) : '-'}</td>
+            {items.map((r: any, ri: number) => (
+              <tr
+                key={r.id}
+                className={`border-b border-border last:border-0 ${dragOverId === r.id ? 'bg-muted' : ''}`}
+                draggable
+                onDragStart={(e) => { e.dataTransfer.setData('text/plain', String(r.id)); e.dataTransfer.effectAllowed = 'move' }}
+                onDragOver={(e) => { e.preventDefault(); setDragOverId(r.id) }}
+                onDrop={(e) => { e.preventDefault(); const dragged = Number(e.dataTransfer.getData('text/plain')); if (dragged !== r.id) { setDragOverId(null); reorder(dragged, r.id) } }}
+                onDragEnd={() => setDragOverId(null)}
+              ><td className="py-2 cursor-grab"><GripVertical className="h-4 w-4 text-muted-foreground" /></td><td className="py-2 text-muted-foreground">{ri + 1}</td><td className="py-2">{r.name}</td><td>{r.listener_id ? listenerList.find((l: any) => l.id === r.listener_id)?.name : t('pages:rateLimits.all')}</td><td>{r.limit_type}</td><td>{r.events}</td><td>{r.window_seconds}s</td><td>{r.action}</td><td>{r.duration_seconds}s</td><td>{r.no_log ? t('pages:rateLimits.suppressed') : (r.log ? t('common:actions.yes') : t('common:actions.no'))}</td><td className="py-2 text-xs text-muted-foreground whitespace-nowrap">{r.updated_at ? formatDateTime(r.updated_at) : '-'}</td>
                 <td className="space-x-1">
                   <IconButton icon={Pencil} aria-label={t('common:actions.edit')} onClick={() => openEdit(r)} />
                   <IconButton icon={Trash2} variant="danger" aria-label={t('common:actions.delete')} onClick={() => rateLimits.remove(r.id).then(reload)} />

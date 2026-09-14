@@ -1510,6 +1510,7 @@
       "title": "WAF Rules",
       "addRule": "Add Rule",
       "tableHeaders": {
+        "order": "Order",
         "name": "Name",
         "listener": "Listener",
         "backend": "Backend",
@@ -1590,6 +1591,7 @@
       "title": "Exceptions",
       "addException": "Add Exception",
       "tableHeaders": {
+        "order": "Order",
         "name": "Name",
         "action": "Action",
         "updated": "Updated",
@@ -1930,6 +1932,7 @@
     "title": "Rate Limits",
     "addRateLimit": "Add Rate Limit",
     "tableHeaders": {
+      "order": "Order",
       "name": "Name",
       "listener": "Listener",
       "type": "Type",

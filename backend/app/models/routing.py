@@ -11,6 +11,7 @@ class RateLimit(Base):
     listener_id = Column(Integer, ForeignKey("listeners.id"), nullable=True)
     name = Column(String, unique=True, index=True, nullable=False)
     enabled = Column(Boolean, default=True)
+    priority = Column(Integer, default=0, index=True, nullable=False)
     limit_type = Column(String, default="basic")  # basic, advanced, waf, response_code
     events = Column(Integer, default=100)
     window_seconds = Column(Integer, default=60)

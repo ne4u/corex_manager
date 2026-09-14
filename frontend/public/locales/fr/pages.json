@@ -1330,6 +1330,7 @@
       "title": "Règles WAF",
       "addRule": "Ajouter une règle",
       "tableHeaders": {
+        "order": "Ordre",
         "name": "Nom",
         "listener": "Listener",
         "backend": "Backend",
@@ -1410,6 +1411,7 @@
       "title": "Exceptions",
       "addException": "Ajouter une exception",
       "tableHeaders": {
+        "order": "Ordre",
         "name": "Nom",
         "action": "Action",
         "updated": "Mis à jour",
@@ -1750,6 +1752,7 @@
     "title": "Limites de débit",
     "addRateLimit": "Ajouter une limite de débit",
     "tableHeaders": {
+      "order": "Ordre",
       "name": "Nom",
       "listener": "Listener",
       "type": "Type",

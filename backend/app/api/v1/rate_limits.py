@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from ...schemas.rate_limits import RateLimitCreate, RateLimitResponse, RateLimitUpdate
+from ...schemas.rate_limits import RateLimitCreate, RateLimitReorder, RateLimitResponse, RateLimitUpdate
 from ...services.rate_limits import (
     create_rate_limit,
     delete_rate_limit,
     list_rate_limits,
+    reorder_rate_limits,
     update_rate_limit,
 )
 from ..deps import get_current_user, get_db, rate_limit, require_write
@@ -30,6 +31,17 @@ def create_rate_limit_endpoint(
     _=Depends(rate_limit),
 ):
     return create_rate_limit(db, r_in)
+
+
+@router.put("/rate-limits/reorder")
+def reorder_rate_limits_endpoint(
+    payload: RateLimitReorder,
+    db: Session = Depends(get_db),
+    user=Depends(require_write),
+    _=Depends(rate_limit),
+):
+    reorder_rate_limits(db, payload.ordered_ids)
+    return {"ok": True}
 
 
 @router.put("/rate-limits/{rid}", response_model=RateLimitResponse)

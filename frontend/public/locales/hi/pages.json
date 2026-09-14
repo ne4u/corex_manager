@@ -1330,6 +1330,7 @@
       "title": "WAF नियम",
       "addRule": "नियम जोड़ें",
       "tableHeaders": {
+        "order": "क्रम",
         "name": "नाम",
         "listener": "श्रोता",
         "backend": "बैकएंड",
@@ -1410,6 +1411,7 @@
       "title": "अपवाद",
       "addException": "अपवाद जोड़ें",
       "tableHeaders": {
+        "order": "क्रम",
         "name": "नाम",
         "action": "क्रिया",
         "updated": "अद्यतनित",
@@ -1750,6 +1752,7 @@
     "title": "रेट सीमाएँ",
     "addRateLimit": "रेट सीमा जोड़ें",
     "tableHeaders": {
+      "order": "क्रम",
       "name": "नाम",
       "listener": "Listener",
       "type": "प्रकार",

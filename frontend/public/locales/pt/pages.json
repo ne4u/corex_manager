@@ -1330,6 +1330,7 @@
       "title": "Regras WAF",
       "addRule": "Adicionar Regra",
       "tableHeaders": {
+        "order": "Ordem",
         "name": "Nome",
         "listener": "Listener",
         "backend": "Backend",
@@ -1410,6 +1411,7 @@
       "title": "Exceções",
       "addException": "Adicionar Exceção",
       "tableHeaders": {
+        "order": "Ordem",
         "name": "Nome",
         "action": "Ação",
         "updated": "Atualizado",
@@ -1750,6 +1752,7 @@
     "title": "Limites de Taxa",
     "addRateLimit": "Adicionar Limite de Taxa",
     "tableHeaders": {
+      "order": "Ordem",
       "name": "Nome",
       "listener": "Listener",
       "type": "Tipo",

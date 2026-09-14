@@ -22,18 +22,32 @@ router = APIRouter()
 # WAF
 @router.get("/waf-rules", response_model=list[WafRuleResponse])
 def list_waf_rules(db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
-    return db.query(WafRule).all()
+    return db.query(WafRule).order_by(WafRule.priority, WafRule.id).all()
 
 
 @router.post("/waf-rules", response_model=WafRuleResponse)
 def create_waf_rule(
     r: WafRuleCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
 ):
-    obj = WafRule(**r.model_dump())
+    last = db.query(WafRule).order_by(WafRule.priority.desc(), WafRule.id.desc()).first()
+    priority = (last.priority + 1) if last else 0
+    obj = WafRule(**r.model_dump(), priority=priority)
     db.add(obj)
     db.commit()
     db.refresh(obj)
     return obj
+
+
+@router.put("/waf-rules/reorder")
+def reorder_waf_rules(
+    payload: WafRuleReorder, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
+    for priority, rid in enumerate(payload.ordered_ids):
+        obj = db.get(WafRule, rid)
+        if obj:
+            obj.priority = priority
+    db.commit()
+    return {"ok": True}
 
 
 @router.put("/waf-rules/{rid}", response_model=WafRuleResponse)
@@ -62,18 +76,32 @@ def delete_waf_rule(rid: int, db: Session = Depends(get_db), user=Depends(requir
 
 @router.get("/waf-exceptions", response_model=list[WafExceptionResponse])
 def list_waf_exceptions(db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
-    return db.query(WafException).all()
+    return db.query(WafException).order_by(WafException.priority, WafException.id).all()
 
 
 @router.post("/waf-exceptions", response_model=WafExceptionResponse)
 def create_waf_exception(
     e: WafExceptionCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
 ):
-    obj = WafException(**e.model_dump())
+    last = db.query(WafException).order_by(WafException.priority.desc(), WafException.id.desc()).first()
+    priority = (last.priority + 1) if last else 0
+    obj = WafException(**e.model_dump(), priority=priority)
     db.add(obj)
     db.commit()
     db.refresh(obj)
     return obj
+
+
+@router.put("/waf-exceptions/reorder")
+def reorder_waf_exceptions(
+    payload: WafExceptionReorder, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
+    for priority, eid in enumerate(payload.ordered_ids):
+        obj = db.get(WafException, eid)
+        if obj:
+            obj.priority = priority
+    db.commit()
+    return {"ok": True}
 
 
 @router.put("/waf-exceptions/{eid}", response_model=WafExceptionResponse)

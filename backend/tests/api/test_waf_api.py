@@ -1037,3 +1037,55 @@ def test_waf_exception_preview_does_not_persist(client, db):
     from app.models.models import WafException
 
     assert db.query(WafException).filter(WafException.name == "ghost").count() == 0
+
+
+def test_reorder_waf_rules(client, db):
+    r1 = client.post("/api/v1/waf-rules", json={"name": "w1", "rule_set": "coraza", "engine": "On"}).json()
+    r2 = client.post("/api/v1/waf-rules", json={"name": "w2", "rule_set": "coraza", "engine": "On"}).json()
+    r3 = client.post("/api/v1/waf-rules", json={"name": "w3", "rule_set": "coraza", "engine": "On"}).json()
+    assert [r1["priority"], r2["priority"], r3["priority"]] == [0, 1, 2]
+
+    resp = client.put("/api/v1/waf-rules/reorder", json={"ordered_ids": [r3["id"], r1["id"], r2["id"]]})
+    assert resp.status_code == 200
+    rules = client.get("/api/v1/waf-rules").json()
+    assert [r["name"] for r in rules] == ["w3", "w1", "w2"]
+    assert [r["priority"] for r in rules] == [0, 1, 2]
+
+
+def test_create_waf_rule_after_reorder_appends_at_end(client, db):
+    r1 = client.post("/api/v1/waf-rules", json={"name": "w1", "rule_set": "coraza", "engine": "On"}).json()
+    r2 = client.post("/api/v1/waf-rules", json={"name": "w2", "rule_set": "coraza", "engine": "On"}).json()
+    client.put("/api/v1/waf-rules/reorder", json={"ordered_ids": [r2["id"], r1["id"]]})
+    r3 = client.post("/api/v1/waf-rules", json={"name": "w3", "rule_set": "coraza", "engine": "On"}).json()
+    rules = client.get("/api/v1/waf-rules").json()
+    assert [r["name"] for r in rules] == ["w2", "w1", "w3"]
+    assert r3["priority"] == 2
+
+
+def test_reorder_waf_exceptions(client, db):
+    e1 = client.post("/api/v1/waf-exceptions", json={"name": "e1", "rule_id": "942100", "action": "remove"}).json()
+    e2 = client.post("/api/v1/waf-exceptions", json={"name": "e2", "rule_id": "942110", "action": "remove"}).json()
+    e3 = client.post("/api/v1/waf-exceptions", json={"name": "e3", "rule_id": "942120", "action": "remove"}).json()
+    assert [e1["priority"], e2["priority"], e3["priority"]] == [0, 1, 2]
+
+    resp = client.put("/api/v1/waf-exceptions/reorder", json={"ordered_ids": [e3["id"], e1["id"], e2["id"]]})
+    assert resp.status_code == 200
+    exceptions = client.get("/api/v1/waf-exceptions").json()
+    assert [e["name"] for e in exceptions] == ["e3", "e1", "e2"]
+    assert [e["priority"] for e in exceptions] == [0, 1, 2]
+
+
+def test_exception_order_changes_generated_config(client, db):
+    """Reordering exceptions must change the emitted Coraza directives."""
+    listener = make_listener(db)
+    make_waf_rule(db, name="waf-ordered", listener_id=listener.id)
+    make_waf_exception(db, name="ex-first", rule_id="942100")
+    make_waf_exception(db, name="ex-second", rule_id="942110")
+    from app.models.models import WafException
+
+    before = coraza_config.generate_coraza_spoa_config(db)
+    exceptions = client.get("/api/v1/waf-exceptions").json()
+    client.put("/api/v1/waf-exceptions/reorder", json={"ordered_ids": [e["id"] for e in reversed(exceptions)]})
+    after = coraza_config.generate_coraza_spoa_config(db)
+    assert before != after
+    assert db.query(WafException).count() == 2

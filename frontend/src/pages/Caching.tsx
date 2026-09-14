@@ -848,8 +848,7 @@ function CacheRulesModal({ config, onClose }: CacheRulesModalProps) {
     if (from < 0 || to < 0) return
     const reordered = [...rules]
     const [moved] = reordered.splice(from, 1)
-    const insertAt = from < to ? to - 1 : to
-    reordered.splice(insertAt, 0, moved)
+    reordered.splice(to, 0, moved)
     // Optimistic reorder so the list does not jump while the request is in flight.
     setRules(reordered)
     withBusy(() => cache.reorderRules(config.backend_id, reordered.map(r => r.id)))

@@ -1330,6 +1330,7 @@
       "title": "WAF-Regeln",
       "addRule": "Regel hinzufügen",
       "tableHeaders": {
+        "order": "Reihenfolge",
         "name": "Name",
         "listener": "Listener",
         "backend": "Backend",
@@ -1410,6 +1411,7 @@
       "title": "Ausnahmen",
       "addException": "Ausnahme hinzufügen",
       "tableHeaders": {
+        "order": "Reihenfolge",
         "name": "Name",
         "action": "Aktion",
         "updated": "Aktualisiert",
@@ -1750,6 +1752,7 @@
     "title": "Ratenlimits",
     "addRateLimit": "Ratenlimit hinzufügen",
     "tableHeaders": {
+      "order": "Reihenfolge",
       "name": "Name",
       "listener": "Listener",
       "type": "Typ",

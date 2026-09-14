@@ -2328,7 +2328,9 @@ def generate_frontend(
                 waf_rule_rate = primary
 
         listener_rate_limits = [
-            rl for rl in db.query(RateLimit).all() if _matches_listener(rl, listener) and rl.enabled
+            rl
+            for rl in db.query(RateLimit).order_by(RateLimit.priority, RateLimit.id).all()
+            if _matches_listener(rl, listener) and rl.enabled
         ]
 
         # Response-code rate limits use a dedicated stick-table backend tracked

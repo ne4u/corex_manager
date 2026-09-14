@@ -1330,6 +1330,7 @@
       "title": "WAF规则",
       "addRule": "添加规则",
       "tableHeaders": {
+        "order": "顺序",
         "name": "名称",
         "listener": "监听器",
         "backend": "后端",
@@ -1410,6 +1411,7 @@
       "title": "例外",
       "addException": "添加例外",
       "tableHeaders": {
+        "order": "顺序",
         "name": "名称",
         "action": "操作",
         "updated": "更新时间",
@@ -1750,6 +1752,7 @@
     "title": "速率限制",
     "addRateLimit": "添加速率限制",
     "tableHeaders": {
+      "order": "顺序",
       "name": "名称",
       "listener": "监听器",
       "type": "类型",

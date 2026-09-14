@@ -12,6 +12,7 @@ class WafRule(Base):
     backend_id = Column(Integer, ForeignKey("backends.id"), nullable=True)
     name = Column(String, unique=True, index=True, nullable=False)
     enabled = Column(Boolean, default=True)
+    priority = Column(Integer, default=0, index=True, nullable=False)
     rule_set = Column(String, default="coraza")  # coraza, owasp-crs, custom, commercial
     rule_set_version = Column(String, nullable=True)
     rule_set_url = Column(String, nullable=True)
@@ -57,6 +58,7 @@ class WafException(Base):
     id = Column(Integer, primary_key=True, index=True)
     waf_rule_id = Column(Integer, ForeignKey("waf_rules.id"), nullable=True)
     name = Column(String, nullable=False)
+    priority = Column(Integer, default=0, index=True, nullable=False)
     rule_id = Column(String, nullable=True)
     rule_tag = Column(String, nullable=True)
     rule_msg = Column(String, nullable=True)

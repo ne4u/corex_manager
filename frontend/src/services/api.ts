@@ -283,6 +283,7 @@ export const wafRules = {
   create: (data: Record<string, unknown>) => api.post('/waf-rules', data),
   update: (id: number, data: Record<string, unknown>) => api.put(`/waf-rules/${id}`, data),
   remove: (id: number) => api.delete(`/waf-rules/${id}`),
+  reorder: (orderedIds: number[]) => api.put('/waf-rules/reorder', { ordered_ids: orderedIds }),
   export: () => api.get('/waf/rules/export'),
   import: (data: Record<string, unknown>) => api.post('/waf/rules/import', data),
   refreshRuleSet: (id: number) => api.post(`/waf/rules/${id}/refresh-rule-set`),
@@ -293,6 +294,7 @@ export const wafExceptions = {
   create: (data: Record<string, unknown>) => api.post('/waf-exceptions', data),
   update: (id: number, data: Record<string, unknown>) => api.put(`/waf-exceptions/${id}`, data),
   remove: (id: number) => api.delete(`/waf-exceptions/${id}`),
+  reorder: (orderedIds: number[]) => api.put('/waf-exceptions/reorder', { ordered_ids: orderedIds }),
   options: () => api.get('/waf/exception-options'),
   preview: (data: Record<string, unknown>) => api.post('/waf/exceptions/preview', data),
 }
@@ -323,6 +325,7 @@ export const rateLimits = {
   create: (data: Record<string, unknown>) => api.post('/rate-limits', data),
   update: (id: number, data: Record<string, unknown>) => api.put(`/rate-limits/${id}`, data),
   remove: (id: number) => api.delete(`/rate-limits/${id}`),
+  reorder: (orderedIds: number[]) => api.put('/rate-limits/reorder', { ordered_ids: orderedIds }),
 }
 
 export const redirects = {

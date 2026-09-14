@@ -1330,6 +1330,7 @@
       "title": "WAFルール",
       "addRule": "ルールを追加",
       "tableHeaders": {
+        "order": "順序",
         "name": "名前",
         "listener": "リスナー",
         "backend": "バックエンド",
@@ -1410,6 +1411,7 @@
       "title": "例外",
       "addException": "例外を追加",
       "tableHeaders": {
+        "order": "順序",
         "name": "名前",
         "action": "アクション",
         "updated": "更新日",
@@ -1750,6 +1752,7 @@
     "title": "レート制限",
     "addRateLimit": "レート制限を追加",
     "tableHeaders": {
+      "order": "順序",
       "name": "名前",
       "listener": "リスナー",
       "type": "タイプ",

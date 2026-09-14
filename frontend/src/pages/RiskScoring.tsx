@@ -475,8 +475,7 @@ export default function RiskScoring() {
     const to = newList.findIndex(r => r.id === targetId)
     if (from < 0 || to < 0) return
     const [moved] = newList.splice(from, 1)
-    const insertAt = from < to ? to - 1 : to
-    newList.splice(insertAt, 0, moved)
+    newList.splice(to, 0, moved)
     const orderedIds = newList.map(r => r.id)
     try {
       await riskRules.reorder(orderedIds)

@@ -1330,6 +1330,7 @@
       "title": "WAF 규칙",
       "addRule": "규칙 추가",
       "tableHeaders": {
+        "order": "순서",
         "name": "이름",
         "listener": "리스너",
         "backend": "백엔드",
@@ -1410,6 +1411,7 @@
       "title": "예외",
       "addException": "예외 추가",
       "tableHeaders": {
+        "order": "순서",
         "name": "이름",
         "action": "작업",
         "updated": "수정일",
@@ -1750,6 +1752,7 @@
     "title": "레이트 제한",
     "addRateLimit": "레이트 제한 추가",
     "tableHeaders": {
+      "order": "순서",
       "name": "이름",
       "listener": "리스너",
       "type": "유형",

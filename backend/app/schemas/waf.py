@@ -95,10 +95,15 @@ WafRuleUpdate = _optional_update(WafRuleBase)
 
 class WafRuleResponse(WafRuleBase):
     id: int
+    priority: int
     created_at: datetime
     updated_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class WafRuleReorder(BaseModel):
+    ordered_ids: list[int]
 
 
 class WafExceptionBase(BaseModel):
@@ -129,9 +134,14 @@ WafExceptionUpdate = _optional_update(WafExceptionBase)
 
 class WafExceptionResponse(WafExceptionBase):
     id: int
+    priority: int
     updated_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class WafExceptionReorder(BaseModel):
+    ordered_ids: list[int]
 
 
 class WafExceptionPreviewRequest(WafExceptionBase):
@@ -198,12 +208,14 @@ __all__ = [
     "WafExceptionOptionsResponse",
     "WafExceptionPreviewRequest",
     "WafExceptionPreviewResponse",
+    "WafExceptionReorder",
     "WafExceptionResponse",
     "WafExceptionRuleOption",
     "WafExceptionUpdate",
     "WafExceptionVariableOption",
     "WafRuleBase",
     "WafRuleCreate",
+    "WafRuleReorder",
     "WafRuleResponse",
     "WafRuleUpdate",
     "WafRuleVersionBase",

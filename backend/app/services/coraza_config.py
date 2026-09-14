@@ -440,7 +440,7 @@ def _listener_default_backend_id(db: Session, listener_id: int | None) -> int | 
 
 
 def _rules_for_listener(db: Session, listener_id: int | None) -> list[WafRule]:
-    all_rules = db.query(WafRule).all()
+    all_rules = db.query(WafRule).order_by(WafRule.priority, WafRule.id).all()
     enabled = _enabled_rules(all_rules)
     default_backend_id = _listener_default_backend_id(db, listener_id)
 
@@ -470,7 +470,11 @@ def _exceptions_for_rules(db: Session, rules: list[WafRule]) -> list[WafExceptio
     # exception is silently dropped and never reaches the generated config, so
     # the on-disk file doesn't change and the "unapplied changes" banner never
     # appears after creating one.
-    return [e for e in db.query(WafException).all() if e.waf_rule_id is None or e.waf_rule_id in rule_ids]
+    return [
+        e
+        for e in db.query(WafException).order_by(WafException.priority, WafException.id).all()
+        if e.waf_rule_id is None or e.waf_rule_id in rule_ids
+    ]
 
 
 def rules_for_listener(db: Session, listener_id: int | None) -> list[WafRule]:

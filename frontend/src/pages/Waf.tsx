@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Shield, FileText, Ban, GitBranch, Download, Upload, Heart, Pencil, Trash2, RefreshCw, Camera, RotateCcw, FileCode } from 'lucide-react'
-import { wafRules, wafExceptions, listeners, waf, backends, settings } from '../services/api'
+import { Shield, FileText, Ban, GitBranch, Download, Upload, Heart, Pencil, Trash2, RefreshCw, Camera, RotateCcw, FileCode, GripVertical } from 'lucide-react'
+import { wafRules, wafExceptions, listeners, waf, backends, settings, getErrorDetail } from '../services/api'
 import useApiList from '../hooks/useApiList'
 import Modal from '../components/Modal'
 import LabelWithTooltip from '../components/LabelWithTooltip'
@@ -106,6 +106,8 @@ export default function Waf() {
   const [tab, setTab] = useState('rules')
   const [health, setHealth] = useState<any>(null)
   const [asnDbAvailable, setAsnDbAvailable] = useState(false)
+  const [dragOverId, setDragOverId] = useState<number | null>(null)
+  const [exDragOverId, setExDragOverId] = useState<number | null>(null)
 
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<number | null>(null)
@@ -288,6 +290,38 @@ export default function Waf() {
     setExForm(emptyException()); setExEditing(null); setExOpen(false); re()
   }
 
+  const reorderRules = async (draggedId: number, targetId: number) => {
+    if (draggedId === targetId) return
+    const newList = [...rules]
+    const from = newList.findIndex((r: any) => r.id === draggedId)
+    const to = newList.findIndex((r: any) => r.id === targetId)
+    if (from < 0 || to < 0) return
+    const [moved] = newList.splice(from, 1)
+    newList.splice(to, 0, moved)
+    try {
+      await wafRules.reorder(newList.map((r: any) => r.id))
+      rr()
+    } catch (err) {
+      alert(getErrorDetail(err))
+    }
+  }
+
+  const reorderExceptions = async (draggedId: number, targetId: number) => {
+    if (draggedId === targetId) return
+    const newList = [...exceptions]
+    const from = newList.findIndex((e: any) => e.id === draggedId)
+    const to = newList.findIndex((e: any) => e.id === targetId)
+    if (from < 0 || to < 0) return
+    const [moved] = newList.splice(from, 1)
+    newList.splice(to, 0, moved)
+    try {
+      await wafExceptions.reorder(newList.map((e: any) => e.id))
+      re()
+    } catch (err) {
+      alert(getErrorDetail(err))
+    }
+  }
+
   const snapshotRule = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!versionRuleId || !versionName) return
@@ -380,10 +414,20 @@ export default function Waf() {
           </div>
           <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
             <table className="w-full text-sm text-start">
-              <thead className="text-muted-foreground border-b border-border"><tr><th>{t('waf.rules.tableHeaders.name')}</th><th>{t('waf.rules.tableHeaders.listener')}</th><th>{t('waf.rules.tableHeaders.backend')}</th><th>{t('waf.rules.tableHeaders.ruleSet')}</th><th>{t('waf.rules.tableHeaders.engine')}</th><th>{t('waf.rules.tableHeaders.paranoia')}</th><th>{t('waf.rules.tableHeaders.action')}</th><th>{t('waf.rules.tableHeaders.enabled')}</th><th className="w-40 whitespace-nowrap">{t('waf.rules.tableHeaders.updated')}</th><th></th></tr></thead>
+              <thead className="text-muted-foreground border-b border-border"><tr><th className="w-8"></th><th className="w-16">{t('waf.rules.tableHeaders.order')}</th><th>{t('waf.rules.tableHeaders.name')}</th><th>{t('waf.rules.tableHeaders.listener')}</th><th>{t('waf.rules.tableHeaders.backend')}</th><th>{t('waf.rules.tableHeaders.ruleSet')}</th><th>{t('waf.rules.tableHeaders.engine')}</th><th>{t('waf.rules.tableHeaders.paranoia')}</th><th>{t('waf.rules.tableHeaders.action')}</th><th>{t('waf.rules.tableHeaders.enabled')}</th><th className="w-40 whitespace-nowrap">{t('waf.rules.tableHeaders.updated')}</th><th></th></tr></thead>
               <tbody>
-                {rules.map((r: any) => (
-                  <tr key={r.id} className="border-b border-border last:border-0">
+                {rules.map((r: any, ri: number) => (
+                  <tr
+                    key={r.id}
+                    className={`border-b border-border last:border-0 ${dragOverId === r.id ? 'bg-muted' : ''}`}
+                    draggable
+                    onDragStart={(e) => { e.dataTransfer.setData('waf-rule', String(r.id)); e.dataTransfer.effectAllowed = 'move' }}
+                    onDragOver={(e) => { e.preventDefault(); setDragOverId(r.id) }}
+                    onDrop={(e) => { e.preventDefault(); const dragged = Number(e.dataTransfer.getData('waf-rule')); if (dragged && dragged !== r.id) { setDragOverId(null); reorderRules(dragged, r.id) } }}
+                    onDragEnd={() => setDragOverId(null)}
+                  >
+                    <td className="py-2 cursor-grab"><GripVertical className="h-4 w-4 text-muted-foreground" /></td>
+                    <td className="py-2 text-muted-foreground">{ri + 1}</td>
                     <td className="py-2">{r.name}</td>
                     <td>{r.listener_id ? listenerList.find((l: any) => l.id === r.listener_id)?.name : t('waf.rules.all')}</td>
                     <td>{r.backend_id ? backendList.find((b: any) => b.id === r.backend_id)?.name : t('waf.rules.any')}</td>
@@ -414,10 +458,20 @@ export default function Waf() {
           <div className="flex items-center justify-between"><h3 className="text-xl font-bold">{t('waf.exceptions.title')}</h3><button onClick={openExAdd} className="btn-primary">{t('waf.exceptions.addException')}</button></div>
           <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
             <table className="w-full text-sm text-start">
-              <thead className="text-muted-foreground border-b border-border"><tr><th>{t('waf.exceptions.tableHeaders.name')}</th><th>{t('waf.exceptions.fields.wafRule')}</th><th>{t('waf.exceptions.fields.conditionVariable')}</th><th>{t('waf.exceptions.fields.conditionOperator')}</th><th>{t('waf.exceptions.fields.conditionValue')}</th><th>{t('waf.exceptions.tableHeaders.action')}</th><th className="w-40 whitespace-nowrap">{t('waf.exceptions.tableHeaders.updated')}</th><th></th></tr></thead>
+              <thead className="text-muted-foreground border-b border-border"><tr><th className="w-8"></th><th className="w-16">{t('waf.exceptions.tableHeaders.order')}</th><th>{t('waf.exceptions.tableHeaders.name')}</th><th>{t('waf.exceptions.fields.wafRule')}</th><th>{t('waf.exceptions.fields.conditionVariable')}</th><th>{t('waf.exceptions.fields.conditionOperator')}</th><th>{t('waf.exceptions.fields.conditionValue')}</th><th>{t('waf.exceptions.tableHeaders.action')}</th><th className="w-40 whitespace-nowrap">{t('waf.exceptions.tableHeaders.updated')}</th><th></th></tr></thead>
               <tbody>
-                {exceptions.map((e: any) => (
-                  <tr key={e.id} className="border-b border-border last:border-0">
+                {exceptions.map((e: any, ei: number) => (
+                  <tr
+                    key={e.id}
+                    className={`border-b border-border last:border-0 ${exDragOverId === e.id ? 'bg-muted' : ''}`}
+                    draggable
+                    onDragStart={(ev) => { ev.dataTransfer.setData('waf-exception', String(e.id)); ev.dataTransfer.effectAllowed = 'move' }}
+                    onDragOver={(ev) => { ev.preventDefault(); setExDragOverId(e.id) }}
+                    onDrop={(ev) => { ev.preventDefault(); const dragged = Number(ev.dataTransfer.getData('waf-exception')); if (dragged && dragged !== e.id) { setExDragOverId(null); reorderExceptions(dragged, e.id) } }}
+                    onDragEnd={() => setExDragOverId(null)}
+                  >
+                    <td className="py-2 cursor-grab"><GripVertical className="h-4 w-4 text-muted-foreground" /></td>
+                    <td className="py-2 text-muted-foreground">{ei + 1}</td>
                     <td className="py-2">{e.name}</td><td className="py-2 text-xs">{e.waf_rule_id ? (rules.find((r: any) => r.id === e.waf_rule_id)?.name || `#${e.waf_rule_id}`) : t('waf.exceptions.fields.global')}</td><td className="font-mono text-xs">{e.condition_variable || '-'}</td><td>{e.condition_variable ? e.condition_operator : '-'}</td><td className="max-w-xs truncate" title={e.condition_value || undefined}>{e.condition_value || '-'}</td><td>{e.action}</td><td className="py-2 text-xs text-muted-foreground whitespace-nowrap">{e.updated_at ? formatDateTime(e.updated_at) : '-'}</td>
                     <td>
                       <div className="flex gap-1">
