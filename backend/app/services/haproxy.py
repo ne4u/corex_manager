@@ -120,6 +120,18 @@ _FCGI_PARAM_RE = re.compile(r"[\r\n;]")
 # Characters that could break a HAProxy log-format query string or inject config
 _QUERY_RE = re.compile(r"[\r\n;#|\"'`$\\]")
 
+# Response-header conditions that use response-phase fetches (res.*, status)
+# must stay inline in http-response rules — they can only be evaluated there.
+_RESP_PHASE_COND_RE = re.compile(r"\bres\.|\bres_|\bstatus\b")
+# Request-phase fetches cannot be evaluated in http-response rules — conditions
+# using them silently never match ("anonymous acl will never match" on 3.5+),
+# and a negated one (!{ req.hdr(...) }) becomes always-true. Such conditions
+# are captured into a txn var during the request phase instead.
+_REQ_PHASE_COND_RE = re.compile(
+    r"\breq\.|\breq_|\bhdr\(|\bpath\b|\bmethod\b|\bmeth\b|\bsrc\b|\bdst\b|"
+    r"\burl_param\b|\burlp\b|\burl\b|\bquery\b|\bbase\b|\bssl_fc\b|\bcapture\."
+)
+
 
 def _safe_name(name: str) -> str:
     """Sanitize a value used as a HAProxy identifier."""
@@ -2845,6 +2857,17 @@ def generate_frontend(
             header_value = _safe_header_value(h.value)
             condition = _format_condition(h.condition)
             if condition:
+                # Request-phase fetches (req.hdr, path, etc.) cannot be
+                # evaluated in http-response rules — the ACL silently never
+                # matches ("anonymous acl will never match" warning on 3.5+)
+                # and a negated condition becomes always-true. Capture the
+                # outcome into a txn var during the request phase and test the
+                # var here instead. Conditions needing response-phase fetches
+                # (res.hdr, status) stay inline — they only work here.
+                if _REQ_PHASE_COND_RE.search(condition) and not _RESP_PHASE_COND_RE.search(condition):
+                    cond_var = f"txn.rh_cond_{h.id}"
+                    lines.append(f"    http-request set-var({cond_var}) bool(1){condition}")
+                    condition = f" if {{ var({cond_var}) -m found }}"
                 condition = f"{condition} !{{ var(txn.is_varnish_fetch) -m found }}"
             else:
                 condition = " if !{ var(txn.is_varnish_fetch) -m found }"

@@ -546,6 +546,63 @@ def test_response_headers_guarded_against_varnish_fetch(db):
     assert "http-response del-header X-Custom-Del if !{ var(txn.is_varnish_fetch) -m found }" in cfg
 
 
+def test_response_header_req_phase_condition_uses_txn_var(db):
+    """A response-header condition using request-phase fetches (req.hdr) cannot
+    be evaluated inside an http-response rule — HAProxy warns 'anonymous acl
+    will never match' and the rule never fires (worse: a negated condition
+    becomes always-true). The condition must be captured into a txn var during
+    the request phase — the same pattern used for txn.is_varnish_fetch — and
+    the http-response rule tests the var instead."""
+    from app.models.models import ResponseHeader
+    backend = make_backend(db)
+    listener = make_listener(db, backend=backend)
+    make_server(db, backend.id)
+    hdr = ResponseHeader(
+        name="nosniff", header="X-Content-Type-Options", value="nosniff",
+        action="set", listener_ids=[],
+        condition="!{ req.hdr(host) -m str logs.example.com }",
+    )
+    db.add(hdr)
+    db.commit()
+    cfg = haproxy.generate_frontend(listener, db)
+    cond_var = f"txn.rh_cond_{hdr.id}"
+    assert (
+        f"http-request set-var({cond_var}) bool(1) "
+        f"if !{{ req.hdr(host) -m str logs.example.com }}" in cfg
+    )
+    resp_lines = [l for l in cfg.splitlines() if "X-Content-Type-Options" in l]
+    assert len(resp_lines) == 1
+    assert "req.hdr" not in resp_lines[0]
+    assert (
+        f'http-response set-header X-Content-Type-Options "nosniff" '
+        f"if {{ var({cond_var}) -m found }} "
+        f"!{{ var(txn.is_varnish_fetch) -m found }}" in resp_lines[0]
+    )
+
+
+def test_response_header_resp_phase_condition_stays_inline(db):
+    """Conditions using response-phase fetches (status, res.hdr) can ONLY be
+    evaluated in the response phase — they must remain inline in the
+    http-response rule, not captured into a request-phase txn var."""
+    from app.models.models import ResponseHeader
+    backend = make_backend(db)
+    listener = make_listener(db, backend=backend)
+    make_server(db, backend.id)
+    db.add(ResponseHeader(
+        name="ok-only", header="X-Ok", value="1", action="set",
+        listener_ids=[], condition="{ status 200 }",
+    ))
+    db.add(ResponseHeader(
+        name="html-only", header="X-Html", value="1", action="set",
+        listener_ids=[], condition="{ res.hdr(content-type) -m beg text/html }",
+    ))
+    db.commit()
+    cfg = haproxy.generate_frontend(listener, db)
+    assert "rh_cond" not in cfg
+    assert 'http-response set-header X-Ok "1" if { status 200 }' in cfg
+    assert "if { res.hdr(content-type) -m beg text/html }" in cfg
+
+
 def test_alt_svc_guarded_against_varnish_fetch(db):
     """Alt-Svc response header must carry !is_varnish_fetch so it's not baked
     into Varnish cache objects and duplicated on cache-hit delivery."""
