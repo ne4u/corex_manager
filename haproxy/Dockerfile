@@ -57,7 +57,7 @@ COPY haproxy/req_fp/ ./
 RUN cargo build --release -p haproxy-req-fp-module
 
 # Stage 2: HAProxy runtime
-FROM haproxytech/haproxy-alpine:3.4
+FROM haproxytech/haproxy-alpine:3.5
 
 USER root
 ARG DATAPLANEAPI_VERSION=3.4.3
