@@ -198,6 +198,13 @@ class CatalogWorker:
             from upstream import fetch_catalog, initialize_upstream
 
         servers = get_enabled_servers()
+
+        # Drop catalogs for servers removed from or disabled in the config.
+        live_ids = {s.get("id") for s in servers}
+        for sid in list(_catalog_cache):
+            if sid not in live_ids:
+                clear_catalog(sid)
+
         if not servers:
             return
 

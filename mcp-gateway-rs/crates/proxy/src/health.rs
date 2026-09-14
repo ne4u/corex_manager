@@ -6,9 +6,10 @@
 
 use std::sync::Arc;
 
+use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 
-use corex_core::config::ServerConfig;
+use corex_core::config::{ConfigBundle, ServerConfig};
 use corex_policy::valkey::ValkeyClient;
 
 use crate::stdio::ProcessManager;
@@ -56,9 +57,12 @@ impl HealthChecker {
     }
 
     /// Run the health check loop until `stop()` is called.
-    pub async fn run(&self, servers: Vec<ServerConfig>) {
+    ///
+    /// The server list is re-read from the shared (hot-reloaded) config on
+    /// every cycle so servers added or enabled after startup are checked.
+    pub async fn run(&self, config: Arc<RwLock<Option<ConfigBundle>>>) {
         loop {
-            self.check_all(&servers).await;
+            self.check_all(&current_servers(&config)).await;
             tokio::select! {
                 _ = tokio::time::sleep(std::time::Duration::from_secs(self.interval)) => {}
                 _ = self.shutdown.notified() => break,
@@ -143,6 +147,15 @@ impl HealthChecker {
             _ => HealthStatus::unknown(server_id),
         }
     }
+}
+
+/// Snapshot the current server list from the shared (hot-reloaded) config.
+pub(crate) fn current_servers(config: &Arc<RwLock<Option<ConfigBundle>>>) -> Vec<ServerConfig> {
+    config
+        .read()
+        .as_ref()
+        .map(|c| c.servers.clone())
+        .unwrap_or_default()
 }
 
 fn now_secs() -> f64 {

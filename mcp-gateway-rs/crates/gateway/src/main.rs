@@ -85,11 +85,12 @@ async fn main() {
         metrics: metrics::Metrics::new(),
     };
 
-    // Start catalog worker.
-    let catalog_servers = config.servers.clone();
+    // Start catalog worker. The worker re-reads the (hot-reloaded) config each
+    // cycle so servers added or enabled after startup are picked up.
     let catalog_refresh = config.catalog_refresh_seconds.max(30) as u64;
     let catalog_store_clone = catalog_store.clone();
     let upstream_clone = upstream.clone();
+    let catalog_config = state.config.clone();
     tokio::spawn(async move {
         let worker = corex_proxy::CatalogWorker::new(
             catalog_store_clone,
@@ -97,11 +98,10 @@ async fn main() {
             ProcessManager::new(),
             catalog_refresh,
         );
-        worker.run(catalog_servers).await;
+        worker.run(catalog_config).await;
     });
 
-    // Start health checker.
-    let health_servers = config.servers.clone();
+    // Start health checker — also reads the live config each cycle.
     let health_interval = std::env::var("MCP_HEALTH_CHECK_INTERVAL")
         .ok()
         .and_then(|v| v.parse().ok())
@@ -109,9 +109,15 @@ async fn main() {
     let health_upstream = state.upstream.clone();
     let health_stdio = ProcessManager::new();
     let health_valkey = corex_policy::valkey::ValkeyClient::connect().await.ok();
+    let health_config = state.config.clone();
     tokio::spawn(async move {
-        let checker = HealthChecker::new(health_valkey, health_upstream, health_stdio, health_interval);
-        checker.run(health_servers).await;
+        let checker = HealthChecker::new(
+            health_valkey,
+            health_upstream,
+            health_stdio,
+            health_interval,
+        );
+        checker.run(health_config).await;
     });
 
     // Start config file watcher.

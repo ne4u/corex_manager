@@ -137,16 +137,18 @@ impl UpstreamClient {
         let headers = self.build_headers(server, None);
         match self.post_with_redirect(&client, url, body, &headers).await {
             Ok(resp) => {
-                if resp.status == 200 {
+                // Mirror send_request: any sub-5xx response proves the upstream
+                // is reachable; only 5xx/transport errors count as failures.
+                if resp.status < 500 {
                     self.breaker.record_success(server.id);
-                    let sid = resp
-                        .upstream_session_id
-                        .clone()
-                        .unwrap_or_default();
+                } else {
+                    self.breaker.record_failure(server.id);
+                }
+                if resp.status == 200 {
+                    let sid = resp.upstream_session_id.clone().unwrap_or_default();
                     Some(sid)
                 } else {
                     tracing::warn!("Upstream initialize returned {} for {url}", resp.status);
-                    self.breaker.record_failure(server.id);
                     None
                 }
             }
@@ -338,9 +340,18 @@ impl UpstreamClient {
                 Ok(r) => r,
                 Err(e) => {
                     tracing::error!("Upstream {url} failed on {method}: {e}");
+                    self.breaker.record_failure(server.id);
                     return None;
                 }
             };
+            // Catalog fetches are intentionally not gated by the circuit
+            // breaker: the periodic refresh doubles as the recovery probe, so
+            // the outcome is recorded instead (a success closes the circuit).
+            if resp.status < 500 {
+                self.breaker.record_success(server.id);
+            } else {
+                self.breaker.record_failure(server.id);
+            }
             if resp.status != 200 {
                 return None;
             }

@@ -9,14 +9,15 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use parking_lot::Mutex;
+use parking_lot::{Mutex, RwLock};
 use sha2::{Digest, Sha256};
 
-use corex_core::config::ServerConfig;
+use corex_core::config::{ConfigBundle, ServerConfig};
 use corex_policy::valkey::ValkeyClient;
 
-use crate::upstream::{Catalog, UpstreamClient};
+use crate::health::current_servers;
 use crate::stdio::ProcessManager;
+use crate::upstream::{Catalog, UpstreamClient};
 
 const CATALOG_TTL: u64 = 7200;
 
@@ -149,10 +150,13 @@ impl CatalogWorker {
     }
 
     /// Run the worker until `stop()` is called.
-    pub async fn run(&self, servers: Vec<ServerConfig>) {
+    ///
+    /// The server list is re-read from the shared (hot-reloaded) config on
+    /// every cycle so servers added or enabled after startup are refreshed.
+    pub async fn run(&self, config: Arc<RwLock<Option<ConfigBundle>>>) {
         // Initial refresh + quick retries in case upstreams are still booting.
         for i in 0..5u32 {
-            self.refresh_all(&servers).await;
+            self.refresh_all(&current_servers(&config)).await;
             if i < 4 {
                 tokio::select! {
                     _ = tokio::time::sleep(std::time::Duration::from_secs(5)) => {}
@@ -163,7 +167,7 @@ impl CatalogWorker {
         loop {
             tokio::select! {
                 _ = tokio::time::sleep(std::time::Duration::from_secs(self.refresh_interval)) => {
-                    self.refresh_all(&servers).await;
+                    self.refresh_all(&current_servers(&config)).await;
                 }
                 _ = self.shutdown.notified() => break,
             }
@@ -182,6 +186,14 @@ impl CatalogWorker {
             .map(|s| self.refresh_one(s.clone()))
             .collect();
         futures::future::join_all(tasks).await;
+        // Drop catalogs for servers removed from or disabled in the config.
+        let live: std::collections::HashSet<i64> =
+            servers.iter().filter(|s| s.enabled).map(|s| s.id).collect();
+        for (id, ..) in self.store.freshness() {
+            if !live.contains(&id) {
+                self.store.clear(id).await;
+            }
+        }
     }
 
     async fn refresh_one(&self, server: ServerConfig) {

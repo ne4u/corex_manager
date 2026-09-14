@@ -195,15 +195,19 @@ async def initialize_upstream(server: dict) -> Optional[str]:
         resp = await _post_with_redirect(client, url, body, headers)
         # Extract session ID from response header
         upstream_sid = resp.headers.get("Mcp-Session-Id")
-        if resp.status_code == 200:
+        # Mirror send_request: any sub-5xx response proves the upstream is
+        # reachable and resets the breaker; only 5xx/transport errors count.
+        if resp.status_code < 500:
             _record_upstream_success(server["id"])
+        else:
+            _record_upstream_failure(server["id"])
+        if resp.status_code == 200:
             # Some streamable HTTP servers (e.g. certain opensearch-mcp versions)
             # do not return a session ID.  Return "" so callers can distinguish
             # a successful stateless initialize (truthy empty string) from a
             # failed one (None).
             return upstream_sid or ""
         logger.warning("Upstream initialize returned %d for %s", resp.status_code, url)
-        _record_upstream_failure(server["id"])
         return None
     except Exception as e:
         logger.error("Upstream initialize failed for %s: %s", url, e)
@@ -355,6 +359,13 @@ async def _fetch_list(
         }
         try:
             resp = await _post_with_redirect(client, url, body, headers)
+            # Catalog fetches are deliberately not gated by the circuit
+            # breaker: the periodic refresh doubles as the recovery probe, so
+            # the outcome is recorded instead (a success closes the circuit).
+            if resp.status_code < 500:
+                _record_upstream_success(server["id"])
+            else:
+                _record_upstream_failure(server["id"])
             if resp.status_code != 200:
                 logger.warning("Upstream %s returned %d for %s", url, resp.status_code, method)
                 return None
@@ -373,6 +384,7 @@ async def _fetch_list(
             req_id += 1
         except Exception as e:
             logger.error("Upstream %s failed on %s: %s", url, method, e)
+            _record_upstream_failure(server["id"])
             return None
 
     return items
