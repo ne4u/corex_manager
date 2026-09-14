@@ -15,13 +15,14 @@ condition variables — from every source available on this deployment:
 - Curated static lists (zones, common condition variables, well-known CRS
   tags) so the editor still offers useful options on a fresh install.
 """
+
 import glob
 import json
 import logging
 import os
 import re
 from collections import deque
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -46,7 +47,7 @@ MAX_VARIABLES = 200
 
 # Coraza/ModSecurity collections that can be exclusion targets
 # (SecRuleUpdateTargetById / ctl:ruleRemoveTargetBy*).
-DEFAULT_ZONES: List[str] = [
+DEFAULT_ZONES: list[str] = [
     "ARGS",
     "ARGS_NAMES",
     "REQUEST_HEADERS",
@@ -60,7 +61,7 @@ DEFAULT_ZONES: List[str] = [
 ]
 
 # Common SecRule variables used as condition targets in practice.
-DEFAULT_CONDITION_VARIABLES: List[str] = [
+DEFAULT_CONDITION_VARIABLES: list[str] = [
     "REQUEST_URI",
     "REQUEST_FILENAME",
     "QUERY_STRING",
@@ -80,7 +81,7 @@ DEFAULT_CONDITION_VARIABLES: List[str] = [
 
 # Well-known OWASP CRS tags so the tag picker is useful even before any rule
 # has fired and before any rule set has been downloaded to disk.
-DEFAULT_TAGS: List[str] = [
+DEFAULT_TAGS: list[str] = [
     "OWASP_CRS",
     "attack-disclosure",
     "attack-fixation",
@@ -116,7 +117,7 @@ _LOG_DATA_RE = re.compile(r'\[data "([^"]+)"\]')
 _WITHIN_RE = re.compile(r"within\s+([A-Z_]+(?::[^\s:.,'\"]+)?)")
 
 
-def _first_group(match: Optional[re.Match]) -> Optional[str]:
+def _first_group(match: re.Match | None) -> str | None:
     if not match:
         return None
     for g in match.groups():
@@ -125,7 +126,7 @@ def _first_group(match: Optional[re.Match]) -> Optional[str]:
     return None
 
 
-def _parse_rule_line(line: str) -> Optional[Dict[str, Any]]:
+def _parse_rule_line(line: str) -> dict[str, Any] | None:
     """Extract {id, msg, tags} from a single SecRule/SecAction line."""
     if not _RULE_LINE_RE.match(line):
         return None
@@ -139,13 +140,13 @@ def _parse_rule_line(line: str) -> Optional[Dict[str, Any]]:
     }
 
 
-def _rule_texts(db: Session) -> List[str]:
+def _rule_texts(db: Session) -> list[str]:
     """Return the contents of every parseable rule source on disk / in the DB."""
-    texts: List[str] = []
+    texts: list[str] = []
 
     # Downloaded CRS version (if the user fetched one via the CRS tab).
     try:
-        from .crs_downloader import get_active_crs_version, _crs_dir
+        from .crs_downloader import _crs_dir, get_active_crs_version
 
         active = get_active_crs_version(db)
         if active:
@@ -168,20 +169,20 @@ def _rule_texts(db: Session) -> List[str]:
     return texts
 
 
-def _read_rule_files(directory: str) -> List[str]:
-    texts: List[str] = []
+def _read_rule_files(directory: str) -> list[str]:
+    texts: list[str] = []
     if not os.path.isdir(directory):
         return texts
     for path in sorted(glob.glob(os.path.join(directory, "*.conf"))):
         try:
-            with open(path, "r", encoding="utf-8", errors="replace") as f:
+            with open(path, encoding="utf-8", errors="replace") as f:
                 texts.append(f.read(RULE_FILE_MAX_BYTES))
         except OSError:
             continue
     return texts
 
 
-def _iter_match_objects(data: Dict[str, Any]):
+def _iter_match_objects(data: dict[str, Any]):
     """Yield candidate match dicts from a parsed JSON log line."""
     match = data.get("match")
     if isinstance(match, dict):
@@ -194,7 +195,7 @@ def _iter_match_objects(data: Dict[str, Any]):
             yield nested
 
 
-def _collect_within(text: Optional[str], variables: Dict[Tuple[str, str], None]) -> None:
+def _collect_within(text: str | None, variables: dict[tuple[str, str], None]) -> None:
     """Extract 'ZONE:key' targets from 'found within ...' match data."""
     if not text:
         return
@@ -208,18 +209,18 @@ def _collect_within(text: Optional[str], variables: Dict[Tuple[str, str], None])
             variables[(zone, key)] = None
 
 
-def _scan_log_tail() -> Tuple[set, set, set, Dict[Tuple[str, str], None]]:
+def _scan_log_tail() -> tuple[set, set, set, dict[tuple[str, str], None]]:
     """Best-effort extraction of ids/tags/msgs/variable targets from the raw log."""
     ids: set = set()
     tags: set = set()
     msgs: set = set()
-    variables: Dict[Tuple[str, str], None] = {}
+    variables: dict[tuple[str, str], None] = {}
 
     path = settings.CORAZA_SPOA_LOG_PATH
     if not os.path.exists(path):
         return ids, tags, msgs, variables
     try:
-        with open(path, "r", encoding="utf-8", errors="replace") as f:
+        with open(path, encoding="utf-8", errors="replace") as f:
             lines = deque(f, maxlen=LOG_SCAN_LINES)
     except OSError:
         return ids, tags, msgs, variables
@@ -236,7 +237,7 @@ def _scan_log_tail() -> Tuple[set, set, set, Dict[Tuple[str, str], None]]:
             continue
         try:
             obj = json.loads(stripped)
-        except (json.JSONDecodeError, ValueError):
+        except json.JSONDecodeError, ValueError:
             continue
         if not isinstance(obj, dict):
             continue
@@ -258,16 +259,16 @@ def _scan_log_tail() -> Tuple[set, set, set, Dict[Tuple[str, str], None]]:
 
 
 @cache(ttl=60, key_prefix="waf")
-def get_exception_options(db: Session) -> Dict[str, Any]:
+def get_exception_options(db: Session) -> dict[str, Any]:
     """Return the merged suggestion catalog for the WAF exception editor."""
-    rules: Dict[str, Dict[str, Any]] = {}
+    rules: dict[str, dict[str, Any]] = {}
     tags: set = set()
-    msgs: Dict[str, Dict[str, Any]] = {}
-    variables: Dict[Tuple[str, str], None] = {}
+    msgs: dict[str, dict[str, Any]] = {}
+    variables: dict[tuple[str, str], None] = {}
     zones_seen: set = set()
     cond_vars_seen: set = set()
 
-    def add_rule(rid: str, msg: Optional[str] = None, rule_tags: Optional[List[str]] = None, hits: int = 0) -> None:
+    def add_rule(rid: str, msg: str | None = None, rule_tags: list[str] | None = None, hits: int = 0) -> None:
         entry = rules.setdefault(rid, {"id": rid, "msg": None, "tags": [], "hits": 0})
         if msg and not entry["msg"]:
             entry["msg"] = msg
@@ -276,7 +277,7 @@ def get_exception_options(db: Session) -> Dict[str, Any]:
             entry["tags"] = sorted(merged)
         entry["hits"] += hits
 
-    def add_msg(msg: str, rule_id: Optional[str] = None) -> None:
+    def add_msg(msg: str, rule_id: str | None = None) -> None:
         entry = msgs.setdefault(msg, {"msg": msg, "rule_id": rule_id, "hits": 0})
         if rule_id and not entry["rule_id"]:
             entry["rule_id"] = rule_id
@@ -363,7 +364,7 @@ def get_exception_options(db: Session) -> Dict[str, Any]:
     }
 
 
-def _split_field(value: Optional[str], comma_only: bool = False) -> List[str]:
+def _split_field(value: str | None, comma_only: bool = False) -> list[str]:
     """Split a stored multi-value field (comma- or whitespace-separated)."""
     if not value:
         return []

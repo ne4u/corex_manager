@@ -45,7 +45,7 @@ def test_sec_rules_text_parsed(db):
     make_waf_rule(
         db,
         name="waf",
-        sec_rules='SecRule ARGS "@rx foo" "id:100001,phase:2,deny,tag:\'attack-custom\',msg:\'My custom rule\'"',
+        sec_rules="SecRule ARGS \"@rx foo\" \"id:100001,phase:2,deny,tag:'attack-custom',msg:'My custom rule'\"",
     )
     out = _options(db)
     by_id = {r["id"]: r for r in out["rules"]}
@@ -73,7 +73,9 @@ def test_log_tail_parsed(db, tmp_path, monkeypatch):
     lines = [
         '[client "1.2.3.4"] Coraza: Warning. x [id "920350"] [msg "Host header is a numeric IP address"] '
         '[data "Matched Data: 1.2.3.4 found within REMOTE_ADDR: 1.2.3.4"] [tag "application-multi"] [tag "OWASP_CRS"]',
-        json.dumps({"match": {"rule_id": 942100, "msg": "SQLi", "tags": ["attack-sqli"], "data": "found within ARGS:q: x"}}),
+        json.dumps(
+            {"match": {"rule_id": 942100, "msg": "SQLi", "tags": ["attack-sqli"], "data": "found within ARGS:q: x"}}
+        ),
     ]
     log.write_text("\n".join(lines) + "\n")
     monkeypatch.setattr(opts.settings, "CORAZA_SPOA_LOG_PATH", str(log))
@@ -108,7 +110,7 @@ def test_existing_exception_values_merged(db):
 
 def test_parse_rule_line():
     parsed = opts._parse_rule_line(
-        'SecRule ARGS "@rx ." "id:942100,phase:2,block,msg:\'SQL Injection\',tag:\'attack-sqli\',tag:\'OWASP_CRS\'"'
+        "SecRule ARGS \"@rx .\" \"id:942100,phase:2,block,msg:'SQL Injection',tag:'attack-sqli',tag:'OWASP_CRS'\""
     )
     assert parsed == {"id": "942100", "msg": "SQL Injection", "tags": ["attack-sqli", "OWASP_CRS"]}
     assert opts._parse_rule_line("# a comment") is None

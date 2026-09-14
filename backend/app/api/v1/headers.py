@@ -1,7 +1,6 @@
-from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from ..deps import get_db, get_current_user, require_write, rate_limit
+
 from ...schemas.headers import (
     RequestHeaderCreate,
     RequestHeaderResponse,
@@ -15,18 +14,17 @@ from ...services.headers import (
     create_response_header,
     delete_request_header,
     delete_response_header,
-    get_request_header,
-    get_response_header,
     list_request_headers,
     list_response_headers,
     update_request_header,
     update_response_header,
 )
+from ..deps import get_current_user, get_db, rate_limit, require_write
 
 router = APIRouter()
 
 
-@router.get("/response-headers", response_model=List[ResponseHeaderResponse])
+@router.get("/response-headers", response_model=list[ResponseHeaderResponse])
 def list_response_headers_endpoint(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
@@ -71,7 +69,7 @@ def delete_response_header_endpoint(
     return {"status": "ok"}
 
 
-@router.get("/request-headers", response_model=List[RequestHeaderResponse])
+@router.get("/request-headers", response_model=list[RequestHeaderResponse])
 def list_request_headers_endpoint(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),

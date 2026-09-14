@@ -1,19 +1,19 @@
 """MaxMind GeoLite2 database download and extraction."""
+
 import os
 import re
 import shutil
 import tarfile
 import tempfile
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from datetime import UTC, datetime
+from typing import Any
 
-import requests
 import geoip2.database
+import requests
 from sqlalchemy.orm import Session
 
 from ..core.config import get_settings
 from ..core.database import SessionLocal
-from ..models.models import Setting
 from .scheduler import PeriodicTask
 from .settings import get_maxmind_license_key
 
@@ -41,7 +41,7 @@ class GeoIpDownloader(PeriodicTask):
             interval_seconds=interval_hours * 3600,
             files_required=[settings.GEOIP_DB_PATH, settings.ASN_DB_PATH, settings.GEOIP_CITY_DB_PATH],
         )
-        self.last_status: Dict[str, Any] = {}
+        self.last_status: dict[str, Any] = {}
 
     def _tick(self) -> bool:
         try:
@@ -56,16 +56,17 @@ class GeoIpDownloader(PeriodicTask):
                 if not getattr(settings, "GEOIP_LUA_MODULE_ENABLED", True):
                     if any(m.get("ok") for m in result["maps"].values()):
                         from . import haproxy as haproxy_service
+
                         haproxy_service.reload_haproxy()
                 self.last_status = {
-                    "ts": datetime.now(timezone.utc).isoformat(),
+                    "ts": datetime.now(UTC).isoformat(),
                     "ok": True,
                     "result": result,
                 }
                 return bool(result.get("ok", False))
         except Exception as exc:
             self.last_status = {
-                "ts": datetime.now(timezone.utc).isoformat(),
+                "ts": datetime.now(UTC).isoformat(),
                 "ok": False,
                 "error": str(exc),
             }
@@ -76,7 +77,7 @@ def _mmdb_filename(edition_id: str) -> str:
     return f"{edition_id}.mmdb"
 
 
-def _find_mmdb_member(tar: tarfile.TarFile, edition_id: str) -> Optional[tarfile.TarInfo]:
+def _find_mmdb_member(tar: tarfile.TarFile, edition_id: str) -> tarfile.TarInfo | None:
     pattern = re.compile(rf"{re.escape(edition_id)}.*\.mmdb$")
     for member in tar.getmembers():
         if pattern.search(member.name):
@@ -91,7 +92,7 @@ def _download_url(edition_id: str, license_key: str) -> str:
     )
 
 
-def _download_one(edition_id: str, dest_path: str, license_key: str) -> Dict[str, Any]:
+def _download_one(edition_id: str, dest_path: str, license_key: str) -> dict[str, Any]:
     if not license_key:
         return {"edition_id": edition_id, "ok": False, "error": "Missing MaxMind license key"}
 
@@ -147,7 +148,7 @@ COUNTRY_MAP_PATH = os.path.abspath(settings.GEOIP_COUNTRY_MAP_PATH)
 ASN_MAP_PATH = os.path.abspath(settings.GEOIP_ASN_MAP_PATH)
 
 
-def _write_network_map(db_path: str, map_path: str, value_fn) -> Dict[str, Any]:
+def _write_network_map(db_path: str, map_path: str, value_fn) -> dict[str, Any]:
     """Read a MaxMind mmdb and write a HAProxy map_ip text file."""
     if not db_path or not os.path.exists(db_path):
         return {"ok": False, "error": f"Database not found: {db_path}"}
@@ -163,9 +164,9 @@ def _write_network_map(db_path: str, map_path: str, value_fn) -> Dict[str, Any]:
         return {"ok": False, "error": str(exc)}
 
 
-def write_haproxy_maps() -> Dict[str, Any]:
+def write_haproxy_maps() -> dict[str, Any]:
     """Generate HAProxy map_ip files from downloaded MaxMind mmdb databases."""
-    result: Dict[str, Any] = {}
+    result: dict[str, Any] = {}
     result["country"] = _write_network_map(
         os.path.abspath(settings.GEOIP_DB_PATH),
         COUNTRY_MAP_PATH,
@@ -179,7 +180,7 @@ def write_haproxy_maps() -> Dict[str, Any]:
     return result
 
 
-def download_maxmind_dbs(db: Session) -> Dict[str, Any]:
+def download_maxmind_dbs(db: Session) -> dict[str, Any]:
     """Download all configured MaxMind editions and return per-file results."""
     license_key = get_maxmind_license_key(db)
     results = []

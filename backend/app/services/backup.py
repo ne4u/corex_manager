@@ -5,14 +5,15 @@ configs, security list files, CRS/custom WAF rule sets, GeoIP databases, and con
 snapshot history) into a downloadable ZIP archive with optional AES (Fernet) password
 protection. Restore accepts an uploaded archive and replaces the running configuration.
 """
+
 import io
 import json
 import os
 import shutil
 import tempfile
 import zipfile
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -20,11 +21,10 @@ from sqlalchemy.orm import Session
 from ..core.config import get_settings
 from ..core.database import Base, SessionLocal
 from ..services.haproxy import (
-    _jsonable,
     _parse_value,
     _serialize_row,
-    write_config,
     reload_haproxy,
+    write_config,
 )
 
 settings = get_settings()
@@ -34,7 +34,7 @@ settings = get_settings()
 _ALWAYS_EXCLUDED = set()
 
 # Secret fields to redact when include_secrets=False.
-SECRET_FIELDS: Dict[str, List[str]] = {
+SECRET_FIELDS: dict[str, list[str]] = {
     "users": ["hashed_password", "totp_secret"],
     "certificates": ["dns_credentials"],
 }
@@ -43,7 +43,16 @@ SECRET_FIELDS: Dict[str, List[str]] = {
 SECRET_SETTING_KEYS = {"maxmind_license_key"}
 
 # Tables only included when include_metrics=True.
-METRICS_TABLES = {"metric_snapshots", "waf_metrics", "audit_events", "waf_rule_versions", "tasks", "csp_reports", "page_protect_scripts", "cache_metric_snapshots"}
+METRICS_TABLES = {
+    "metric_snapshots",
+    "waf_metrics",
+    "audit_events",
+    "waf_rule_versions",
+    "tasks",
+    "csp_reports",
+    "page_protect_scripts",
+    "cache_metric_snapshots",
+}
 
 # Tables only included when include_secrets=True.
 SECRET_TABLES = {"users"}
@@ -56,17 +65,15 @@ SECRET_TABLES = {"users"}
 _JSON_SECRET_COLUMNS = {"vector_sinks": "options"}
 
 
-def _redact_json_secrets(table_name: str, row_dict: Dict[str, Any]) -> None:
+def _redact_json_secrets(table_name: str, row_dict: dict[str, Any]) -> None:
     """Strip enc:-prefixed secret values from JSON columns in-place."""
     col = _JSON_SECRET_COLUMNS.get(table_name)
     if not col:
         return
     options = row_dict.get(col)
     if isinstance(options, dict):
-        row_dict[col] = {
-            k: v for k, v in options.items()
-            if not (isinstance(v, str) and v.startswith("enc:"))
-        }
+        row_dict[col] = {k: v for k, v in options.items() if not (isinstance(v, str) and v.startswith("enc:"))}
+
 
 # Encryption magic header: 7-byte magic + 16-byte salt + ciphertext.
 _ENC_MAGIC = b"HPMENC1"
@@ -81,7 +88,8 @@ ARCHIVE_VERSION = 1
 # Serialization
 # ---------------------------------------------------------------------------
 
-def _serialize_db(db: Session, include_secrets: bool, include_metrics: bool) -> Dict[str, List[Dict[str, Any]]]:
+
+def _serialize_db(db: Session, include_secrets: bool, include_metrics: bool) -> dict[str, list[dict[str, Any]]]:
     """Serialize all DB tables into a dict of {table_name: [row_dicts]}.
 
     Conditionally includes users (secrets) and metrics tables.
@@ -90,7 +98,7 @@ def _serialize_db(db: Session, include_secrets: bool, include_metrics: bool) -> 
     Uses yield_per to stream large tables without loading all rows into memory
     at once, reducing the time the SQLite read transaction is held open.
     """
-    snapshot: Dict[str, List[Dict[str, Any]]] = {}
+    snapshot: dict[str, list[dict[str, Any]]] = {}
     for table in Base.metadata.tables.values():
         name = table.name
         if name in SECRET_TABLES and not include_secrets:
@@ -166,7 +174,7 @@ def _stream_db_json_to_zip(
         f.write(b"}")
 
 
-def _restore_db_from_snapshot(db: Session, snapshot: Dict[str, List[Dict[str, Any]]]) -> int:
+def _restore_db_from_snapshot(db: Session, snapshot: dict[str, list[dict[str, Any]]]) -> int:
     """Restore DB tables from an in-memory snapshot dict.
 
     Deletes all tables present in the snapshot (in reverse dependency order) and
@@ -201,7 +209,7 @@ def _restore_db_from_snapshot(db: Session, snapshot: Dict[str, List[Dict[str, An
     return count
 
 
-def _reset_sequences(db: Session, snapshot: Dict[str, List[Dict[str, Any]]]) -> None:
+def _reset_sequences(db: Session, snapshot: dict[str, list[dict[str, Any]]]) -> None:
     """Reset auto-increment sequences after a restore.
 
     On SQLite, updates the sqlite_sequence table so the next insert doesn't
@@ -232,13 +240,9 @@ def _reset_sequences(db: Session, snapshot: Dict[str, List[Dict[str, Any]]]) -> 
             ids = [r.get("id") for r in rows if r.get("id") is not None]
             if not ids:
                 continue
-            seq_result = db.execute(text(
-                f"SELECT pg_get_serial_sequence('{table.name}', 'id')"
-            )).scalar()
+            seq_result = db.execute(text(f"SELECT pg_get_serial_sequence('{table.name}', 'id')")).scalar()
             if seq_result:
-                db.execute(text(
-                    f"SELECT setval('{seq_result}', {max(ids)}, true)"
-                ))
+                db.execute(text(f"SELECT setval('{seq_result}', {max(ids)}, true)"))
         db.commit()
 
 
@@ -281,10 +285,12 @@ def _add_file_to_zip(zf: zipfile.ZipFile, file_path: str, arcname: str) -> bool:
     return False
 
 
-def _collect_files(db: Session, include_secrets: bool, include_metrics: bool) -> Tuple[List[Tuple[str, str]], List[Tuple[str, str]]]:
+def _collect_files(
+    db: Session, include_secrets: bool, include_metrics: bool
+) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
     """Return (files, dirs) to include in the archive as (source_path, arcname) pairs."""
-    files: List[Tuple[str, str]] = []
-    dirs: List[Tuple[str, str]] = []
+    files: list[tuple[str, str]] = []
+    dirs: list[tuple[str, str]] = []
 
     # HAProxy + Coraza config files.
     files.append((settings.HAPROXY_CONFIG_PATH, "config/haproxy.cfg"))
@@ -311,6 +317,7 @@ def _collect_files(db: Session, include_secrets: bool, include_metrics: bool) ->
 
     # Config snapshot history.
     from ..services.haproxy import _snapshots_dir
+
     dirs.append((_snapshots_dir(), "data/snapshots"))
 
     # GeoIP databases.
@@ -328,6 +335,7 @@ def _collect_files(db: Session, include_secrets: bool, include_metrics: bool) ->
 # File extraction (restore)
 # ---------------------------------------------------------------------------
 
+
 def _extract_dir_from_zip(zf: zipfile.ZipFile, arc_prefix: str, dest_dir: str) -> int:
     """Extract all files under arc_prefix from the zip into dest_dir. Returns count."""
     if not arc_prefix.endswith("/"):
@@ -341,7 +349,7 @@ def _extract_dir_from_zip(zf: zipfile.ZipFile, arc_prefix: str, dest_dir: str) -
         if info.is_dir():
             continue
         if info.filename.startswith(arc_prefix):
-            rel = info.filename[len(arc_prefix):]
+            rel = info.filename[len(arc_prefix) :]
             if not rel:
                 continue
             dest = os.path.join(dest_dir, rel)
@@ -366,11 +374,13 @@ def _extract_file_from_zip(zf: zipfile.ZipFile, arcname: str, dest_path: str) ->
 # Encryption
 # ---------------------------------------------------------------------------
 
+
 def _derive_fernet_key(password: str, salt: bytes) -> bytes:
     """Derive a Fernet-compatible key from a password + salt using PBKDF2."""
+    import base64
+
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-    import base64
 
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
@@ -385,6 +395,7 @@ def _derive_fernet_key(password: str, salt: bytes) -> bytes:
 def _encrypt_archive(plaintext: bytes, password: str) -> bytes:
     """Encrypt archive bytes with a password. Returns magic + salt + ciphertext."""
     import os as _os
+
     from cryptography.fernet import Fernet
 
     salt = _os.urandom(_PBKDF2_SALT_LEN)
@@ -394,7 +405,7 @@ def _encrypt_archive(plaintext: bytes, password: str) -> bytes:
     return _ENC_MAGIC + salt + ciphertext
 
 
-def _decrypt_archive(data: bytes, password: Optional[str]) -> bytes:
+def _decrypt_archive(data: bytes, password: str | None) -> bytes:
     """Decrypt archive bytes. Raises ValueError if encrypted without password or wrong password."""
     if not data.startswith(_ENC_MAGIC):
         # Not encrypted — return as-is.
@@ -403,8 +414,8 @@ def _decrypt_archive(data: bytes, password: Optional[str]) -> bytes:
         raise ValueError("Archive is password-protected. Please provide the password.")
     from cryptography.fernet import Fernet, InvalidToken
 
-    salt = data[len(_ENC_MAGIC):len(_ENC_MAGIC) + _PBKDF2_SALT_LEN]
-    ciphertext = data[len(_ENC_MAGIC) + _PBKDF2_SALT_LEN:]
+    salt = data[len(_ENC_MAGIC) : len(_ENC_MAGIC) + _PBKDF2_SALT_LEN]
+    ciphertext = data[len(_ENC_MAGIC) + _PBKDF2_SALT_LEN :]
     key = _derive_fernet_key(password, salt)
     cipher = Fernet(key)
     try:
@@ -417,12 +428,13 @@ def _decrypt_archive(data: bytes, password: Optional[str]) -> bytes:
 # Public API
 # ---------------------------------------------------------------------------
 
+
 def create_export(
     db: Session,
     include_secrets: bool = True,
     include_metrics: bool = False,
-    password: Optional[str] = None,
-) -> Tuple[str, bool]:
+    password: str | None = None,
+) -> tuple[str, bool]:
     """Build a full-system export archive and return (temp_file_path, encrypted).
 
     The archive is a ZIP written to a temporary file (to avoid holding 200+ MB
@@ -439,7 +451,7 @@ def create_export(
     """
     manifest = {
         "version": ARCHIVE_VERSION,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
         "include_secrets": include_secrets,
         "include_metrics": include_metrics,
         "encrypted": password is not None,
@@ -487,9 +499,9 @@ def create_export(
 def restore_export(
     db: Session,
     archive_bytes: bytes,
-    password: Optional[str] = None,
+    password: str | None = None,
     apply_config: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Restore the system from an export archive.
 
     Replaces all DB tables and files present in the archive, then optionally
@@ -535,6 +547,7 @@ def restore_export(
 
     # Directories.
     from ..services.haproxy import _snapshots_dir
+
     dir_mappings = [
         ("certs", settings.CERT_DIR),
         ("data/lists", settings.SECURITY_LISTS_DIR),
@@ -559,7 +572,7 @@ def restore_export(
 
     # Auto-apply config + reload HAProxy.
     config_applied = False
-    reload_result: Optional[Dict[str, Any]] = None
+    reload_result: dict[str, Any] | None = None
     if apply_config:
         try:
             write_config(db, created_by="system-restore")

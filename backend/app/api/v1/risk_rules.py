@@ -5,11 +5,10 @@ and seed-baseline endpoints. Rules are scoped to a ruleset via ruleset_id.
 The total of matched rule points is clamped to [0, 99] at runtime by the
 Lua risk_compute action.
 """
-from typing import List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from ..deps import get_current_user, get_db, require_write, rate_limit
 from ...models.models import RiskRule, RiskRuleset
 from ...schemas.security_rules import (
     RiskRuleCreate,
@@ -22,18 +21,18 @@ from ...schemas.security_rules import (
 )
 from ...services.risk_scoring import (
     derive_category,
-    parse_expression,
     reorder_rules,
     seed_baseline_rules,
     validate_expression,
 )
+from ..deps import get_current_user, get_db, rate_limit, require_write
 
 router = APIRouter()
 
 
-@router.get("/risk-rules", response_model=List[RiskRuleResponse])
+@router.get("/risk-rules", response_model=list[RiskRuleResponse])
 def list_risk_rules(
-    ruleset_id: Optional[int] = None,
+    ruleset_id: int | None = None,
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
     _=Depends(rate_limit),
@@ -66,9 +65,9 @@ def create_risk_rule(
     if not category:
         category = derive_category(ast, r.points)
 
-    max_priority = db.query(RiskRule).filter(
-        RiskRule.ruleset_id == r.ruleset_id
-    ).order_by(RiskRule.priority.desc()).first()
+    max_priority = (
+        db.query(RiskRule).filter(RiskRule.ruleset_id == r.ruleset_id).order_by(RiskRule.priority.desc()).first()
+    )
     priority = (max_priority.priority + 1) if max_priority else 0
     obj = RiskRule(
         name=r.name,
@@ -110,9 +109,7 @@ def validate_risk_rule(
     suggested_category = None
     if ok and ast:
         suggested_category = derive_category(ast, 0)
-    return RiskRuleValidateResponse(
-        ok=ok, ast=ast, error=error, suggested_category=suggested_category
-    )
+    return RiskRuleValidateResponse(ok=ok, ast=ast, error=error, suggested_category=suggested_category)
 
 
 @router.post("/risk-rules/seed-baseline", response_model=RiskSeedBaselineResponse)

@@ -12,9 +12,9 @@ listener) or insecure (would serve captcha over plaintext HTTP) are skipped:
 
 These features fire on the HTTPS listener after the redirect.
 """
+
 from app.services import haproxy
 from app.services.haproxy import generate_frontend
-from app.services.settings import set_setting
 from tests.factories import (
     make_backend,
     make_listener,
@@ -44,6 +44,7 @@ def _section(cfg, frontend_name):
 # ---------------------------------------------------------------------------
 # Change 1 + 2: Security rule challenge actions skipped on force_https
 # ---------------------------------------------------------------------------
+
 
 def test_security_rule_challenge_skipped_on_force_https(db):
     """A challenge-action security rule is NOT emitted on a force_https listener."""
@@ -101,6 +102,7 @@ def test_security_rule_block_still_emitted_on_force_https(db):
 # Change 3: WAF challenge actions skipped on force_https
 # ---------------------------------------------------------------------------
 
+
 def test_waf_challenge_skipped_on_force_https(db):
     """A challenge-action WAF rule is NOT emitted on a force_https listener."""
     backend = make_backend(db, name="web")
@@ -133,13 +135,21 @@ def test_waf_challenge_still_emitted_on_ssl_listener(db):
 # Change 4: Rate limit challenge actions skipped on force_https
 # ---------------------------------------------------------------------------
 
+
 def test_rate_limit_challenge_skipped_on_force_https(db):
     """A challenge-action basic rate limit is NOT emitted on a force_https listener."""
     backend = make_backend(db, name="web")
     make_server(db, backend.id)
     listener = _make_force_https_listener(db)
-    make_rate_limit(db, listener_id=listener.id, name="rl_challenge", limit_type="basic",
-                    action="challenge", events=5, window_seconds=30)
+    make_rate_limit(
+        db,
+        listener_id=listener.id,
+        name="rl_challenge",
+        limit_type="basic",
+        action="challenge",
+        events=5,
+        window_seconds=30,
+    )
 
     cfg = haproxy.generate_config(db)
     section = _section(cfg, "force_tls")
@@ -153,8 +163,15 @@ def test_rate_limit_challenge_still_emitted_on_ssl_listener(db):
     backend = make_backend(db, name="web")
     make_server(db, backend.id)
     listener = make_listener(db, backend=backend, name="https_in", bind_port=443, ssl_enabled=True)
-    make_rate_limit(db, listener_id=listener.id, name="rl_challenge", limit_type="basic",
-                    action="challenge", events=5, window_seconds=30)
+    make_rate_limit(
+        db,
+        listener_id=listener.id,
+        name="rl_challenge",
+        limit_type="basic",
+        action="challenge",
+        events=5,
+        window_seconds=30,
+    )
 
     cfg = haproxy.generate_config(db)
     section = _section(cfg, "https_in")
@@ -167,20 +184,23 @@ def test_rate_limit_block_still_emitted_on_force_https(db):
     backend = make_backend(db, name="web")
     make_server(db, backend.id)
     listener = _make_force_https_listener(db)
-    make_rate_limit(db, listener_id=listener.id, name="rl_block", limit_type="basic",
-                    action="block", events=5, window_seconds=30)
+    make_rate_limit(
+        db, listener_id=listener.id, name="rl_block", limit_type="basic", action="block", events=5, window_seconds=30
+    )
 
     cfg = haproxy.generate_config(db)
     section = _section(cfg, "force_tls")
 
     # The rate limit deny should still fire
-    assert "deny_status 429" in section or "deny_status" in section, \
+    assert "deny_status 429" in section or "deny_status" in section, (
         "Block rate limit NOT emitted on force_https listener"
+    )
 
 
 # ---------------------------------------------------------------------------
 # Change 5: Page Protect (CSP report + beacon) skipped on force_https
 # ---------------------------------------------------------------------------
+
 
 def test_page_protect_csp_report_skipped_on_force_https(db):
     """CSP report capture is NOT emitted on a force_https listener."""
@@ -189,18 +209,22 @@ def test_page_protect_csp_report_skipped_on_force_https(db):
     listener = _make_force_https_listener(db)
 
     cfg = generate_frontend(
-        listener, db, page_protect_enabled=True, page_protect_report_path="/_csp-report",
+        listener,
+        db,
+        page_protect_enabled=True,
+        page_protect_report_path="/_csp-report",
     )
 
     assert "is_csp_report" not in cfg, "CSP report ACL emitted on force_https listener"
     # The log-format always includes the csp_report field, but the capture
     # rules (wait-for-body, set-var, return 204) should NOT be emitted.
-    assert "wait-for-body time 5s if is_csp_report" not in cfg, \
+    assert "wait-for-body time 5s if is_csp_report" not in cfg, (
         "CSP report body capture emitted on force_https listener"
-    assert "set-var(txn.csp_report) req.body if is_csp_report" not in cfg, \
+    )
+    assert "set-var(txn.csp_report) req.body if is_csp_report" not in cfg, (
         "CSP report set-var emitted on force_https listener"
-    assert "return status 204 if is_csp_report" not in cfg, \
-        "CSP report return emitted on force_https listener"
+    )
+    assert "return status 204 if is_csp_report" not in cfg, "CSP report return emitted on force_https listener"
 
 
 def test_page_protect_beacon_skipped_on_force_https(db):
@@ -210,7 +234,8 @@ def test_page_protect_beacon_skipped_on_force_https(db):
     listener = _make_force_https_listener(db)
 
     cfg = generate_frontend(
-        listener, db,
+        listener,
+        db,
         page_protect_enabled=True,
         page_protect_beacon={"enabled": True, "trust_enabled": True},
     )
@@ -229,17 +254,20 @@ def test_page_protect_csp_report_still_emitted_on_ssl_listener(db):
     listener = make_listener(db, backend=backend, name="https_in", bind_port=443, ssl_enabled=True)
 
     cfg = generate_frontend(
-        listener, db, page_protect_enabled=True, page_protect_report_path="/_csp-report",
+        listener,
+        db,
+        page_protect_enabled=True,
+        page_protect_report_path="/_csp-report",
     )
 
     assert "is_csp_report" in cfg, "CSP report ACL NOT emitted on SSL listener"
-    assert "set-var(txn.csp_report) req.body if is_csp_report" in cfg, \
-        "CSP report capture NOT emitted on SSL listener"
+    assert "set-var(txn.csp_report) req.body if is_csp_report" in cfg, "CSP report capture NOT emitted on SSL listener"
 
 
 # ---------------------------------------------------------------------------
 # Change 7: Request fingerprint skipped on force_https
 # ---------------------------------------------------------------------------
+
 
 def test_req_fp_capture_skipped_on_force_https(db):
     """lua.req_fp_capture and lua.req_fp_response are NOT emitted on a force_https listener."""
@@ -297,9 +325,11 @@ def test_geoip_set_vars_still_emitted_on_force_https(db, monkeypatch):
 # Change 8: Risk scoring skipped on force_https
 # ---------------------------------------------------------------------------
 
+
 def test_risk_scoring_skipped_on_force_https(db):
     """Risk scoring (risk_capture, match flags, risk_compute) is NOT emitted on a force_https listener."""
     from tests.factories import make_security_rule
+
     backend = make_backend(db, name="web")
     make_server(db, backend.id)
     listener = _make_force_https_listener(db)
@@ -319,6 +349,7 @@ def test_risk_scoring_skipped_on_force_https(db):
 def test_risk_scoring_still_emitted_on_ssl_listener(db):
     """Risk scoring IS emitted on a regular SSL listener (no regression)."""
     from tests.factories import make_security_rule
+
     backend = make_backend(db, name="web")
     make_server(db, backend.id)
     listener = make_listener(db, backend=backend, name="https_in", bind_port=443, ssl_enabled=True)
@@ -333,6 +364,7 @@ def test_risk_scoring_still_emitted_on_ssl_listener(db):
 # ---------------------------------------------------------------------------
 # Change 9: API Armor skipped on force_https (depends on req_fp)
 # ---------------------------------------------------------------------------
+
 
 def test_api_armor_skipped_on_force_https(db):
     """API Armor body buffering and deeper analysis are NOT emitted on a force_https listener."""
@@ -367,6 +399,7 @@ def test_api_armor_still_emitted_on_ssl_listener(db):
 # Integration: force_https redirect still emitted
 # ---------------------------------------------------------------------------
 
+
 def test_force_https_redirect_still_emitted(db):
     """The force_https redirect to HTTPS is still emitted after all skips."""
     backend = make_backend(db, name="web")
@@ -376,5 +409,4 @@ def test_force_https_redirect_still_emitted(db):
     cfg = haproxy.generate_config(db)
     section = _section(cfg, "force_tls")
 
-    assert "http-request redirect scheme https code 301" in section, \
-        "Force HTTPS redirect NOT emitted"
+    assert "http-request redirect scheme https code 301" in section, "Force HTTPS redirect NOT emitted"

@@ -9,10 +9,10 @@ This is a defense-in-depth backstop: the frontend also shows a blocking modal.
 If the claim is absent (tokens issued before this feature shipped) the
 request is allowed through — the next token refresh will add the claim.
 """
-import json
+
 import re
 
-from fastapi import Request, Response
+from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
@@ -39,7 +39,7 @@ _API_PREFIX = "/api/v1"
 
 def _is_whitelisted(path: str) -> bool:
     if path.startswith(_API_PREFIX):
-        path = path[len(_API_PREFIX):]
+        path = path[len(_API_PREFIX) :]
     return any(p.search(path) for p in _WHITELIST_PATTERNS)
 
 

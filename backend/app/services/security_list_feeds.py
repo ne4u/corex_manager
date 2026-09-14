@@ -5,9 +5,10 @@ are due (based on update_interval_hours). Each refresh fetches the feed URL,
 parses the response, validates entries per list_type, and replaces the target
 list's entries.
 """
+
 import logging
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 import requests
 from sqlalchemy.orm import Session
@@ -38,10 +39,10 @@ def _utcnow() -> datetime:
     (now - feed.last_updated_at) don't fail with "can't subtract
     offset-naive and offset-aware datetimes".
     """
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
-def refresh_feed(db: Session, feed: DynamicFeed) -> Dict[str, Any]:
+def refresh_feed(db: Session, feed: DynamicFeed) -> dict[str, Any]:
     """Fetch and apply a single feed. Mutates the target list's entries.
 
     Returns a summary dict: {ok, entry_count, skipped, error?}.
@@ -139,7 +140,7 @@ class DynamicFeedUpdater(PeriodicTask):
     in ``_refresh_due_feeds`` prevents redundant feed fetches regardless.
     """
 
-    def __init__(self, poll_interval_seconds: Optional[int] = None):
+    def __init__(self, poll_interval_seconds: int | None = None):
         super().__init__(
             name="security_list_feeds_poll",
             interval_seconds=(
@@ -166,8 +167,7 @@ class DynamicFeedUpdater(PeriodicTask):
                 continue
             due = (
                 feed.last_updated_at is None
-                or (now - feed.last_updated_at).total_seconds()
-                >= feed.update_interval_hours * 3600
+                or (now - feed.last_updated_at).total_seconds() >= feed.update_interval_hours * 3600
             )
             if not due:
                 continue
@@ -207,6 +207,7 @@ def _maybe_auto_apply_after_feed_refresh(db: Session) -> None:
     try:
         from .config import security_list_files_unapplied
         from .tasks import queue_task
+
         sec_unapplied, other_unapplied = security_list_files_unapplied(db)
         if not sec_unapplied:
             return

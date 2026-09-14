@@ -1,7 +1,8 @@
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 from fastapi import APIRouter, Depends, Form, HTTPException
 from sqlalchemy.orm import Session
-from ..deps import get_current_user, get_db, require_write, rate_limit
+
 from ...models.models import Certificate, Task
 from ...schemas.certificates import (
     AcmeCaResponse,
@@ -19,6 +20,7 @@ from ...services.certificates import (
 )
 from ...services.dns_providers import get_active_acme_client, list_dns_providers
 from ...services.tasks import cancel_task, queue_task
+from ..deps import get_current_user, get_db, rate_limit, require_write
 
 router = APIRouter()
 
@@ -41,9 +43,9 @@ def list_acme_cas_route(
     return AcmeCaResponse(cas=list_acme_cas())
 
 
-@router.get("/certificates", response_model=List[CertificateResponse])
+@router.get("/certificates", response_model=list[CertificateResponse])
 def list_certs(
-    kind: Optional[str] = None,
+    kind: str | None = None,
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
     _=Depends(rate_limit),
@@ -64,7 +66,7 @@ def get_cert_issue_status(
 
     existing_certs = {c.id: c for c in db.query(Certificate).all()}
     tasks = db.query(Task).filter(Task.task_type == "issue_certificate").order_by(Task.created_at.desc()).all()
-    by_cert: Dict[int, Dict[str, Any]] = {}
+    by_cert: dict[int, dict[str, Any]] = {}
     reconciled = False
     for t in tasks:
         cert_id = (t.payload or {}).get("cert_id")
@@ -145,7 +147,7 @@ def issue_cert(
 def upload_cert(
     cert_id: int,
     fullchain: str = Form(...),
-    key: Optional[str] = Form(""),
+    key: str | None = Form(""),
     chain: str = Form(""),
     db: Session = Depends(get_db),
     user=Depends(require_write),

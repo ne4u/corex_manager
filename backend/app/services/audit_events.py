@@ -8,30 +8,30 @@ best-effort for grouping events under the apply that bundled them; if a
 snapshot record is pruned, its events still show as applied via
 ``last_applied_at`` and fall into an "Earlier applies" bucket.
 """
+
 import csv
 import io
 import json
-from datetime import datetime, timezone
-from typing import Optional, List, Dict
+from datetime import UTC, datetime
 
-from sqlalchemy import or_, func, distinct
+from sqlalchemy import distinct, or_
 from sqlalchemy.orm import Session
 
-from ..models.tasks import ConfigSnapshot
 from ..models.models import AuditEvent
-from ..schemas.audit import AuditEventResponse, AuditEventFilterOptions
+from ..models.tasks import ConfigSnapshot
+from ..schemas.audit import AuditEventFilterOptions, AuditEventResponse
 
 
-def _parse_iso(dt_str: Optional[str]) -> Optional[datetime]:
+def _parse_iso(dt_str: str | None) -> datetime | None:
     if not dt_str:
         return None
     dt = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
     if dt.tzinfo:
-        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+        dt = dt.astimezone(UTC).replace(tzinfo=None)
     return dt
 
 
-def _get_last_applied_at(db: Session) -> Optional[datetime]:
+def _get_last_applied_at(db: Session) -> datetime | None:
     """Return the timestamp of the last successful config apply.
 
     Reads the ``last_applied_at`` setting (set by ``save_config_snapshot``).
@@ -40,27 +40,22 @@ def _get_last_applied_at(db: Session) -> Optional[datetime]:
     apply has ever happened.
     """
     from .settings import get_setting
+
     val = get_setting(db, "last_applied_at", "")
     if val:
         try:
             dt = datetime.fromisoformat(val)
             if dt.tzinfo:
-                dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+                dt = dt.astimezone(UTC).replace(tzinfo=None)
             return dt
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             pass
     # Fallback: use the latest snapshot's created_at
-    snap = (
-        db.query(ConfigSnapshot)
-        .order_by(ConfigSnapshot.created_at.desc())
-        .first()
-    )
+    snap = db.query(ConfigSnapshot).order_by(ConfigSnapshot.created_at.desc()).first()
     return snap.created_at if snap else None
 
 
-def _compute_snapshot_for_events(
-    events: List[AuditEvent], db: Session
-) -> Dict[int, Optional[ConfigSnapshot]]:
+def _compute_snapshot_for_events(events: list[AuditEvent], db: Session) -> dict[int, ConfigSnapshot | None]:
     """Map each event to its applying snapshot (best-effort).
 
     Returns ``{event_id: ConfigSnapshot or None}``.  The applying snapshot
@@ -70,14 +65,10 @@ def _compute_snapshot_for_events(
     """
     if not events:
         return {}
-    snapshots = (
-        db.query(ConfigSnapshot)
-        .order_by(ConfigSnapshot.created_at.asc())
-        .all()
-    )
+    snapshots = db.query(ConfigSnapshot).order_by(ConfigSnapshot.created_at.asc()).all()
     if not snapshots:
         return {e.id: None for e in events}
-    result: Dict[int, Optional[ConfigSnapshot]] = {}
+    result: dict[int, ConfigSnapshot | None] = {}
     for event in events:
         applying = None
         for snap in snapshots:  # sorted ascending
@@ -90,13 +81,13 @@ def _compute_snapshot_for_events(
 
 def _build_audit_event_query(
     db: Session,
-    username: Optional[str] = None,
-    action: Optional[str] = None,
-    resource: Optional[str] = None,
-    ip_address: Optional[str] = None,
-    start: Optional[datetime] = None,
-    end: Optional[datetime] = None,
-    has_snapshot: Optional[bool] = None,
+    username: str | None = None,
+    action: str | None = None,
+    resource: str | None = None,
+    ip_address: str | None = None,
+    start: datetime | None = None,
+    end: datetime | None = None,
+    has_snapshot: bool | None = None,
 ):
     query = db.query(AuditEvent).order_by(AuditEvent.created_at.desc())
     if username:
@@ -105,9 +96,7 @@ def _build_audit_event_query(
         query = query.filter(AuditEvent.action.ilike(f"%{action}%"))
     if resource:
         like = f"%{resource}%"
-        query = query.filter(
-            or_(AuditEvent.resource_type.ilike(like), AuditEvent.resource_id.ilike(like))
-        )
+        query = query.filter(or_(AuditEvent.resource_type.ilike(like), AuditEvent.resource_id.ilike(like)))
     if ip_address:
         query = query.filter(AuditEvent.ip_address.ilike(f"%{ip_address}%"))
     if start:
@@ -141,27 +130,24 @@ def _build_audit_event_query(
 def list_audit_events(
     db: Session,
     limit: int = 100,
-    username: Optional[str] = None,
-    action: Optional[str] = None,
-    resource: Optional[str] = None,
-    ip_address: Optional[str] = None,
-    from_date: Optional[str] = None,
-    to_date: Optional[str] = None,
-    has_snapshot: Optional[bool] = None,
+    username: str | None = None,
+    action: str | None = None,
+    resource: str | None = None,
+    ip_address: str | None = None,
+    from_date: str | None = None,
+    to_date: str | None = None,
+    has_snapshot: bool | None = None,
 ):
     start = _parse_iso(from_date)
     end = _parse_iso(to_date)
-    query = _build_audit_event_query(
-        db, username, action, resource, ip_address, start, end, has_snapshot
-    )
+    query = _build_audit_event_query(db, username, action, resource, ip_address, start, end, has_snapshot)
     events = query.limit(limit).all()
 
     # Compute snapshot association dynamically from timestamps.
     snap_map = _compute_snapshot_for_events(events, db)
     snap_ids = {s.id for s in snap_map.values() if s}
     snaps = (
-        {s.id: s for s in db.query(ConfigSnapshot).filter(ConfigSnapshot.id.in_(snap_ids)).all()}
-        if snap_ids else {}
+        {s.id: s for s in db.query(ConfigSnapshot).filter(ConfigSnapshot.id.in_(snap_ids)).all()} if snap_ids else {}
     )
     last_applied = _get_last_applied_at(db)
 
@@ -193,26 +179,20 @@ def list_audit_events(
 
 def export_audit_events_csv(
     db: Session,
-    username: Optional[str] = None,
-    action: Optional[str] = None,
-    resource: Optional[str] = None,
-    ip_address: Optional[str] = None,
-    from_date: Optional[str] = None,
-    to_date: Optional[str] = None,
-    has_snapshot: Optional[bool] = None,
+    username: str | None = None,
+    action: str | None = None,
+    resource: str | None = None,
+    ip_address: str | None = None,
+    from_date: str | None = None,
+    to_date: str | None = None,
+    has_snapshot: bool | None = None,
 ) -> str:
     start = _parse_iso(from_date)
     end = _parse_iso(to_date)
-    query = _build_audit_event_query(
-        db, username, action, resource, ip_address, start, end, has_snapshot
-    )
+    query = _build_audit_event_query(db, username, action, resource, ip_address, start, end, has_snapshot)
 
     # Pre-fetch snapshots (small list) and last_applied_at for dynamic lookup.
-    snapshots = (
-        db.query(ConfigSnapshot)
-        .order_by(ConfigSnapshot.created_at.asc())
-        .all()
-    )
+    snapshots = db.query(ConfigSnapshot).order_by(ConfigSnapshot.created_at.asc()).all()
     last_applied = _get_last_applied_at(db)
 
     output = io.StringIO()
@@ -267,28 +247,23 @@ def export_audit_events_csv(
 def get_audit_event_filter_options(db: Session) -> AuditEventFilterOptions:
     """Return distinct values for audit event filter dropdowns."""
     usernames = [
-        r[0] for r in
-        db.query(distinct(AuditEvent.username))
+        r[0]
+        for r in db.query(distinct(AuditEvent.username))
         .filter(AuditEvent.username.isnot(None))
         .order_by(AuditEvent.username)
         .all()
     ]
-    actions = [
-        r[0] for r in
-        db.query(distinct(AuditEvent.action))
-        .order_by(AuditEvent.action)
-        .all()
-    ]
+    actions = [r[0] for r in db.query(distinct(AuditEvent.action)).order_by(AuditEvent.action).all()]
     resource_types = [
-        r[0] for r in
-        db.query(distinct(AuditEvent.resource_type))
+        r[0]
+        for r in db.query(distinct(AuditEvent.resource_type))
         .filter(AuditEvent.resource_type.isnot(None))
         .order_by(AuditEvent.resource_type)
         .all()
     ]
     ip_addresses = [
-        r[0] for r in
-        db.query(distinct(AuditEvent.ip_address))
+        r[0]
+        for r in db.query(distinct(AuditEvent.ip_address))
         .filter(AuditEvent.ip_address.isnot(None))
         .order_by(AuditEvent.ip_address)
         .all()

@@ -1,83 +1,69 @@
 """Tests for API Armor schema management service."""
+
 import json
 
 import pytest
-
+from app.models.api_armor import ApiSchema, OpenApiSpec
 from app.services.api_armor_schemas import (
-    parse_openapi_spec,
-    extract_schemas_from_openapi,
-    normalize_path,
-    path_matches,
-    import_openapi_spec,
-    get_schema_for_endpoint,
     _infer_schema_python,
     _merge_schemas_python,
+    extract_schemas_from_openapi,
+    get_schema_for_endpoint,
+    import_openapi_spec,
+    normalize_path,
+    parse_openapi_spec,
+    path_matches,
 )
-from app.models.api_armor import OpenApiSpec, ApiSchema
-
 
 # Sample OpenAPI 3.0 spec for testing
-SAMPLE_OPENAPI = json.dumps({
-    "openapi": "3.0.3",
-    "info": {"title": "Test API", "version": "1.0.0"},
-    "paths": {
-        "/api/v1/users": {
-            "post": {
-                "operationId": "createUser",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "name": {"type": "string"},
-                                    "email": {"type": "string"},
-                                    "age": {"type": "integer"}
-                                },
-                                "required": ["name", "email"]
+SAMPLE_OPENAPI = json.dumps(
+    {
+        "openapi": "3.0.3",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "paths": {
+            "/api/v1/users": {
+                "post": {
+                    "operationId": "createUser",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {"type": "string"},
+                                        "email": {"type": "string"},
+                                        "age": {"type": "integer"},
+                                    },
+                                    "required": ["name", "email"],
+                                }
                             }
                         }
-                    }
+                    },
+                },
+                "get": {
+                    "operationId": "listUsers",
+                    "requestBody": {"content": {"application/json": {"schema": {"type": "object"}}}},
+                },
+            },
+            "/api/v1/users/{id}": {
+                "put": {
+                    "operationId": "updateUser",
+                    "requestBody": {
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/UserUpdate"}}}
+                    },
                 }
             },
-            "get": {
-                "operationId": "listUsers",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {"type": "object"}
-                        }
-                    }
+        },
+        "components": {
+            "schemas": {
+                "UserUpdate": {
+                    "type": "object",
+                    "properties": {"name": {"type": "string"}, "email": {"type": "string"}},
                 }
             }
         },
-        "/api/v1/users/{id}": {
-            "put": {
-                "operationId": "updateUser",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/UserUpdate"
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    },
-    "components": {
-        "schemas": {
-            "UserUpdate": {
-                "type": "object",
-                "properties": {
-                    "name": {"type": "string"},
-                    "email": {"type": "string"}
-                }
-            }
-        }
     }
-})
+)
 
 
 def test_parse_openapi_spec_json():
@@ -213,12 +199,12 @@ def test_merge_schemas_python_objects():
     s1 = {
         "type": "object",
         "properties": {"name": {"type": "string"}, "age": {"type": "integer"}},
-        "required": ["name", "age"]
+        "required": ["name", "age"],
     }
     s2 = {
         "type": "object",
         "properties": {"name": {"type": "string"}, "email": {"type": "string"}},
-        "required": ["name", "email"]
+        "required": ["name", "email"],
     }
     merged = _merge_schemas_python(s1, s2)
     assert "name" in merged["properties"]

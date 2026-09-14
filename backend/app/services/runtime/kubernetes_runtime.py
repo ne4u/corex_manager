@@ -13,11 +13,11 @@ Container names within the Pod are configured via:
   - ``K8S_CORAZA_CONTAINER`` (default ``coraza-spoa``)
   - ``K8S_VARNISH_CONTAINER`` (default ``varnish``)
 """
+
 from __future__ import annotations
 
 import logging
 import time
-from typing import Optional
 
 from ..config import get_settings
 from .base import RuntimeBackend
@@ -39,8 +39,8 @@ class KubernetesRuntime(RuntimeBackend):
     """Runtime backend using the Kubernetes API (in-cluster config)."""
 
     def __init__(self) -> None:
-        self._api: Optional["k8s_client.CoreV1Api"] = None
-        self._init_error: Optional[str] = None
+        self._api: k8s_client.CoreV1Api | None = None
+        self._init_error: str | None = None
         if k8s_client is None:
             self._init_error = "Kubernetes SDK not installed"
             return
@@ -159,7 +159,7 @@ class KubernetesRuntime(RuntimeBackend):
             if last.startswith("EXIT_CODE:"):
                 try:
                     real_ec = int(last.split(":", 1)[1])
-                except (ValueError, IndexError):
+                except ValueError, IndexError:
                     pass
                 # Remove the EXIT_CODE line from the output
                 output = "\n".join(lines[:-1]).strip()
@@ -183,7 +183,7 @@ class KubernetesRuntime(RuntimeBackend):
             return False, f"haproxy container check failed: {output}"
         return ec == 0, output
 
-    def haproxy_version_verbose(self) -> Optional[str]:
+    def haproxy_version_verbose(self) -> str | None:
         """Run haproxy -vv in the HAProxy container."""
         if not self._ready():
             return None
@@ -198,8 +198,8 @@ class KubernetesRuntime(RuntimeBackend):
 
     def haproxy_logs(
         self,
-        tail: Optional[int] = None,
-        since: Optional[int] = None,
+        tail: int | None = None,
+        since: int | None = None,
         timestamps: bool = False,
     ) -> str:
         """Fetch HAProxy container logs via the Kubernetes API."""
@@ -440,13 +440,25 @@ class KubernetesRuntime(RuntimeBackend):
             counters = data.get("counters", {})
             result: dict = {}
             for key in (
-                "MAIN.cache_hit", "MAIN.cache_miss", "MAIN.cache_hit_grace",
-                "MAIN.cache_hitpass", "MAIN.cache_hitmiss",
-                "MAIN.n_object", "MAIN.n_lru_nuked", "MAIN.n_expired",
-                "MAIN.threads", "MAIN.sess_conn", "MAIN.client_req",
-                "MAIN.backend_req", "MAIN.fetch_head", "MAIN.fetch_length",
-                "MAIN.fetch_chunked", "MAIN.bans", "MAIN.bans_completed",
-                "MAIN.s_resp_bodybytes", "MAIN.b_resp_bodybytes",
+                "MAIN.cache_hit",
+                "MAIN.cache_miss",
+                "MAIN.cache_hit_grace",
+                "MAIN.cache_hitpass",
+                "MAIN.cache_hitmiss",
+                "MAIN.n_object",
+                "MAIN.n_lru_nuked",
+                "MAIN.n_expired",
+                "MAIN.threads",
+                "MAIN.sess_conn",
+                "MAIN.client_req",
+                "MAIN.backend_req",
+                "MAIN.fetch_head",
+                "MAIN.fetch_length",
+                "MAIN.fetch_chunked",
+                "MAIN.bans",
+                "MAIN.bans_completed",
+                "MAIN.s_resp_bodybytes",
+                "MAIN.b_resp_bodybytes",
             ):
                 if key in counters:
                     val = counters[key].get("value", 0)
@@ -502,6 +514,11 @@ class KubernetesRuntime(RuntimeBackend):
                     running = cs.state and cs.state.running is not None
                     err = None if running else "container not running"
                     return {"available": True, "running": running, "error": err, "type": "kubernetes"}
-            return {"available": False, "running": False, "error": "vector sidecar not found in pod", "type": "kubernetes"}
+            return {
+                "available": False,
+                "running": False,
+                "error": "vector sidecar not found in pod",
+                "type": "kubernetes",
+            }
         except Exception as exc:
             return {"available": False, "running": False, "error": str(exc), "type": "kubernetes"}

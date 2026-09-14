@@ -6,6 +6,7 @@ buffering (wait-for-body for JSON/form/graphql content types) and the
 lua.api_body_parse action. The Rust module is loaded via the combined
 modules.lua loader.
 """
+
 from app.services import haproxy
 from app.services.settings import set_setting
 from tests.factories import make_backend, make_listener, make_server
@@ -77,7 +78,9 @@ def test_api_armor_module_loaded_in_global_section(db):
     assert "lua-load-per-thread" in cfg
     # Verify the loader file contains the api_armor module require
     import os
+
     from app.core.config import get_settings
+
     settings = get_settings()
     loader_path = os.path.join(
         os.path.dirname(os.path.abspath(settings.HAPROXY_CONFIG_PATH)),
@@ -113,7 +116,9 @@ def test_api_armor_disabled_does_not_load_module(db):
     db.commit()
     # Remove stale modules.lua from previous tests so we get a clean check
     import os
+
     from app.core.config import get_settings
+
     settings = get_settings()
     loader_path = os.path.join(
         os.path.dirname(os.path.abspath(settings.HAPROXY_CONFIG_PATH)),

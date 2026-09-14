@@ -1,4 +1,5 @@
 """Tests for security rules HAProxy emission."""
+
 from app.services import haproxy
 from app.services.security_rules import emit_security_rules, parse_expression, translate
 from tests.factories import (
@@ -71,7 +72,7 @@ def test_emit_security_rules_log(db):
     joined = "\n".join(lines)
     assert "txn.sec.action" in joined
     assert "txn.action" in joined
-    assert 'set-var(txn.action) str(block)' in joined
+    assert "set-var(txn.action) str(block)" in joined
     assert "txn.sec.rule" in joined
     assert "log-rule" in joined
     assert "X-Security-Log" not in joined
@@ -104,7 +105,7 @@ def test_emit_security_rules_name_with_spaces(db):
     emit_security_rules(listener, db, lines)
     joined = "\n".join(lines)
     assert 'set-var(txn.sec.rule) str("block hosting providers")' in joined
-    assert 'set-var(txn.sec.action) str(block)' in joined
+    assert "set-var(txn.sec.action) str(block)" in joined
 
 
 def test_emit_security_rules_custom_status(db):
@@ -207,9 +208,7 @@ def test_generate_global_section_nbthread_default(monkeypatch):
 def test_generate_global_section_nbthread_user_tunable(monkeypatch):
     """A user-supplied nbthread option should override the CPU default."""
     monkeypatch.setattr(haproxy, "_default_nbthread", lambda: 4)
-    cfg = haproxy.generate_global_section(
-        global_options=[{"enabled": True, "directive": "nbthread", "value": "8"}]
-    )
+    cfg = haproxy.generate_global_section(global_options=[{"enabled": True, "directive": "nbthread", "value": "8"}])
     assert "nbthread 8" in cfg
     assert "nbthread 4" not in cfg
 
@@ -217,9 +216,7 @@ def test_generate_global_section_nbthread_user_tunable(monkeypatch):
 def test_generate_global_section_nbthread_disabled_override(monkeypatch):
     """A disabled user nbthread option is ignored and CPU default is still applied."""
     monkeypatch.setattr(haproxy, "_default_nbthread", lambda: 4)
-    cfg = haproxy.generate_global_section(
-        global_options=[{"enabled": False, "directive": "nbthread", "value": "8"}]
-    )
+    cfg = haproxy.generate_global_section(global_options=[{"enabled": False, "directive": "nbthread", "value": "8"}])
     assert "nbthread 4" in cfg
     assert "nbthread 8" not in cfg
 
@@ -260,6 +257,7 @@ def test_generate_global_section_multi_filter_bufsize_user_override():
 def test_generate_global_section_multi_filter_bufsize_img2webp_wins():
     """IMG_2_WEBP_BUFSIZE takes precedence over the multi-filter default."""
     from app.core.config import get_settings
+
     s = get_settings()
     orig = s.IMG_2_WEBP_BUFSIZE
     try:
@@ -284,6 +282,7 @@ def test_generate_global_section_req_fp_no_auto_bufsize():
 def test_generate_global_section_req_fp_bufsize_opt_in():
     """HAPROXY_LUA_REQFP_BUFSIZE > 0 opts back in to the bufsize floor."""
     from app.core.config import get_settings
+
     s = get_settings()
     orig = s.HAPROXY_LUA_REQFP_BUFSIZE
     try:
@@ -297,6 +296,7 @@ def test_generate_global_section_req_fp_bufsize_opt_in():
 def test_generate_global_section_txn_vars_cap_from_default_bufsize():
     """tune.vars.txn-max-size = default bufsize + headroom when nothing else sets bufsize."""
     from app.core.config import get_settings
+
     s = get_settings()
     cfg = haproxy.generate_global_section()
     expected = s.HAPROXY_DEFAULT_BUFSIZE + s.HAPROXY_TXN_VARS_HEADROOM
@@ -306,6 +306,7 @@ def test_generate_global_section_txn_vars_cap_from_default_bufsize():
 def test_generate_global_section_txn_vars_cap_tracks_user_bufsize():
     """A user tune.bufsize raises the txn-vars cap so req.body vars still fit."""
     from app.core.config import get_settings
+
     s = get_settings()
     cfg = haproxy.generate_global_section(
         global_options=[{"enabled": True, "directive": "tune.bufsize", "value": "262144"}],
@@ -360,6 +361,7 @@ def test_generate_global_section_h2_max_frame_size_not_emitted_when_unset():
 def test_generate_global_section_quic_auto_bufsize():
     """QUIC enabled auto-raises tune.bufsize to HAPROXY_QUIC_MIN_BUFSIZE when user hasn't set it."""
     from app.core.config import get_settings
+
     s = get_settings()
     cfg = haproxy.generate_global_section(quic_enabled=True)
     assert f"tune.bufsize {s.HAPROXY_QUIC_MIN_BUFSIZE}" in cfg
@@ -368,6 +370,7 @@ def test_generate_global_section_quic_auto_bufsize():
 def test_generate_global_section_disk_cache_auto_bufsize():
     """Disk cache (Varnish) enabled auto-raises tune.bufsize (H2 mux has same one-buffer limit)."""
     from app.core.config import get_settings
+
     s = get_settings()
     cfg = haproxy.generate_global_section(disk_cache_enabled=True)
     assert f"tune.bufsize {s.HAPROXY_QUIC_MIN_BUFSIZE}" in cfg
@@ -376,6 +379,7 @@ def test_generate_global_section_disk_cache_auto_bufsize():
 def test_generate_global_section_quic_warns_small_user_bufsize():
     """QUIC enabled with a user tune.bufsize below the minimum emits a warning comment."""
     from app.core.config import get_settings
+
     s = get_settings()
     cfg = haproxy.generate_global_section(
         quic_enabled=True,
@@ -390,6 +394,7 @@ def test_generate_global_section_quic_warns_small_user_bufsize():
 def test_generate_global_section_quic_no_warning_for_large_user_bufsize():
     """QUIC enabled with a user tune.bufsize >= minimum does not emit a warning."""
     from app.core.config import get_settings
+
     s = get_settings()
     cfg = haproxy.generate_global_section(
         quic_enabled=True,
@@ -424,8 +429,8 @@ def test_generate_config_with_security_rule(db):
     make_security_rule(db, name="block-wp", expression='http.request.uri.path = "/wp-login.php"', action="block")
     cfg = haproxy.generate_config(db)
     assert "txn.sec.done" in cfg
-    assert 'http-request deny' in cfg
-    assert 'wp-login.php' in cfg
+    assert "http-request deny" in cfg
+    assert "wp-login.php" in cfg
 
 
 def test_generate_config_rate_limit_gated_by_skip(db):
@@ -505,6 +510,7 @@ def test_generate_frontend_req_fp_enabled(db):
 def test_generate_frontend_req_fp_before_response_headers(db):
     """lua.req_fp_response must run before any http-response set-header so txn.req_fp is populated."""
     from app.models.models import ResponseHeader
+
     backend = make_backend(db)
     listener = make_listener(db, backend=backend)
     make_server(db, backend.id)
@@ -526,6 +532,7 @@ def test_response_headers_guarded_against_varnish_fetch(db):
     var (set during the request phase in generate_frontend) because req.hdr_cnt
     is incompatible with http-response rules in HAProxy 3.4+."""
     from app.models.models import ResponseHeader
+
     backend = make_backend(db)
     listener = make_listener(db, backend=backend)
     make_server(db, backend.id)
@@ -534,7 +541,16 @@ def test_response_headers_guarded_against_varnish_fetch(db):
     # add-header with no user condition (the one that produces duplicate values)
     db.add(ResponseHeader(name="add-nocond", header="X-Custom-Add", value="value2", action="add", listener_ids=[]))
     # set-header with a user condition
-    db.add(ResponseHeader(name="set-cond", header="X-Custom-Cond", value="value3", action="set", listener_ids=[], condition="{ status 200 }"))
+    db.add(
+        ResponseHeader(
+            name="set-cond",
+            header="X-Custom-Cond",
+            value="value3",
+            action="set",
+            listener_ids=[],
+            condition="{ status 200 }",
+        )
+    )
     # del-header with no user condition (value column is NOT NULL but unused for del)
     db.add(ResponseHeader(name="del-nocond", header="X-Custom-Del", value="unused", action="del", listener_ids=[]))
     db.commit()
@@ -542,7 +558,10 @@ def test_response_headers_guarded_against_varnish_fetch(db):
     # All response header rules should be guarded with !{ var(txn.is_varnish_fetch) -m found }
     assert 'http-response set-header X-Custom-Set "value1" if !{ var(txn.is_varnish_fetch) -m found }' in cfg
     assert 'http-response add-header X-Custom-Add "value2" if !{ var(txn.is_varnish_fetch) -m found }' in cfg
-    assert 'http-response set-header X-Custom-Cond "value3" if { status 200 } !{ var(txn.is_varnish_fetch) -m found }' in cfg
+    assert (
+        'http-response set-header X-Custom-Cond "value3" if { status 200 } !{ var(txn.is_varnish_fetch) -m found }'
+        in cfg
+    )
     assert "http-response del-header X-Custom-Del if !{ var(txn.is_varnish_fetch) -m found }" in cfg
 
 
@@ -554,22 +573,23 @@ def test_response_header_req_phase_condition_uses_txn_var(db):
     the request phase — the same pattern used for txn.is_varnish_fetch — and
     the http-response rule tests the var instead."""
     from app.models.models import ResponseHeader
+
     backend = make_backend(db)
     listener = make_listener(db, backend=backend)
     make_server(db, backend.id)
     hdr = ResponseHeader(
-        name="nosniff", header="X-Content-Type-Options", value="nosniff",
-        action="set", listener_ids=[],
+        name="nosniff",
+        header="X-Content-Type-Options",
+        value="nosniff",
+        action="set",
+        listener_ids=[],
         condition="!{ req.hdr(host) -m str logs.example.com }",
     )
     db.add(hdr)
     db.commit()
     cfg = haproxy.generate_frontend(listener, db)
     cond_var = f"txn.rh_cond_{hdr.id}"
-    assert (
-        f"http-request set-var({cond_var}) bool(1) "
-        f"if !{{ req.hdr(host) -m str logs.example.com }}" in cfg
-    )
+    assert f"http-request set-var({cond_var}) bool(1) if !{{ req.hdr(host) -m str logs.example.com }}" in cfg
     resp_lines = [l for l in cfg.splitlines() if "X-Content-Type-Options" in l]
     assert len(resp_lines) == 1
     assert "req.hdr" not in resp_lines[0]
@@ -585,17 +605,30 @@ def test_response_header_resp_phase_condition_stays_inline(db):
     evaluated in the response phase — they must remain inline in the
     http-response rule, not captured into a request-phase txn var."""
     from app.models.models import ResponseHeader
+
     backend = make_backend(db)
     listener = make_listener(db, backend=backend)
     make_server(db, backend.id)
-    db.add(ResponseHeader(
-        name="ok-only", header="X-Ok", value="1", action="set",
-        listener_ids=[], condition="{ status 200 }",
-    ))
-    db.add(ResponseHeader(
-        name="html-only", header="X-Html", value="1", action="set",
-        listener_ids=[], condition="{ res.hdr(content-type) -m beg text/html }",
-    ))
+    db.add(
+        ResponseHeader(
+            name="ok-only",
+            header="X-Ok",
+            value="1",
+            action="set",
+            listener_ids=[],
+            condition="{ status 200 }",
+        )
+    )
+    db.add(
+        ResponseHeader(
+            name="html-only",
+            header="X-Html",
+            value="1",
+            action="set",
+            listener_ids=[],
+            condition="{ res.hdr(content-type) -m beg text/html }",
+        )
+    )
     db.commit()
     cfg = haproxy.generate_frontend(listener, db)
     assert "rh_cond" not in cfg
@@ -675,6 +708,7 @@ def test_csp_guarded_against_varnish_fetch(db):
     generate_frontend) because req.hdr_cnt is incompatible with http-response
     rules in HAProxy 3.4+."""
     from tests.factories import make_page_protect_policy
+
     backend = make_backend(db, name="protected_be")
     make_server(db, backend.id)
     make_page_protect_policy(db, backend_ids=[backend.id], mode="enforce", directives={"default-src": ["'self'"]})
@@ -687,6 +721,7 @@ def test_csp_guarded_against_varnish_fetch(db):
 def test_generate_config_req_fp_via_setting(db):
     """generate_config should emit both req_fp directives when the req_fp_enabled setting is true."""
     from app.services.settings import set_setting
+
     backend = make_backend(db)
     make_listener(db, backend=backend)
     make_server(db, backend.id)
@@ -699,6 +734,7 @@ def test_generate_config_req_fp_via_setting(db):
 def test_generate_config_ja4_disabled_via_setting(db):
     """generate_config should omit ja4 lua-load when the ja4_enabled setting is false."""
     from app.services.settings import set_setting
+
     backend = make_backend(db)
     make_listener(db, backend=backend)
     make_server(db, backend.id)
@@ -712,8 +748,12 @@ def test_generate_config_ja4_disabled_via_setting(db):
 def test_emit_security_rules_redirect(db):
     listener = make_listener(db)
     make_security_rule(
-        db, name="redirect-rule", expression='http.host = "bad.com"',
-        action="redirect", redirect_url="https://example.com/blocked", redirect_code=301,
+        db,
+        name="redirect-rule",
+        expression='http.host = "bad.com"',
+        action="redirect",
+        redirect_url="https://example.com/blocked",
+        redirect_code=301,
     )
     lines: list = []
     emit_security_rules(listener, db, lines)
@@ -725,8 +765,11 @@ def test_emit_security_rules_redirect(db):
 def test_emit_security_rules_redirect_default_code(db):
     listener = make_listener(db)
     make_security_rule(
-        db, name="redirect-default", expression='http.host = "bad.com"',
-        action="redirect", redirect_url="/blocked",
+        db,
+        name="redirect-default",
+        expression='http.host = "bad.com"',
+        action="redirect",
+        redirect_url="/blocked",
     )
     lines: list = []
     emit_security_rules(listener, db, lines)
@@ -736,13 +779,18 @@ def test_emit_security_rules_redirect_default_code(db):
 
 def test_emit_security_rules_custom_response(db):
     from app.models.models import CustomErrorPage
+
     listener = make_listener(db)
     ep = CustomErrorPage(code=403, content_type="text/html", content="<h1>Blocked</h1>")
     db.add(ep)
     db.flush()
     make_security_rule(
-        db, name="custom-response", expression='http.host = "bad.com"',
-        action="custom_response", status_code=403, error_page_id=ep.id,
+        db,
+        name="custom-response",
+        expression='http.host = "bad.com"',
+        action="custom_response",
+        status_code=403,
+        error_page_id=ep.id,
     )
     lines: list = []
     emit_security_rules(listener, db, lines)
@@ -755,8 +803,11 @@ def test_emit_security_rules_custom_response(db):
 def test_emit_security_rules_custom_response_no_page_falls_back(db):
     listener = make_listener(db)
     make_security_rule(
-        db, name="custom-no-page", expression='http.host = "bad.com"',
-        action="custom_response", status_code=451,
+        db,
+        name="custom-no-page",
+        expression='http.host = "bad.com"',
+        action="custom_response",
+        status_code=451,
     )
     lines: list = []
     emit_security_rules(listener, db, lines)
@@ -770,8 +821,12 @@ def test_generate_config_with_redirect_rule(db):
     listener = make_listener(db, backend=backend)
     make_server(db, backend.id)
     make_security_rule(
-        db, name="redirect-rule", expression='http.host = "bad.com"',
-        action="redirect", redirect_url="https://example.com/safe", redirect_code=301,
+        db,
+        name="redirect-rule",
+        expression='http.host = "bad.com"',
+        action="redirect",
+        redirect_url="https://example.com/safe",
+        redirect_code=301,
     )
     cfg = haproxy.generate_config(db)
     assert "http-request redirect location https://example.com/safe code 301" in cfg
@@ -779,6 +834,7 @@ def test_generate_config_with_redirect_rule(db):
 
 def test_generate_config_with_custom_response_rule(db):
     from app.models.models import CustomErrorPage
+
     backend = make_backend(db)
     listener = make_listener(db, backend=backend)
     make_server(db, backend.id)
@@ -786,8 +842,12 @@ def test_generate_config_with_custom_response_rule(db):
     db.add(ep)
     db.flush()
     make_security_rule(
-        db, name="teapot-rule", expression='http.host = "teapot.com"',
-        action="custom_response", status_code=418, error_page_id=ep.id,
+        db,
+        name="teapot-rule",
+        expression='http.host = "teapot.com"',
+        action="custom_response",
+        status_code=418,
+        error_page_id=ep.id,
     )
     cfg = haproxy.generate_config(db)
     assert "http-request return status 418" in cfg
@@ -813,6 +873,7 @@ def _patch_geoip2(monkeypatch, supported: bool):
     monkeypatch.setattr(haproxy_mod, "_geoip2_support_cache", supported)
     monkeypatch.setattr(haproxy_mod, "_haproxy_supports_geoip2", lambda: supported)
     from app.core.config import get_settings
+
     monkeypatch.setattr(get_settings(), "GEOIP_LUA_MODULE_ENABLED", False)
 
 
@@ -1039,9 +1100,10 @@ def test_global_options_change_detected_by_config_status(db, monkeypatch, tmp_pa
     """
     import json
     import os
+
     from app.core.config import get_settings
+    from app.services.config import get_config_diff, get_config_status
     from app.services.settings import set_setting
-    from app.services.config import get_config_status, get_config_diff
 
     s = get_settings()
     # Redirect config paths to temp dir so we control the .applied files and
@@ -1064,7 +1126,8 @@ def test_global_options_change_detected_by_config_status(db, monkeypatch, tmp_pa
     # Baseline the risk_rules_data.lua file too — _config_status_data compares
     # it, so without an .applied snapshot it would falsely report unapplied.
     try:
-        from app.services.risk_scoring import generate_risk_rules_data, _risk_rules_data_path
+        from app.services.risk_scoring import _risk_rules_data_path, generate_risk_rules_data
+
         rrd_path = _risk_rules_data_path()
         rrd = generate_risk_rules_data(db)
         os.makedirs(os.path.dirname(rrd_path), exist_ok=True)
@@ -1080,6 +1143,7 @@ def test_global_options_change_detected_by_config_status(db, monkeypatch, tmp_pa
     # report unapplied.
     try:
         from app.services.resp_transform import generate_resp_transform_file_contents
+
         rt_dir = str(tmp_path / "resp-transform")
         os.makedirs(rt_dir, exist_ok=True)
         rt_gen = generate_resp_transform_file_contents(db)
@@ -1096,11 +1160,17 @@ def test_global_options_change_detected_by_config_status(db, monkeypatch, tmp_pa
     assert get_config_status(db) is False
 
     # 3. Save global options (same shape as the frontend PUT)
-    set_setting(db, "haproxy_global_options", json.dumps([
-        {"target": "section", "directive": "tune.ssl.lifetime", "value": "16834", "enabled": True},
-        {"target": "section", "directive": "tune.stick-counters", "value": "4", "enabled": False},
-        {"target": "section", "directive": "tune.h2.initial-window-size", "value": "10485760", "enabled": True},
-    ]))
+    set_setting(
+        db,
+        "haproxy_global_options",
+        json.dumps(
+            [
+                {"target": "section", "directive": "tune.ssl.lifetime", "value": "16834", "enabled": True},
+                {"target": "section", "directive": "tune.stick-counters", "value": "4", "enabled": False},
+                {"target": "section", "directive": "tune.h2.initial-window-size", "value": "10485760", "enabled": True},
+            ]
+        ),
+    )
     db.commit()
 
     # 4. Status should now be True (unapplied changes detected)
@@ -1236,8 +1306,8 @@ def test_default_json_log_format_lua_module(tmp_path, monkeypatch):
     _create_mmdb_files(tmp_path, monkeypatch)
 
     fmt = haproxy._default_json_log_format(ja4_enabled=False)
-    assert 'lua.geoip2-lookup-city' in fmt
-    assert 'lua.geoip2-lookup-asn' in fmt
+    assert "lua.geoip2-lookup-city" in fmt
+    assert "lua.geoip2-lookup-asn" in fmt
     assert '"country"' in fmt
     assert '"asn"' in fmt
     assert '"city"' in fmt
@@ -1272,6 +1342,7 @@ def test_generate_global_section_lua_module(tmp_path, monkeypatch):
     _create_mmdb_files(tmp_path, monkeypatch)
     # Point HAPROXY_CONFIG_PATH at tmp_path so the loader is written there
     from app.core.config import get_settings
+
     s = get_settings()
     cfg_path = tmp_path / "haproxy.cfg"
     monkeypatch.setattr(s, "HAPROXY_CONFIG_PATH", str(cfg_path))

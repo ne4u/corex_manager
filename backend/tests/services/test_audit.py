@@ -1,8 +1,7 @@
 """Unit tests for the audit service: action derivation, payload truncation, config-change classification."""
-import json
-from datetime import datetime, timedelta, timezone
 
-import pytest
+import json
+from datetime import UTC, datetime, timedelta
 
 from app.services.audit import (
     derive_action,
@@ -11,8 +10,8 @@ from app.services.audit import (
     truncate_payload,
 )
 
-
 # --- derive_action: special cases -----------------------------------------
+
 
 def test_derive_action_login():
     action, rtype, rid = derive_action("POST", "/api/v1/auth/token")
@@ -98,6 +97,7 @@ def test_derive_action_refresh_feed():
 
 # --- derive_action: generic REST fallback ---------------------------------
 
+
 def test_derive_action_create_backend():
     action, rtype, rid = derive_action("POST", "/api/v1/backends")
     assert action == "create_backend"
@@ -159,6 +159,7 @@ def test_derive_action_create_user():
 
 # --- should_capture_payload ------------------------------------------------
 
+
 def test_should_capture_payload_json():
     assert should_capture_payload("/api/v1/backends", "application/json") is True
 
@@ -190,6 +191,7 @@ def test_should_capture_payload_cert_update():
 
 # --- truncate_payload ------------------------------------------------------
 
+
 def test_truncate_payload_empty():
     assert truncate_payload(b"", 1024) is None
 
@@ -201,7 +203,7 @@ def test_truncate_payload_json_dict():
 
 
 def test_truncate_payload_json_list():
-    body = b'[1, 2, 3]'
+    body = b"[1, 2, 3]"
     result = truncate_payload(body, 1024)
     assert result == {"_list": [1, 2, 3]}
 
@@ -234,10 +236,12 @@ def test_truncate_payload_non_json_truncated():
 
 # --- _get_last_applied_at --------------------------------------------------
 
+
 def test_get_last_applied_at_from_setting(db):
     """last_applied_at setting is the primary source."""
-    from app.services.settings import set_setting
     from app.services.audit_events import _get_last_applied_at
+    from app.services.settings import set_setting
+
     ts = datetime(2026, 1, 15, 12, 0, 0)
     set_setting(db, "last_applied_at", ts.isoformat())
     result = _get_last_applied_at(db)
@@ -250,7 +254,8 @@ def test_get_last_applied_at_fallback_to_snapshot(db):
     """If setting is missing, fall back to latest ConfigSnapshot.created_at."""
     from app.models.tasks import ConfigSnapshot
     from app.services.audit_events import _get_last_applied_at
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    now = datetime.now(UTC).replace(tzinfo=None)
     snap = ConfigSnapshot(snapshot_path="/tmp/test.json", created_at=now)
     db.add(snap)
     db.commit()
@@ -262,19 +267,24 @@ def test_get_last_applied_at_fallback_to_snapshot(db):
 def test_get_last_applied_at_none_when_no_data(db):
     """Returns None when no setting and no snapshots exist."""
     from app.services.audit_events import _get_last_applied_at
+
     result = _get_last_applied_at(db)
     assert result is None
 
 
 # --- _compute_snapshot_for_events -----------------------------------------
 
+
 def test_compute_snapshot_before_event(db):
     """Event before a snapshot maps to that snapshot."""
     from app.models.models import AuditEvent
     from app.models.tasks import ConfigSnapshot
     from app.services.audit_events import _compute_snapshot_for_events
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
-    event = AuditEvent(action="create_backend", method="POST", path="/api/v1/backends", created_at=now - timedelta(minutes=5))
+
+    now = datetime.now(UTC).replace(tzinfo=None)
+    event = AuditEvent(
+        action="create_backend", method="POST", path="/api/v1/backends", created_at=now - timedelta(minutes=5)
+    )
     db.add(event)
     db.commit()
     snap = ConfigSnapshot(snapshot_path="/tmp/test.json", created_at=now)
@@ -290,7 +300,8 @@ def test_compute_snapshot_after_all_snapshots(db):
     from app.models.models import AuditEvent
     from app.models.tasks import ConfigSnapshot
     from app.services.audit_events import _compute_snapshot_for_events
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    now = datetime.now(UTC).replace(tzinfo=None)
     snap = ConfigSnapshot(snapshot_path="/tmp/test.json", created_at=now - timedelta(minutes=10))
     db.add(snap)
     db.commit()
@@ -306,12 +317,15 @@ def test_compute_snapshot_between_two_snapshots(db):
     from app.models.models import AuditEvent
     from app.models.tasks import ConfigSnapshot
     from app.services.audit_events import _compute_snapshot_for_events
-    base = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    base = datetime.now(UTC).replace(tzinfo=None)
     snap1 = ConfigSnapshot(snapshot_path="/tmp/s1.json", created_at=base - timedelta(minutes=20))
     snap2 = ConfigSnapshot(snapshot_path="/tmp/s2.json", created_at=base - timedelta(minutes=5))
     db.add_all([snap1, snap2])
     db.commit()
-    event = AuditEvent(action="create_backend", method="POST", path="/api/v1/backends", created_at=base - timedelta(minutes=10))
+    event = AuditEvent(
+        action="create_backend", method="POST", path="/api/v1/backends", created_at=base - timedelta(minutes=10)
+    )
     db.add(event)
     db.commit()
     result = _compute_snapshot_for_events([event], db)
@@ -323,6 +337,7 @@ def test_compute_snapshot_no_snapshots(db):
     """No snapshots → all events map to None."""
     from app.models.models import AuditEvent
     from app.services.audit_events import _compute_snapshot_for_events
+
     event = AuditEvent(action="create_backend", method="POST", path="/api/v1/backends")
     db.add(event)
     db.commit()
@@ -333,11 +348,13 @@ def test_compute_snapshot_no_snapshots(db):
 def test_compute_snapshot_empty_events(db):
     """Empty event list → empty map."""
     from app.services.audit_events import _compute_snapshot_for_events
+
     result = _compute_snapshot_for_events([], db)
     assert result == {}
 
 
 # --- is_config_change ------------------------------------------------------
+
 
 def test_is_config_change_auth_paths():
     """Auth events don't affect generated config."""

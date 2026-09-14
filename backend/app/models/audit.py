@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, Boolean, Text, DateTime, ForeignKey, JSON, text
+from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String, text
 from sqlalchemy.orm import relationship
+
 from .base import Base, utcnow
 
 
@@ -28,4 +29,4 @@ class AuditEvent(Base):
     user = relationship("User")
 
 
-__all__ = ['AuditEvent']
+__all__ = ["AuditEvent"]

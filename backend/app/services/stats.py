@@ -1,7 +1,8 @@
 import logging
-import socket
 import os
-from typing import List, Dict, Any
+import socket
+from typing import Any
+
 from ..core.config import get_settings
 from ..core.valkey_client import cache
 from . import dataplane
@@ -29,7 +30,7 @@ def _send_command(cmd: str) -> str:
             while True:
                 try:
                     chunk = s.recv(16384)
-                except socket.timeout:
+                except TimeoutError:
                     break
                 if not chunk:
                     break
@@ -40,7 +41,7 @@ def _send_command(cmd: str) -> str:
         return f"error: {e}"
 
 
-def _send_command_batch(commands: List[str]) -> str:
+def _send_command_batch(commands: list[str]) -> str:
     """Send multiple commands to the HAProxy stats socket in a single connection.
 
     Pipelines all commands (newline-separated) in one socket connection to avoid
@@ -68,7 +69,7 @@ def _send_command_batch(commands: List[str]) -> str:
             while True:
                 try:
                     chunk = s.recv(16384)
-                except socket.timeout:
+                except TimeoutError:
                     break
                 if not chunk:
                     break
@@ -79,7 +80,7 @@ def _send_command_batch(commands: List[str]) -> str:
         return f"error: {e}"
 
 
-def parse_csv(csv_text: str) -> List[Dict[str, Any]]:
+def parse_csv(csv_text: str) -> list[dict[str, Any]]:
     lines = csv_text.strip().splitlines()
     if not lines:
         return []
@@ -99,7 +100,7 @@ def parse_csv(csv_text: str) -> List[Dict[str, Any]]:
     return results
 
 
-def _dp_info_to_process_info(info: Dict[str, Any]) -> Dict[str, Any]:
+def _dp_info_to_process_info(info: dict[str, Any]) -> dict[str, Any]:
     """Normalize Data Plane API info response into the same key/value shape as `show info`."""
     data = info.get("data", info) if isinstance(info, dict) else info
     if not isinstance(data, dict):
@@ -110,17 +111,17 @@ def _dp_info_to_process_info(info: Dict[str, Any]) -> Dict[str, Any]:
 def _to_float(value: Any, default: float = 0.0) -> float:
     try:
         return float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 
-def _compute_cpu_load(info: Dict[str, Any]) -> float:
+def _compute_cpu_load(info: dict[str, Any]) -> float:
     # HAProxy reports the percentage of time it was idle; load is the inverse.
     idle = _to_float(info.get("Idle_pct"), 100.0)
     return max(0.0, min(100.0, 100.0 - idle))
 
 
-def _compute_memory_usage_mb(info: Dict[str, Any]) -> float:
+def _compute_memory_usage_mb(info: dict[str, Any]) -> float:
     # Try the most useful memory counters in order of preference.
     for key in ("PoolUsed_MB", "PoolAlloc_MB", "Memmax_MB"):
         val = _to_float(info.get(key), 0.0)
@@ -134,12 +135,12 @@ def _compute_memory_usage_mb(info: Dict[str, Any]) -> float:
 
 
 @cache(ttl=5, key_prefix="haproxy")
-def get_process_info() -> Dict[str, Any]:
+def get_process_info() -> dict[str, Any]:
     # The Data Plane API /runtime/info endpoint (v3) does not expose Uptime,
     # CurrConns, Maxconn, CumReq, etc. Read the canonical process fields from
     # the local HAProxy socket first, then overlay any extra dataplane fields.
     out = _send_command("show info")
-    result: Dict[str, Any] = {}
+    result: dict[str, Any] = {}
     for line in out.splitlines():
         if ":" in line:
             key, _, val = line.partition(":")
@@ -158,7 +159,7 @@ def get_process_info() -> Dict[str, Any]:
 
 
 @cache(ttl=5, key_prefix="haproxy")
-def get_backend_stats() -> List[Dict[str, Any]]:
+def get_backend_stats() -> list[dict[str, Any]]:
     if settings.DATAPLANE_API_ENABLED:
         try:
             dp_stats = dataplane.get_stats()
@@ -172,7 +173,7 @@ def get_backend_stats() -> List[Dict[str, Any]]:
     return parse_csv(raw)
 
 
-def _get_dp_stats() -> Dict[str, Any]:
+def _get_dp_stats() -> dict[str, Any]:
     """Fetch listener/backend stats from the Data Plane API and process info from the HAProxy socket.
 
     The Data Plane API /runtime/info endpoint does not expose CurrConns/Maxconn/CumReq,
@@ -199,7 +200,7 @@ def _get_dp_stats() -> Dict[str, Any]:
 
 
 @cache(ttl=5, key_prefix="haproxy")
-def get_stats() -> Dict[str, Any]:
+def get_stats() -> dict[str, Any]:
     if settings.DATAPLANE_API_ENABLED:
         dp_stats = _get_dp_stats()
         if dp_stats:
@@ -223,7 +224,7 @@ def get_stats() -> Dict[str, Any]:
     }
 
 
-def _parse_lua_cli_stats(raw: str) -> Dict[str, int]:
+def _parse_lua_cli_stats(raw: str) -> dict[str, int]:
     """Parse the output of a Lua CLI stats command.
 
     The Rust modules register CLI commands (e.g. ``show compress-stats``)
@@ -231,7 +232,7 @@ def _parse_lua_cli_stats(raw: str) -> Dict[str, int]:
     for known keys. Returns an empty dict if the command is not recognized
     (e.g. the module is not loaded).
     """
-    result: Dict[str, int] = {}
+    result: dict[str, int] = {}
     for line in raw.splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
@@ -241,12 +242,12 @@ def _parse_lua_cli_stats(raw: str) -> Dict[str, int]:
             key = key.strip().lower().replace("-", "_").replace(" ", "_")
             try:
                 result[key] = int(val.strip())
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 continue
     return result
 
 
-def get_lua_module_stats() -> Dict[str, Any]:
+def get_lua_module_stats() -> dict[str, Any]:
     """Fetch cumulative bytes-saved counters from the Rust Lua modules.
 
     The haproxy-compression (brotli/zstd) and haproxy-img-2-webp modules

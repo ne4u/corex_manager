@@ -4,11 +4,12 @@ Samples HAProxy memory cache stats (from `show stat`) and disk cache stats
 (from `varnishstat -j`) every CACHE_METRICS_SAMPLE_INTERVAL_SECONDS, stores
 them in CacheMetricSnapshot rows, and prunes old data.
 """
+
 import logging
 import threading
 import time
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -27,7 +28,7 @@ def _disk_cache_globally_enabled(db: Session) -> bool:
     return get_setting(db, "disk_cache_enabled", str(settings.DISK_CACHE_ENABLED)).lower() in ("true", "1", "yes")
 
 
-def _extract_haproxy_cache_stats(backend_name: str, all_stats: List[Dict[str, Any]]) -> Dict[str, Any]:
+def _extract_haproxy_cache_stats(backend_name: str, all_stats: list[dict[str, Any]]) -> dict[str, Any]:
     """Extract cache-related counters from HAProxy `show stat` for a backend.
 
     HAProxy's `show stat` CSV exposes `cache_lookups` and `cache_hits` for
@@ -44,7 +45,7 @@ def _extract_haproxy_cache_stats(backend_name: str, all_stats: List[Dict[str, An
     where avg_object_size = bout / total_responses for the backend. This is
     an approximation since HAProxy doesn't expose per-cache-hit bytes.
     """
-    result: Dict[str, Any] = {}
+    result: dict[str, Any] = {}
     for row in all_stats:
         if not isinstance(row, dict):
             continue
@@ -78,7 +79,7 @@ def _extract_haproxy_cache_stats(backend_name: str, all_stats: List[Dict[str, An
                     result["cache_bytes_saved_estimate"] = int(hits * avg_obj_size)
                 else:
                     result["cache_bytes_saved_estimate"] = 0
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 result = {}
             break
     return result
@@ -93,14 +94,14 @@ def sample_cache_metrics() -> None:
         disk_globally_enabled = _disk_cache_globally_enabled(db)
 
         # Get all HAProxy stats once (cached for 5s by the stats service)
-        haproxy_all_stats: List[Dict[str, Any]] = []
+        haproxy_all_stats: list[dict[str, Any]] = []
         try:
             haproxy_all_stats = stats.get_backend_stats()
         except Exception as exc:
             logger.debug("Failed to fetch HAProxy stats for cache metrics: %s", exc)
 
         # Get disk cache stats once (if any backend uses disk cache)
-        disk_stats: Dict[str, Any] = {}
+        disk_stats: dict[str, Any] = {}
         any_disk = db.query(CacheConfig).filter(CacheConfig.disk_cache_enabled == True).first()  # noqa: E712
         if any_disk and disk_globally_enabled:
             try:
@@ -112,7 +113,7 @@ def sample_cache_metrics() -> None:
         # These are only available when the respective modules are loaded
         # (compression or img_2_webp enabled in Global Options). The function
         # returns 0 for unavailable counters.
-        lua_module_stats: Dict[str, Any] = {}
+        lua_module_stats: dict[str, Any] = {}
         try:
             lua_module_stats = stats.get_lua_module_stats()
         except Exception as exc:
@@ -124,17 +125,17 @@ def sample_cache_metrics() -> None:
         # epoch-second in get_cache_metrics. If each row got its own
         # datetime.now() and the loop crossed a second boundary, the dedup
         # would fail and global counters would be double-counted.
-        sample_time = datetime.now(timezone.utc).replace(tzinfo=None)
+        sample_time = datetime.now(UTC).replace(tzinfo=None)
         for cc in db.query(CacheConfig).all():
             backend = db.get(Backend, cc.backend_id)
             if not backend:
                 continue
 
-            haproxy_cache_stats: Dict[str, Any] = {}
+            haproxy_cache_stats: dict[str, Any] = {}
             if cc.haproxy_enabled:
                 haproxy_cache_stats = _extract_haproxy_cache_stats(backend.name, haproxy_all_stats)
 
-            backend_disk_stats: Dict[str, Any] = {}
+            backend_disk_stats: dict[str, Any] = {}
             if cc.disk_cache_enabled and disk_globally_enabled:
                 backend_disk_stats = disk_stats
 
@@ -165,7 +166,7 @@ def sample_cache_metrics() -> None:
 
 def prune_cache_metrics(db: Session) -> int:
     """Delete cache metric snapshots older than the retention window."""
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=settings.CACHE_METRICS_RETENTION_DAYS)).replace(tzinfo=None)
+    cutoff = (datetime.now(UTC) - timedelta(days=settings.CACHE_METRICS_RETENTION_DAYS)).replace(tzinfo=None)
     result = db.query(CacheMetricSnapshot).filter(CacheMetricSnapshot.created_at < cutoff).delete()
     db.commit()
     return result
@@ -173,8 +174,8 @@ def prune_cache_metrics(db: Session) -> int:
 
 def _bucket(ts: datetime, step: int) -> datetime:
     """Floor a timestamp to the start of a step bucket."""
-    epoch = ts.replace(tzinfo=timezone.utc).timestamp()
-    return datetime.fromtimestamp((epoch // step) * step, tz=timezone.utc)
+    epoch = ts.replace(tzinfo=UTC).timestamp()
+    return datetime.fromtimestamp((epoch // step) * step, tz=UTC)
 
 
 def _auto_step(start: datetime, end: datetime) -> int:
@@ -203,11 +204,11 @@ def _counter_delta(cur: int, prev: int) -> int:
 
 def get_cache_metrics(
     db: Session,
-    from_ts: Optional[datetime] = None,
-    to_ts: Optional[datetime] = None,
-    step: Optional[int] = None,
-    backend_id: Optional[int] = None,
-) -> Dict[str, Any]:
+    from_ts: datetime | None = None,
+    to_ts: datetime | None = None,
+    step: int | None = None,
+    backend_id: int | None = None,
+) -> dict[str, Any]:
     """Query cache metrics, aggregated into time buckets.
 
     HAProxy ``cache_lookups``/``cache_hits`` and Varnish ``MAIN.cache_hit``/
@@ -228,7 +229,7 @@ def get_cache_metrics(
 
     Returns {"snapshots": [...], "summary": {...}}.
     """
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(UTC).replace(tzinfo=None)
     if to_ts is None:
         to_ts = now
     if from_ts is None:
@@ -238,9 +239,9 @@ def get_cache_metrics(
 
     # Normalize timestamps to UTC naive for SQLite comparison
     if from_ts.tzinfo:
-        from_ts = from_ts.astimezone(timezone.utc).replace(tzinfo=None)
+        from_ts = from_ts.astimezone(UTC).replace(tzinfo=None)
     if to_ts.tzinfo:
-        to_ts = to_ts.astimezone(timezone.utc).replace(tzinfo=None)
+        to_ts = to_ts.astimezone(UTC).replace(tzinfo=None)
 
     # Fetch one extra sample interval before the window so the first in-window
     # delta has a baseline. Without this, the first bucket would always be 0.
@@ -259,31 +260,37 @@ def get_cache_metrics(
     # --- HAProxy memory cache: per-backend cumulative counters ---
     # Group by backend, compute deltas between consecutive samples, then sum
     # deltas across backends into shared time buckets.
-    by_backend: Dict[int, List[CacheMetricSnapshot]] = {}
+    by_backend: dict[int, list[CacheMetricSnapshot]] = {}
     for snap in snapshots:
         by_backend.setdefault(snap.backend_id, []).append(snap)
 
     # bucket_time -> accumulators
-    buckets: Dict[datetime, Dict[str, int]] = {}
+    buckets: dict[datetime, dict[str, int]] = {}
 
-    def _ensure_bucket(b: datetime) -> Dict[str, int]:
-        return buckets.setdefault(b, {
-            "haproxy_hit": 0, "haproxy_miss": 0,
-            "disk_hit": 0, "disk_miss": 0, "disk_objects": 0,
-            # Bandwidth-saved accumulators (bytes):
-            "memory_cache_bytes_saved": 0,
-            "native_compression_bytes_saved": 0,
-            "disk_cache_bytes_saved": 0,
-            "brotli_zstd_bytes_saved": 0,
-            "webp_bytes_saved": 0,
-        })
+    def _ensure_bucket(b: datetime) -> dict[str, int]:
+        return buckets.setdefault(
+            b,
+            {
+                "haproxy_hit": 0,
+                "haproxy_miss": 0,
+                "disk_hit": 0,
+                "disk_miss": 0,
+                "disk_objects": 0,
+                # Bandwidth-saved accumulators (bytes):
+                "memory_cache_bytes_saved": 0,
+                "native_compression_bytes_saved": 0,
+                "disk_cache_bytes_saved": 0,
+                "brotli_zstd_bytes_saved": 0,
+                "webp_bytes_saved": 0,
+            },
+        )
 
     for _bid, snaps in by_backend.items():
-        prev_hit: Optional[int] = None
-        prev_miss: Optional[int] = None
-        prev_cache_bytes_saved: Optional[int] = None
-        prev_comp_in: Optional[int] = None
-        prev_comp_out: Optional[int] = None
+        prev_hit: int | None = None
+        prev_miss: int | None = None
+        prev_cache_bytes_saved: int | None = None
+        prev_comp_in: int | None = None
+        prev_comp_out: int | None = None
         for snap in snaps:
             hs = snap.haproxy_stats or {}
             cur_hit = int(hs.get("cache_hit", 0) or 0)
@@ -317,7 +324,7 @@ def get_cache_metrics(
     # --- Disk cache: GLOBAL cumulative counters (same value on every backend row) ---
     # Deduplicate by sample timestamp (rounded to second) to avoid multiplying
     # by the number of cached backends.
-    disk_series: Dict[int, Dict[str, int]] = {}  # epoch_second -> counters
+    disk_series: dict[int, dict[str, int]] = {}  # epoch_second -> counters
     for snap in snapshots:
         ds = snap.disk_cache_stats or {}
         if not ds:
@@ -330,15 +337,18 @@ def get_cache_metrics(
         cur_obj = int(ds.get("MAIN.n_object", 0) or 0)
         cur_s_body = int(ds.get("MAIN.s_resp_bodybytes", 0) or 0)
         cur_b_body = int(ds.get("MAIN.b_resp_bodybytes", 0) or 0)
-        key = int(snap.created_at.replace(tzinfo=timezone.utc).timestamp())
+        key = int(snap.created_at.replace(tzinfo=UTC).timestamp())
         existing = disk_series.get(key)
         if existing is None:
             disk_series[key] = {
-                "hit": cur_hit, "miss": cur_miss,
+                "hit": cur_hit,
+                "miss": cur_miss,
                 "hit_grace": cur_hit_grace,
-                "hitpass": cur_hitpass, "hitmiss": cur_hitmiss,
+                "hitpass": cur_hitpass,
+                "hitmiss": cur_hitmiss,
                 "objects": cur_obj,
-                "s_body": cur_s_body, "b_body": cur_b_body,
+                "s_body": cur_s_body,
+                "b_body": cur_b_body,
             }
         else:
             # All backends at the same sample time should have identical disk
@@ -352,11 +362,11 @@ def get_cache_metrics(
             existing["s_body"] = max(existing["s_body"], cur_s_body)
             existing["b_body"] = max(existing["b_body"], cur_b_body)
 
-    prev_disk: Optional[Dict[str, int]] = None
+    prev_disk: dict[str, int] | None = None
     for key in sorted(disk_series.keys()):
         cur = disk_series[key]
         # Strip tzinfo for comparison with the naive from_ts/to_ts used above
-        ts = datetime.fromtimestamp(key, tz=timezone.utc).replace(tzinfo=None)
+        ts = datetime.fromtimestamp(key, tz=UTC).replace(tzinfo=None)
         if ts >= from_ts:
             b = _bucket(ts, step)
             bucket = _ensure_bucket(b)
@@ -397,14 +407,14 @@ def get_cache_metrics(
     # --- Lua module stats: GLOBAL cumulative counters (brotli/zstd + WebP) ---
     # Same deduplication pattern as disk cache — the sampler stores the same
     # global counters on every per-backend row.
-    lua_series: Dict[int, Dict[str, int]] = {}  # epoch_second -> counters
+    lua_series: dict[int, dict[str, int]] = {}  # epoch_second -> counters
     for snap in snapshots:
         ls = snap.lua_module_stats or {}
         if not ls:
             continue
         cur_br_zstd = int(ls.get("brotli_zstd_bytes_saved", 0) or 0)
         cur_webp = int(ls.get("webp_bytes_saved", 0) or 0)
-        key = int(snap.created_at.replace(tzinfo=timezone.utc).timestamp())
+        key = int(snap.created_at.replace(tzinfo=UTC).timestamp())
         existing = lua_series.get(key)
         if existing is None:
             lua_series[key] = {"br_zstd": cur_br_zstd, "webp": cur_webp}
@@ -412,10 +422,10 @@ def get_cache_metrics(
             existing["br_zstd"] = max(existing["br_zstd"], cur_br_zstd)
             existing["webp"] = max(existing["webp"], cur_webp)
 
-    prev_lua: Optional[Dict[str, int]] = None
+    prev_lua: dict[str, int] | None = None
     for key in sorted(lua_series.keys()):
         cur = lua_series[key]
-        ts = datetime.fromtimestamp(key, tz=timezone.utc).replace(tzinfo=None)
+        ts = datetime.fromtimestamp(key, tz=UTC).replace(tzinfo=None)
         if ts >= from_ts:
             b = _bucket(ts, step)
             bucket = _ensure_bucket(b)
@@ -425,7 +435,7 @@ def get_cache_metrics(
         prev_lua = cur
 
     # --- Build response ---
-    result_snapshots: List[Dict[str, Any]] = []
+    result_snapshots: list[dict[str, Any]] = []
     total_haproxy_hits = 0
     total_haproxy_miss = 0
     total_disk_hits = 0
@@ -461,33 +471,35 @@ def get_cache_metrics(
 
         h_total = h_hit + h_miss
         d_total = d_hit + d_miss
-        total_bandwidth_saved = (
-            mem_bytes + native_comp_bytes + disk_bytes + br_zstd_bytes + webp_bytes
-        )
+        total_bandwidth_saved = mem_bytes + native_comp_bytes + disk_bytes + br_zstd_bytes + webp_bytes
 
-        result_snapshots.append({
-            "timestamp": bucket_time.isoformat(),
-            "haproxy_cache_hit": h_hit,
-            "haproxy_cache_miss": h_miss,
-            "disk_cache_hit": d_hit,
-            "disk_cache_miss": d_miss,
-            "disk_cache_objects": d_obj,
-            "haproxy_hit_rate": round(h_hit / h_total * 100, 2) if h_total > 0 else 0.0,
-            "disk_hit_rate": round(d_hit / d_total * 100, 2) if d_total > 0 else 0.0,
-            # Bandwidth-saved fields (bytes per interval):
-            "memory_cache_bytes_saved": mem_bytes,
-            "native_compression_bytes_saved": native_comp_bytes,
-            "disk_cache_bytes_saved": disk_bytes,
-            "brotli_zstd_bytes_saved": br_zstd_bytes,
-            "webp_bytes_saved": webp_bytes,
-            "total_bandwidth_saved": total_bandwidth_saved,
-        })
+        result_snapshots.append(
+            {
+                "timestamp": bucket_time.isoformat(),
+                "haproxy_cache_hit": h_hit,
+                "haproxy_cache_miss": h_miss,
+                "disk_cache_hit": d_hit,
+                "disk_cache_miss": d_miss,
+                "disk_cache_objects": d_obj,
+                "haproxy_hit_rate": round(h_hit / h_total * 100, 2) if h_total > 0 else 0.0,
+                "disk_hit_rate": round(d_hit / d_total * 100, 2) if d_total > 0 else 0.0,
+                # Bandwidth-saved fields (bytes per interval):
+                "memory_cache_bytes_saved": mem_bytes,
+                "native_compression_bytes_saved": native_comp_bytes,
+                "disk_cache_bytes_saved": disk_bytes,
+                "brotli_zstd_bytes_saved": br_zstd_bytes,
+                "webp_bytes_saved": webp_bytes,
+                "total_bandwidth_saved": total_bandwidth_saved,
+            }
+        )
 
     haproxy_total = total_haproxy_hits + total_haproxy_miss
     disk_total = total_disk_hits + total_disk_miss
     total_bandwidth = (
-        total_memory_cache_bytes_saved + total_native_compression_bytes_saved
-        + total_disk_cache_bytes_saved + total_brotli_zstd_bytes_saved
+        total_memory_cache_bytes_saved
+        + total_native_compression_bytes_saved
+        + total_disk_cache_bytes_saved
+        + total_brotli_zstd_bytes_saved
         + total_webp_bytes_saved
     )
 

@@ -4,8 +4,8 @@ Rules decide what gets cached and drive both tiers: memory cache (HAProxy ACLs
 gating `cache-use`) and disk cache (HAProxy use-server directives routing to
 Varnish). With no rules, nothing is cached.
 """
-import pytest
 
+import pytest
 from app.services import haproxy, varnish
 from app.services.cache_rules import (
     emit_haproxy_cache_rules,
@@ -16,26 +16,32 @@ from app.services.cache_rules import (
 from app.services.settings import set_setting
 from tests.factories import make_backend, make_cache_config, make_cache_rule, make_server
 
-
 # ---------------------------------------------------------------------------
 # Pattern normalization
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("raw,expected", [
-    ("/downloads/*", "/downloads/"),
-    ("/downloads/", "/downloads/"),
-    ("/downloads", "/downloads"),
-])
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("/downloads/*", "/downloads/"),
+        ("/downloads/", "/downloads/"),
+        ("/downloads", "/downloads"),
+    ],
+)
 def test_normalize_path_strips_trailing_wildcard(raw, expected):
     assert normalize_pattern("path", raw) == expected
 
 
-@pytest.mark.parametrize("raw,expected", [
-    ("*.png", "png"),
-    (".png", "png"),
-    ("png", "png"),
-    ("PNG", "png"),
-])
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("*.png", "png"),
+        (".png", "png"),
+        ("png", "png"),
+        ("PNG", "png"),
+    ],
+)
 def test_normalize_extension_accepts_common_forms(raw, expected):
     assert normalize_pattern("extension", raw) == expected
 
@@ -44,15 +50,18 @@ def test_normalize_filename_strips_leading_slash():
     assert normalize_pattern("filename", "/linux.iso") == "linux.iso"
 
 
-@pytest.mark.parametrize("match_type,pattern", [
-    ("path", "downloads/"),        # missing leading slash
-    ("path", "/"),                 # matches everything
-    ("filename", "dir/file.iso"),  # not a single segment
-    ("filename", "*.iso"),         # wildcard
-    ("extension", "pn g"),         # not alphanumeric
-    ("extension", ""),             # empty
-    ("path", '/a"b'),              # would break out of a VCL string literal
-])
+@pytest.mark.parametrize(
+    "match_type,pattern",
+    [
+        ("path", "downloads/"),  # missing leading slash
+        ("path", "/"),  # matches everything
+        ("filename", "dir/file.iso"),  # not a single segment
+        ("filename", "*.iso"),  # wildcard
+        ("extension", "pn g"),  # not alphanumeric
+        ("extension", ""),  # empty
+        ("path", '/a"b'),  # would break out of a VCL string literal
+    ],
+)
 def test_normalize_rejects_invalid_patterns(match_type, pattern):
     with pytest.raises(ValueError):
         normalize_pattern(match_type, pattern)
@@ -66,6 +75,7 @@ def test_normalize_rejects_unknown_match_type():
 # ---------------------------------------------------------------------------
 # Condition builders
 # ---------------------------------------------------------------------------
+
 
 def test_vcl_condition_escapes_regex_metacharacters(db):
     cc = make_cache_config(db, make_backend(db, name="b1").id)
@@ -98,6 +108,7 @@ def test_haproxy_acl_criterion_per_match_type(db):
 # Empty ruleset — nothing is cached
 # ---------------------------------------------------------------------------
 
+
 def test_no_rules_caches_nothing_in_haproxy(db):
     backend = make_backend(db, name="norules")
     make_server(db, backend.id)
@@ -116,7 +127,7 @@ def test_no_rules_caches_nothing_in_vcl(db):
     make_cache_config(db, backend.id, disk_cache_enabled=True)
     vcl = varnish.generate_vcl(db)
     # VCL should NOT have rule evaluation logic
-    assert 'X-Cache-Decision' not in vcl
+    assert "X-Cache-Decision" not in vcl
     assert "cacheability rules" not in vcl.lower()
     # VCL should just cache GET/HEAD
     assert "return(hash);" in vcl
@@ -135,6 +146,7 @@ def test_all_bypass_rules_cache_nothing(db):
 # ---------------------------------------------------------------------------
 # Ordered first-match semantics
 # ---------------------------------------------------------------------------
+
 
 def test_haproxy_cache_rule_negates_earlier_bypass(db):
     """A cache rule must not apply when an earlier bypass rule matched."""
@@ -207,6 +219,7 @@ def test_disabled_rules_are_skipped(db):
 # End-to-end generation
 # ---------------------------------------------------------------------------
 
+
 def test_vcl_backends_point_to_haproxy(db):
     """VCL backend definition points to HAProxy, not origin servers.
 
@@ -227,7 +240,7 @@ def test_vcl_backends_point_to_haproxy(db):
     assert '.host = "10.0.0.99"' not in vcl
     assert '.port = "8080"' not in vcl
     # X-Varnish-Fetch is set so HAProxy doesn't route back to Varnish
-    assert 'X-Varnish-Fetch' in vcl
+    assert "X-Varnish-Fetch" in vcl
 
 
 def test_advanced_haproxy_condition_is_anded_onto_rules(db):
@@ -298,9 +311,13 @@ def test_haproxy_use_server_negates_bypass_rules(db):
     make_server(db, backend.id)
     cc = make_cache_config(db, backend.id, disk_cache_enabled=True)
     # Bypass rule (priority 0) - disk tier
-    bypass_rule = make_cache_rule(db, cc.id, match_type="path", pattern="/private/", action="bypass", tier="disk", priority=0)
+    bypass_rule = make_cache_rule(
+        db, cc.id, match_type="path", pattern="/private/", action="bypass", tier="disk", priority=0
+    )
     # Cache rule (priority 1) - should negate earlier bypass rule - disk tier
-    cache_rule = make_cache_rule(db, cc.id, match_type="path", pattern="/public/", action="cache", tier="disk", priority=1)
+    cache_rule = make_cache_rule(
+        db, cc.id, match_type="path", pattern="/public/", action="cache", tier="disk", priority=1
+    )
     set_setting(db, "disk_cache_enabled", "true")
     db.commit()
 
@@ -308,7 +325,9 @@ def test_haproxy_use_server_negates_bypass_rules(db):
     # Cache rule's use-server should negate the bypass rule
     lines = cfg.split("\n")
     # ACL names include backend name: cacherule_{backend.name}_{rule.id}
-    use_server_lines = [l for l in lines if "use-server disk_cache if" in l and "cacherule_" in l and "!is_cache_purge" not in l]
+    use_server_lines = [
+        l for l in lines if "use-server disk_cache if" in l and "cacherule_" in l and "!is_cache_purge" not in l
+    ]
     # Should have one use-server for the cache rule
     assert len(use_server_lines) >= 1
     # The cache rule use-server line should reference both rules
@@ -379,6 +398,7 @@ def test_disk_cache_bypass_rule_no_use_server(db):
 # ---------------------------------------------------------------------------
 # Tier-Specific Rules
 # ---------------------------------------------------------------------------
+
 
 def test_memory_only_rule_not_in_disk_cache(db):
     """Rules with tier='memory' only apply to memory cache, not disk cache.
@@ -473,27 +493,29 @@ def test_mixed_tier_rules(db):
     assert len(memory_lines) == 2  # jpg + /static/ (memory-tier rules)
     assert all("!is_varnish_fetch" in l for l in memory_lines)
     # Disk cache should have iso and /downloads/ (disk-tier rules only)
-    disk_lines = [l for l in cfg.split("\n") if "use-server disk_cache if cacherule_" in l and "!is_cache_purge" not in l]
+    disk_lines = [
+        l for l in cfg.split("\n") if "use-server disk_cache if cacherule_" in l and "!is_cache_purge" not in l
+    ]
     assert len(disk_lines) == 2  # iso + downloads
 
 
 def test_tier_validation_in_schema(db):
     """Pydantic schema validates tier field."""
+    import pytest
     from app.schemas.cache import CacheRuleCreate
     from pydantic import ValidationError
-    import pytest
-    
+
     # Valid tiers
     for tier in ["memory", "disk"]:
         rule = CacheRuleCreate(match_type="extension", pattern="png", tier=tier)
         assert rule.tier == tier
-    
+
     # Invalid tier (including "both" which is no longer supported)
     for invalid_tier in ["invalid", "both", "cache", ""]:
         with pytest.raises(ValidationError) as exc_info:
             CacheRuleCreate(match_type="extension", pattern="png", tier=invalid_tier)
         assert "tier must be one of" in str(exc_info.value)
-    
+
     # Tier is required
     with pytest.raises(ValidationError) as exc_info:
         CacheRuleCreate(match_type="extension", pattern="png")  # Missing tier
@@ -612,7 +634,9 @@ def test_cache_store_guarded_with_response_phase_rules(db):
     # Request-phase rule (needed to trigger any_cacheable=True)
     make_cache_rule(db, cc.id, match_type="extension", pattern="html", action="cache", tier="memory", priority=0)
     # Response-phase rule (content_type) for memory tier
-    make_cache_rule(db, cc.id, match_type="content_type", pattern="text/html", action="cache", tier="memory", priority=1)
+    make_cache_rule(
+        db, cc.id, match_type="content_type", pattern="text/html", action="cache", tier="memory", priority=1
+    )
     set_setting(db, "disk_cache_enabled", "true")
     db.commit()
 

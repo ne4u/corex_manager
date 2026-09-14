@@ -1,5 +1,6 @@
 """ACME Certificate Authority metadata for acme.sh and certbot."""
-from typing import Any, Dict, List, Optional
+
+from typing import Any
 
 # CA short names supported by acme.sh, mapped to their directory URLs for certbot.
 ACME_CA_MAP = {
@@ -55,7 +56,7 @@ ACME_CA_MAP = {
 }
 
 
-def list_acme_cas() -> List[Dict[str, Any]]:
+def list_acme_cas() -> list[dict[str, Any]]:
     """Return the supported CA list with short names and certbot URLs."""
     return [
         {"id": short, "name": meta["name"], "url": meta["url"], "help": meta.get("help")}
@@ -63,7 +64,7 @@ def list_acme_cas() -> List[Dict[str, Any]]:
     ]
 
 
-def resolve_ca_server(ca_value: Optional[str], client: str) -> Optional[str]:
+def resolve_ca_server(ca_value: str | None, client: str) -> str | None:
     """Return the --server value to pass to the ACME client.
 
     For acme.sh the short name is returned (or the raw URL).

@@ -1,8 +1,6 @@
-from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from ..deps import get_db, get_current_user, require_write, rate_limit
-from ...models.proxy import Listener
+
 from ...schemas.listeners import ListenerCreate, ListenerResponse, ListenerUpdate
 from ...services.listeners import (
     create_listener,
@@ -11,11 +9,12 @@ from ...services.listeners import (
     list_listeners,
     update_listener,
 )
+from ..deps import get_current_user, get_db, rate_limit, require_write
 
 router = APIRouter()
 
 
-@router.get("/listeners", response_model=List[ListenerResponse])
+@router.get("/listeners", response_model=list[ListenerResponse])
 def list_listener_endpoints(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),

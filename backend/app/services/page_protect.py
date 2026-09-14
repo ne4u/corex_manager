@@ -3,18 +3,19 @@
 Core service: CSP header builder, CSP report parser, script inventory upsert,
 settings helpers, and dashboard stats.
 """
+
 import hashlib
 import json
 import logging
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 from urllib.parse import urlparse
 
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from ..core.config import get_settings
-from ..models.models import CspReport, PageProtectPolicy, PageProtectScript, Setting
+from ..models.models import CspReport, PageProtectPolicy, PageProtectScript
 from .settings import get_setting, set_setting
 
 logger = logging.getLogger(__name__)
@@ -22,7 +23,7 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 # Map CSP violated-directive → resource_type for the script inventory.
-_DIRECTIVE_TO_RESOURCE_TYPE: Dict[str, str] = {
+_DIRECTIVE_TO_RESOURCE_TYPE: dict[str, str] = {
     "script-src": "script",
     "script-src-elem": "script",
     "script-src-attr": "script",
@@ -49,8 +50,8 @@ _DEFAULTS = {
     "report_retention_days": 7,
     "report_path": settings.PAGE_PROTECT_DEFAULT_REPORT_PATH,
     "baseline_start": "",  # ISO timestamp or empty
-    "baseline_end": "",    # ISO timestamp or empty
-    "baseline_note": "",   # optional user label
+    "baseline_end": "",  # ISO timestamp or empty
+    "baseline_note": "",  # optional user label
     "beacon_injection_enabled": False,
     "beacon_trust_enabled": False,
     "beacon_path": "/_cx-assets",
@@ -62,7 +63,7 @@ _DEFAULTS = {
 }
 
 # Reverse map: resource_type → CSP directive for the recommender.
-_RESOURCE_TYPE_TO_DIRECTIVE: Dict[str, str] = {
+_RESOURCE_TYPE_TO_DIRECTIVE: dict[str, str] = {
     "script": "script-src",
     "connect": "connect-src",
     "img": "img-src",
@@ -77,7 +78,7 @@ _RESOURCE_TYPE_TO_DIRECTIVE: Dict[str, str] = {
 _MIN_DISTINCT_IPS = 2
 
 
-def build_csp_header(directives: Dict[str, List[str]], report_uri: Optional[str] = None) -> str:
+def build_csp_header(directives: dict[str, list[str]], report_uri: str | None = None) -> str:
     """Convert a directive dict to a CSP header value string.
 
     Example: {"default-src": ["'self'"], "script-src": ["'self'", "https://cdn.example.com"]}
@@ -86,7 +87,7 @@ def build_csp_header(directives: Dict[str, List[str]], report_uri: Optional[str]
     If report_uri is provided and the directives do not already contain
     "report-uri", it is appended as the report destination.
     """
-    parts: List[str] = []
+    parts: list[str] = []
     for directive, sources in directives.items():
         if not sources:
             # Directive with no sources (e.g. upgrade-insecure-requests)
@@ -103,11 +104,13 @@ def build_report_to_header(report_path: str, group_name: str = "csp-endpoint") -
 
     The endpoint group is relative to the site origin (report_path).
     """
-    return json.dumps({
-        "group": group_name,
-        "max_age": 10886400,
-        "endpoints": [{"url": report_path}],
-    })
+    return json.dumps(
+        {
+            "group": group_name,
+            "max_age": 10886400,
+            "endpoints": [{"url": report_path}],
+        }
+    )
 
 
 def is_page_protect_enabled(db: Session) -> bool:
@@ -159,9 +162,9 @@ def is_page_protect_hashing_enabled(db: Session) -> bool:
     return str(val).lower() in ("true", "1", "yes")
 
 
-def get_page_protect_settings(db: Session) -> Dict[str, Any]:
+def get_page_protect_settings(db: Session) -> dict[str, Any]:
     """Read all page_protect_* settings from the settings table."""
-    result: Dict[str, Any] = {}
+    result: dict[str, Any] = {}
     for key, default in _DEFAULTS.items():
         val = get_setting(db, f"page_protect_{key}", str(default))
         if isinstance(default, bool):
@@ -169,20 +172,20 @@ def get_page_protect_settings(db: Session) -> Dict[str, Any]:
         elif isinstance(default, int):
             try:
                 result[key] = int(val)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 result[key] = default
         elif isinstance(default, list):
             try:
                 parsed = json.loads(val) if val else []
                 result[key] = parsed if isinstance(parsed, list) else []
-            except (json.JSONDecodeError, ValueError, TypeError):
+            except json.JSONDecodeError, ValueError, TypeError:
                 result[key] = []
         else:
             result[key] = val
     return result
 
 
-def update_page_protect_settings(db: Session, updates: Dict[str, Any]) -> Dict[str, Any]:
+def update_page_protect_settings(db: Session, updates: dict[str, Any]) -> dict[str, Any]:
     """Write page_protect_* settings to the settings table."""
     for key, value in updates.items():
         if key not in _DEFAULTS:
@@ -203,7 +206,7 @@ def get_report_path(db: Session) -> str:
     return val or _DEFAULTS["report_path"]
 
 
-def _extract_domain(url: str) -> Optional[str]:
+def _extract_domain(url: str) -> str | None:
     """Extract the domain (netloc) from a URL."""
     try:
         parsed = urlparse(url)
@@ -218,7 +221,7 @@ def _extract_domain(url: str) -> Optional[str]:
     return None
 
 
-def parse_csp_report(body: str) -> Optional[Dict[str, Any]]:
+def parse_csp_report(body: str) -> dict[str, Any] | None:
     """Parse a CSP report JSON body.
 
     Handles three formats:
@@ -231,7 +234,7 @@ def parse_csp_report(body: str) -> Optional[Dict[str, Any]]:
     """
     try:
         data = json.loads(body)
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return None
 
     if isinstance(data, list):
@@ -245,7 +248,7 @@ def parse_csp_report(body: str) -> Optional[Dict[str, Any]]:
     return _parse_single_report(data)
 
 
-def _parse_single_report(data: Any) -> Optional[Dict[str, Any]]:
+def _parse_single_report(data: Any) -> dict[str, Any] | None:
     """Parse a single report object (dict)."""
     if not isinstance(data, dict):
         return None
@@ -310,7 +313,7 @@ def _parse_single_report(data: Any) -> Optional[Dict[str, Any]]:
     return None
 
 
-def extract_script_info(report: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def extract_script_info(report: dict[str, Any]) -> dict[str, Any] | None:
     """Extract URL and resource_type from a parsed CSP report.
 
     Returns {"url": ..., "resource_type": ...} or None if no blocked URI.
@@ -333,10 +336,12 @@ def extract_script_info(report: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     return {"url": blocked_uri, "resource_type": resource_type, "domain": domain}
 
 
-def upsert_script_inventory(db: Session, url: str, resource_type: str, domain: Optional[str], source: str = "csp") -> PageProtectScript:
+def upsert_script_inventory(
+    db: Session, url: str, resource_type: str, domain: str | None, source: str = "csp"
+) -> PageProtectScript:
     """Upsert a PageProtectScript row (update last_seen, occurrence_count; insert if new)."""
     script = db.query(PageProtectScript).filter(PageProtectScript.url == url).first()
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(UTC).replace(tzinfo=None)
     if script:
         script.last_seen = now
         script.occurrence_count = (script.occurrence_count or 0) + 1
@@ -359,14 +364,14 @@ def upsert_script_inventory(db: Session, url: str, resource_type: str, domain: O
 
 def store_csp_report(
     db: Session,
-    report: Dict[str, Any],
-    client_ip: Optional[str] = None,
-    backend_name: Optional[str] = None,
-    listener_name: Optional[str] = None,
-    policy_id: Optional[int] = None,
+    report: dict[str, Any],
+    client_ip: str | None = None,
+    backend_name: str | None = None,
+    listener_name: str | None = None,
+    policy_id: int | None = None,
 ) -> CspReport:
     """Store a parsed CSP report in the database and upsert the script inventory."""
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(UTC).replace(tzinfo=None)
     record = CspReport(
         policy_id=policy_id,
         captured_at=now,
@@ -399,7 +404,7 @@ def store_csp_report(
 
 def prune_csp_reports(db: Session, retention_days: int = 7) -> int:
     """Delete CSP reports older than retention_days."""
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=retention_days)).replace(tzinfo=None)
+    cutoff = (datetime.now(UTC) - timedelta(days=retention_days)).replace(tzinfo=None)
     result = db.query(CspReport).filter(CspReport.captured_at < cutoff).delete()
     db.commit()
     return result
@@ -418,16 +423,20 @@ def prune_stale_scripts(db: Session, stale_days: int) -> int:
     """
     if stale_days <= 0:
         return 0
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=stale_days)).replace(tzinfo=None)
-    stale = db.query(PageProtectScript).filter(
-        PageProtectScript.hash_changed == False,  # noqa: E712
-        PageProtectScript.ignored == False,  # noqa: E712
-        PageProtectScript.last_seen < cutoff,
-        or_(
-            PageProtectScript.last_hash_at == None,  # noqa: E711
-            PageProtectScript.last_hash_at < cutoff,
-        ),
-    ).all()
+    cutoff = (datetime.now(UTC) - timedelta(days=stale_days)).replace(tzinfo=None)
+    stale = (
+        db.query(PageProtectScript)
+        .filter(
+            PageProtectScript.hash_changed == False,  # noqa: E712
+            PageProtectScript.ignored == False,  # noqa: E712
+            PageProtectScript.last_seen < cutoff,
+            or_(
+                PageProtectScript.last_hash_at == None,  # noqa: E711
+                PageProtectScript.last_hash_at < cutoff,
+            ),
+        )
+        .all()
+    )
     for s in stale:
         db.delete(s)
     if stale:
@@ -435,7 +444,7 @@ def prune_stale_scripts(db: Session, stale_days: int) -> int:
     return len(stale)
 
 
-def parse_beacon_data(body: Any) -> List[Dict[str, Any]]:
+def parse_beacon_data(body: Any) -> list[dict[str, Any]]:
     """Parse a beacon POST body and return a list of resource dicts.
 
     The beacon JS sends JSON: ``{"page": "...", "resources": [...], "ts": ...}``
@@ -444,12 +453,12 @@ def parse_beacon_data(body: Any) -> List[Dict[str, Any]]:
     if isinstance(body, str):
         try:
             body = json.loads(body)
-        except (json.JSONDecodeError, ValueError):
+        except json.JSONDecodeError, ValueError:
             return []
     if isinstance(body, bytes):
         try:
             body = json.loads(body.decode("utf-8", errors="replace"))
-        except (json.JSONDecodeError, ValueError):
+        except json.JSONDecodeError, ValueError:
             return []
     if not isinstance(body, dict):
         return []
@@ -465,15 +474,17 @@ def parse_beacon_data(body: Any) -> List[Dict[str, Any]]:
             continue
         if not url.startswith(("http://", "https://")):
             continue
-        result.append({
-            "url": url,
-            "resource_type": r.get("resource_type") or "other",
-            "domain": r.get("domain"),
-        })
+        result.append(
+            {
+                "url": url,
+                "resource_type": r.get("resource_type") or "other",
+                "domain": r.get("domain"),
+            }
+        )
     return result
 
 
-def store_beacon_resources(db: Session, resources: List[Dict[str, Any]]) -> int:
+def store_beacon_resources(db: Session, resources: list[dict[str, Any]]) -> int:
     """Upsert beacon resources into the script inventory with source='beacon'."""
     count = 0
     for r in resources:
@@ -484,7 +495,7 @@ def store_beacon_resources(db: Session, resources: List[Dict[str, Any]]) -> int:
     return count
 
 
-def get_beacon_settings(db: Session) -> Dict[str, Any]:
+def get_beacon_settings(db: Session) -> dict[str, Any]:
     """Return beacon-specific settings from the Page Protect config."""
     pp = get_page_protect_settings(db)
     return {
@@ -498,7 +509,7 @@ def get_beacon_settings(db: Session) -> Dict[str, Any]:
     }
 
 
-def build_beacon_rule(pp_settings: Dict[str, Any], beacon_script_url: str) -> Dict[str, Any]:
+def build_beacon_rule(pp_settings: dict[str, Any], beacon_script_url: str) -> dict[str, Any]:
     """Build a resp_transform inject rule dict for the beacon script tag.
 
     This rule is merged into the per-backend resp-transform JSON config file
@@ -510,10 +521,13 @@ def build_beacon_rule(pp_settings: Dict[str, Any], beacon_script_url: str) -> Di
     ACL still matches the base path.
     """
     from .page_protect_beacon_js import BEACON_JS
+
     version = hashlib.sha256(BEACON_JS.encode()).hexdigest()[:8]
     separator = "&" if "?" in beacon_script_url else "?"
     versioned_url = f"{beacon_script_url}{separator}v={version}"
-    content_types = [c.strip() for c in (pp_settings.get("beacon_content_types") or "text/html").split(",") if c.strip()]
+    content_types = [
+        c.strip() for c in (pp_settings.get("beacon_content_types") or "text/html").split(",") if c.strip()
+    ]
     path_patterns = [p.strip() for p in (pp_settings.get("beacon_path_patterns") or "").split(",") if p.strip()]
     return {
         "id": 999999,  # sentinel ID to distinguish beacon rules from user rules
@@ -529,19 +543,29 @@ def build_beacon_rule(pp_settings: Dict[str, Any], beacon_script_url: str) -> Di
     }
 
 
-def get_stats(db: Session) -> Dict[str, Any]:
+def get_stats(db: Session) -> dict[str, Any]:
     """Aggregate dashboard stats."""
     total_scripts = db.query(func.count(PageProtectScript.id)).scalar() or 0
     total_reports = db.query(func.count(CspReport.id)).scalar() or 0
-    changed_scripts = db.query(func.count(PageProtectScript.id)).filter(
-        PageProtectScript.hash_changed == True,  # noqa: E712
-        PageProtectScript.ignored == False,  # noqa: E712
-    ).scalar() or 0
-    active_policies = db.query(func.count(PageProtectPolicy.id)).filter(
-        PageProtectPolicy.enabled == True  # noqa: E712
-    ).scalar() or 0
+    changed_scripts = (
+        db.query(func.count(PageProtectScript.id))
+        .filter(
+            PageProtectScript.hash_changed == True,  # noqa: E712
+            PageProtectScript.ignored == False,  # noqa: E712
+        )
+        .scalar()
+        or 0
+    )
+    active_policies = (
+        db.query(func.count(PageProtectPolicy.id))
+        .filter(
+            PageProtectPolicy.enabled == True  # noqa: E712
+        )
+        .scalar()
+        or 0
+    )
 
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(UTC).replace(tzinfo=None)
     cutoff_24h = now - timedelta(hours=24)
     reports_24h = db.query(func.count(CspReport.id)).filter(CspReport.captured_at >= cutoff_24h).scalar() or 0
 
@@ -556,9 +580,7 @@ def get_stats(db: Session) -> Dict[str, Any]:
         .limit(10)
         .all()
     )
-    top_violated_directives = [
-        {"directive": d, "count": c} for d, c in top_directives if d
-    ]
+    top_violated_directives = [{"directive": d, "count": c} for d, c in top_directives if d]
 
     # Top blocked URIs (last 7 days)
     top_uris = (
@@ -570,9 +592,7 @@ def get_stats(db: Session) -> Dict[str, Any]:
         .limit(10)
         .all()
     )
-    top_blocked_uris = [
-        {"uri": u, "count": c} for u, c in top_uris if u
-    ]
+    top_blocked_uris = [{"uri": u, "count": c} for u, c in top_uris if u]
 
     return {
         "total_scripts": total_scripts,
@@ -589,12 +609,13 @@ def get_stats(db: Session) -> Dict[str, Any]:
 # Baselining window
 # ---------------------------------------------------------------------------
 
-def get_baseline(db: Session) -> Dict[str, Any]:
+
+def get_baseline(db: Session) -> dict[str, Any]:
     """Return the current baseline window state."""
     start = get_setting(db, "page_protect_baseline_start", "")
     end = get_setting(db, "page_protect_baseline_end", "")
     note = get_setting(db, "page_protect_baseline_note", "")
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(UTC).replace(tzinfo=None)
 
     if not start:
         status = "idle"
@@ -603,7 +624,7 @@ def get_baseline(db: Session) -> Dict[str, Any]:
     else:
         status = "complete"
 
-    result: Dict[str, Any] = {"status": status, "note": note}
+    result: dict[str, Any] = {"status": status, "note": note}
 
     if start:
         result["start"] = start
@@ -632,13 +653,13 @@ def get_baseline(db: Session) -> Dict[str, Any]:
     return result
 
 
-def start_baseline(db: Session, note: str = "") -> Dict[str, Any]:
+def start_baseline(db: Session, note: str = "") -> dict[str, Any]:
     """Start a new baseline collection window.
 
     If a window is already in progress (start set, end empty), it is replaced.
     If a window is complete (start+end set), it is also replaced.
     """
-    now_iso = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
+    now_iso = datetime.now(UTC).replace(tzinfo=None).isoformat()
     set_setting(db, "page_protect_baseline_start", now_iso)
     set_setting(db, "page_protect_baseline_end", "")
     set_setting(db, "page_protect_baseline_note", note)
@@ -646,18 +667,18 @@ def start_baseline(db: Session, note: str = "") -> Dict[str, Any]:
     return get_baseline(db)
 
 
-def stop_baseline(db: Session) -> Dict[str, Any]:
+def stop_baseline(db: Session) -> dict[str, Any]:
     """Stop the current baseline window (set the end timestamp)."""
     start = get_setting(db, "page_protect_baseline_start", "")
     if not start:
         return {"status": "idle", "error": "no baseline in progress"}
-    now_iso = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
+    now_iso = datetime.now(UTC).replace(tzinfo=None).isoformat()
     set_setting(db, "page_protect_baseline_end", now_iso)
     db.commit()
     return get_baseline(db)
 
 
-def clear_baseline(db: Session) -> Dict[str, Any]:
+def clear_baseline(db: Session) -> dict[str, Any]:
     """Clear the baseline window entirely."""
     set_setting(db, "page_protect_baseline_start", "")
     set_setting(db, "page_protect_baseline_end", "")
@@ -666,7 +687,7 @@ def clear_baseline(db: Session) -> Dict[str, Any]:
     return {"status": "idle"}
 
 
-def _parse_iso(s: str) -> Optional[datetime]:
+def _parse_iso(s: str) -> datetime | None:
     """Parse an ISO 8601 timestamp string to a naive UTC datetime."""
     try:
         dt = datetime.fromisoformat(s)
@@ -677,7 +698,7 @@ def _parse_iso(s: str) -> Optional[datetime]:
         return None
 
 
-def _baseline_counts(db: Session, start: str, end: Optional[str]) -> Dict[str, int]:
+def _baseline_counts(db: Session, start: str, end: str | None) -> dict[str, int]:
     """Count scripts and reports within the baseline window."""
     start_dt = _parse_iso(start)
     end_dt = _parse_iso(end) if end else None
@@ -709,11 +730,12 @@ def _baseline_counts(db: Session, start: str, end: Optional[str]) -> Dict[str, i
 # Policy recommender
 # ---------------------------------------------------------------------------
 
+
 def recommend_policy(
     db: Session,
-    backend_ids: Optional[List[int]] = None,
-    report_path: Optional[str] = None,
-) -> Dict[str, Any]:
+    backend_ids: list[int] | None = None,
+    report_path: str | None = None,
+) -> dict[str, Any]:
     """Recommend a CSP policy based on observed data.
 
     Uses the script inventory and CSP violation reports within the baseline
@@ -733,12 +755,11 @@ def recommend_policy(
     end_dt = _parse_iso(end_str) if end_str else None
 
     # Build backend name filter for reports (reports store backend_name, not id)
-    backend_names: Optional[List[str]] = None
+    backend_names: list[str] | None = None
     if backend_ids:
         from ..models.models import Backend
-        backend_names = [
-            b.name for b in db.query(Backend).filter(Backend.id.in_(backend_ids)).all()
-        ]
+
+        backend_names = [b.name for b in db.query(Backend).filter(Backend.id.in_(backend_ids)).all()]
 
     # --- Query script inventory ---
     script_q = db.query(PageProtectScript)
@@ -760,7 +781,7 @@ def recommend_policy(
 
     # --- Build per-directive origin lists from inventory ---
     # Group by resource_type → domain → {urls, occurrence_count}
-    by_type: Dict[str, Dict[str, dict]] = {}
+    by_type: dict[str, dict[str, dict]] = {}
     ignored_urls = {s.url for s in scripts if s.ignored}
     for s in scripts:
         if s.ignored:
@@ -772,11 +793,14 @@ def recommend_policy(
         if not domain or domain == "self":
             continue
         by_type.setdefault(rt, {})
-        entry = by_type[rt].setdefault(domain, {
-            "occurrence_count": 0,
-            "distinct_ips": set(),
-            "urls": set(),
-        })
+        entry = by_type[rt].setdefault(
+            domain,
+            {
+                "occurrence_count": 0,
+                "distinct_ips": set(),
+                "urls": set(),
+            },
+        )
         entry["occurrence_count"] += s.occurrence_count or 1
         entry["urls"].add(s.url)
 
@@ -798,9 +822,9 @@ def recommend_policy(
                 by_type[rt][domain]["distinct_ips"].add(r.client_ip)
 
     # --- Build directives ---
-    directives: Dict[str, List[str]] = {}
-    warnings: List[str] = []
-    sources_detail: Dict[str, List[dict]] = {}
+    directives: dict[str, list[str]] = {}
+    warnings: list[str] = []
+    sources_detail: dict[str, list[dict]] = {}
 
     # Always start with default-src
     directives["default-src"] = ["'self'"]
@@ -808,10 +832,7 @@ def recommend_policy(
     directives["form-action"] = ["'self'"]
 
     # object-src: default to 'none' unless we observed object violations
-    has_object = any(
-        r.violated_directive and r.violated_directive.startswith("object-src")
-        for r in reports
-    )
+    has_object = any(r.violated_directive and r.violated_directive.startswith("object-src") for r in reports)
     if not has_object:
         directives["object-src"] = ["'none'"]
         warnings.append("object-src set to 'none' (no object/embed violations observed)")
@@ -819,8 +840,8 @@ def recommend_policy(
     # Build per-directive source lists
     for rt, domains in by_type.items():
         directive = _RESOURCE_TYPE_TO_DIRECTIVE[rt]
-        sources: List[str] = ["'self'"]
-        detail_list: List[dict] = []
+        sources: list[str] = ["'self'"]
+        detail_list: list[dict] = []
 
         for domain, info in sorted(
             domains.items(),
@@ -838,8 +859,7 @@ def recommend_policy(
                 # have the reports filtered to this window). Include it but
                 # warn.
                 warnings.append(
-                    f"{origin} in {directive} has no violation reports in window — "
-                    f"verify this is a legitimate origin"
+                    f"{origin} in {directive} has no violation reports in window — verify this is a legitimate origin"
                 )
             elif reports and distinct_ips < _MIN_DISTINCT_IPS and distinct_ips > 0:
                 warnings.append(
@@ -849,12 +869,14 @@ def recommend_policy(
 
             if origin not in sources:
                 sources.append(origin)
-            detail_list.append({
-                "origin": origin,
-                "occurrence_count": info["occurrence_count"],
-                "distinct_ips": distinct_ips,
-                "sample_url": next(iter(info["urls"]), ""),
-            })
+            detail_list.append(
+                {
+                    "origin": origin,
+                    "occurrence_count": info["occurrence_count"],
+                    "distinct_ips": distinct_ips,
+                    "sample_url": next(iter(info["urls"]), ""),
+                }
+            )
 
         directives[directive] = sources
         sources_detail[directive] = detail_list
@@ -876,14 +898,22 @@ def recommend_policy(
         if "script-src" not in directives:
             directives["script-src"] = ["'self'"]
         directives["script-src"].append("'unsafe-inline'")
-        count = sum(1 for r in reports if r.blocked_uri == "inline" and r.violated_directive and r.violated_directive.startswith("script-src"))
+        count = sum(
+            1
+            for r in reports
+            if r.blocked_uri == "inline" and r.violated_directive and r.violated_directive.startswith("script-src")
+        )
         warnings.append(f"'unsafe-inline' added to script-src ({count} inline script violations observed)")
 
     if inline_style:
         if "style-src" not in directives:
             directives["style-src"] = ["'self'"]
         directives["style-src"].append("'unsafe-inline'")
-        count = sum(1 for r in reports if r.blocked_uri == "inline" and r.violated_directive and r.violated_directive.startswith("style-src"))
+        count = sum(
+            1
+            for r in reports
+            if r.blocked_uri == "inline" and r.violated_directive and r.violated_directive.startswith("style-src")
+        )
         warnings.append(f"'unsafe-inline' added to style-src ({count} inline style violations observed)")
 
     if eval_violation:
@@ -904,7 +934,9 @@ def recommend_policy(
             if d not in directives:
                 directives[d] = ["'self'"]
             directives[d].append("data:")
-        warnings.append(f"data: added to {', '.join(data_directives)} ({len(data_violations)} data: URI violations observed)")
+        warnings.append(
+            f"data: added to {', '.join(data_directives)} ({len(data_violations)} data: URI violations observed)"
+        )
 
     if blob_violations:
         blob_directives = set()
@@ -916,7 +948,9 @@ def recommend_policy(
             if d not in directives:
                 directives[d] = ["'self'"]
             directives[d].append("blob:")
-        warnings.append(f"blob: added to {', '.join(blob_directives)} ({len(blob_violations)} blob: URI violations observed)")
+        warnings.append(
+            f"blob: added to {', '.join(blob_directives)} ({len(blob_violations)} blob: URI violations observed)"
+        )
 
     # --- report-uri ---
     if not report_path:
@@ -934,8 +968,11 @@ def recommend_policy(
     }
 
     if not scripts and not reports:
-        warnings.insert(0, "No observed data in the selected window. This is a minimal safe policy. "
-                           "Enable monitoring and let traffic flow to collect data, then re-run the recommender.")
+        warnings.insert(
+            0,
+            "No observed data in the selected window. This is a minimal safe policy. "
+            "Enable monitoring and let traffic flow to collect data, then re-run the recommender.",
+        )
 
     return {
         "directives": directives,

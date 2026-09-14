@@ -1,43 +1,50 @@
-from datetime import datetime
-from typing import Optional, List, Dict, Any, Type, TypeVar
-from pydantic import BaseModel, Field, model_validator, field_validator, ConfigDict
-from ._base import _optional_update
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict
+
 
 class SettingBase(BaseModel):
     key: str
-    value: Optional[str] = None
+    value: str | None = None
 
 
 class SettingCreate(BaseModel):
-    value: Optional[str] = None
+    value: str | None = None
 
 
 class SettingResponse(BaseModel):
-    id: Optional[int] = None
+    id: int | None = None
     key: str
-    value: Optional[str] = None
+    value: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class GeoIpDownloadResponse(BaseModel):
     ok: bool
-    results: List[Dict[str, Any]]
+    results: list[dict[str, Any]]
 
 
 class GeoIpStatusResponse(BaseModel):
-    last_download: Optional[str] = None
-    databases: List[Dict[str, Any]] = []
+    last_download: str | None = None
+    databases: list[dict[str, Any]] = []
 
 
 class AsnLookupResponse(BaseModel):
     ip: str
-    asn: Optional[int] = None
-    organization: Optional[str] = None
-    network: Optional[str] = None
-    city: Optional[str] = None
-    country: Optional[str] = None
-    country_code: Optional[str] = None
+    asn: int | None = None
+    organization: str | None = None
+    network: str | None = None
+    city: str | None = None
+    country: str | None = None
+    country_code: str | None = None
 
 
-__all__ = ['AsnLookupResponse', 'GeoIpDownloadResponse', 'GeoIpStatusResponse', 'SettingBase', 'SettingCreate', 'SettingResponse']
+__all__ = [
+    "AsnLookupResponse",
+    "GeoIpDownloadResponse",
+    "GeoIpStatusResponse",
+    "SettingBase",
+    "SettingCreate",
+    "SettingResponse",
+]

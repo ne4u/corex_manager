@@ -1,8 +1,4 @@
 """Tests for the /risk-rulesets API endpoints."""
-import pytest
-from fastapi.testclient import TestClient
-
-from app.models.models import RiskRuleset, RiskRule
 
 
 class TestRiskRulesetsAPI:
@@ -17,10 +13,13 @@ class TestRiskRulesetsAPI:
         assert default["rule_count"] == 0
 
     def test_create_ruleset(self, client, db):
-        resp = client.post("/api/v1/risk-rulesets", json={
-            "name": "Human Score",
-            "description": "Browser traffic scoring",
-        })
+        resp = client.post(
+            "/api/v1/risk-rulesets",
+            json={
+                "name": "Human Score",
+                "description": "Browser traffic scoring",
+            },
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert data["name"] == "Human Score"
@@ -40,10 +39,13 @@ class TestRiskRulesetsAPI:
     def test_update_ruleset(self, client, db):
         create = client.post("/api/v1/risk-rulesets", json={"name": "Test RS", "description": ""})
         rsid = create.json()["id"]
-        resp = client.put(f"/api/v1/risk-rulesets/{rsid}", json={
-            "name": "Renamed RS",
-            "description": "Updated description",
-        })
+        resp = client.put(
+            f"/api/v1/risk-rulesets/{rsid}",
+            json={
+                "name": "Renamed RS",
+                "description": "Updated description",
+            },
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert data["name"] == "Renamed RS"
@@ -67,12 +69,15 @@ class TestRiskRulesetsAPI:
         create = client.post("/api/v1/risk-rulesets", json={"name": "ToDelete", "description": ""})
         rsid = create.json()["id"]
         # Create a rule in this ruleset
-        client.post("/api/v1/risk-rules", json={
-            "name": "Test rule",
-            "expression": 'http.host = "a"',
-            "points": 5,
-            "ruleset_id": rsid,
-        })
+        client.post(
+            "/api/v1/risk-rules",
+            json={
+                "name": "Test rule",
+                "expression": 'http.host = "a"',
+                "points": 5,
+                "ruleset_id": rsid,
+            },
+        )
         # Delete the ruleset
         resp = client.delete(f"/api/v1/risk-rulesets/{rsid}")
         assert resp.status_code == 200
@@ -85,18 +90,24 @@ class TestRiskRulesetsAPI:
         create = client.post("/api/v1/risk-rulesets", json={"name": "Human", "description": ""})
         human_id = create.json()["id"]
         # Create rules in both rulesets
-        client.post("/api/v1/risk-rules", json={
-            "name": "Default rule",
-            "expression": 'http.host = "a"',
-            "points": 5,
-            "ruleset_id": 1,
-        })
-        client.post("/api/v1/risk-rules", json={
-            "name": "Human rule",
-            "expression": 'http.host = "b"',
-            "points": 5,
-            "ruleset_id": human_id,
-        })
+        client.post(
+            "/api/v1/risk-rules",
+            json={
+                "name": "Default rule",
+                "expression": 'http.host = "a"',
+                "points": 5,
+                "ruleset_id": 1,
+            },
+        )
+        client.post(
+            "/api/v1/risk-rules",
+            json={
+                "name": "Human rule",
+                "expression": 'http.host = "b"',
+                "points": 5,
+                "ruleset_id": human_id,
+            },
+        )
         # List all
         all_rules = client.get("/api/v1/risk-rules").json()
         assert len(all_rules) == 2
@@ -107,11 +118,14 @@ class TestRiskRulesetsAPI:
         assert human_rules[0]["ruleset_id"] == human_id
 
     def test_create_rule_invalid_ruleset(self, client, db):
-        resp = client.post("/api/v1/risk-rules", json={
-            "name": "Test",
-            "expression": 'http.host = "a"',
-            "points": 5,
-            "ruleset_id": 9999,
-        })
+        resp = client.post(
+            "/api/v1/risk-rules",
+            json={
+                "name": "Test",
+                "expression": 'http.host = "a"',
+                "points": 5,
+                "ruleset_id": 9999,
+            },
+        )
         assert resp.status_code == 400
         assert "not found" in resp.json().get("detail", "")

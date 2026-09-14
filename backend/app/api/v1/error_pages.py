@@ -1,7 +1,6 @@
-from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from ..deps import get_db, get_current_user, require_write, rate_limit
+
 from ...schemas.error_pages import (
     CustomErrorPageCreate,
     CustomErrorPagePreview,
@@ -11,16 +10,16 @@ from ...schemas.error_pages import (
 from ...services.error_pages import (
     create_error_page,
     delete_error_page,
-    get_error_page,
     list_error_pages,
     preview_error_page,
     update_error_page,
 )
+from ..deps import get_current_user, get_db, rate_limit, require_write
 
 router = APIRouter()
 
 
-@router.get("/error-pages", response_model=List[CustomErrorPageResponse])
+@router.get("/error-pages", response_model=list[CustomErrorPageResponse])
 def list_error_pages_endpoint(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),

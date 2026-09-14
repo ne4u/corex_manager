@@ -1,7 +1,6 @@
-from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from ..deps import get_current_user, get_db, require_write, rate_limit
+
 from ...schemas.backends import (
     BackendCreate,
     BackendResponse,
@@ -22,18 +21,18 @@ from ...services.backends import (
     delete_server,
     get_backend,
     get_backend_rule,
-    get_server,
     list_backend_rules,
     list_backends,
     update_backend,
     update_backend_rule,
     update_server,
 )
+from ..deps import get_current_user, get_db, rate_limit, require_write
 
 router = APIRouter()
 
 
-@router.get("/backends", response_model=List[BackendResponse])
+@router.get("/backends", response_model=list[BackendResponse])
 def list_backends_endpoint(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
@@ -137,9 +136,9 @@ def delete_server_endpoint(
     return {"status": "ok"}
 
 
-@router.get("/backend-rules", response_model=List[BackendRuleResponse])
+@router.get("/backend-rules", response_model=list[BackendRuleResponse])
 def list_backend_rules_endpoint(
-    listener_id: Optional[int] = None,
+    listener_id: int | None = None,
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
     _=Depends(rate_limit),

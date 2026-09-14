@@ -6,9 +6,8 @@ identically to the original main() function.
 
 Prime Directive: Docker Compose Must Not Break.
 """
-import importlib
+
 import inspect
-from unittest.mock import patch, MagicMock
 
 import pytest
 
@@ -17,9 +16,8 @@ import pytest
 def deploy_module():
     """Import deploy.py as a module."""
     import importlib.util
-    spec = importlib.util.spec_from_file_location(
-        "deploy", "/Users/akauffman/CascadeProjects/corex_manager/deploy.py"
-    )
+
+    spec = importlib.util.spec_from_file_location("deploy", "/Users/akauffman/CascadeProjects/corex_manager/deploy.py")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
@@ -38,7 +36,7 @@ class TestDeployDockerTargetUnchanged:
         parser = deploy_module.argparse.ArgumentParser()
         # Re-create the parser to check defaults
         src = inspect.getsource(deploy_module.main)
-        assert "default=\"docker\"" in src or "default='docker'" in src
+        assert 'default="docker"' in src or "default='docker'" in src
 
     def test_k8s_functions_exist(self, deploy_module):
         """k8s deploy functions should exist alongside docker."""
@@ -82,10 +80,19 @@ class TestDeployDockerTargetUnchanged:
     def test_helper_functions_unchanged(self, deploy_module):
         """Core helper functions should still exist."""
         for func_name in [
-            "_require", "_run", "_ssh_cmd", "_ssh_capture", "_rsync",
-            "_detect_sudo", "_remote_docker", "_prompt",
-            "_compute_file_hashes", "_detect_changed_files",
-            "_map_files_to_services", "_download_manifest", "_upload_manifest",
+            "_require",
+            "_run",
+            "_ssh_cmd",
+            "_ssh_capture",
+            "_rsync",
+            "_detect_sudo",
+            "_remote_docker",
+            "_prompt",
+            "_compute_file_hashes",
+            "_detect_changed_files",
+            "_map_files_to_services",
+            "_download_manifest",
+            "_upload_manifest",
             "_print_deploy_plan",
         ]:
             assert hasattr(deploy_module, func_name), f"Missing function: {func_name}"

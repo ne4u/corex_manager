@@ -1,9 +1,7 @@
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import MagicMock
-
-import pytest
 
 from app.models.models import WafMetric
 from app.services import waf_metrics
@@ -98,19 +96,21 @@ def test_parse_line_plain_log_line():
 
 def test_parse_line_coraza_spoa_match_json():
     """coraza-spoa main logs a zerolog JSON line with a nested match object."""
-    line = json.dumps({
-        "level": "error",
-        "time": "2026-08-05T12:00:00Z",
-        "match": {
-            "client": "192.168.1.50",
-            "rule_id": 920420,
-            "msg": "Request content type is not allowed by policy",
-            "severity": "critical",
-            "uri": "/",
-            "unique_id": "ABCDEF123456",
-            "disruptive": False,
-        },
-    })
+    line = json.dumps(
+        {
+            "level": "error",
+            "time": "2026-08-05T12:00:00Z",
+            "match": {
+                "client": "192.168.1.50",
+                "rule_id": 920420,
+                "msg": "Request content type is not allowed by policy",
+                "severity": "critical",
+                "uri": "/",
+                "unique_id": "ABCDEF123456",
+                "disruptive": False,
+            },
+        }
+    )
     parsed = waf_metrics._parse_line(line)
     assert parsed["action"] == "pass"
     assert parsed["rule_id"] == "920420"
@@ -150,8 +150,12 @@ def test_geo_country_lookup_error():
 def test_sample_waf_metrics(db, temp_coraza_paths, monkeypatch):
     log_path = temp_coraza_paths["log"]
     lines = [
-        json.dumps({"action": "deny", "rule_id": "1", "severity": "CRITICAL", "msg": "XSS", "client": "1.2.3.4", "uri": "/a"}),
-        json.dumps({"action": "drop", "rule_id": "2", "severity": "HIGH", "msg": "SQLi", "client": "5.6.7.8", "uri": "/b"}),
+        json.dumps(
+            {"action": "deny", "rule_id": "1", "severity": "CRITICAL", "msg": "XSS", "client": "1.2.3.4", "uri": "/a"}
+        ),
+        json.dumps(
+            {"action": "drop", "rule_id": "2", "severity": "HIGH", "msg": "SQLi", "client": "5.6.7.8", "uri": "/b"}
+        ),
         json.dumps({"message": "noise"}),
     ]
     with open(log_path, "w") as f:
@@ -174,7 +178,9 @@ def test_sample_waf_metrics(db, temp_coraza_paths, monkeypatch):
 def test_sample_waf_metrics_offset_and_truncate(db, temp_coraza_paths, monkeypatch):
     log_path = temp_coraza_paths["log"]
     offset_path = temp_coraza_paths["offset"]
-    line1 = json.dumps({"action": "deny", "rule_id": "1", "severity": "CRITICAL", "msg": "XSS", "client": "1.2.3.4", "uri": "/a"})
+    line1 = json.dumps(
+        {"action": "deny", "rule_id": "1", "severity": "CRITICAL", "msg": "XSS", "client": "1.2.3.4", "uri": "/a"}
+    )
 
     with open(log_path, "w") as f:
         f.write(line1 + "\n")
@@ -196,12 +202,14 @@ def test_sample_waf_metrics_offset_and_truncate(db, temp_coraza_paths, monkeypat
 
 
 def test_get_waf_metrics_breakdowns(db):
-    now = datetime.now(timezone.utc)
-    for i, (action, rule_id, severity, msg, country) in enumerate([
-        ("deny", "1", "CRITICAL", "XSS", "US"),
-        ("deny", "1", "CRITICAL", "XSS", "US"),
-        ("drop", "2", "HIGH", "SQLi", "CA"),
-    ]):
+    now = datetime.now(UTC)
+    for i, (action, rule_id, severity, msg, country) in enumerate(
+        [
+            ("deny", "1", "CRITICAL", "XSS", "US"),
+            ("deny", "1", "CRITICAL", "XSS", "US"),
+            ("drop", "2", "HIGH", "SQLi", "CA"),
+        ]
+    ):
         db.add(
             WafMetric(
                 captured_at=(now - timedelta(seconds=i)).replace(tzinfo=None),
@@ -227,20 +235,22 @@ def test_get_waf_metrics_breakdowns(db):
 
 
 def test_get_waf_metrics_empty(db):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     result = waf_metrics.get_waf_metrics(db, start=now - timedelta(minutes=5), breakdown="action")
     assert result == {"time": [], "series": [], "breakdown": "action", "totals": {}}
 
 
 def test_get_waf_metrics_msg_breakdown_collapses_anomaly_score(db):
     """CRS 'Inbound Anomaly Score Exceeded (Total Score N)' messages group together."""
-    now = datetime.now(timezone.utc)
-    for i, msg in enumerate([
-        "Inbound Anomaly Score Exceeded (Total Score: 23)",
-        "Inbound Anomaly Score Exceeded (Total Score: 15)",
-        "Inbound Anomaly Score Exceeded (Total Score: 42)",
-        "SQL Injection Attack",
-    ]):
+    now = datetime.now(UTC)
+    for i, msg in enumerate(
+        [
+            "Inbound Anomaly Score Exceeded (Total Score: 23)",
+            "Inbound Anomaly Score Exceeded (Total Score: 15)",
+            "Inbound Anomaly Score Exceeded (Total Score: 42)",
+            "SQL Injection Attack",
+        ]
+    ):
         db.add(
             WafMetric(
                 captured_at=(now - timedelta(seconds=i)).replace(tzinfo=None),
@@ -266,12 +276,12 @@ def test_get_waf_metrics_msg_breakdown_collapses_anomaly_score(db):
 def test_prune_waf_metrics(db, monkeypatch):
     monkeypatch.setattr(waf_metrics.settings, "WAF_METRICS_RETENTION_DAYS", 1)
     old = WafMetric(
-        captured_at=(datetime.now(timezone.utc) - timedelta(days=2)).replace(tzinfo=None),
+        captured_at=(datetime.now(UTC) - timedelta(days=2)).replace(tzinfo=None),
         action="deny",
         rule_id="1",
     )
     new = WafMetric(
-        captured_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        captured_at=datetime.now(UTC).replace(tzinfo=None),
         action="deny",
         rule_id="1",
     )

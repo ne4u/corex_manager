@@ -14,14 +14,13 @@ Two functions:
   stats socket (batched in a single connection). Called after every successful
   HAProxy reload and once on startup.
 """
-import json
+
 import logging
 import threading
 import time
-from typing import List
 
-from ..core.config import get_settings
 from ..core import valkey_client
+from ..core.config import get_settings
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -29,7 +28,7 @@ settings = get_settings()
 VALKEY_KEY = "beacon_trust:ips"
 
 
-def _parse_show_table(output: str) -> List[str]:
+def _parse_show_table(output: str) -> list[str]:
     """Parse the output of ``show table beacon_trust_table`` and return trusted IPs.
 
     Output format (one entry per line):
@@ -40,7 +39,7 @@ def _parse_show_table(output: str) -> List[str]:
     trusted. We don't check gpt0 because track-sc doesn't set it; we use
     table_cnt (request count) for runtime lookups instead.
     """
-    ips: List[str] = []
+    ips: list[str] = []
     for line in output.splitlines():
         line = line.strip()
         if not line or line.startswith("#") or line.startswith("table:"):
@@ -53,7 +52,7 @@ def _parse_show_table(output: str) -> List[str]:
     return ips
 
 
-def export_trust_table() -> List[str]:
+def export_trust_table() -> list[str]:
     """Export the beacon_trust_table stick table to Valkey.
 
     Sends ``show table beacon_trust_table`` to the HAProxy stats socket,

@@ -14,7 +14,7 @@ from .fcgi import router as fcgi_router
 from .ha import router as ha_router
 from .headers import router as headers_router
 from .listeners import router as listeners_router
-from .vector import router as vector_router
+from .mcp import router as mcp_router
 from .page_protect import router as page_protect_router
 from .rate_limits import router as rate_limits_router
 from .redirects import router as redirects_router
@@ -28,8 +28,8 @@ from .ssllabs import router as ssllabs_router
 from .system import router as system_router
 from .tasks import router as tasks_router
 from .users import router as users_router
+from .vector import router as vector_router
 from .waf import router as waf_router
-from .mcp import router as mcp_router
 
 
 def build_v1_router() -> APIRouter:

@@ -1,10 +1,12 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
+
 from .base import Base, utcnow
 
 
 class CacheConfig(Base):
     """Per-backend cache configuration for memory cache (HAProxy native) and disk cache."""
+
     __tablename__ = "cache_configs"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -54,9 +56,10 @@ class CacheRule(Base):
     Each rule targets a specific cache tier via the `tier` field (required):
     - "memory": applies only to memory cache (HAProxy ACLs on `http-request cache-use`)
     - "disk": applies only to disk cache (HAProxy use-server directives)
-    
+
     To cache the same pattern in both tiers, create two separate rules.
     """
+
     __tablename__ = "cache_rules"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -64,7 +67,7 @@ class CacheRule(Base):
     priority = Column(Integer, default=0, nullable=False)
     enabled = Column(Boolean, default=True)
     match_type = Column(String, nullable=False)  # "path" | "filename" | "extension"
-    pattern = Column(String, nullable=False)     # normalized on save
+    pattern = Column(String, nullable=False)  # normalized on save
     action = Column(String, default="cache", nullable=False)  # "cache" | "bypass"
     tier = Column(String, nullable=False)  # "memory" | "disk" (required)
     created_at = Column(DateTime, default=utcnow)
@@ -73,4 +76,4 @@ class CacheRule(Base):
     cache_config = relationship("CacheConfig", back_populates="rules")
 
 
-__all__ = ['CacheConfig', 'CacheRule']
+__all__ = ["CacheConfig", "CacheRule"]

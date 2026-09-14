@@ -13,10 +13,11 @@ This module provides:
 The tokenizer, parser, AST, and DNF normalizer live in ``shared.expression_core``
 and are imported here.
 """
+
 import os
 import re
 import sys
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -25,14 +26,16 @@ from ..core.config import get_settings
 # Import shared expression engine
 # In Docker, PYTHONPATH=/app makes 'shared' importable.
 # For local dev, add the project root to sys.path.
-_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 from shared.expression_core import (
-    Token,
-    _tokenize,
+    _tokenize as _tokenize,
+)
+from shared.expression_core import (
     parse_expression as _shared_parse_expression,
-    validate_expression as _shared_validate_expression,
+)
+from shared.expression_core import (
     to_dnf,
 )
 
@@ -49,7 +52,7 @@ settings = get_settings()
 # For geoip fields, the fetch template uses {db} placeholder.
 # For header/cookie/query fields, the fetch template uses {key} placeholder.
 
-_FIELD_MAP: Dict[str, Tuple[str, str, str]] = {
+_FIELD_MAP: dict[str, tuple[str, str, str]] = {
     # Request fields
     "http.request.method": ("method", "request", "string"),
     "http.request.uri.path": ("path", "request", "string"),
@@ -134,7 +137,7 @@ _FIELD_MAP: Dict[str, Tuple[str, str, str]] = {
 }
 
 # Fields that use bracket subscripts: field["key"] → fetch with key substituted
-_BRACKET_FIELDS: Dict[str, str] = {
+_BRACKET_FIELDS: dict[str, str] = {
     "http.request.headers": "req.hdr({key})",
     "http.request.cookies": "req.cook({key})",
     "http.request.uri.query": "url_query",  # special: regex-based
@@ -144,7 +147,7 @@ _BRACKET_FIELDS: Dict[str, str] = {
 }
 
 # Boolean fields (no operator — just existence)
-_BOOL_FIELDS: Dict[str, str] = {
+_BOOL_FIELDS: dict[str, str] = {
     "http.request.tls": "ssl_fc",
     "http.request.scheme": "ssl_fc",  # handled specially for = "https"/"http"
     # Risk Scoring metadata fields (set by lua.risk_capture)
@@ -161,7 +164,7 @@ _JA4_FETCH = "lua.ja4_fp"
 # The converters take an IP sample + dot-path props matching the maxminddb
 # record structure: lua.geoip2-lookup-city("country","iso_code"), etc.
 # Covers all 9 geoip fields — no geoip2 build dependency required.
-_GEOIP_LUA_FIELDS: Dict[str, Tuple[str, str, str]] = {
+_GEOIP_LUA_FIELDS: dict[str, tuple[str, str, str]] = {
     "ip.geoip.country": ('src,lua.geoip2-lookup-city("country","iso_code")', "request", "string"),
     "ip.geoip.asnum": ('src,lua.geoip2-lookup-asn("autonomous_system_number")', "request", "string"),
     "ip.geoip.continent": ('src,lua.geoip2-lookup-city("continent","code")', "request", "string"),
@@ -190,6 +193,7 @@ _RESPONSE_ACTIONS = {"block", "allow", "redirect"}
 # operators are recognized as boolean conditions.
 # ---------------------------------------------------------------------------
 
+
 def _build_bool_fields_set() -> set:
     """Build the set of field names that can appear as bare booleans."""
     s = set(_BOOL_FIELDS.keys())
@@ -206,7 +210,8 @@ _BOOL_FIELDS_SET = _build_bool_fields_set()
 # parse_expression / validate_expression — wrappers around shared engine
 # ---------------------------------------------------------------------------
 
-def parse_expression(text: str) -> Dict[str, Any]:
+
+def parse_expression(text: str) -> dict[str, Any]:
     """Parse a Cloudflare-style expression string into an AST dict.
 
     Passes the backend's boolean field set so bare fields like
@@ -215,7 +220,7 @@ def parse_expression(text: str) -> Dict[str, Any]:
     return _shared_parse_expression(text, bool_fields=_BOOL_FIELDS_SET)
 
 
-def validate_expression(text: str, db: Optional[Session] = None) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
+def validate_expression(text: str, db: Session | None = None) -> tuple[bool, dict[str, Any] | None, str | None]:
     """Validate an expression string.
 
     Returns (ok, ast, error). If db is provided, also resolves list references
@@ -240,6 +245,7 @@ _to_dnf = to_dnf
 # Translator: AST leaf → HAProxy condition fragment
 # ---------------------------------------------------------------------------
 
+
 def _bool_fetch_cond(fetch: str, field: str = "") -> str:
     """Build a HAProxy condition fragment testing that a boolean fetch is true.
 
@@ -258,7 +264,7 @@ def _bool_fetch_cond(fetch: str, field: str = "") -> str:
     return f"{{ {fetch} }}"
 
 
-def _resolve_field(field: str) -> Tuple[str, str, str, Optional[str]]:
+def _resolve_field(field: str) -> tuple[str, str, str, str | None]:
     """Resolve a field name to (haproxy_fetch, phase, value_type, bracket_key).
 
     For bracket fields like http.request.headers["x"], returns the fetch with
@@ -288,11 +294,13 @@ def _resolve_field(field: str) -> Tuple[str, str, str, Optional[str]]:
             # Lazy import to avoid a circular import (haproxy.py imports
             # security_rules lazily at call sites).
             from .haproxy import _geoip_lua_module_available
+
             if _geoip_lua_module_available() and field in _GEOIP_LUA_FIELDS:
                 # Rust Lua module — the primary GeoIP engine.
                 lua_fetch, lua_phase, lua_vtype = _GEOIP_LUA_FIELDS[field]
                 return (lua_fetch, lua_phase, lua_vtype, None)
             from .haproxy import _haproxy_supports_geoip2
+
             if _haproxy_supports_geoip2():
                 if "{geo_db}" in fetch_tpl:
                     geo_db = os.path.abspath(settings.GEOIP_DB_PATH)
@@ -328,20 +336,20 @@ def _resolve_field(field: str) -> Tuple[str, str, str, Optional[str]]:
 def _haproxy_quoted_key(key: str) -> str:
     """Sanitize a header/cookie name for use in HAProxy fetch expressions."""
     # HAProxy header names are case-insensitive tokens; allow alnum, -, _
-    safe = re.sub(r'[^A-Za-z0-9_-]', '', key)
+    safe = re.sub(r"[^A-Za-z0-9_-]", "", key)
     return safe.lower() if safe else key.lower()
 
 
 def _haproxy_string_value(value: str) -> str:
     """Escape a string value for HAProxy (wrap in quotes if needed)."""
     # HAProxy string values: use backslash-escaped quotes
-    if re.match(r'^[A-Za-z0-9_./:-]+$', value):
+    if re.match(r"^[A-Za-z0-9_./:-]+$", value):
         return value
     escaped = value.replace("\\", "\\\\").replace('"', '\\"')
     return f'"{escaped}"'
 
 
-def _resolve_risk_ruleset_field(field: str, db: Session) -> Optional[Tuple[str, str, str, Optional[str]]]:
+def _resolve_risk_ruleset_field(field: str, db: Session) -> tuple[str, str, str, str | None] | None:
     """Check if a field is a dynamic risk ruleset field (risk.<slug>.score /
     .rules_hit / .rules_hit_count / .hit_density) and resolve it.
 
@@ -349,41 +357,45 @@ def _resolve_risk_ruleset_field(field: str, db: Session) -> Optional[Tuple[str, 
     field is not a dynamic risk ruleset field.
     """
     # risk.<slug>.score
-    m = re.match(r'^risk\.([a-z_][a-z0-9_]*)\.score$', field)
+    m = re.match(r"^risk\.([a-z_][a-z0-9_]*)\.score$", field)
     if m:
         slug = m.group(1)
         from ..models.models import RiskRuleset
+
         if not db.query(RiskRuleset).filter(RiskRuleset.slug == slug).first():
             raise ValueError(f"Unknown risk ruleset: {slug}")
         return (f"var(txn.risk.{slug}.score)", "request", "int", None)
     # risk.<slug>.rules_hit
-    m = re.match(r'^risk\.([a-z_][a-z0-9_]*)\.rules_hit$', field)
+    m = re.match(r"^risk\.([a-z_][a-z0-9_]*)\.rules_hit$", field)
     if m:
         slug = m.group(1)
         from ..models.models import RiskRuleset
+
         if not db.query(RiskRuleset).filter(RiskRuleset.slug == slug).first():
             raise ValueError(f"Unknown risk ruleset: {slug}")
         return (f"var(txn.risk.{slug}.rules_hit)", "request", "string", None)
     # risk.<slug>.rules_hit_count
-    m = re.match(r'^risk\.([a-z_][a-z0-9_]*)\.rules_hit_count$', field)
+    m = re.match(r"^risk\.([a-z_][a-z0-9_]*)\.rules_hit_count$", field)
     if m:
         slug = m.group(1)
         from ..models.models import RiskRuleset
+
         if not db.query(RiskRuleset).filter(RiskRuleset.slug == slug).first():
             raise ValueError(f"Unknown risk ruleset: {slug}")
         return (f"var(txn.risk.{slug}.rules_hit_count)", "request", "int", None)
     # risk.<slug>.hit_density
-    m = re.match(r'^risk\.([a-z_][a-z0-9_]*)\.hit_density$', field)
+    m = re.match(r"^risk\.([a-z_][a-z0-9_]*)\.hit_density$", field)
     if m:
         slug = m.group(1)
         from ..models.models import RiskRuleset
+
         if not db.query(RiskRuleset).filter(RiskRuleset.slug == slug).first():
             raise ValueError(f"Unknown risk ruleset: {slug}")
         return (f"var(txn.risk.{slug}.hit_density)", "request", "int", None)
     return None
 
 
-def _translate_leaf(node: Dict[str, Any], db: Session) -> str:
+def _translate_leaf(node: dict[str, Any], db: Session) -> str:
     """Translate a single leaf condition to a HAProxy condition fragment.
 
     Returns a string like ``src -f /path/to/file.lst`` or
@@ -484,10 +496,10 @@ def _translate_leaf(node: Dict[str, Any], db: Session) -> str:
             if op == "=" and isinstance(value, str):
                 # Match query param key=value
                 regex = f"(^|&){re.escape(key)}={re.escape(value)}($|&)"
-                cond = f"{{ url_query -m reg \"{regex}\" }}"
+                cond = f'{{ url_query -m reg "{regex}" }}'
             elif op == "exists":
                 regex = f"(^|&){re.escape(key)}="
-                cond = f"{{ url_query -m reg \"{regex}\" }}"
+                cond = f'{{ url_query -m reg "{regex}" }}'
             else:
                 raise ValueError(f"Query param {key!r} only supports = and exists operators")
             return f"!{cond}" if negated else cond
@@ -510,7 +522,7 @@ def _translate_leaf(node: Dict[str, Any], db: Session) -> str:
         # was overwritten"). Use the bare form (method VALUE) for = and != to
         # avoid the warning. Other operators (regex, contains, etc.) still need
         # explicit -m flags and may warn, but are uncommon for method matching.
-        is_method_fetch = (fetch == "method")
+        is_method_fetch = fetch == "method"
         if isinstance(value, str):
             if op == "=":
                 if is_method_fetch:
@@ -605,8 +617,7 @@ def _translate_leaf(node: Dict[str, Any], db: Session) -> str:
             # fields (regex matching against the sample). Reject non-string fields.
             if vtype != "string":
                 raise ValueError(
-                    f"Pattern lists can only be used with string-typed fields, "
-                    f"not {field!r} (type: {vtype})"
+                    f"Pattern lists can only be used with string-typed fields, not {field!r} (type: {vtype})"
                 )
             cond = f"{{ {fetch} -m reg -f {list_path} }}"
         else:
@@ -625,8 +636,8 @@ def _escape_regex(s: str) -> str:
 
 def _resolve_list_path(db: Session, list_type: str, list_name: str) -> str:
     """Resolve a security list reference to a file path, verifying the list exists."""
+    from ..models.models import AsnList, GeoList, Ja4List, NetworkList, PatternList
     from .security_lists import safe_filename
-    from ..models.models import NetworkList, AsnList, GeoList, Ja4List, PatternList
 
     model_map = {
         "network": NetworkList,
@@ -655,7 +666,8 @@ def _resolve_list_path(db: Session, list_type: str, list_name: str) -> str:
 # Full translation: AST → HAProxy condition string
 # ---------------------------------------------------------------------------
 
-def translate(ast: Dict[str, Any], db: Session) -> Tuple[str, str]:
+
+def translate(ast: dict[str, Any], db: Session) -> tuple[str, str]:
     """Translate an AST to a HAProxy condition string and determine the phase.
 
     Returns (condition_string, phase) where phase is "request" or "response".
@@ -668,7 +680,7 @@ def translate(ast: Dict[str, Any], db: Session) -> Tuple[str, str]:
     dnf = _to_dnf(ast)
 
     # Translate each OR-group
-    group_strs: List[str] = []
+    group_strs: list[str] = []
     for group in dnf:
         term_strs = [_translate_leaf(term, db) for term in group]
         if len(term_strs) == 1:
@@ -684,7 +696,7 @@ def translate(ast: Dict[str, Any], db: Session) -> Tuple[str, str]:
     return " or ".join(group_strs), phase
 
 
-def _determine_phase(node: Dict[str, Any]) -> str:
+def _determine_phase(node: dict[str, Any]) -> str:
     """Determine if the expression is request-phase or response-phase."""
     t = node["type"]
     if t in ("and", "or"):
@@ -734,9 +746,10 @@ def _safe_log_value(value: str) -> str:
     return '"' + _LOG_VALUE_RE.sub("", str(value)) + '"'
 
 
-def rules_for_listener(db: Session, listener_id: int) -> List[Any]:
+def rules_for_listener(db: Session, listener_id: int) -> list[Any]:
     """Return enabled SecurityRules matching the given listener, ordered by priority."""
     from ..models.models import SecurityRule
+
     rules = db.query(SecurityRule).filter(SecurityRule.enabled == True).order_by(SecurityRule.priority).all()
     matched = []
     for rule in rules:
@@ -747,7 +760,7 @@ def rules_for_listener(db: Session, listener_id: int) -> List[Any]:
     return matched
 
 
-def emit_security_rules(listener: Any, db: Session, lines: List[str]) -> None:
+def emit_security_rules(listener: Any, db: Session, lines: list[str]) -> None:
     """Emit http-request/http-response lines for security rules on a listener.
 
     Lines are appended to the ``lines`` list. Called from ``generate_frontend``
@@ -762,7 +775,7 @@ def emit_security_rules(listener: Any, db: Session, lines: List[str]) -> None:
     if not rules:
         return
 
-    block_status = settings.SECURITY_RULES_BLOCK_STATUS if hasattr(settings, 'SECURITY_RULES_BLOCK_STATUS') else 403
+    block_status = settings.SECURITY_RULES_BLOCK_STATUS if hasattr(settings, "SECURITY_RULES_BLOCK_STATUS") else 403
     force_https_redirect = getattr(listener, "force_https", False) and not getattr(listener, "ssl_enabled", False)
 
     for rule in rules:
@@ -772,7 +785,7 @@ def emit_security_rules(listener: Any, db: Session, lines: List[str]) -> None:
         except ValueError:
             # Skip rules that fail to parse at emit time (shouldn't happen if
             # validation was done on save, but be defensive).
-                continue
+            continue
 
         # Skip actions are only valid for request-phase rules
         if phase == "response" and rule.action in _SKIP_ACTIONS:
@@ -789,8 +802,9 @@ def emit_security_rules(listener: Any, db: Session, lines: List[str]) -> None:
             _emit_request_rule(rule, condition, lines, block_status, db, listener)
 
 
-def _emit_request_rule(rule: Any, condition: str, lines: List[str], block_status: int,
-                       db: Session = None, listener: Any = None) -> None:
+def _emit_request_rule(
+    rule: Any, condition: str, lines: list[str], block_status: int, db: Session = None, listener: Any = None
+) -> None:
     """Emit http-request lines for a request-phase security rule."""
     if _API_ARMOR_VAR_RE.search(condition):
         guarded_cond = _api_armor_guarded_condition(condition)
@@ -825,6 +839,7 @@ def _emit_request_rule(rule: Any, condition: str, lines: List[str], block_status
 
     if rule.action == "challenge":
         from .haproxy import _emit_challenge_redirect, _safe_token
+
         challenge_url = _safe_token(rule.redirect_url or settings.CAPTCHA_CHALLENGE_URL)
         _emit_challenge_redirect(lines, guarded_cond, challenge_url, rule.id, "security", rule.name)
         # Mark as done so no further security rules run after the challenge redirect
@@ -838,7 +853,7 @@ def _emit_request_rule(rule: Any, condition: str, lines: List[str], block_status
             if ep_path:
                 lines.append(
                     f'    http-request return status {status} content-type "{content_type}" '
-                    f'lf-file {ep_path} if {guarded_cond}'
+                    f"lf-file {ep_path} if {guarded_cond}"
                 )
                 return
         # Fallback: plain deny with status code
@@ -852,14 +867,14 @@ def _emit_request_rule(rule: Any, condition: str, lines: List[str], block_status
     lines.append(f"    http-request set-var(txn.sec.done) bool(1) if {guarded_cond}")
 
 
-def _resolve_error_page(rule: Any, db: Session, listener: Any) -> Tuple[Optional[str], str]:
+def _resolve_error_page(rule: Any, db: Session, listener: Any) -> tuple[str | None, str]:
     """Resolve a security rule's error_page_id to a file path + content type.
 
     Writes the error file to a per-listener directory and returns (path, content_type).
     Returns (None, "text/html") if the error page cannot be resolved.
     """
-    from .haproxy import _write_error_file, _safe_path_name, _safe_token
     from ..models.models import CustomErrorPage
+    from .haproxy import _safe_path_name, _safe_token, _write_error_file
 
     ep = db.get(CustomErrorPage, rule.error_page_id)
     if not ep:
@@ -874,7 +889,7 @@ def _resolve_error_page(rule: Any, db: Session, listener: Any) -> Tuple[Optional
     return ep_path, content_type
 
 
-def _emit_response_rule(rule: Any, condition: str, lines: List[str], block_status: int) -> None:
+def _emit_response_rule(rule: Any, condition: str, lines: list[str], block_status: int) -> None:
     """Emit http-response lines for a response-phase security rule."""
     # no_log: suppress the entire request log line for matching requests
     if getattr(rule, "no_log", False):
@@ -909,9 +924,11 @@ def _is_block_action(action: str) -> bool:
 # Reorder
 # ---------------------------------------------------------------------------
 
-def reorder_rules(db: Session, ordered_ids: List[int]) -> None:
+
+def reorder_rules(db: Session, ordered_ids: list[int]) -> None:
     """Reassign priorities based on the given ordered list of rule IDs."""
     from ..models.models import SecurityRule
+
     for priority, rule_id in enumerate(ordered_ids):
         rule = db.get(SecurityRule, rule_id)
         if rule:
@@ -927,7 +944,7 @@ def reorder_rules(db: Session, ordered_ids: List[int]) -> None:
 _JA4_FIELD = "http.request.ja4"
 
 
-def _ast_references_field(node: Dict[str, Any], field: str) -> bool:
+def _ast_references_field(node: dict[str, Any], field: str) -> bool:
     """Recursively check whether an AST node references the given field."""
     if not isinstance(node, dict):
         return False
@@ -941,14 +958,15 @@ def _ast_references_field(node: Dict[str, Any], field: str) -> bool:
     return node.get("field") == field
 
 
-def rules_referencing_ja4(db: Session) -> List[Any]:
+def rules_referencing_ja4(db: Session) -> list[Any]:
     """Return enabled SecurityRules whose expression references http.request.ja4.
 
     Used by the ja4_enabled toggle to auto-disable rules that would produce
     a broken HAProxy config (referencing the unloaded lua.ja4_fp fetch).
     """
     from ..models.models import SecurityRule
-    matches: List[SecurityRule] = []
+
+    matches: list[SecurityRule] = []
     for rule in db.query(SecurityRule).filter(SecurityRule.enabled == True).all():
         ast = rule.expression_ast
         if isinstance(ast, dict) and _ast_references_field(ast, _JA4_FIELD):
@@ -960,7 +978,7 @@ def rules_referencing_ja4(db: Session) -> List[Any]:
     return matches
 
 
-def _ast_references_list(node: Dict[str, Any], list_type: str, list_name: str) -> bool:
+def _ast_references_list(node: dict[str, Any], list_type: str, list_name: str) -> bool:
     """Recursively check whether an AST node references the given security list.
 
     Matches ``in_list`` leaf nodes whose ``list_type`` and ``list_name`` equal
@@ -978,7 +996,7 @@ def _ast_references_list(node: Dict[str, Any], list_type: str, list_name: str) -
     return False
 
 
-def rules_referencing_list(db: Session, list_type: str, list_name: str) -> List[Any]:
+def rules_referencing_list(db: Session, list_type: str, list_name: str) -> list[Any]:
     """Return SecurityRules whose expression references the given security list.
 
     Walks each rule's pre-parsed ``expression_ast`` for ``in_list`` leaf nodes
@@ -986,7 +1004,8 @@ def rules_referencing_list(db: Session, list_type: str, list_name: str) -> List[
     delete protection to block deletion of a list referenced by a rule.
     """
     from ..models.models import SecurityRule
-    matches: List[SecurityRule] = []
+
+    matches: list[SecurityRule] = []
     for rule in db.query(SecurityRule).all():
         ast = rule.expression_ast
         if isinstance(ast, dict) and _ast_references_list(ast, list_type, list_name):

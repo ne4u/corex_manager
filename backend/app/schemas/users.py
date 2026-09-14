@@ -1,7 +1,8 @@
 from datetime import datetime
-from typing import Optional, List, Dict, Any, Type, TypeVar
-from pydantic import BaseModel, Field, model_validator, field_validator, ConfigDict
-from ._base import _optional_update
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
+
 
 class UserBase(BaseModel):
     username: str
@@ -17,9 +18,9 @@ class UserCreate(UserBase):
 
 
 class UserUpdate(BaseModel):
-    username: Optional[str] = None
-    role: Optional[str] = None
-    password: Optional[str] = None
+    username: str | None = None
+    role: str | None = None
+    password: str | None = None
     email: str = Field(min_length=1)
     first_name: str = Field(min_length=1)
     last_name: str = Field(min_length=1)
@@ -32,12 +33,12 @@ class UserResponse(BaseModel):
     role: str
     is_admin: bool
     totp_enabled: bool = False
-    email: Optional[str] = None
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    organization: Optional[str] = None
-    last_login_at: Optional[datetime] = None
-    password_changed_at: Optional[datetime] = None
+    email: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None
+    organization: str | None = None
+    last_login_at: datetime | None = None
+    password_changed_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -45,19 +46,19 @@ class UserResponse(BaseModel):
 
 
 class UserPreferenceUpdate(BaseModel):
-    theme: Optional[str] = None
-    custom_themes: Optional[Dict[str, Any]] = None
-    language: Optional[str] = None
-    datetime_format: Optional[str] = None
-    timezone: Optional[str] = None
+    theme: str | None = None
+    custom_themes: dict[str, Any] | None = None
+    language: str | None = None
+    datetime_format: str | None = None
+    timezone: str | None = None
 
 
 class UserPreferenceResponse(BaseModel):
-    theme: Optional[str] = None
-    custom_themes: Optional[Dict[str, Any]] = None
-    language: Optional[str] = None
-    datetime_format: Optional[str] = None
-    timezone: Optional[str] = None
+    theme: str | None = None
+    custom_themes: dict[str, Any] | None = None
+    language: str | None = None
+    datetime_format: str | None = None
+    timezone: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -70,7 +71,7 @@ class ChangePasswordRequest(BaseModel):
 
 
 class TOTPSetupRequest(BaseModel):
-    alias: Optional[str] = None
+    alias: str | None = None
 
 
 class TOTPSetupResponse(BaseModel):
@@ -96,7 +97,7 @@ class SessionSettingsResponse(BaseModel):
     timeout_minutes: int
     warning_seconds: int
     password_expired: bool = False
-    password_policy: Dict[str, Any] = {}
+    password_policy: dict[str, Any] = {}
 
 
 class LoginResponse(BaseModel):
@@ -106,4 +107,19 @@ class LoginResponse(BaseModel):
     password_expired: bool = False
 
 
-__all__ = ['LoginResponse', 'SessionSettingsResponse', 'TOTPDisableRequest', 'TOTPSetupRequest', 'TOTPSetupResponse', 'TOTPVerifyRequest', 'TOTPVerifyResponse', 'UserBase', 'UserCreate', 'UserPreferenceResponse', 'UserPreferenceUpdate', 'UserResponse', 'UserUpdate', 'ChangePasswordRequest']
+__all__ = [
+    "LoginResponse",
+    "SessionSettingsResponse",
+    "TOTPDisableRequest",
+    "TOTPSetupRequest",
+    "TOTPSetupResponse",
+    "TOTPVerifyRequest",
+    "TOTPVerifyResponse",
+    "UserBase",
+    "UserCreate",
+    "UserPreferenceResponse",
+    "UserPreferenceUpdate",
+    "UserResponse",
+    "UserUpdate",
+    "ChangePasswordRequest",
+]

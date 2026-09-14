@@ -21,10 +21,7 @@ def test_rewrite_with_host_emits_host_acl_and_combined_condition(db):
     cfg = haproxy.generate_config(db)
     assert "acl rewrite_path_rw_host path_reg ^/" in cfg
     assert "acl rewrite_host_rw_host hdr(host) -i test.bob.com" in cfg
-    assert (
-        "http-request set-path /prefix%[path] if rewrite_path_rw_host rewrite_host_rw_host"
-        in cfg
-    )
+    assert "http-request set-path /prefix%[path] if rewrite_path_rw_host rewrite_host_rw_host" in cfg
 
 
 def test_rewrite_both_type_emits_acls_once(db):
@@ -42,10 +39,7 @@ def test_rewrite_both_type_emits_acls_once(db):
     # path_reg and host ACLs must appear exactly once each (not duplicated by the query block)
     assert cfg.count("acl rewrite_path_rw_both path_reg ^/") == 1
     assert cfg.count("acl rewrite_host_rw_both hdr(host) -i test.bob.com") == 1
-    assert (
-        "http-request set-path /prefix%[path] if rewrite_path_rw_both rewrite_host_rw_both"
-        in cfg
-    )
+    assert "http-request set-path /prefix%[path] if rewrite_path_rw_both rewrite_host_rw_both" in cfg
     assert "http-request set-query" in cfg
 
 

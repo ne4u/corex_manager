@@ -1,10 +1,10 @@
 from datetime import datetime
-from typing import Optional, List, Dict, Any, Type, TypeVar
-from pydantic import BaseModel, Field, model_validator, field_validator, ConfigDict
-from ._base import _optional_update
+
+from pydantic import BaseModel, ConfigDict
+
 
 class ConfigApplyRequest(BaseModel):
-    comment: Optional[str] = None
+    comment: str | None = None
 
 
 class ConfigApplyResponse(BaseModel):
@@ -25,10 +25,10 @@ class ConfigRevertResponse(BaseModel):
 
 class ConfigSnapshotBase(BaseModel):
     created_at: datetime
-    created_by: Optional[str] = None
-    comment: Optional[str] = None
-    diff: Optional[str] = None
-    snapshot_path: Optional[str] = None
+    created_by: str | None = None
+    comment: str | None = None
+    diff: str | None = None
+    snapshot_path: str | None = None
 
 
 class ConfigSnapshotResponse(ConfigSnapshotBase):
@@ -43,4 +43,12 @@ class ConfigSnapshotRollbackResponse(BaseModel):
     task_id: int
 
 
-__all__ = ['ConfigApplyRequest', 'ConfigApplyResponse', 'ConfigRevertRequest', 'ConfigRevertResponse', 'ConfigSnapshotBase', 'ConfigSnapshotResponse', 'ConfigSnapshotRollbackResponse']
+__all__ = [
+    "ConfigApplyRequest",
+    "ConfigApplyResponse",
+    "ConfigRevertRequest",
+    "ConfigRevertResponse",
+    "ConfigSnapshotBase",
+    "ConfigSnapshotResponse",
+    "ConfigSnapshotRollbackResponse",
+]

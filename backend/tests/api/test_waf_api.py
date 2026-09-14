@@ -1,8 +1,7 @@
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
-
 from app.models.models import WafMetric, WafRule
 from app.services import coraza_config
 from tests.factories import (
@@ -239,10 +238,12 @@ def test_waf_rules_export_import(client, db):
 def test_waf_rule_refresh_rule_set_success(client, db, tmp_path, monkeypatch):
     """POST /waf/rules/{id}/refresh-rule-set triggers a download."""
     from app.services import rule_set_downloader
+
     monkeypatch.setattr(rule_set_downloader.settings, "CUSTOM_RULES_DIR", str(tmp_path))
     rule = make_waf_rule(db, name="remote-waf", rule_set="remote", rule_set_url="https://example.com/rules.conf")
 
     from unittest.mock import MagicMock, patch
+
     mock_resp = MagicMock()
     mock_resp.text = 'SecRule REQUEST_URI "@rx ." "id:1,phase:1,deny"'
     mock_resp.raise_for_status = MagicMock()
@@ -296,26 +297,28 @@ def test_waf_logs_coraza_spoa_match_format(client, temp_coraza_paths):
     import json
 
     log_path = temp_coraza_paths["log"]
-    line = json.dumps({
-        "level": "error",
-        "time": "2025-06-30T17:18:08Z",
-        "match": {
-            "client": "192.168.1.50",
-            "file": "@owasp_crs/REQUEST-920-PROTOCOL-ENFORCEMENT.conf",
-            "line": 2810,
-            "rule_id": 920420,
-            "msg": "Request content type is not allowed by policy",
-            "data": "|application/dns-message|",
-            "severity": "critical",
-            "version": "OWASP_CRS/4.18.0-dev",
-            "tags": ["attack-protocol"],
-            "server": "10.1.1.2",
-            "uri": "/",
-            "unique_id": "ABCDEF123456",
-            "disruptive": True,
-            "phase": "request-headers",
-        },
-    })
+    line = json.dumps(
+        {
+            "level": "error",
+            "time": "2025-06-30T17:18:08Z",
+            "match": {
+                "client": "192.168.1.50",
+                "file": "@owasp_crs/REQUEST-920-PROTOCOL-ENFORCEMENT.conf",
+                "line": 2810,
+                "rule_id": 920420,
+                "msg": "Request content type is not allowed by policy",
+                "data": "|application/dns-message|",
+                "severity": "critical",
+                "version": "OWASP_CRS/4.18.0-dev",
+                "tags": ["attack-protocol"],
+                "server": "10.1.1.2",
+                "uri": "/",
+                "unique_id": "ABCDEF123456",
+                "disruptive": True,
+                "phase": "request-headers",
+            },
+        }
+    )
     with open(log_path, "w") as f:
         f.write(line + "\n")
     res = client.get("/api/v1/waf/logs")
@@ -333,7 +336,7 @@ def test_waf_logs_coraza_spoa_match_format(client, temp_coraza_paths):
 
 
 def test_waf_haproxy_stats(client, db):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     db.add(
         WafMetric(
             captured_at=now.replace(tzinfo=None),
@@ -398,7 +401,6 @@ class _FakeValkey:
 
 def _use_fake_valkey(monkeypatch):
     """Route all valkey_client helpers through an in-memory fake."""
-    import json as _json
 
     fake = _FakeValkey()
     monkeypatch.setattr("app.core.valkey_client._get_client", lambda: fake)
@@ -657,6 +659,7 @@ def test_verify_captcha_stores_client_binding_hash(client, db, monkeypatch):
     # Mock the Cap provider's verify to succeed without a network call
     async def mock_verify(self, token, secret, remote_ip=None):
         return True
+
     monkeypatch.setattr(CapProvider, "verify", mock_verify)
 
     fake = _use_fake_valkey(monkeypatch)
@@ -664,6 +667,7 @@ def test_verify_captcha_stores_client_binding_hash(client, db, monkeypatch):
 
     # Ensure captcha settings are configured (conftest already sets CAPTCHA_SECRET)
     from app.services.settings import set_setting
+
     set_setting(db, "captcha_valid_seconds", "3600")
 
     res = client.post(
@@ -713,6 +717,7 @@ def test_config_apply_generates_waf_config(client, db):
 
 # ---- CRS management endpoints ----
 
+
 def _make_crs_zip_bytes(version: str = "4.0.0") -> bytes:
     """Build a minimal CRS ZIP in memory for testing."""
     import io
@@ -728,13 +733,16 @@ def _make_crs_zip_bytes(version: str = "4.0.0") -> bytes:
 
 def _mock_github_api(tag: str = "v4.0.0"):
     from unittest.mock import MagicMock
+
     resp = MagicMock()
     resp.status_code = 200
     resp.json.return_value = {
         "tag_name": tag,
         "assets": [
-            {"name": f"coreruleset-{tag.lstrip('v')}-minimal.zip",
-             "browser_download_url": f"https://example.com/crs/{tag}/minimal.zip"},
+            {
+                "name": f"coreruleset-{tag.lstrip('v')}-minimal.zip",
+                "browser_download_url": f"https://example.com/crs/{tag}/minimal.zip",
+            },
         ],
     }
     resp.raise_for_status = MagicMock()
@@ -743,6 +751,7 @@ def _mock_github_api(tag: str = "v4.0.0"):
 
 def _mock_zip_response(zip_bytes: bytes):
     from unittest.mock import MagicMock
+
     resp = MagicMock()
     resp.content = zip_bytes
     resp.raise_for_status = MagicMock()
@@ -760,13 +769,17 @@ def test_crs_status_embedded(client, db):
 
 def test_crs_download_success(client, db, tmp_path, monkeypatch):
     """POST /waf/crs/download downloads and extracts CRS."""
-    from app.services import crs_downloader
     from unittest.mock import patch
+
+    from app.services import crs_downloader
+
     monkeypatch.setattr(crs_downloader.settings, "CRS_DIR", str(tmp_path))
     zip_bytes = _make_crs_zip_bytes("4.0.0")
 
-    with patch("app.services.crs_downloader.requests.get",
-               side_effect=[_mock_github_api("v4.0.0"), _mock_zip_response(zip_bytes)]):
+    with patch(
+        "app.services.crs_downloader.requests.get",
+        side_effect=[_mock_github_api("v4.0.0"), _mock_zip_response(zip_bytes)],
+    ):
         with patch("app.services.coraza_config.write_coraza_spoa_config"):
             res = client.post("/api/v1/waf/crs/download")
 
@@ -783,8 +796,10 @@ def test_crs_download_success(client, db, tmp_path, monkeypatch):
 
 def test_crs_download_github_rate_limit(client, db, tmp_path, monkeypatch):
     """POST /waf/crs/download returns 400 on GitHub API rate limit."""
-    from app.services import crs_downloader
     from unittest.mock import MagicMock, patch
+
+    from app.services import crs_downloader
+
     monkeypatch.setattr(crs_downloader.settings, "CRS_DIR", str(tmp_path))
 
     api_resp = MagicMock()
@@ -802,12 +817,24 @@ def test_crs_download_github_rate_limit(client, db, tmp_path, monkeypatch):
 def test_crs_list_snapshots(client, db):
     """GET /waf/crs/snapshots returns snapshot list."""
     import json
+
     from app.services.settings import set_setting
-    set_setting(db, "crs_snapshot_1", json.dumps({
-        "id": 1, "version": "v4.0.0", "dir_version": "4.0.0",
-        "file_hash": "abc", "file_path": "/x",
-        "created_at": "2024-01-01T00:00:00", "created_by": "tester",
-    }))
+
+    set_setting(
+        db,
+        "crs_snapshot_1",
+        json.dumps(
+            {
+                "id": 1,
+                "version": "v4.0.0",
+                "dir_version": "4.0.0",
+                "file_hash": "abc",
+                "file_path": "/x",
+                "created_at": "2024-01-01T00:00:00",
+                "created_by": "tester",
+            }
+        ),
+    )
     res = client.get("/api/v1/waf/crs/snapshots")
     assert res.status_code == 200
     data = res.json()
@@ -818,9 +845,11 @@ def test_crs_list_snapshots(client, db):
 def test_crs_rollback_success(client, db, tmp_path, monkeypatch):
     """POST /waf/crs/rollback/{id} switches active version."""
     import json
+    from unittest.mock import patch
+
     from app.services import crs_downloader
     from app.services.settings import set_setting
-    from unittest.mock import patch
+
     monkeypatch.setattr(crs_downloader.settings, "CRS_DIR", str(tmp_path))
 
     # Create two version dirs
@@ -830,7 +859,21 @@ def test_crs_rollback_success(client, db, tmp_path, monkeypatch):
         with open(os.path.join(d, "crs-setup.conf.example"), "w") as f:
             f.write("# setup\n")
 
-    set_setting(db, "crs_snapshot_1", json.dumps({"id": 1, "version": "v3.3.0", "dir_version": "3.3.0", "file_hash": "aaa", "file_path": "/x", "created_at": "2024-01-01T00:00:00", "created_by": "a"}))
+    set_setting(
+        db,
+        "crs_snapshot_1",
+        json.dumps(
+            {
+                "id": 1,
+                "version": "v3.3.0",
+                "dir_version": "3.3.0",
+                "file_hash": "aaa",
+                "file_path": "/x",
+                "created_at": "2024-01-01T00:00:00",
+                "created_by": "a",
+            }
+        ),
+    )
     set_setting(db, "crs_active_version", "4.0.0")
 
     with patch("app.services.coraza_config.write_coraza_spoa_config"):
@@ -850,10 +893,26 @@ def test_crs_rollback_not_found(client, db):
 def test_crs_delete_snapshot(client, db, tmp_path, monkeypatch):
     """DELETE /waf/crs/snapshots/{id} removes the snapshot."""
     import json
+
     from app.services import crs_downloader
     from app.services.settings import set_setting
+
     monkeypatch.setattr(crs_downloader.settings, "CRS_DIR", str(tmp_path))
-    set_setting(db, "crs_snapshot_1", json.dumps({"id": 1, "version": "v3.3.0", "dir_version": "3.3.0", "file_hash": "aaa", "file_path": "/x", "created_at": "2024-01-01T00:00:00", "created_by": "a"}))
+    set_setting(
+        db,
+        "crs_snapshot_1",
+        json.dumps(
+            {
+                "id": 1,
+                "version": "v3.3.0",
+                "dir_version": "3.3.0",
+                "file_hash": "aaa",
+                "file_path": "/x",
+                "created_at": "2024-01-01T00:00:00",
+                "created_by": "a",
+            }
+        ),
+    )
     set_setting(db, "crs_active_version", "4.0.0")
 
     res = client.delete("/api/v1/waf/crs/snapshots/1")
@@ -868,10 +927,26 @@ def test_crs_delete_snapshot(client, db, tmp_path, monkeypatch):
 def test_crs_delete_active_snapshot_fails(client, db, tmp_path, monkeypatch):
     """DELETE /waf/crs/snapshots/{id} returns 400 for active version."""
     import json
+
     from app.services import crs_downloader
     from app.services.settings import set_setting
+
     monkeypatch.setattr(crs_downloader.settings, "CRS_DIR", str(tmp_path))
-    set_setting(db, "crs_snapshot_1", json.dumps({"id": 1, "version": "v4.0.0", "dir_version": "4.0.0", "file_hash": "aaa", "file_path": "/x", "created_at": "2024-01-01T00:00:00", "created_by": "a"}))
+    set_setting(
+        db,
+        "crs_snapshot_1",
+        json.dumps(
+            {
+                "id": 1,
+                "version": "v4.0.0",
+                "dir_version": "4.0.0",
+                "file_hash": "aaa",
+                "file_path": "/x",
+                "created_at": "2024-01-01T00:00:00",
+                "created_by": "a",
+            }
+        ),
+    )
     set_setting(db, "crs_active_version", "4.0.0")
 
     res = client.delete("/api/v1/waf/crs/snapshots/1")
@@ -892,6 +967,7 @@ def test_crs_set_pinned_version(client, db):
 def test_crs_set_pinned_version_empty(client, db):
     """PUT /waf/crs/pinned-version with empty value clears the pin."""
     from app.services.settings import set_setting
+
     set_setting(db, "crs_pinned_version", "4.0.0")
     res = client.put("/api/v1/waf/crs/pinned-version", json={"value": ""})
     assert res.status_code == 200
@@ -904,6 +980,7 @@ def test_waf_exception_options(client, db, monkeypatch):
     # Bypass the Valkey-backed @cache wrapper so a running local Valkey can't
     # serve stale results across test runs.
     from app.services import waf_exception_options
+
     monkeypatch.setattr(
         waf_exception_options, "get_exception_options", waf_exception_options.get_exception_options.__wrapped__
     )
@@ -958,4 +1035,5 @@ def test_waf_exception_preview_does_not_persist(client, db):
     )
     assert res.status_code == 200
     from app.models.models import WafException
+
     assert db.query(WafException).filter(WafException.name == "ghost").count() == 0

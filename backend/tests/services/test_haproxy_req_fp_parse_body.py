@@ -13,6 +13,7 @@ handling the listener), the generated HAProxy config emits:
 When API Armor is enabled on the listener, it handles body buffering via
 txn.api_body and the req_fp_parse_body path is skipped (no double buffering).
 """
+
 from app.services import haproxy
 from app.services.settings import set_setting
 from tests.factories import make_backend, make_listener, make_server

@@ -5,17 +5,17 @@ Revises: t1u2v3w4x5y6
 Create Date: 2026-08-29 00:00:00.000000
 
 """
-from typing import Sequence, Union
 
-from alembic import op
+from collections.abc import Sequence
+
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = 'u2v3w4x5y6z7'
-down_revision: Union[str, Sequence[str], None] = 't1u2v3w4x5y6'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision: str = "u2v3w4x5y6z7"
+down_revision: str | Sequence[str] | None = "t1u2v3w4x5y6"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -29,13 +29,11 @@ def upgrade() -> None:
     requires a boolean literal for BOOLEAN columns; SQLite also accepts
     'true' as a boolean default.
     """
-    with op.batch_alter_table('audit_events', schema=None) as batch_op:
-        batch_op.add_column(
-            sa.Column('config_change', sa.Boolean(), nullable=False, server_default=sa.text('true'))
-        )
+    with op.batch_alter_table("audit_events", schema=None) as batch_op:
+        batch_op.add_column(sa.Column("config_change", sa.Boolean(), nullable=False, server_default=sa.text("true")))
 
 
 def downgrade() -> None:
     """Remove the config_change column."""
-    with op.batch_alter_table('audit_events', schema=None) as batch_op:
-        batch_op.drop_column('config_change')
+    with op.batch_alter_table("audit_events", schema=None) as batch_op:
+        batch_op.drop_column("config_change")

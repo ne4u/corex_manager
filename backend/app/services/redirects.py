@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+
 from ..models.logging import CustomErrorPage
 from ..models.routing import Redirect, Rewrite
 from ..schemas.redirects import RedirectCreate, RedirectUpdate, RewriteCreate, RewriteUpdate

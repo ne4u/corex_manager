@@ -1,16 +1,18 @@
 """Tests for API Armor behavioral profiling sampler."""
+
 import json
 import os
 import tempfile
+from datetime import UTC
 
+from app.models.api_armor import ApiProfile
 from app.services.api_armor_profiler import (
     ApiArmorProfiler,
-    normalize_path,
-    extract_dimension,
     check_anomaly,
+    extract_dimension,
     finalize_profile,
+    normalize_path,
 )
-from app.models.api_armor import ApiProfile, ApiAnomaly
 
 
 def test_normalize_path_numeric():
@@ -181,7 +183,8 @@ def test_profiler_processes_log_file(db):
 
 def test_prune_profiles_removes_old_profiles_and_anomalies(db):
     """prune_profiles deletes old profiles and their anomalies."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
+
     from app.models.api_armor import ApiAnomaly
     from app.services.api_armor_profiler import prune_profiles
 
@@ -191,7 +194,7 @@ def test_prune_profiles_removes_old_profiles_and_anomalies(db):
         dimensions={},
         sample_count=1,
         learned=False,
-        last_seen=datetime.now(timezone.utc) - timedelta(days=90),
+        last_seen=datetime.now(UTC) - timedelta(days=90),
     )
     new = ApiProfile(
         method="POST",
@@ -199,12 +202,16 @@ def test_prune_profiles_removes_old_profiles_and_anomalies(db):
         dimensions={},
         sample_count=1,
         learned=False,
-        last_seen=datetime.now(timezone.utc),
+        last_seen=datetime.now(UTC),
     )
     db.add_all([old, new])
     db.commit()
     db.refresh(old)
-    db.add(ApiAnomaly(method="POST", path="/old", dimension="content_type", created_at=datetime.now(timezone.utc) - timedelta(days=90)))
+    db.add(
+        ApiAnomaly(
+            method="POST", path="/old", dimension="content_type", created_at=datetime.now(UTC) - timedelta(days=90)
+        )
+    )
     db.commit()
 
     count = prune_profiles(db, retention_days=30)

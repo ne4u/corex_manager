@@ -24,13 +24,12 @@ os.environ["API_ARMOR_DIR"] = os.path.join(test_data_dir, "api-armor")
 atexit.register(shutil.rmtree, test_data_dir, ignore_errors=True)
 
 import pytest
-from fastapi.testclient import TestClient
-
 from app.core.database import Base, engine, get_db
 from app.core.dependencies import get_current_user, rate_limit, rate_limit_by_ip
 from app.main import app
 from app.models.models import User
 from app.services import config as _config_service
+from fastapi.testclient import TestClient
 
 # Disable the /config/status cache for the test session. Tests mutate the DB
 # directly (bypassing the audit middleware / write_config invalidation hooks),
@@ -117,6 +116,7 @@ def db():
     # FK constraints are satisfied. The migration seeds this in production;
     # tests using Base.metadata.create_all skip the migration.
     from app.models.models import RiskRuleset
+
     rs = RiskRuleset(id=1, name="Default", slug="default", description="Default", enabled=True, priority=0)
     session.add(rs)
     session.commit()

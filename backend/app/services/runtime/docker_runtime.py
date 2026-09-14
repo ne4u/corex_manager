@@ -6,13 +6,12 @@ preserving: the same ``docker.from_env()``, ``container.exec_run()``,
 ``container.restart()``, and ``container.logs()`` calls with the same
 arguments are used.
 """
+
 from __future__ import annotations
 
 import logging
 import os
-import subprocess
 import time
-from typing import Optional
 
 from ..config import get_settings
 from .base import RuntimeBackend
@@ -61,6 +60,7 @@ class DockerRuntime(RuntimeBackend):
             return ec, (output or b"").decode().strip()
 
         import concurrent.futures
+
         print("[DOCKER_CHECK] starting thread pool", flush=True)
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         future = executor.submit(_run)
@@ -79,7 +79,7 @@ class DockerRuntime(RuntimeBackend):
             print(f"[DOCKER_CHECK] exception: {e}", flush=True)
             return False, f"haproxy container check failed: {e}"
 
-    def haproxy_version_verbose(self) -> Optional[str]:
+    def haproxy_version_verbose(self) -> str | None:
         """Run haproxy -vv in the haproxy container via the Docker SDK."""
         if docker is None:
             return None
@@ -95,8 +95,8 @@ class DockerRuntime(RuntimeBackend):
 
     def haproxy_logs(
         self,
-        tail: Optional[int] = None,
-        since: Optional[int] = None,
+        tail: int | None = None,
+        since: int | None = None,
         timestamps: bool = False,
     ) -> str:
         """Fetch HAProxy stdout logs via the Docker SDK."""
@@ -156,8 +156,7 @@ class DockerRuntime(RuntimeBackend):
     @staticmethod
     def _find_vector_container(client):
         """Locate the vector container by compose service label or name."""
-        name = os.environ.get("VECTOR_CONTAINER_NAME",
-                              getattr(settings, "VECTOR_CONTAINER_NAME", "vector"))
+        name = os.environ.get("VECTOR_CONTAINER_NAME", getattr(settings, "VECTOR_CONTAINER_NAME", "vector"))
         try:
             for container in client.containers.list():
                 labels = container.labels or {}
@@ -200,6 +199,7 @@ class DockerRuntime(RuntimeBackend):
             return ec, (output or b"").decode("utf-8", errors="replace").strip()
 
         import concurrent.futures
+
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         future = executor.submit(_run)
         try:
@@ -323,13 +323,25 @@ class DockerRuntime(RuntimeBackend):
             counters = data.get("counters", {})
             result: dict = {}
             for key in (
-                "MAIN.cache_hit", "MAIN.cache_miss", "MAIN.cache_hit_grace",
-                "MAIN.cache_hitpass", "MAIN.cache_hitmiss",
-                "MAIN.n_object", "MAIN.n_lru_nuked", "MAIN.n_expired",
-                "MAIN.threads", "MAIN.sess_conn", "MAIN.client_req",
-                "MAIN.backend_req", "MAIN.fetch_head", "MAIN.fetch_length",
-                "MAIN.fetch_chunked", "MAIN.bans", "MAIN.bans_completed",
-                "MAIN.s_resp_bodybytes", "MAIN.b_resp_bodybytes",
+                "MAIN.cache_hit",
+                "MAIN.cache_miss",
+                "MAIN.cache_hit_grace",
+                "MAIN.cache_hitpass",
+                "MAIN.cache_hitmiss",
+                "MAIN.n_object",
+                "MAIN.n_lru_nuked",
+                "MAIN.n_expired",
+                "MAIN.threads",
+                "MAIN.sess_conn",
+                "MAIN.client_req",
+                "MAIN.backend_req",
+                "MAIN.fetch_head",
+                "MAIN.fetch_length",
+                "MAIN.fetch_chunked",
+                "MAIN.bans",
+                "MAIN.bans_completed",
+                "MAIN.s_resp_bodybytes",
+                "MAIN.b_resp_bodybytes",
             ):
                 if key in counters:
                     val = counters[key].get("value", 0)
@@ -382,6 +394,11 @@ class DockerRuntime(RuntimeBackend):
             # Refresh status from the daemon
             container.reload()
             running = container.status == "running"
-            return {"available": True, "running": running, "error": None if running else "container not running", "type": "docker"}
+            return {
+                "available": True,
+                "running": running,
+                "error": None if running else "container not running",
+                "type": "docker",
+            }
         except Exception as exc:
             return {"available": False, "running": False, "error": str(exc), "type": "docker"}

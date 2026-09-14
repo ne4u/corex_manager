@@ -10,6 +10,7 @@ The old standalone `lua-load /etc/haproxy/req_fp.lua` line is removed — req_fp
 is now Rust-only (Docker-only), matching the compression/resp_transform/
 api-armor modules.
 """
+
 from app.services import haproxy
 from app.services.settings import set_setting
 from tests.factories import make_backend, make_listener, make_server
@@ -43,7 +44,9 @@ def test_req_fp_enabled_emits_combined_loader_and_actions(db):
     # The combined loader script includes the req_fp module require
     # (read the generated modules.lua to verify)
     import os
+
     from app.core.config import get_settings
+
     settings = get_settings()
     loader_path = os.path.join(
         os.path.dirname(os.path.abspath(settings.HAPROXY_CONFIG_PATH)),
@@ -72,6 +75,7 @@ def test_req_fp_standalone_lua_load_removed(db):
 def test_req_fp_module_disabled_no_actions(db, monkeypatch):
     """REQ_FP_MODULE_ENABLED=false → no per-frontend actions even if req_fp_enabled=true."""
     from app.core.config import get_settings
+
     settings = get_settings()
     monkeypatch.setattr(settings, "REQ_FP_MODULE_ENABLED", False)
 

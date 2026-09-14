@@ -1,15 +1,15 @@
-from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from ..deps import get_db, get_current_user, require_admin, rate_limit
+
 from ...models.auth import User
 from ...schemas.users import UserCreate, UserResponse, UserUpdate
 from ...services.users import create_user, delete_user, get_user, list_users, update_user
+from ..deps import get_current_user, get_db, rate_limit, require_admin
 
 router = APIRouter()
 
 
-@router.get("/users", response_model=List[UserResponse])
+@router.get("/users", response_model=list[UserResponse])
 def list_users_endpoint(
     db: Session = Depends(get_db),
     user=Depends(require_admin),

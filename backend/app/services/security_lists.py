@@ -3,13 +3,15 @@
 A Security List is a named collection of entries (IP/CIDR, ASN, or country code).
 Dynamic feeds auto-populate Network or ASN lists from a remote URL.
 """
+
 import csv
 import io
 import ipaddress
 import os
 import re
 import threading
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from collections.abc import Callable
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -90,35 +92,264 @@ def validate_asn_value(value: str) -> str:
 # ---------------------------------------------------------------------------
 
 # ISO 3166-1 alpha-2 officially assigned country codes.
-ISO_ALPHA2_CODES: Set[str] = {
-    "AD", "AE", "AF", "AG", "AI", "AL", "AM", "AO", "AQ", "AR", "AS", "AT", "AU",
-    "AW", "AX", "AZ", "BA", "BB", "BD", "BE", "BF", "BG", "BH", "BI", "BJ", "BL",
-    "BM", "BN", "BO", "BQ", "BR", "BS", "BT", "BV", "BW", "BY", "BZ", "CA", "CC",
-    "CD", "CF", "CG", "CH", "CI", "CK", "CL", "CM", "CN", "CO", "CR", "CU", "CV",
-    "CW", "CX", "CY", "CZ", "DE", "DJ", "DK", "DM", "DO", "DZ", "EC", "EE", "EG",
-    "EH", "ER", "ES", "ET", "FI", "FJ", "FK", "FM", "FO", "FR", "GA", "GB", "GD",
-    "GE", "GF", "GG", "GH", "GI", "GL", "GM", "GN", "GP", "GQ", "GR", "GS", "GT",
-    "GU", "GW", "GY", "HK", "HM", "HN", "HR", "HT", "HU", "ID", "IE", "IL", "IM",
-    "IN", "IO", "IQ", "IR", "IS", "IT", "JE", "JM", "JO", "JP", "KE", "KG", "KH",
-    "KI", "KM", "KN", "KP", "KR", "KW", "KY", "KZ", "LA", "LB", "LC", "LI", "LK",
-    "LR", "LS", "LT", "LU", "LV", "LY", "MA", "MC", "MD", "ME", "MF", "MG", "MH",
-    "MK", "ML", "MM", "MN", "MO", "MP", "MQ", "MR", "MS", "MT", "MU", "MV", "MW",
-    "MX", "MY", "MZ", "NA", "NC", "NE", "NF", "NG", "NI", "NL", "NO", "NP", "NR",
-    "NU", "NZ", "OM", "PA", "PE", "PF", "PG", "PH", "PK", "PL", "PM", "PN", "PR",
-    "PS", "PT", "PW", "PY", "QA", "RE", "RO", "RS", "RU", "RW", "SA", "SB", "SC",
-    "SD", "SE", "SG", "SH", "SI", "SJ", "SK", "SL", "SM", "SN", "SO", "SR", "SS",
-    "ST", "SV", "SX", "SY", "SZ", "TC", "TD", "TF", "TG", "TH", "TJ", "TK", "TL",
-    "TM", "TN", "TO", "TR", "TT", "TV", "TW", "TZ", "UA", "UG", "UM", "US", "UY",
-    "UZ", "VA", "VC", "VE", "VG", "VI", "VN", "VU", "WF", "WS", "YE", "YT", "ZA",
-    "ZM", "ZW",
+ISO_ALPHA2_CODES: set[str] = {
+    "AD",
+    "AE",
+    "AF",
+    "AG",
+    "AI",
+    "AL",
+    "AM",
+    "AO",
+    "AQ",
+    "AR",
+    "AS",
+    "AT",
+    "AU",
+    "AW",
+    "AX",
+    "AZ",
+    "BA",
+    "BB",
+    "BD",
+    "BE",
+    "BF",
+    "BG",
+    "BH",
+    "BI",
+    "BJ",
+    "BL",
+    "BM",
+    "BN",
+    "BO",
+    "BQ",
+    "BR",
+    "BS",
+    "BT",
+    "BV",
+    "BW",
+    "BY",
+    "BZ",
+    "CA",
+    "CC",
+    "CD",
+    "CF",
+    "CG",
+    "CH",
+    "CI",
+    "CK",
+    "CL",
+    "CM",
+    "CN",
+    "CO",
+    "CR",
+    "CU",
+    "CV",
+    "CW",
+    "CX",
+    "CY",
+    "CZ",
+    "DE",
+    "DJ",
+    "DK",
+    "DM",
+    "DO",
+    "DZ",
+    "EC",
+    "EE",
+    "EG",
+    "EH",
+    "ER",
+    "ES",
+    "ET",
+    "FI",
+    "FJ",
+    "FK",
+    "FM",
+    "FO",
+    "FR",
+    "GA",
+    "GB",
+    "GD",
+    "GE",
+    "GF",
+    "GG",
+    "GH",
+    "GI",
+    "GL",
+    "GM",
+    "GN",
+    "GP",
+    "GQ",
+    "GR",
+    "GS",
+    "GT",
+    "GU",
+    "GW",
+    "GY",
+    "HK",
+    "HM",
+    "HN",
+    "HR",
+    "HT",
+    "HU",
+    "ID",
+    "IE",
+    "IL",
+    "IM",
+    "IN",
+    "IO",
+    "IQ",
+    "IR",
+    "IS",
+    "IT",
+    "JE",
+    "JM",
+    "JO",
+    "JP",
+    "KE",
+    "KG",
+    "KH",
+    "KI",
+    "KM",
+    "KN",
+    "KP",
+    "KR",
+    "KW",
+    "KY",
+    "KZ",
+    "LA",
+    "LB",
+    "LC",
+    "LI",
+    "LK",
+    "LR",
+    "LS",
+    "LT",
+    "LU",
+    "LV",
+    "LY",
+    "MA",
+    "MC",
+    "MD",
+    "ME",
+    "MF",
+    "MG",
+    "MH",
+    "MK",
+    "ML",
+    "MM",
+    "MN",
+    "MO",
+    "MP",
+    "MQ",
+    "MR",
+    "MS",
+    "MT",
+    "MU",
+    "MV",
+    "MW",
+    "MX",
+    "MY",
+    "MZ",
+    "NA",
+    "NC",
+    "NE",
+    "NF",
+    "NG",
+    "NI",
+    "NL",
+    "NO",
+    "NP",
+    "NR",
+    "NU",
+    "NZ",
+    "OM",
+    "PA",
+    "PE",
+    "PF",
+    "PG",
+    "PH",
+    "PK",
+    "PL",
+    "PM",
+    "PN",
+    "PR",
+    "PS",
+    "PT",
+    "PW",
+    "PY",
+    "QA",
+    "RE",
+    "RO",
+    "RS",
+    "RU",
+    "RW",
+    "SA",
+    "SB",
+    "SC",
+    "SD",
+    "SE",
+    "SG",
+    "SH",
+    "SI",
+    "SJ",
+    "SK",
+    "SL",
+    "SM",
+    "SN",
+    "SO",
+    "SR",
+    "SS",
+    "ST",
+    "SV",
+    "SX",
+    "SY",
+    "SZ",
+    "TC",
+    "TD",
+    "TF",
+    "TG",
+    "TH",
+    "TJ",
+    "TK",
+    "TL",
+    "TM",
+    "TN",
+    "TO",
+    "TR",
+    "TT",
+    "TV",
+    "TW",
+    "TZ",
+    "UA",
+    "UG",
+    "UM",
+    "US",
+    "UY",
+    "UZ",
+    "VA",
+    "VC",
+    "VE",
+    "VG",
+    "VI",
+    "VN",
+    "VU",
+    "WF",
+    "WS",
+    "YE",
+    "YT",
+    "ZA",
+    "ZM",
+    "ZW",
 }
 
 _country_cache_lock = threading.Lock()
-_country_cache: Optional[Dict[str, str]] = None
-_country_cache_db_mtime: Optional[float] = None
+_country_cache: dict[str, str] | None = None
+_country_cache_db_mtime: float | None = None
 
 
-def _load_country_cache() -> Optional[Dict[str, str]]:
+def _load_country_cache() -> dict[str, str] | None:
     """Load a mapping of country code -> name from the MaxMind Country DB.
 
     Returns None if the DB is absent or unreadable. The result is cached and
@@ -135,7 +366,7 @@ def _load_country_cache() -> Optional[Dict[str, str]]:
     with _country_cache_lock:
         if _country_cache is not None and _country_cache_db_mtime == mtime:
             return _country_cache
-        code_to_name: Dict[str, str] = {}
+        code_to_name: dict[str, str] = {}
         try:
             import geoip2.database
 
@@ -152,7 +383,7 @@ def _load_country_cache() -> Optional[Dict[str, str]]:
         return _country_cache
 
 
-def get_known_country_codes() -> Optional[Set[str]]:
+def get_known_country_codes() -> set[str] | None:
     """Return the set of country codes present in the MaxMind Country DB.
 
     Returns None if the DB is absent. The result is cached and refreshed when
@@ -164,7 +395,7 @@ def get_known_country_codes() -> Optional[Set[str]]:
     return set(cache.keys())
 
 
-def get_country_options() -> List[Dict[str, str]]:
+def get_country_options() -> list[dict[str, str]]:
     """Return a sorted list of {code, name} country options.
 
     If the MaxMind Country DB is present, the list is derived from it and
@@ -174,11 +405,7 @@ def get_country_options() -> List[Dict[str, str]]:
     cache = _load_country_cache()
     if cache is None:
         cache = COUNTRY_NAMES
-    options = [
-        {"code": code, "name": name}
-        for code, name in cache.items()
-        if code in ISO_ALPHA2_CODES
-    ]
+    options = [{"code": code, "name": name} for code, name in cache.items() if code in ISO_ALPHA2_CODES]
     options.sort(key=lambda o: (o["name"].lower(), o["code"]))
     return options
 
@@ -243,6 +470,7 @@ def validate_ja4_value(value: str) -> str:
 # Pattern (regex) validation
 # ---------------------------------------------------------------------------
 
+
 def validate_pattern_value(value: str) -> str:
     """Validate a regex pattern entry for a Pattern security list.
 
@@ -272,7 +500,8 @@ def validate_pattern_value(value: str) -> str:
 # Dynamic feed parser
 # ---------------------------------------------------------------------------
 
-def _get_validator(list_type: Optional[str]) -> Optional[Callable[[str], str]]:
+
+def _get_validator(list_type: str | None) -> Callable[[str], str] | None:
     """Return the validator for a given list type, or None."""
     if list_type == "network":
         return validate_network_value
@@ -287,7 +516,7 @@ def _get_validator(list_type: Optional[str]) -> Optional[Callable[[str], str]]:
     return None
 
 
-def _is_valid_for_list_type(value: str, list_type: Optional[str]) -> bool:
+def _is_valid_for_list_type(value: str, list_type: str | None) -> bool:
     """Return True if ``value`` is a valid entry for ``list_type``."""
     validator = _get_validator(list_type)
     if not validator:
@@ -299,7 +528,7 @@ def _is_valid_for_list_type(value: str, list_type: Optional[str]) -> bool:
         return False
 
 
-def parse_feed_text(text: str, list_type: Optional[str] = None) -> List[Tuple[str, Optional[str]]]:
+def parse_feed_text(text: str, list_type: str | None = None) -> list[tuple[str, str | None]]:
     """Parse dynamic-feed text into (value, optional note) rows.
 
     Splits on newlines. Blank lines and lines starting with '#' are ignored.
@@ -317,7 +546,7 @@ def parse_feed_text(text: str, list_type: Optional[str] = None) -> List[Tuple[st
     """
     if not text:
         return []
-    rows: List[Tuple[str, Optional[str]]] = []
+    rows: list[tuple[str, str | None]] = []
     first_line = True
     for raw_line in text.splitlines():
         line = raw_line.strip()
@@ -364,7 +593,8 @@ def parse_feed_text(text: str, list_type: Optional[str] = None) -> List[Tuple[st
 # List-file writer (consumed by HAProxy config generation)
 # ---------------------------------------------------------------------------
 
-def generate_security_list_file_contents(db: Session) -> Dict[str, str]:
+
+def generate_security_list_file_contents(db: Session) -> dict[str, str]:
     """Return ``{rel_path: content}`` for every security list, without writing.
 
     ``rel_path`` is relative to ``SECURITY_LISTS_DIR``, e.g.
@@ -372,9 +602,9 @@ def generate_security_list_file_contents(db: Session) -> Dict[str, str]:
     newline. Used by the config-status check to detect unapplied list edits
     without touching disk.
     """
-    from ..models.models import NetworkList, AsnList, GeoList, Ja4List, PatternList
+    from ..models.models import AsnList, GeoList, Ja4List, NetworkList, PatternList
 
-    out: Dict[str, str] = {}
+    out: dict[str, str] = {}
     for _, model_cls, subdir in (
         ("network", NetworkList, "network"),
         ("asn", AsnList, "asn"),
@@ -390,7 +620,7 @@ def generate_security_list_file_contents(db: Session) -> Dict[str, str]:
     return out
 
 
-def write_security_list_files(db: Session) -> Dict[str, Any]:
+def write_security_list_files(db: Session) -> dict[str, Any]:
     """Write each Security List to a file on disk under SECURITY_LISTS_DIR.
 
     Network lists -> {dir}/network/{name}.lst  (one IP/CIDR per line)
@@ -405,17 +635,16 @@ def write_security_list_files(db: Session) -> Dict[str, Any]:
 
     Returns a summary dict with paths written and counts.
     """
-    from ..models.models import NetworkList, AsnList, GeoList, Ja4List, PatternList
 
     base = settings.SECURITY_LISTS_DIR
     subdirs = ("network", "asn", "geo", "ja4", "pattern")
-    summary: Dict[str, Any] = {"network": [], "asn": [], "geo": [], "ja4": [], "pattern": []}
+    summary: dict[str, Any] = {"network": [], "asn": [], "geo": [], "ja4": [], "pattern": []}
 
     for sub in subdirs:
         os.makedirs(os.path.join(base, sub), exist_ok=True)
 
     contents = generate_security_list_file_contents(db)
-    written_paths: Set[str] = set()
+    written_paths: set[str] = set()
     for rel, content in contents.items():
         path = os.path.join(base, rel)
         with open(path, "w") as f:
@@ -452,10 +681,12 @@ def write_security_list_files(db: Session) -> Dict[str, Any]:
 # "In use" reference detection (for delete protection)
 # ---------------------------------------------------------------------------
 
+
 # Map list_type -> model class. Lazy import to avoid circular imports
 # (security_rules imports security_lists for safe_filename).
 def _list_model(list_type: str):
-    from ..models.models import NetworkList, AsnList, GeoList, Ja4List, PatternList
+    from ..models.models import AsnList, GeoList, Ja4List, NetworkList, PatternList
+
     return {
         "network": NetworkList,
         "asn": AsnList,
@@ -465,7 +696,7 @@ def _list_model(list_type: str):
     }.get(list_type)
 
 
-def find_list_references(db: Session, list_type: str, list_id: int) -> Dict[str, Any]:
+def find_list_references(db: Session, list_type: str, list_id: int) -> dict[str, Any]:
     """Collect every reference to a security list.
 
     Returns a dict with:
@@ -481,7 +712,7 @@ def find_list_references(db: Session, list_type: str, list_id: int) -> Dict[str,
     from .settings import get_setting as _get_setting
 
     model = _list_model(list_type)
-    refs: Dict[str, Any] = {"feed": None, "rule_refs": [], "setting_refs": []}
+    refs: dict[str, Any] = {"feed": None, "rule_refs": [], "setting_refs": []}
     if model is None:
         return refs
 
@@ -492,14 +723,13 @@ def find_list_references(db: Session, list_type: str, list_id: int) -> Dict[str,
 
     # Dynamic feed ownership (network/asn/ja4 only).
     feed = (
-        db.query(DynamicFeed)
-        .filter(DynamicFeed.list_type == list_type, DynamicFeed.target_list_id == list_id)
-        .first()
+        db.query(DynamicFeed).filter(DynamicFeed.list_type == list_type, DynamicFeed.target_list_id == list_id).first()
     )
     refs["feed"] = feed
 
     # Security rule references (in_list AST nodes).
     from .security_rules import rules_referencing_list
+
     for rule in rules_referencing_list(db, list_type, list_name):
         refs["rule_refs"].append(f"security rule '{rule.name}'")
 
@@ -509,23 +739,18 @@ def find_list_references(db: Session, list_type: str, list_id: int) -> Dict[str,
         if trusted:
             trusted_names = [n.strip() for n in trusted.split(",") if n.strip()]
             if list_name in trusted_names:
-                refs["setting_refs"].append(
-                    "Restore Client IP trusted-source setting (Global Options)"
-                )
+                refs["setting_refs"].append("Restore Client IP trusted-source setting (Global Options)")
 
     return refs
 
 
-def build_in_use_message(list_name: str, refs: Dict[str, Any]) -> Optional[str]:
+def build_in_use_message(list_name: str, refs: dict[str, Any]) -> str | None:
     """Combine rule + setting references into a single 409 body.
 
     Returns None when there are no rule/setting references (the feed reference
     is handled separately by the caller with its own force-bypassable message).
     """
-    parts: List[str] = list(refs.get("rule_refs", [])) + list(refs.get("setting_refs", []))
+    parts: list[str] = list(refs.get("rule_refs", [])) + list(refs.get("setting_refs", []))
     if not parts:
         return None
-    return (
-        f"List '{list_name}' is in use by: {', '.join(parts)}. "
-        f"Remove those references before deleting."
-    )
+    return f"List '{list_name}' is in use by: {', '.join(parts)}. Remove those references before deleting."

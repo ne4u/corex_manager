@@ -3,8 +3,8 @@ import subprocess
 import tempfile
 
 from app.models.models import Certificate
-from app.services.certificates import _cert_dir, upload_custom_certificate
 from app.services import haproxy
+from app.services.certificates import upload_custom_certificate
 from tests.factories import make_backend, make_listener, make_server
 
 
@@ -15,11 +15,24 @@ def _generate_self_signed_cert():
         cert_path = os.path.join(d, "cert.pem")
         subprocess.run(
             [
-                "openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
-                "-keyout", key_path, "-out", cert_path, "-days", "1",
-                "-subj", "/CN=test",
+                "openssl",
+                "req",
+                "-x509",
+                "-newkey",
+                "rsa:2048",
+                "-nodes",
+                "-keyout",
+                key_path,
+                "-out",
+                cert_path,
+                "-days",
+                "1",
+                "-subj",
+                "/CN=test",
             ],
-            check=True, capture_output=True, text=True,
+            check=True,
+            capture_output=True,
+            text=True,
         )
         with open(cert_path) as f:
             cert = f.read()
@@ -35,6 +48,7 @@ def test_upload_custom_certificate_ca_kind(db, monkeypatch, tmp_path):
     db.flush()
 
     import app.services.certificates as cert_service
+
     cert_dir = tmp_path / "certs"
     cert_dir.mkdir()
     monkeypatch.setattr(cert_service.settings, "CERT_DIR", str(cert_dir))
@@ -62,8 +76,16 @@ def test_generate_backend_uses_certificate_fks(db):
     backend = make_backend(db)
     make_listener(db, backend=backend)
 
-    ca_cert = Certificate(name="test-ca", domain="test-ca", provider="custom", kind="ca", cert_path="/certs/test-ca/ca.pem")
-    client_cert = Certificate(name="test-client", domain="test-client", provider="custom", kind="client", cert_path="/certs/test-client/haproxy.pem")
+    ca_cert = Certificate(
+        name="test-ca", domain="test-ca", provider="custom", kind="ca", cert_path="/certs/test-ca/ca.pem"
+    )
+    client_cert = Certificate(
+        name="test-client",
+        domain="test-client",
+        provider="custom",
+        kind="client",
+        cert_path="/certs/test-client/haproxy.pem",
+    )
     db.add(ca_cert)
     db.add(client_cert)
     db.flush()

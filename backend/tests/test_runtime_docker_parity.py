@@ -8,8 +8,9 @@ and call patterns.
 
 Prime Directive: Docker Compose Must Not Break.
 """
+
 import sys
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -32,10 +33,12 @@ def mock_docker_sdk(monkeypatch):
 
     # Patch the module-level docker variable in docker_runtime
     import app.services.runtime.docker_runtime as dr_module
+
     monkeypatch.setattr(dr_module, "docker", mock_docker_mod)
 
     # Clear the runtime cache so DockerRuntime is re-instantiated
     from app.services.runtime import get_runtime
+
     get_runtime.cache_clear()
 
     return mock_docker_mod, mock_client, mock_container
@@ -50,6 +53,7 @@ class TestDockerRuntimeHaproxyValidation:
         mock_container.exec_run.return_value = (0, b"Configuration valid")
 
         from app.services.runtime.docker_runtime import DockerRuntime
+
         rt = DockerRuntime()
         ok, output = rt.validate_haproxy_config("/tmp/test.cfg")
 
@@ -63,6 +67,7 @@ class TestDockerRuntimeHaproxyValidation:
         mock_container.exec_run.return_value = (1, b"Syntax error on line 5")
 
         from app.services.runtime.docker_runtime import DockerRuntime
+
         rt = DockerRuntime()
         ok, output = rt.validate_haproxy_config("/tmp/test.cfg")
 
@@ -74,9 +79,11 @@ class TestDockerRuntimeHaproxyValidation:
         as the original code so the caller can fall back to local haproxy."""
         # Patch the module-level docker variable to None
         import app.services.runtime.docker_runtime as dr_module
+
         monkeypatch.setattr(dr_module, "docker", None)
 
         from app.services.runtime.docker_runtime import DockerRuntime
+
         rt = DockerRuntime()
         ok, output = rt.validate_haproxy_config("/tmp/test.cfg")
 
@@ -92,6 +99,7 @@ class TestDockerRuntimeHaproxyVersion:
         mock_container.exec_run.return_value = (0, b"HAProxy version 2.8.0\nFeature: geoip2")
 
         from app.services.runtime.docker_runtime import DockerRuntime
+
         rt = DockerRuntime()
         result = rt.haproxy_version_verbose()
 
@@ -104,6 +112,7 @@ class TestDockerRuntimeHaproxyVersion:
         mock_container.exec_run.side_effect = Exception("connection refused")
 
         from app.services.runtime.docker_runtime import DockerRuntime
+
         rt = DockerRuntime()
         result = rt.haproxy_version_verbose()
 
@@ -128,6 +137,7 @@ class TestDockerRuntimeCorazaRestart:
         mock_client.containers.list.return_value = [other_container, labeled_container]
 
         from app.services.runtime.docker_runtime import DockerRuntime
+
         rt = DockerRuntime()
         result = rt.restart_coraza()
 
@@ -144,6 +154,7 @@ class TestDockerRuntimeCorazaRestart:
         mock_client.containers.list.return_value = [named_container]
 
         from app.services.runtime.docker_runtime import DockerRuntime
+
         rt = DockerRuntime()
         result = rt.restart_coraza()
 
@@ -155,6 +166,7 @@ class TestDockerRuntimeCorazaRestart:
         mock_client.containers.list.return_value = []
 
         from app.services.runtime.docker_runtime import DockerRuntime
+
         rt = DockerRuntime()
         result = rt.restart_coraza()
 
@@ -169,6 +181,7 @@ class TestDockerRuntimeVarnish:
         mock_container.exec_run.return_value = (0, b"")
 
         from app.services.runtime.docker_runtime import DockerRuntime
+
         rt = DockerRuntime()
         ok, output = rt.validate_vcl("/app/data/_validate.vcl")
 
@@ -180,6 +193,7 @@ class TestDockerRuntimeVarnish:
         mock_container.exec_run.return_value = (1, b"VCL syntax error")
 
         from app.services.runtime.docker_runtime import DockerRuntime
+
         rt = DockerRuntime()
         ok, output = rt.validate_vcl("/app/data/_validate.vcl")
 
@@ -191,19 +205,19 @@ class TestDockerRuntimeVarnish:
         mock_container.exec_run.return_value = (0, b"")
 
         from app.services.runtime.docker_runtime import DockerRuntime
+
         rt = DockerRuntime()
         result = rt.purge_all()
 
         assert result is True
-        mock_container.exec_run.assert_called_once_with(
-            'varnishadm ban "obj.http.X-Cache-Backend ~ .*"'
-        )
+        mock_container.exec_run.assert_called_once_with('varnishadm ban "obj.http.X-Cache-Backend ~ .*"')
 
     def test_purge_vcl_with_ban_expr(self, mock_docker_sdk):
         mock_docker, mock_client, mock_container = mock_docker_sdk
         mock_container.exec_run.return_value = (0, b"")
 
         from app.services.runtime.docker_runtime import DockerRuntime
+
         rt = DockerRuntime()
         ban_expr = 'obj.http.X-Cache-Backend == "my_backend"'
         result = rt.purge_vcl(ban_expr)
@@ -211,9 +225,7 @@ class TestDockerRuntimeVarnish:
         assert result is True
         # The DockerRuntime wraps the ban_expr in double quotes, matching
         # the original code's f'varnishadm ban "{ban_expr}"' pattern.
-        mock_container.exec_run.assert_called_once_with(
-            f'varnishadm ban "{ban_expr}"'
-        )
+        mock_container.exec_run.assert_called_once_with(f'varnishadm ban "{ban_expr}"')
 
 
 class TestDockerRuntimeHealth:
@@ -223,6 +235,7 @@ class TestDockerRuntimeHealth:
         mock_docker, mock_client, mock_container = mock_docker_sdk
 
         from app.services.runtime.docker_runtime import DockerRuntime
+
         rt = DockerRuntime()
         assert rt.is_available() is True
 
@@ -231,6 +244,7 @@ class TestDockerRuntimeHealth:
         mock_client.containers.get.side_effect = Exception("not found")
 
         from app.services.runtime.docker_runtime import DockerRuntime
+
         rt = DockerRuntime()
         assert rt.is_available() is False
 
@@ -238,6 +252,7 @@ class TestDockerRuntimeHealth:
         mock_docker, mock_client, mock_container = mock_docker_sdk
 
         from app.services.runtime.docker_runtime import DockerRuntime
+
         rt = DockerRuntime()
         desc = rt.describe()
 
@@ -254,6 +269,7 @@ class TestRuntimeAutoDetection:
         monkeypatch.setattr("os.path.exists", lambda p: "serviceaccount" in p)
 
         from app.services.runtime import _detect_runtime
+
         assert _detect_runtime() == "kubernetes"
 
     def test_detects_docker_when_sock_exists(self, monkeypatch):
@@ -265,6 +281,7 @@ class TestRuntimeAutoDetection:
         monkeypatch.setattr("os.path.exists", mock_exists)
 
         from app.services.runtime import _detect_runtime
+
         assert _detect_runtime() == "docker"
 
     def test_detects_none_when_nothing_available(self, monkeypatch):
@@ -272,6 +289,7 @@ class TestRuntimeAutoDetection:
         monkeypatch.setattr("os.path.exists", lambda p: False)
 
         from app.services.runtime import _detect_runtime
+
         assert _detect_runtime() == "none"
 
 

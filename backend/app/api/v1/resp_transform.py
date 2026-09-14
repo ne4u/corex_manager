@@ -1,26 +1,25 @@
-from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from ..deps import get_db, get_current_user, require_write, rate_limit
+
+from ...core.config import get_settings
 from ...schemas.resp_transform import (
     ResponseTransformCreate,
+    ResponseTransformReorder,
     ResponseTransformResponse,
     ResponseTransformUpdate,
-    ResponseTransformReorder,
     ResponseTransformValidateRequest,
     ResponseTransformValidateResponse,
 )
 from ...services.resp_transform import (
     create_response_transform,
     delete_response_transform,
-    get_response_transform,
     list_response_transforms,
-    update_response_transform,
     reorder_response_transforms,
+    update_response_transform,
     validate_response_transform,
 )
 from ...services.settings import get_setting
-from ...core.config import get_settings
+from ..deps import get_current_user, get_db, rate_limit, require_write
 
 router = APIRouter()
 
@@ -43,7 +42,7 @@ def _require_resp_transform_enabled(db: Session = Depends(get_db)):
         )
 
 
-@router.get("/resp-transforms", response_model=List[ResponseTransformResponse])
+@router.get("/resp-transforms", response_model=list[ResponseTransformResponse])
 def list_resp_transforms_endpoint(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),

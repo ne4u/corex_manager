@@ -5,13 +5,13 @@ PAGE_PROTECT_SAMPLER_INTERVAL_SECONDS, extracts lines with a non-empty
 csp_report field, parses the CSP violation report, stores it in the database,
 and upserts the script inventory.
 """
+
 import json
 import logging
 import os
 import threading
 import time
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
@@ -38,17 +38,17 @@ def _offset_path() -> str:
     return os.path.join(base, ".page_protect_sampler_offset")
 
 
-def _read_offset() -> Optional[float]:
+def _read_offset() -> float | None:
     """Read the last-seen Docker log timestamp (unix seconds) from disk."""
     try:
-        with open(_offset_path(), "r") as f:
+        with open(_offset_path()) as f:
             val = f.read().strip()
             return float(val) if val else None
     except Exception:
         return None
 
 
-def _write_offset(ts: Optional[float]) -> None:
+def _write_offset(ts: float | None) -> None:
     try:
         with open(_offset_path(), "w") as f:
             f.write(str(ts) if ts is not None else "")
@@ -56,7 +56,7 @@ def _write_offset(ts: Optional[float]) -> None:
         pass
 
 
-def _parse_log_line(line: str) -> Optional[dict]:
+def _parse_log_line(line: str) -> dict | None:
     """Parse a HAProxy JSON log line and return it if it has a csp_report or asset_beacon field."""
     line = line.strip()
     if not line:
@@ -70,7 +70,7 @@ def _parse_log_line(line: str) -> Optional[dict]:
         log_line = line
     try:
         parsed = json.loads(log_line)
-    except (json.JSONDecodeError, ValueError):
+    except json.JSONDecodeError, ValueError:
         return None
     if not isinstance(parsed, dict):
         return None
@@ -93,7 +93,7 @@ def _parse_log_line(line: str) -> Optional[dict]:
     }
 
 
-def _docker_ts_to_unix(ts_str: str) -> Optional[float]:
+def _docker_ts_to_unix(ts_str: str) -> float | None:
     """Convert a Docker ISO timestamp string to unix seconds."""
     try:
         # Docker uses ISO 8601 with nanosecond precision sometimes; trim to microseconds.
@@ -102,7 +102,7 @@ def _docker_ts_to_unix(ts_str: str) -> Optional[float]:
             dt = datetime.fromisoformat(ts_str)
         else:
             dt = datetime.fromisoformat(ts_str)
-        return dt.replace(tzinfo=timezone.utc).timestamp()
+        return dt.replace(tzinfo=UTC).timestamp()
     except Exception:
         return None
 
@@ -122,7 +122,7 @@ def sample_csp_reports(force_recent: bool = False) -> int:
         logger.debug("Runtime backend not available; skipping CSP report sampling")
         return 0
 
-    db: Optional[Session] = None
+    db: Session | None = None
     try:
         if force_recent:
             # Manual trigger: grab last 10 minutes regardless of offset
@@ -151,7 +151,7 @@ def sample_csp_reports(force_recent: bool = False) -> int:
         retention_days = pp_settings.get("report_retention_days", 7)
 
         stored = 0
-        max_ts: Optional[float] = None
+        max_ts: float | None = None
         for line in raw.splitlines():
             entry = _parse_log_line(line)
             if not entry:
@@ -194,7 +194,9 @@ def sample_csp_reports(force_recent: bool = False) -> int:
                 if resources:
                     beacon_stored = store_beacon_resources(db, resources)
                     if beacon_stored:
-                        logger.info("Stored %d resources from beacon (page=%s)", beacon_stored, parsed_log.get("path", "?"))
+                        logger.info(
+                            "Stored %d resources from beacon (page=%s)", beacon_stored, parsed_log.get("path", "?")
+                        )
 
         if stored:
             db.commit()

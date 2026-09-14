@@ -1,4 +1,5 @@
 """MCP policy helpers: expression validation and builder metadata."""
+
 import asyncio
 import datetime
 import json
@@ -7,7 +8,7 @@ import os
 import sys
 import threading
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 from urllib.parse import quote
 
 from sqlalchemy.orm import Session
@@ -15,11 +16,13 @@ from sqlalchemy.orm import Session
 # Import shared expression engine
 # In Docker, PYTHONPATH=/app makes 'shared' importable.
 # For local dev, add the project root to sys.path.
-_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 from shared.expression_core import (
     parse_expression as _shared_parse_expression,
+)
+from shared.expression_core import (
     validate_expression as _shared_validate_expression,
 )
 
@@ -36,7 +39,7 @@ _CATALOG_TTL = 7200  # seconds
 # tracking. Prevents the Add Policy builder from spawning a new refresh thread
 # on every 3-second poll while a refresh is already running or has just failed.
 _CATALOG_REFRESH_COOLDOWN_SECONDS = 30
-_last_catalog_refresh_trigger: Dict[int, float] = {}
+_last_catalog_refresh_trigger: dict[int, float] = {}
 _refreshing_server_ids: set = set()
 
 
@@ -56,12 +59,12 @@ MCP_METHODS = [
 ]
 
 
-def parse_mcp_expression(text: str) -> Dict[str, Any]:
+def parse_mcp_expression(text: str) -> dict[str, Any]:
     """Parse an MCP policy expression into an AST dict."""
     return _shared_parse_expression(text)
 
 
-def validate_mcp_expression(text: str) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
+def validate_mcp_expression(text: str) -> tuple[bool, dict[str, Any] | None, str | None]:
     """Validate an MCP policy expression. Returns (ok, ast, error)."""
     return _shared_validate_expression(text)
 
@@ -76,7 +79,7 @@ def _wrap_resource_uri(namespace: str, original_uri: str) -> str:
     return f"mcp://{namespace}/{quote(original_uri, safe='')}"
 
 
-def _get_server_catalog(server: McpServer, client: Any) -> Optional[Dict[str, Any]]:
+def _get_server_catalog(server: McpServer, client: Any) -> dict[str, Any] | None:
     """Return the cached catalog dict for a server, or None if unavailable."""
     if not client:
         return None
@@ -89,7 +92,7 @@ def _get_server_catalog(server: McpServer, client: Any) -> Optional[Dict[str, An
     return None
 
 
-def _store_server_catalog(server_id: int, catalog: Dict[str, Any]) -> None:
+def _store_server_catalog(server_id: int, catalog: dict[str, Any]) -> None:
     """Store a server catalog in Valkey using the backend Valkey client."""
     client = _get_client()
     if not client:
@@ -135,7 +138,7 @@ async def _close_upstream_clients(upstream_mod: Any) -> None:
     upstream_mod._circuit_state.clear()
 
 
-async def _fetch_catalog_async(server: McpServer, db: Session) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+async def _fetch_catalog_async(server: McpServer, db: Session) -> tuple[dict[str, Any] | None, str | None]:
     """Fetch the catalog from the upstream server using the gateway upstream client.
 
     Returns (catalog, error).  catalog is None on any failure; error describes why.
@@ -167,16 +170,19 @@ async def _fetch_catalog_async(server: McpServer, db: Session) -> Tuple[Optional
         upstream_sid = await initialize_upstream(server_dict)
         if upstream_sid is None:
             # Run a diagnostic initialize to capture the exact HTTP status/body.
-            status, body, _ = await upstream_mod.send_request(server_dict, {
-                "jsonrpc": "2.0",
-                "id": 1,
-                "method": "initialize",
-                "params": {
-                    "protocolVersion": "2025-11-25",
-                    "capabilities": {},
-                    "clientInfo": {"name": "mcp-gateway", "version": "0.1.0"},
+            status, body, _ = await upstream_mod.send_request(
+                server_dict,
+                {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "initialize",
+                    "params": {
+                        "protocolVersion": "2025-11-25",
+                        "capabilities": {},
+                        "clientInfo": {"name": "mcp-gateway", "version": "0.1.0"},
+                    },
                 },
-            })
+            )
             if isinstance(body, dict) and "error" in body:
                 return None, f"MCP server initialize failed (HTTP {status}): {body['error']}"
             return None, f"MCP server initialize failed (HTTP {status}): {body}"
@@ -189,7 +195,7 @@ async def _fetch_catalog_async(server: McpServer, db: Session) -> Tuple[Optional
         return None, str(e)
 
 
-def refresh_server_catalog(server: McpServer, db: Session) -> Optional[Dict[str, Any]]:
+def refresh_server_catalog(server: McpServer, db: Session) -> dict[str, Any] | None:
     """Refresh and store the catalog for a single server (synchronous wrapper)."""
     try:
         catalog, error = asyncio.run(_fetch_catalog_async(server, db))
@@ -201,7 +207,7 @@ def refresh_server_catalog(server: McpServer, db: Session) -> Optional[Dict[str,
         logger.error("Unexpected error refreshing catalog for %s: %s", server.name, e)
         catalog, error = None, str(e)
 
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.datetime.now(datetime.UTC)
     server.last_seen_at = now
     if not catalog:
         _clear_server_catalog(server.id)
@@ -219,7 +225,7 @@ def refresh_server_catalog(server: McpServer, db: Session) -> Optional[Dict[str,
 
 
 def _background_refresh_thread(
-    server_ids: List[int],
+    server_ids: list[int],
     max_attempts: int = 1,
     interval_seconds: int = 5,
 ) -> None:
@@ -252,7 +258,9 @@ def _background_refresh_thread(
 
                     logger.info(
                         "Background catalog refresh for server %s (attempt %d/%d)",
-                        server.name, attempt, max_attempts,
+                        server.name,
+                        attempt,
+                        max_attempts,
                     )
                     catalog = refresh_server_catalog(server, db)
                     if catalog:
@@ -273,10 +281,10 @@ def _background_refresh_thread(
 
 
 def trigger_background_catalog_refresh(
-    server_ids: List[int],
+    server_ids: list[int],
     max_attempts: int = 1,
     interval_seconds: int = 5,
-) -> List[int]:
+) -> list[int]:
     """Fire-and-forget background refresh for a list of server IDs.
 
     Returns the list of server IDs that were actually queued for refresh. IDs
@@ -291,7 +299,7 @@ def trigger_background_catalog_refresh(
         return []
 
     now = time.time()
-    to_trigger: List[int] = []
+    to_trigger: list[int] = []
     for sid in server_ids:
         if sid in _refreshing_server_ids:
             logger.debug("Catalog refresh for server %d already in progress, skipping", sid)
@@ -316,15 +324,15 @@ def trigger_background_catalog_refresh(
     return to_trigger
 
 
-def build_policy_builder_metadata(db: Session, team_ids: List[int]) -> Dict[str, Any]:
+def build_policy_builder_metadata(db: Session, team_ids: list[int]) -> dict[str, Any]:
     """Return all dynamic data needed by the Add Policy builder for the user's teams."""
     client = _get_client()
 
-    servers: List[Dict[str, Any]] = []
-    stale_servers: List[Dict[str, Any]] = []
-    tools: List[str] = []
-    resources: List[str] = []
-    prompts: List[str] = []
+    servers: list[dict[str, Any]] = []
+    stale_servers: list[dict[str, Any]] = []
+    tools: list[str] = []
+    resources: list[str] = []
+    prompts: list[str] = []
 
     if team_ids:
         for server in (
@@ -343,12 +351,14 @@ def build_policy_builder_metadata(db: Session, team_ids: List[int]) -> Dict[str,
             servers.append(server_meta)
 
             if server_meta["stale"]:
-                stale_servers.append({
-                    "id": server.id,
-                    "namespace": server.namespace,
-                    "name": server.name,
-                    "last_catalog_at": server_meta["last_catalog_at"],
-                })
+                stale_servers.append(
+                    {
+                        "id": server.id,
+                        "namespace": server.namespace,
+                        "name": server.name,
+                        "last_catalog_at": server_meta["last_catalog_at"],
+                    }
+                )
 
             catalog = _get_server_catalog(server, client)
             if not catalog:
@@ -368,17 +378,14 @@ def build_policy_builder_metadata(db: Session, team_ids: List[int]) -> Dict[str,
                 if name:
                     prompts.append(_prefix_tool_name(namespace, name))
 
-    identities: List[str] = []
+    identities: list[str] = []
     if team_ids:
         for identity in (
-            db.query(McpIdentity)
-            .filter(McpIdentity.team_id.in_(team_ids))
-            .order_by(McpIdentity.name)
-            .all()
+            db.query(McpIdentity).filter(McpIdentity.team_id.in_(team_ids)).order_by(McpIdentity.name).all()
         ):
             identities.append(identity.name)
 
-    teams: List[Dict[str, Any]] = []
+    teams: list[dict[str, Any]] = []
     if team_ids:
         for team in db.query(Team).filter(Team.id.in_(team_ids)).order_by(Team.name).all():
             teams.append({"id": team.id, "name": team.name, "slug": team.slug})

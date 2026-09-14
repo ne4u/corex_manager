@@ -5,10 +5,10 @@ Coraza SPOA, Varnish) regardless of whether the deployment uses Docker Compose
 or Kubernetes. The backend is selected at startup via ``COREX_RUNTIME`` (see
 ``__init__.py``).
 """
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Optional
 
 
 class RuntimeBackend(ABC):
@@ -35,7 +35,7 @@ class RuntimeBackend(ABC):
         """
 
     @abstractmethod
-    def haproxy_version_verbose(self) -> Optional[str]:
+    def haproxy_version_verbose(self) -> str | None:
         """Run ``haproxy -vv`` in the HAProxy container/pod.
 
         Returns the stdout output, or None if unavailable.
@@ -44,8 +44,8 @@ class RuntimeBackend(ABC):
     @abstractmethod
     def haproxy_logs(
         self,
-        tail: Optional[int] = None,
-        since: Optional[int] = None,
+        tail: int | None = None,
+        since: int | None = None,
         timestamps: bool = False,
     ) -> str:
         """Fetch HAProxy stdout logs.

@@ -1,5 +1,6 @@
 """Tests for Page Protect HAProxy config generation."""
-from app.services.haproxy import generate_config, generate_frontend, generate_backend, _default_json_log_format
+
+from app.services.haproxy import _default_json_log_format, generate_backend, generate_config, generate_frontend
 from app.services.page_protect import is_page_protect_enabled
 from app.services.settings import set_setting
 from tests.factories import make_backend, make_listener, make_page_protect_policy
@@ -40,8 +41,13 @@ def test_frontend_no_csp_rules_when_disabled(db):
 
 def test_backend_emits_csp_header_monitor(db):
     backend = make_backend(db, name="be1")
-    make_page_protect_policy(db, name="p1", backend_ids=[backend.id], mode="monitor",
-                             directives={"script-src": ["'self'", "https://cdn.example.com"]})
+    make_page_protect_policy(
+        db,
+        name="p1",
+        backend_ids=[backend.id],
+        mode="monitor",
+        directives={"script-src": ["'self'", "https://cdn.example.com"]},
+    )
     db.commit()
     config = generate_backend(backend, db, page_protect_enabled=True)
     assert "Content-Security-Policy-Report-Only" in config
@@ -52,9 +58,14 @@ def test_backend_emits_csp_header_monitor(db):
 
 def test_backend_emits_csp_report_uri(db):
     backend = make_backend(db, name="be1")
-    make_page_protect_policy(db, name="p1", backend_ids=[backend.id], mode="monitor",
-                             report_path="/_csp-report",
-                             directives={"default-src": ["'self'"]})
+    make_page_protect_policy(
+        db,
+        name="p1",
+        backend_ids=[backend.id],
+        mode="monitor",
+        report_path="/_csp-report",
+        directives={"default-src": ["'self'"]},
+    )
     db.commit()
     config = generate_backend(backend, db, page_protect_enabled=True)
     assert "report-uri /_csp-report" in config
@@ -62,8 +73,9 @@ def test_backend_emits_csp_report_uri(db):
 
 def test_backend_csp_header_value_is_not_double_quoted(db):
     backend = make_backend(db, name="be1")
-    make_page_protect_policy(db, name="p1", backend_ids=[backend.id], mode="monitor",
-                             directives={"default-src": ["'self'"]})
+    make_page_protect_policy(
+        db, name="p1", backend_ids=[backend.id], mode="monitor", directives={"default-src": ["'self'"]}
+    )
     db.commit()
     config = generate_backend(backend, db, page_protect_enabled=True)
     # The config line should use a single HAProxy double-quoted token and the
@@ -77,8 +89,9 @@ def test_backend_csp_header_value_is_not_double_quoted(db):
 
 def test_backend_emits_csp_header_enforce(db):
     backend = make_backend(db, name="be1")
-    make_page_protect_policy(db, name="p1", backend_ids=[backend.id], mode="enforce",
-                             directives={"default-src": ["'self'"]})
+    make_page_protect_policy(
+        db, name="p1", backend_ids=[backend.id], mode="enforce", directives={"default-src": ["'self'"]}
+    )
     db.commit()
     config = generate_backend(backend, db, page_protect_enabled=True)
     assert "Content-Security-Policy" in config
@@ -87,8 +100,14 @@ def test_backend_emits_csp_header_enforce(db):
 
 def test_backend_csp_header_sampling(db):
     backend = make_backend(db, name="be1")
-    make_page_protect_policy(db, name="p1", backend_ids=[backend.id], mode="monitor",
-                             sample_rate_percent=50, directives={"script-src": ["'self'"]})
+    make_page_protect_policy(
+        db,
+        name="p1",
+        backend_ids=[backend.id],
+        mode="monitor",
+        sample_rate_percent=50,
+        directives={"script-src": ["'self'"]},
+    )
     db.commit()
     config = generate_backend(backend, db, page_protect_enabled=True)
     assert "rand(100)" in config
@@ -97,8 +116,14 @@ def test_backend_csp_header_sampling(db):
 
 def test_backend_csp_header_full_sample_no_rand(db):
     backend = make_backend(db, name="be1")
-    make_page_protect_policy(db, name="p1", backend_ids=[backend.id], mode="monitor",
-                             sample_rate_percent=100, directives={"script-src": ["'self'"]})
+    make_page_protect_policy(
+        db,
+        name="p1",
+        backend_ids=[backend.id],
+        mode="monitor",
+        sample_rate_percent=100,
+        directives={"script-src": ["'self'"]},
+    )
     db.commit()
     config = generate_backend(backend, db, page_protect_enabled=True)
     assert "rand(100)" not in config
@@ -107,8 +132,9 @@ def test_backend_csp_header_full_sample_no_rand(db):
 def test_backend_csp_header_per_backend_scoping(db):
     backend1 = make_backend(db, name="be1")
     backend2 = make_backend(db, name="be2")
-    make_page_protect_policy(db, name="p1", backend_ids=[backend1.id], mode="monitor",
-                             directives={"script-src": ["'self'"]})
+    make_page_protect_policy(
+        db, name="p1", backend_ids=[backend1.id], mode="monitor", directives={"script-src": ["'self'"]}
+    )
     db.commit()
     config1 = generate_backend(backend1, db, page_protect_enabled=True)
     config2 = generate_backend(backend2, db, page_protect_enabled=True)
@@ -118,8 +144,7 @@ def test_backend_csp_header_per_backend_scoping(db):
 
 def test_backend_csp_header_all_backends_when_empty(db):
     backend = make_backend(db, name="be1")
-    make_page_protect_policy(db, name="p1", backend_ids=[], mode="monitor",
-                             directives={"script-src": ["'self'"]})
+    make_page_protect_policy(db, name="p1", backend_ids=[], mode="monitor", directives={"script-src": ["'self'"]})
     db.commit()
     config = generate_backend(backend, db, page_protect_enabled=True)
     assert "Content-Security-Policy-Report-Only" in config
@@ -127,8 +152,9 @@ def test_backend_csp_header_all_backends_when_empty(db):
 
 def test_backend_no_csp_when_disabled(db):
     backend = make_backend(db, name="be1")
-    make_page_protect_policy(db, name="p1", backend_ids=[backend.id], mode="monitor",
-                             directives={"script-src": ["'self'"]})
+    make_page_protect_policy(
+        db, name="p1", backend_ids=[backend.id], mode="monitor", directives={"script-src": ["'self'"]}
+    )
     db.commit()
     config = generate_backend(backend, db, page_protect_enabled=False)
     assert "Content-Security-Policy" not in config
@@ -138,8 +164,9 @@ def test_generate_config_with_page_protect_enabled(db):
     listener = make_listener(db, name="http_in", bind_port=80)
     backend = make_backend(db, name="be1")
     listener.default_backend_id = backend.id
-    make_page_protect_policy(db, name="p1", backend_ids=[backend.id], mode="monitor",
-                             directives={"script-src": ["'self'"]})
+    make_page_protect_policy(
+        db, name="p1", backend_ids=[backend.id], mode="monitor", directives={"script-src": ["'self'"]}
+    )
     set_setting(db, "page_protect_monitoring_enabled", "true")
     db.commit()
     config = generate_config(db)
@@ -152,8 +179,9 @@ def test_generate_config_without_page_protect(db):
     listener = make_listener(db, name="http_in", bind_port=80)
     backend = make_backend(db, name="be1")
     listener.default_backend_id = backend.id
-    make_page_protect_policy(db, name="p1", backend_ids=[backend.id], mode="monitor",
-                             directives={"script-src": ["'self'"]})
+    make_page_protect_policy(
+        db, name="p1", backend_ids=[backend.id], mode="monitor", directives={"script-src": ["'self'"]}
+    )
     set_setting(db, "page_protect_monitoring_enabled", "false")
     db.commit()
     config = generate_config(db)
@@ -176,8 +204,9 @@ def test_generate_config_sets_log_len_for_csp_reports(db):
     listener = make_listener(db, name="http_in", bind_port=80)
     backend = make_backend(db, name="be1")
     listener.default_backend_id = backend.id
-    make_page_protect_policy(db, name="p1", backend_ids=[backend.id], mode="monitor",
-                             directives={"script-src": ["'self'"]})
+    make_page_protect_policy(
+        db, name="p1", backend_ids=[backend.id], mode="monitor", directives={"script-src": ["'self'"]}
+    )
     set_setting(db, "page_protect_monitoring_enabled", "true")
     db.commit()
     config = generate_config(db)
@@ -197,14 +226,18 @@ def test_generate_global_section_managed_vector_log(db):
     the coreX log source is enabled (i.e. at least one enabled sink has
     source=corex). Uses ring@vector_tcp (HAProxy 3.4 log directive only
     accepts IP addresses, not hostnames)."""
-    from app.services.haproxy import generate_global_section, generate_config
     from app.models.logging import VectorSink
     from app.services import vector_pipeline as vp
+    from app.services.haproxy import generate_config, generate_global_section
 
     # Create an enabled sink with source=corex — this auto-enables the source
-    sink = VectorSink(name="s3", type="aws_s3", source="corex",
-                      options=vp.encrypt_sink_options("aws_s3",
-                        {"bucket": "b", "region": "r"}), enabled=True)
+    sink = VectorSink(
+        name="s3",
+        type="aws_s3",
+        source="corex",
+        options=vp.encrypt_sink_options("aws_s3", {"bucket": "b", "region": "r"}),
+        enabled=True,
+    )
     db.add(sink)
     db.commit()
     cfg = generate_global_section(db=db)

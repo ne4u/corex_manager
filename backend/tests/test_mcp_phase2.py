@@ -1,10 +1,10 @@
 """Tests for MCP Gateway Phase 2 — virtual registry, catalog, namespacing, routing."""
+
 import json
 import os
 import sys
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
-from urllib.parse import quote, unquote
+from unittest.mock import AsyncMock, MagicMock
+from urllib.parse import quote
 
 import pytest
 
@@ -16,16 +16,19 @@ if _GATEWAY_DIR not in sys.path:
 
 # ---- Resource URI wrap/unwrap tests ----
 
+
 def test_wrap_resource_uri():
     import importlib
-    protocol = importlib.import_module('protocol')
+
+    protocol = importlib.import_module("protocol")
     wrapped = protocol._wrap_resource_uri("jira", "issue://PROJ-123")
     assert wrapped == f"mcp://jira/{quote('issue://PROJ-123', safe='')}"
 
 
 def test_unwrap_resource_uri():
     import importlib
-    protocol = importlib.import_module('protocol')
+
+    protocol = importlib.import_module("protocol")
     original = "issue://PROJ-123"
     wrapped = protocol._wrap_resource_uri("jira", original)
     namespace, unwrapped = protocol._unwrap_resource_uri(wrapped)
@@ -35,7 +38,8 @@ def test_unwrap_resource_uri():
 
 def test_unwrap_resource_uri_not_wrapped():
     import importlib
-    protocol = importlib.import_module('protocol')
+
+    protocol = importlib.import_module("protocol")
     namespace, original = protocol._unwrap_resource_uri("https://example.com/res")
     assert namespace is None
     assert original == "https://example.com/res"
@@ -43,7 +47,8 @@ def test_unwrap_resource_uri_not_wrapped():
 
 def test_wrap_unwrap_roundtrip_special_chars():
     import importlib
-    protocol = importlib.import_module('protocol')
+
+    protocol = importlib.import_module("protocol")
     original = "file:///path/with spaces/and?query=1&x=2"
     wrapped = protocol._wrap_resource_uri("weather", original)
     namespace, unwrapped = protocol._unwrap_resource_uri(wrapped)
@@ -53,9 +58,11 @@ def test_wrap_unwrap_roundtrip_special_chars():
 
 # ---- Catalog store/retrieve tests ----
 
+
 def test_catalog_store_and_retrieve():
     import importlib
-    catalog = importlib.import_module('catalog')
+
+    catalog = importlib.import_module("catalog")
     catalog.clear_all_catalogs()
     catalog_data = {"tools": [{"name": "get"}], "resources": [], "prompts": []}
     catalog.store_catalog(1, catalog_data)
@@ -66,7 +73,8 @@ def test_catalog_store_and_retrieve():
 
 def test_catalog_clear():
     import importlib
-    catalog = importlib.import_module('catalog')
+
+    catalog = importlib.import_module("catalog")
     catalog.clear_all_catalogs()
     catalog.store_catalog(1, {"tools": [], "resources": [], "prompts": []})
     assert catalog.get_catalog(1) is not None
@@ -76,7 +84,8 @@ def test_catalog_clear():
 
 def test_catalog_change_detection():
     import importlib
-    catalog = importlib.import_module('catalog')
+
+    catalog = importlib.import_module("catalog")
     catalog.clear_all_catalogs()
     catalog.store_catalog(1, {"tools": [{"name": "a"}], "resources": [], "prompts": []})
     # First store should not register as changed (no previous hash)
@@ -97,7 +106,8 @@ def test_catalog_change_detection():
 
 def test_catalog_get_all_catalogs():
     import importlib
-    catalog = importlib.import_module('catalog')
+
+    catalog = importlib.import_module("catalog")
     catalog.clear_all_catalogs()
     catalog.store_catalog(1, {"tools": [{"name": "a"}], "resources": [], "prompts": []})
     catalog.store_catalog(2, {"tools": [{"name": "b"}], "resources": [], "prompts": []})
@@ -110,9 +120,11 @@ def test_catalog_get_all_catalogs():
 
 # ---- Config loader team helpers ----
 
+
 def test_config_loader_get_team_servers():
     import importlib
-    cl = importlib.import_module('config_loader')
+
+    cl = importlib.import_module("config_loader")
     cl._config = {
         "servers": [
             {"id": 1, "team_id": 10, "name": "a", "enabled": True},
@@ -127,7 +139,8 @@ def test_config_loader_get_team_servers():
 
 def test_config_loader_get_server_by_id():
     import importlib
-    cl = importlib.import_module('config_loader')
+
+    cl = importlib.import_module("config_loader")
     cl._config = {
         "servers": [
             {"id": 1, "team_id": 10, "name": "a", "enabled": True},
@@ -141,9 +154,11 @@ def test_config_loader_get_server_by_id():
 
 # ---- Upstream fetch_catalog tests ----
 
+
 def test_upstream_cancel_inflight_no_task():
     import importlib
-    upstream = importlib.import_module('upstream')
+
+    upstream = importlib.import_module("upstream")
     # No in-flight task → returns False
     assert upstream.cancel_inflight("sess1", 42) is False
 
@@ -151,12 +166,21 @@ def test_upstream_cancel_inflight_no_task():
 @pytest.mark.asyncio
 async def test_upstream_send_request_tracked_cleans_up():
     import importlib
-    upstream = importlib.import_module('upstream')
+
+    upstream = importlib.import_module("upstream")
     # Mock send_request to avoid real HTTP
     upstream.send_request = AsyncMock(return_value=(200, {"jsonrpc": "2.0", "result": {}}, {}))
-    server = {"id": 1, "url": "https://up.example.com/mcp", "auth_type": "none", "verify_tls": True, "timeout_ms": 30000}
+    server = {
+        "id": 1,
+        "url": "https://up.example.com/mcp",
+        "auth_type": "none",
+        "verify_tls": True,
+        "timeout_ms": 30000,
+    }
 
-    result = await upstream.send_request_tracked("sess1", 42, server, {"jsonrpc": "2.0", "id": 1, "method": "ping"}, None)
+    result = await upstream.send_request_tracked(
+        "sess1", 42, server, {"jsonrpc": "2.0", "id": 1, "method": "ping"}, None
+    )
     assert result[0] == 200
     # After completion, the inflight entry should be cleaned up
     assert ("sess1", 42) not in upstream._inflight
@@ -164,15 +188,19 @@ async def test_upstream_send_request_tracked_cleans_up():
 
 # ---- Protocol list handler tests (catalog-based) ----
 
+
 def test_tools_list_merges_catalogs():
     import importlib
-    protocol = importlib.import_module('protocol')
-    catalog = importlib.import_module('catalog')
+
+    protocol = importlib.import_module("protocol")
+    catalog = importlib.import_module("catalog")
     catalog.clear_all_catalogs()
 
     # Set up catalogs for two servers
     catalog.store_catalog(1, {"tools": [{"name": "get", "description": "Get weather"}], "resources": [], "prompts": []})
-    catalog.store_catalog(2, {"tools": [{"name": "search", "description": "Search issues"}], "resources": [], "prompts": []})
+    catalog.store_catalog(
+        2, {"tools": [{"name": "search", "description": "Search issues"}], "resources": [], "prompts": []}
+    )
 
     # Mock config_loader
     protocol.get_enabled_servers = lambda: [
@@ -200,15 +228,19 @@ def test_tools_list_merges_catalogs():
 
 def test_resources_list_wraps_uris():
     import importlib
-    protocol = importlib.import_module('protocol')
-    catalog = importlib.import_module('catalog')
+
+    protocol = importlib.import_module("protocol")
+    catalog = importlib.import_module("catalog")
     catalog.clear_all_catalogs()
 
-    catalog.store_catalog(1, {
-        "tools": [],
-        "resources": [{"uri": "issue://PROJ-123", "name": "issue"}],
-        "prompts": [],
-    })
+    catalog.store_catalog(
+        1,
+        {
+            "tools": [],
+            "resources": [{"uri": "issue://PROJ-123", "name": "issue"}],
+            "prompts": [],
+        },
+    )
 
     protocol.get_enabled_servers = lambda: [
         {"id": 1, "team_id": 10, "name": "jira", "namespace": "jira", "enabled": True},
@@ -228,11 +260,14 @@ def test_resources_list_wraps_uris():
 
 def test_prompts_list_merges_catalogs():
     import importlib
-    protocol = importlib.import_module('protocol')
-    catalog = importlib.import_module('catalog')
+
+    protocol = importlib.import_module("protocol")
+    catalog = importlib.import_module("catalog")
     catalog.clear_all_catalogs()
 
-    catalog.store_catalog(1, {"tools": [], "resources": [], "prompts": [{"name": "summarize", "description": "Summarize"}]})
+    catalog.store_catalog(
+        1, {"tools": [], "resources": [], "prompts": [{"name": "summarize", "description": "Summarize"}]}
+    )
     catalog.store_catalog(2, {"tools": [], "resources": [], "prompts": [{"name": "triage", "description": "Triage"}]})
 
     protocol.get_enabled_servers = lambda: [
@@ -254,8 +289,9 @@ def test_prompts_list_merges_catalogs():
 
 def test_tools_list_partial_failure_with_warnings():
     import importlib
-    protocol = importlib.import_module('protocol')
-    catalog = importlib.import_module('catalog')
+
+    protocol = importlib.import_module("protocol")
+    catalog = importlib.import_module("catalog")
     catalog.clear_all_catalogs()
 
     # Only one server has a catalog
@@ -283,8 +319,9 @@ def test_tools_list_partial_failure_with_warnings():
 
 def test_tools_list_empty_when_no_servers():
     import importlib
-    protocol = importlib.import_module('protocol')
-    catalog = importlib.import_module('catalog')
+
+    protocol = importlib.import_module("protocol")
+    catalog = importlib.import_module("catalog")
     catalog.clear_all_catalogs()
 
     protocol.get_enabled_servers = lambda: []
@@ -299,15 +336,19 @@ def test_tools_list_empty_when_no_servers():
 
 def test_resources_templates_list():
     import importlib
-    protocol = importlib.import_module('protocol')
-    catalog = importlib.import_module('catalog')
+
+    protocol = importlib.import_module("protocol")
+    catalog = importlib.import_module("catalog")
     catalog.clear_all_catalogs()
 
-    catalog.store_catalog(1, {
-        "tools": [],
-        "resources": [{"uri": "issue://PROJ", "uriTemplate": "issue://{project}/{id}"}],
-        "prompts": [],
-    })
+    catalog.store_catalog(
+        1,
+        {
+            "tools": [],
+            "resources": [{"uri": "issue://PROJ", "uriTemplate": "issue://{project}/{id}"}],
+            "prompts": [],
+        },
+    )
 
     protocol.get_enabled_servers = lambda: [
         {"id": 1, "team_id": 10, "name": "jira", "namespace": "jira", "enabled": True},
@@ -325,10 +366,12 @@ def test_resources_templates_list():
 
 # ---- Route call tests ----
 
+
 @pytest.mark.asyncio
 async def test_route_call_unknown_namespace():
     import importlib
-    protocol = importlib.import_module('protocol')
+
+    protocol = importlib.import_module("protocol")
     protocol.get_enabled_servers = lambda: []
     protocol.get_server_by_namespace = lambda ns: None
 
@@ -344,7 +387,8 @@ async def test_route_call_unknown_namespace():
 @pytest.mark.asyncio
 async def test_route_call_missing_prefix():
     import importlib
-    protocol = importlib.import_module('protocol')
+
+    protocol = importlib.import_module("protocol")
 
     auth_ctx = MagicMock()
     auth_ctx.team_id = 10
@@ -358,9 +402,19 @@ async def test_route_call_missing_prefix():
 @pytest.mark.asyncio
 async def test_route_call_resource_unwrap():
     import importlib
-    protocol = importlib.import_module('protocol')
 
-    server = {"id": 1, "team_id": 10, "name": "jira", "namespace": "jira", "url": "https://up/mcp", "auth_type": "none", "verify_tls": True, "timeout_ms": 30000}
+    protocol = importlib.import_module("protocol")
+
+    server = {
+        "id": 1,
+        "team_id": 10,
+        "name": "jira",
+        "namespace": "jira",
+        "url": "https://up/mcp",
+        "auth_type": "none",
+        "verify_tls": True,
+        "timeout_ms": 30000,
+    }
     protocol.get_enabled_servers = lambda: [server]
     protocol.get_server_by_namespace = lambda ns: server if ns == "jira" else None
     protocol.get_upstream_session = lambda sid, server_id: "upstream-sess"
@@ -383,7 +437,8 @@ async def test_route_call_resource_unwrap():
 @pytest.mark.asyncio
 async def test_route_call_team_isolation():
     import importlib
-    protocol = importlib.import_module('protocol')
+
+    protocol = importlib.import_module("protocol")
 
     server = {"id": 1, "team_id": 20, "name": "jira", "namespace": "jira", "url": "https://up/mcp"}
     protocol.get_enabled_servers = lambda: [server]
@@ -400,10 +455,12 @@ async def test_route_call_team_isolation():
 
 # ---- Notification handling tests ----
 
+
 @pytest.mark.asyncio
 async def test_notification_cancelled_calls_cancel_inflight():
     import importlib
-    protocol = importlib.import_module('protocol')
+
+    protocol = importlib.import_module("protocol")
     protocol.cancel_inflight = MagicMock(return_value=True)
     protocol.get_enabled_servers = lambda: []
     protocol.get_upstream_session = lambda sid, server_id: None
@@ -419,7 +476,8 @@ async def test_notification_cancelled_calls_cancel_inflight():
 @pytest.mark.asyncio
 async def test_notification_initialized_fans_out():
     import importlib
-    protocol = importlib.import_module('protocol')
+
+    protocol = importlib.import_module("protocol")
 
     servers = [
         {"id": 1, "team_id": 10, "name": "a", "namespace": "a", "url": "https://a/mcp"},
@@ -438,10 +496,12 @@ async def test_notification_initialized_fans_out():
 
 # ---- Unknown method test ----
 
+
 def test_unknown_method_returns_method_not_found():
     """Verify -32601 is returned for unknown methods (not forwarded to upstream)."""
     import importlib
-    protocol = importlib.import_module('protocol')
+
+    protocol = importlib.import_module("protocol")
     # The routing in handle_mcp_post should return -32601 for unknown methods
     # We can verify the error code constant exists
     assert protocol.JSONRPC_METHOD_NOT_FOUND == -32601
@@ -449,9 +509,11 @@ def test_unknown_method_returns_method_not_found():
 
 # ---- Catalog worker tests ----
 
+
 def test_catalog_worker_singleton():
     import importlib
-    catalog = importlib.import_module('catalog')
+
+    catalog = importlib.import_module("catalog")
     w1 = catalog.get_worker()
     w2 = catalog.get_worker()
     assert w1 is w2
@@ -459,7 +521,8 @@ def test_catalog_worker_singleton():
 
 def test_catalog_worker_creation_with_env():
     import importlib
-    catalog = importlib.import_module('catalog')
+
+    catalog = importlib.import_module("catalog")
     # Reset singleton
     catalog._worker = None
     old = os.environ.get("MCP_CATALOG_REFRESH_SECONDS", "")

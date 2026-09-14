@@ -8,7 +8,7 @@ validate Auth0 access tokens against them.
 import logging
 import re
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
 from sqlalchemy.orm import Session
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 # Cache for Auth0 Management API access token.
 # {domain: {"token": str, "expires_at": float}}
-_token_cache: Dict[str, Dict[str, Any]] = {}
+_token_cache: dict[str, dict[str, Any]] = {}
 
 
 def _get_setting_or_raise(name: str) -> str:
@@ -68,10 +68,10 @@ def _get_management_token(domain: str, client_id: str, client_secret: str) -> st
     return token
 
 
-def _paginated_get(domain: str, token: str, path: str, per_page: int = 100) -> List[Dict[str, Any]]:
+def _paginated_get(domain: str, token: str, path: str, per_page: int = 100) -> list[dict[str, Any]]:
     """Fetch all pages from an Auth0 Management API GET endpoint."""
     base = f"https://{domain}/api/v2"
-    results: List[Dict[str, Any]] = []
+    results: list[dict[str, Any]] = []
     page = 0
     with httpx.Client(timeout=30.0) as client:
         while True:
@@ -93,20 +93,14 @@ def _paginated_get(domain: str, token: str, path: str, per_page: int = 100) -> L
     return results
 
 
-def _build_user_name(user: Dict[str, Any]) -> str:
+def _build_user_name(user: dict[str, Any]) -> str:
     """Derive a display name for the McpIdentity from an Auth0 user profile."""
-    name = (
-        user.get("email")
-        or user.get("name")
-        or user.get("nickname")
-        or user.get("user_id")
-        or "auth0-user"
-    )
+    name = user.get("email") or user.get("name") or user.get("nickname") or user.get("user_id") or "auth0-user"
     # Auth0 user_ids contain characters like "|" and ":" that we do not want in a name.
     return re.sub(r"[^a-zA-Z0-9._@+-]", "-", name).strip("-")[:120]
 
 
-def _is_auth0_user_enabled(user: Dict[str, Any]) -> bool:
+def _is_auth0_user_enabled(user: dict[str, Any]) -> bool:
     """An identity should be disabled if the Auth0 user is blocked or,
     when require_verified_email is requested, the email is not verified."""
     if user.get("blocked"):
@@ -114,7 +108,7 @@ def _is_auth0_user_enabled(user: Dict[str, Any]) -> bool:
     return True
 
 
-def _build_user_info(user: Dict[str, Any]) -> Dict[str, Any]:
+def _build_user_info(user: dict[str, Any]) -> dict[str, Any]:
     """Store a sanitized, useful subset of the Auth0 profile."""
     return {
         "user_id": user.get("user_id"),
@@ -146,7 +140,7 @@ def sync_auth0_identities(
     team_id: int,
     dry_run: bool = False,
     require_verified_email: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Fetch Auth0 users and create/update McpIdentity rows under the given team.
 
     Returns a summary dict with created/updated/skipped counts and any errors.
@@ -157,12 +151,16 @@ def sync_auth0_identities(
     client_secret = settings.AUTH0_CLIENT_SECRET
     audience = settings.AUTH0_MCP_AUDIENCE
 
-    missing = [k for k, v in {
-        "AUTH0_DOMAIN": domain,
-        "AUTH0_CLIENT_ID": client_id,
-        "AUTH0_CLIENT_SECRET": client_secret,
-        "AUTH0_MCP_AUDIENCE": audience,
-    }.items() if not v]
+    missing = [
+        k
+        for k, v in {
+            "AUTH0_DOMAIN": domain,
+            "AUTH0_CLIENT_ID": client_id,
+            "AUTH0_CLIENT_SECRET": client_secret,
+            "AUTH0_MCP_AUDIENCE": audience,
+        }.items()
+        if not v
+    ]
     if missing:
         raise ValueError(f"Auth0 integration is not fully configured. Missing: {', '.join(missing)}")
 
@@ -175,7 +173,7 @@ def sync_auth0_identities(
     created = 0
     updated = 0
     skipped = 0
-    errors: List[str] = []
+    errors: list[str] = []
 
     for user in users:
         user_id = user.get("user_id")

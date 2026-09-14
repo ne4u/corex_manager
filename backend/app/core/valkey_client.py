@@ -10,8 +10,9 @@ Replaces the former memcache.py module. Valkey provides:
 import json
 import logging
 import time
+from collections.abc import Callable
 from functools import wraps
-from typing import Any, Callable, Optional
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -44,7 +45,6 @@ def _get_client():
 
     try:
         from valkey import Valkey
-        from valkey.exceptions import ValkeyError
     except ImportError:
         return None
 
@@ -52,6 +52,7 @@ def _get_client():
     if getattr(_settings, "VALKEY_SENTINEL_ENABLED", False):
         try:
             from valkey.sentinel import Sentinel
+
             sentinel_hosts_raw = getattr(_settings, "VALKEY_SENTINEL_HOSTS", "") or ""
             sentinel_hosts = []
             for chunk in sentinel_hosts_raw.split(","):
@@ -146,8 +147,10 @@ def is_available() -> bool:
 # Function-result caching
 # ---------------------------------------------------------------------------
 
+
 def cache(ttl: int = 10, key_prefix: str = "cache") -> Callable[..., Any]:
     """Decorator that caches a function result in Valkey for ``ttl`` seconds."""
+
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -171,6 +174,7 @@ def cache(ttl: int = 10, key_prefix: str = "cache") -> Callable[..., Any]:
             return result
 
         return wrapper
+
     return decorator
 
 
@@ -203,6 +207,7 @@ def cache_get(key: str) -> Any:
 # ---------------------------------------------------------------------------
 # Rate limiting (fixed-window counter)
 # ---------------------------------------------------------------------------
+
 
 def check_rate_limit(key: str, max_requests: int, window_seconds: int) -> bool:
     """Fixed-window rate limiter. Returns True if the request is allowed."""
@@ -244,6 +249,7 @@ def get_rate_limit_remaining(key: str, max_requests: int, window_seconds: int) -
 # Task queue (backed by Valkey lists — LPUSH/BRPOP)
 # ---------------------------------------------------------------------------
 
+
 def enqueue(queue_name: str, payload: Any) -> bool:
     client = _get_client()
     if not client:
@@ -257,7 +263,7 @@ def enqueue(queue_name: str, payload: Any) -> bool:
         return False
 
 
-def dequeue(queue_name: str, timeout: int = 1) -> Optional[Any]:
+def dequeue(queue_name: str, timeout: int = 1) -> Any | None:
     client = _get_client()
     if not client:
         return None
@@ -289,6 +295,7 @@ def queue_length(queue_name: str) -> int:
 # JWT token revocation
 # ---------------------------------------------------------------------------
 
+
 def revoke_token(token: str, ttl: int) -> bool:
     """Add a JWT token to the deny-list until it expires."""
     client = _get_client()
@@ -317,6 +324,7 @@ def is_token_revoked(token: str) -> bool:
 # Captcha validation cookie (_cv) — client-bound token
 # ---------------------------------------------------------------------------
 
+
 def set_cv_token(token: str, binding_hash: str, ttl: int) -> bool:
     """Store the client-binding hash for a solved captcha cookie token.
 
@@ -335,7 +343,7 @@ def set_cv_token(token: str, binding_hash: str, ttl: int) -> bool:
         return False
 
 
-def get_cv_token(token: str) -> Optional[str]:
+def get_cv_token(token: str) -> str | None:
     """Return the stored binding hash for a captcha cookie token (or None)."""
     client = _get_client()
     if not client:

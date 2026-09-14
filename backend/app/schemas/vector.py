@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -15,7 +15,7 @@ VALID_SINK_TYPES = (
 
 # Required option fields per sink type. Secret fields are listed separately so
 # the API can encrypt them at rest and mask them on read.
-REQUIRED_OPTIONS: Dict[str, List[str]] = {
+REQUIRED_OPTIONS: dict[str, list[str]] = {
     "aws_s3": ["bucket", "region"],
     "azure_logs_ingestion": ["endpoint", "dcr_immutable_id", "stream_name"],
     "datadog_logs": ["api_key"],
@@ -25,7 +25,7 @@ REQUIRED_OPTIONS: Dict[str, List[str]] = {
     "splunk_hec_logs": ["endpoint", "token"],
 }
 
-SECRET_OPTIONS: Dict[str, List[str]] = {
+SECRET_OPTIONS: dict[str, list[str]] = {
     "aws_s3": ["access_key_id", "secret_access_key", "session_token"],
     "azure_logs_ingestion": ["client_secret"],
     "datadog_logs": ["api_key"],
@@ -42,7 +42,7 @@ class VectorSinkBase(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     type: str
     source: str = "corex"
-    options: Dict[str, Any] = Field(default_factory=dict)
+    options: dict[str, Any] = Field(default_factory=dict)
     enabled: bool = True
 
     @field_validator("type")
@@ -95,9 +95,9 @@ class VectorSinkTestRequest(BaseModel):
     name: str = "test"
     type: str
     source: str = "corex"
-    options: Dict[str, Any] = Field(default_factory=dict)
+    options: dict[str, Any] = Field(default_factory=dict)
     enabled: bool = True
-    sink_id: Optional[int] = None
+    sink_id: int | None = None
     send_test_event: bool = False
 
     @field_validator("type")
@@ -130,16 +130,21 @@ class VectorPreviewResponse(BaseModel):
 
 
 class VectorPipelineResponse(BaseModel):
-    sources: Dict[str, bool]
-    sinks: List[VectorSinkResponse]
+    sources: dict[str, bool]
+    sinks: list[VectorSinkResponse]
     applied: bool
-    runtime: Dict[str, Any]
-    vector_status: Dict[str, Any] = Field(default_factory=dict)
+    runtime: dict[str, Any]
+    vector_status: dict[str, Any] = Field(default_factory=dict)
 
 
 __all__ = [
-    'VectorPipelineResponse', 'VectorPreviewResponse', 'VectorSinkBase',
-    'VectorSinkCreate', 'VectorSinkResponse', 'VectorSinkTestRequest',
-    'VectorSinkTestResponse', 'VectorSinkUpdate',
-    'VectorValidateResponse',
+    "VectorPipelineResponse",
+    "VectorPreviewResponse",
+    "VectorSinkBase",
+    "VectorSinkCreate",
+    "VectorSinkResponse",
+    "VectorSinkTestRequest",
+    "VectorSinkTestResponse",
+    "VectorSinkUpdate",
+    "VectorValidateResponse",
 ]

@@ -3,13 +3,14 @@
 Mirrors the WAF metrics sampler pattern: file offset tracking, periodic sampling,
 time-bucketed aggregation with breakdown support.
 """
+
 import json
 import logging
 import os
 import threading
 import time
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -31,7 +32,7 @@ def _offset_path() -> str:
 
 def _read_offset() -> int:
     try:
-        with open(_offset_path(), "r") as f:
+        with open(_offset_path()) as f:
             return int(f.read().strip() or "0")
     except Exception:
         return 0
@@ -45,7 +46,7 @@ def _write_offset(offset: int) -> None:
         pass
 
 
-def _parse_event_line(line: str) -> Optional[Dict[str, Any]]:
+def _parse_event_line(line: str) -> dict[str, Any] | None:
     """Parse a single NDJSON event line."""
     line = line.strip()
     if not line:
@@ -75,7 +76,7 @@ def sample_mcp_metrics() -> None:
         db = SessionLocal()
         new_records = 0
 
-        with open(path, "r", encoding="utf-8", errors="replace") as f:
+        with open(path, encoding="utf-8", errors="replace") as f:
             f.seek(last_offset)
             for line in f:
                 parsed = _parse_event_line(line)
@@ -86,7 +87,7 @@ def sample_mcp_metrics() -> None:
                 try:
                     captured_at = datetime.fromisoformat(ts_str).replace(tzinfo=None)
                 except Exception:
-                    captured_at = datetime.now(timezone.utc).replace(tzinfo=None)
+                    captured_at = datetime.now(UTC).replace(tzinfo=None)
 
                 event = McpEvent(
                     captured_at=captured_at,
@@ -129,7 +130,7 @@ def sample_mcp_metrics() -> None:
 
 def prune_mcp_metrics(db: Session) -> int:
     """Delete McpEvent rows older than retention period."""
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=settings.MCP_METRICS_RETENTION_DAYS)).replace(tzinfo=None)
+    cutoff = (datetime.now(UTC) - timedelta(days=settings.MCP_METRICS_RETENTION_DAYS)).replace(tzinfo=None)
     result = db.query(McpEvent).filter(McpEvent.captured_at < cutoff).delete()
     db.commit()
     return result
@@ -160,9 +161,10 @@ def start_mcp_sampler() -> None:
 # Aggregation / API
 # ---------------------------------------------------------------------------
 
+
 def _bucket(ts: datetime, step: int) -> datetime:
-    epoch = ts.replace(tzinfo=timezone.utc).timestamp()
-    return datetime.fromtimestamp((epoch // step) * step, tz=timezone.utc)
+    epoch = ts.replace(tzinfo=UTC).timestamp()
+    return datetime.fromtimestamp((epoch // step) * step, tz=UTC)
 
 
 def _auto_step(start: datetime, end: datetime) -> int:
@@ -198,12 +200,12 @@ _BREAKDOWN_FIELDS = {
 def get_mcp_metrics(
     db: Session,
     start: datetime,
-    end: Optional[datetime] = None,
-    step: Optional[int] = None,
+    end: datetime | None = None,
+    step: int | None = None,
     breakdown: str = "action",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Aggregate MCP events into time-bucketed series by breakdown field."""
-    end = (end or datetime.now(timezone.utc)).replace(tzinfo=None)
+    end = (end or datetime.now(UTC)).replace(tzinfo=None)
     start = start.replace(tzinfo=None) if start else (end - timedelta(minutes=5))
     step = step or _auto_step(start, end)
 
@@ -224,14 +226,14 @@ def get_mcp_metrics(
         return {"time": [], "series": [], "breakdown": breakdown, "totals": {}, "latency": []}
 
     # Build time buckets
-    buckets: Dict[datetime, List[McpEvent]] = {}
+    buckets: dict[datetime, list[McpEvent]] = {}
     for row in rows:
         ts = _bucket(row.captured_at, step)
         buckets.setdefault(ts, []).append(row)
 
     # Determine breakdown keys and totals
     series_keys: set = set()
-    totals: Dict[str, int] = {}
+    totals: dict[str, int] = {}
     for row in rows:
         val = str(getattr(row, breakdown_col) or "unknown")
         series_keys.add(val)
@@ -241,28 +243,24 @@ def get_mcp_metrics(
     # at step intervals. This ensures the chart always shows the full selected
     # range with regular intervals, even when traffic is sparse (e.g. a handful
     # of requests during a day should produce many buckets, not a single bar).
-    start_bucket = _bucket(start.replace(tzinfo=timezone.utc), step)
-    end_bucket = _bucket(end.replace(tzinfo=timezone.utc), step)
-    timestamps: List[datetime] = []
+    start_bucket = _bucket(start.replace(tzinfo=UTC), step)
+    end_bucket = _bucket(end.replace(tzinfo=UTC), step)
+    timestamps: list[datetime] = []
     cur = start_bucket
     while cur <= end_bucket:
         timestamps.append(cur)
-        cur = datetime.fromtimestamp(cur.timestamp() + step, tz=timezone.utc)
+        cur = datetime.fromtimestamp(cur.timestamp() + step, tz=UTC)
 
-    series: List[Dict[str, Any]] = []
+    series: list[dict[str, Any]] = []
     for key in sorted(series_keys):
         data = []
         for ts in timestamps:
-            count = sum(
-                1
-                for row in buckets.get(ts, [])
-                if str(getattr(row, breakdown_col) or "unknown") == key
-            )
+            count = sum(1 for row in buckets.get(ts, []) if str(getattr(row, breakdown_col) or "unknown") == key)
             data.append({"time": ts.isoformat(), "count": count})
         series.append({"key": key, "data": data})
 
     # Latency stats per bucket
-    latency_data: List[Dict[str, Any]] = []
+    latency_data: list[dict[str, Any]] = []
     for ts in timestamps:
         bucket_rows = buckets.get(ts, [])
         latencies = [r.latency_ms for r in bucket_rows if r.latency_ms is not None]
@@ -271,13 +269,15 @@ def get_mcp_metrics(
             p50 = latencies[len(latencies) // 2]
             p99 = latencies[min(int(len(latencies) * 0.99), len(latencies) - 1)]
             avg = sum(latencies) / len(latencies)
-            latency_data.append({
-                "time": ts.isoformat(),
-                "p50": p50,
-                "p99": p99,
-                "avg": int(avg),
-                "count": len(latencies),
-            })
+            latency_data.append(
+                {
+                    "time": ts.isoformat(),
+                    "p50": p50,
+                    "p99": p99,
+                    "avg": int(avg),
+                    "count": len(latencies),
+                }
+            )
         else:
             latency_data.append({"time": ts.isoformat(), "p50": 0, "p99": 0, "avg": 0, "count": 0})
 

@@ -7,13 +7,12 @@ Tests cover:
 - Metrics sampler — tail NDJSON, store McpEvent rows, prune old data
 - Metrics API — GET /mcp/metrics with breakdown
 """
+
 import json
 import os
 import sys
-import tempfile
-import time
-from datetime import datetime, timezone, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -25,10 +24,12 @@ if _GATEWAY_DIR not in sys.path:
 
 # ---- Rate limiter tests ----
 
+
 def test_rate_limit_allows_within_quota():
     """Requests within the RPM quota are allowed."""
     import importlib
-    rl = importlib.import_module('ratelimit')
+
+    rl = importlib.import_module("ratelimit")
     # Mock Valkey client with pipeline-based ZSET sliding window
     mock_client = MagicMock()
     # Each check_rate_limit call does two pipeline rounds:
@@ -36,11 +37,16 @@ def test_rate_limit_allows_within_quota():
     #   2nd pipeline: zadd + expire → execute returns [1, True]
     # Counts seen: 0, 1, 2 (all < 60, so all allowed)
     mock_pipe = MagicMock()
-    mock_pipe.execute = MagicMock(side_effect=[
-        [0, 0], [1, True],   # 1st call: count=0 → allowed
-        [0, 1], [1, True],   # 2nd call: count=1 → allowed
-        [0, 2], [1, True],   # 3rd call: count=2 → allowed
-    ])
+    mock_pipe.execute = MagicMock(
+        side_effect=[
+            [0, 0],
+            [1, True],  # 1st call: count=0 → allowed
+            [0, 1],
+            [1, True],  # 2nd call: count=1 → allowed
+            [0, 2],
+            [1, True],  # 3rd call: count=2 → allowed
+        ]
+    )
     mock_client.pipeline = MagicMock(return_value=mock_pipe)
     rl._client = mock_client
     rl._get_client = lambda: mock_client
@@ -54,19 +60,27 @@ def test_rate_limit_allows_within_quota():
 def test_rate_limit_denies_when_exceeded():
     """Requests beyond the quota are denied."""
     import importlib
-    rl = importlib.import_module('ratelimit')
+
+    rl = importlib.import_module("ratelimit")
     mock_client = MagicMock()
     # Sliding window: counts 0,1,2,3,4 are < 5 (allowed), count 5 >= 5 (denied)
     # Allowed calls do 2 pipeline rounds; denied call does only 1 (returns early)
     mock_pipe = MagicMock()
-    mock_pipe.execute = MagicMock(side_effect=[
-        [0, 0], [1, True],   # 1st: count=0 → allowed
-        [0, 1], [1, True],   # 2nd: count=1 → allowed
-        [0, 2], [1, True],   # 3rd: count=2 → allowed
-        [0, 3], [1, True],   # 4th: count=3 → allowed
-        [0, 4], [1, True],   # 5th: count=4 → allowed
-        [0, 5],              # 6th: count=5 >= 5 → denied (no 2nd pipeline)
-    ])
+    mock_pipe.execute = MagicMock(
+        side_effect=[
+            [0, 0],
+            [1, True],  # 1st: count=0 → allowed
+            [0, 1],
+            [1, True],  # 2nd: count=1 → allowed
+            [0, 2],
+            [1, True],  # 3rd: count=2 → allowed
+            [0, 3],
+            [1, True],  # 4th: count=3 → allowed
+            [0, 4],
+            [1, True],  # 5th: count=4 → allowed
+            [0, 5],  # 6th: count=5 >= 5 → denied (no 2nd pipeline)
+        ]
+    )
     mock_client.pipeline = MagicMock(return_value=mock_pipe)
     rl._client = mock_client
     rl._get_client = lambda: mock_client
@@ -83,7 +97,8 @@ def test_rate_limit_denies_when_exceeded():
 def test_rate_limit_no_valkey_allows():
     """When Valkey is unavailable, requests are allowed (fail open)."""
     import importlib
-    rl = importlib.import_module('ratelimit')
+
+    rl = importlib.import_module("ratelimit")
     rl._client = None
     rl._get_client = lambda: None
 
@@ -95,7 +110,8 @@ def test_rate_limit_no_valkey_allows():
 def test_rate_limit_zero_rpm_allows():
     """max_rpm=0 means no limit (disabled)."""
     import importlib
-    rl = importlib.import_module('ratelimit')
+
+    rl = importlib.import_module("ratelimit")
     rl._client = None
     rl._get_client = lambda: None
 
@@ -106,16 +122,19 @@ def test_rate_limit_zero_rpm_allows():
 def test_rate_limit_error_code():
     """MCP_RATE_LIMITED is -32029."""
     import importlib
-    rl = importlib.import_module('ratelimit')
+
+    rl = importlib.import_module("ratelimit")
     assert rl.MCP_RATE_LIMITED == -32029
 
 
 # ---- Event logger tests ----
 
+
 def test_event_log_writes_ndjson(tmp_path):
     """log_event writes a valid NDJSON line with expected fields."""
     import importlib
-    events = importlib.import_module('events')
+
+    events = importlib.import_module("events")
     log_file = str(tmp_path / "events.ndjson")
     events._log_path = log_file
     events._log_payloads = False
@@ -147,7 +166,8 @@ def test_event_log_writes_ndjson(tmp_path):
 def test_event_log_payload_logging(tmp_path):
     """When MCP_LOG_PAYLOADS is true, params/result are included."""
     import importlib
-    events = importlib.import_module('events')
+
+    events = importlib.import_module("events")
     log_file = str(tmp_path / "events.ndjson")
     events._log_path = log_file
     events._log_payloads = True
@@ -174,7 +194,8 @@ def test_event_log_payload_logging(tmp_path):
 def test_event_log_generate_request_id():
     """generate_request_id returns a non-empty string."""
     import importlib
-    events = importlib.import_module('events')
+
+    events = importlib.import_module("events")
     rid = events.generate_request_id()
     assert isinstance(rid, str)
     assert len(rid) > 0
@@ -183,7 +204,8 @@ def test_event_log_generate_request_id():
 def test_event_log_rate_limited_action(tmp_path):
     """log_event can log a rate_limited action."""
     import importlib
-    events = importlib.import_module('events')
+
+    events = importlib.import_module("events")
     log_file = str(tmp_path / "events.ndjson")
     events._log_path = log_file
     events._log_payloads = False
@@ -209,21 +231,31 @@ def test_event_log_rate_limited_action(tmp_path):
 
 # ---- Protocol integration tests ----
 
+
 @pytest.mark.asyncio
 async def test_protocol_route_call_rate_limited():
     """When rate limit is exceeded, protocol returns -32029."""
     import importlib
-    protocol = importlib.import_module('protocol')
-    policy = importlib.import_module('policy')
-    ratelimit = importlib.import_module('ratelimit')
+
+    protocol = importlib.import_module("protocol")
+    policy = importlib.import_module("policy")
+    ratelimit = importlib.import_module("ratelimit")
 
     # Allow-all policy
-    policy.load_policies({
-        "policies": [
-            {"name": "allow-all", "enabled": True, "priority": 0,
-             "expression": "true", "expression_ast": None, "action": "allow"},
-        ]
-    })
+    policy.load_policies(
+        {
+            "policies": [
+                {
+                    "name": "allow-all",
+                    "enabled": True,
+                    "priority": 0,
+                    "expression": "true",
+                    "expression_ast": None,
+                    "action": "allow",
+                },
+            ]
+        }
+    )
 
     server = {"id": 1, "team_id": 10, "name": "jira", "namespace": "jira", "url": "https://up/mcp"}
     protocol.get_enabled_servers = lambda: [server]
@@ -231,8 +263,14 @@ async def test_protocol_route_call_rate_limited():
     protocol.get_upstream_session = lambda sid, server_id: "upstream-sess"
     protocol.send_request_tracked = AsyncMock(return_value=(200, {"jsonrpc": "2.0", "result": {}}, {}))
     _test_policies = [
-        {"name": "allow-all", "enabled": True, "priority": 0,
-         "expression": "true", "expression_ast": None, "action": "allow"},
+        {
+            "name": "allow-all",
+            "enabled": True,
+            "priority": 0,
+            "expression": "true",
+            "expression_ast": None,
+            "action": "allow",
+        },
     ]
     protocol.get_config = lambda: {"policies": _test_policies, "default_rpm": 60}
 
@@ -240,6 +278,7 @@ async def test_protocol_route_call_rate_limited():
     protocol.check_rate_limit = lambda identity_id, tool, max_rpm: (False, 0)
 
     from types import SimpleNamespace
+
     auth_ctx = SimpleNamespace(name="alice", kind="pat", team_id=10, identity_id=1, claims={})
 
     response = await protocol._route_call("sess1", auth_ctx, "tools/call", {"name": "jira__search"}, 1, {}, "tool")
@@ -252,17 +291,26 @@ async def test_protocol_route_call_rate_limited():
 async def test_protocol_route_call_skip_ratelimit():
     """Policy with skip_ratelimit action bypasses rate limiting."""
     import importlib
-    protocol = importlib.import_module('protocol')
-    policy = importlib.import_module('policy')
-    ratelimit = importlib.import_module('ratelimit')
+
+    protocol = importlib.import_module("protocol")
+    policy = importlib.import_module("policy")
+    ratelimit = importlib.import_module("ratelimit")
 
     # skip_ratelimit policy
-    policy.load_policies({
-        "policies": [
-            {"name": "skip-rl", "enabled": True, "priority": 0,
-             "expression": "true", "expression_ast": None, "action": "skip_ratelimit"},
-        ]
-    })
+    policy.load_policies(
+        {
+            "policies": [
+                {
+                    "name": "skip-rl",
+                    "enabled": True,
+                    "priority": 0,
+                    "expression": "true",
+                    "expression_ast": None,
+                    "action": "skip_ratelimit",
+                },
+            ]
+        }
+    )
 
     server = {"id": 1, "team_id": 10, "name": "jira", "namespace": "jira", "url": "https://up/mcp"}
     protocol.get_enabled_servers = lambda: [server]
@@ -270,8 +318,14 @@ async def test_protocol_route_call_skip_ratelimit():
     protocol.get_upstream_session = lambda sid, server_id: "upstream-sess"
     protocol.send_request_tracked = AsyncMock(return_value=(200, {"jsonrpc": "2.0", "result": {}}, {}))
     _test_policies = [
-        {"name": "skip-rl", "enabled": True, "priority": 0,
-         "expression": "true", "expression_ast": None, "action": "skip_ratelimit"},
+        {
+            "name": "skip-rl",
+            "enabled": True,
+            "priority": 0,
+            "expression": "true",
+            "expression_ast": None,
+            "action": "skip_ratelimit",
+        },
     ]
     protocol.get_config = lambda: {"policies": _test_policies, "default_rpm": 60}
 
@@ -279,6 +333,7 @@ async def test_protocol_route_call_skip_ratelimit():
     protocol.check_rate_limit = lambda identity_id, tool, max_rpm: (False, 0)
 
     from types import SimpleNamespace
+
     auth_ctx = SimpleNamespace(name="alice", kind="pat", team_id=10, identity_id=1, claims={})
 
     response = await protocol._route_call("sess1", auth_ctx, "tools/call", {"name": "jira__search"}, 1, {}, "tool")
@@ -291,20 +346,29 @@ async def test_protocol_route_call_skip_ratelimit():
 async def test_protocol_event_logged_on_allow(tmp_path):
     """Event is logged when a call is allowed."""
     import importlib
-    protocol = importlib.import_module('protocol')
-    policy = importlib.import_module('policy')
-    events = importlib.import_module('events')
+
+    protocol = importlib.import_module("protocol")
+    policy = importlib.import_module("policy")
+    events = importlib.import_module("events")
 
     log_file = str(tmp_path / "events.ndjson")
     events._log_path = log_file
     events._log_payloads = False
 
-    policy.load_policies({
-        "policies": [
-            {"name": "allow-all", "enabled": True, "priority": 0,
-             "expression": "true", "expression_ast": None, "action": "allow"},
-        ]
-    })
+    policy.load_policies(
+        {
+            "policies": [
+                {
+                    "name": "allow-all",
+                    "enabled": True,
+                    "priority": 0,
+                    "expression": "true",
+                    "expression_ast": None,
+                    "action": "allow",
+                },
+            ]
+        }
+    )
 
     server = {"id": 1, "team_id": 10, "name": "jira", "namespace": "jira", "url": "https://up/mcp"}
     protocol.get_enabled_servers = lambda: [server]
@@ -312,8 +376,14 @@ async def test_protocol_event_logged_on_allow(tmp_path):
     protocol.get_upstream_session = lambda sid, server_id: "upstream-sess"
     protocol.send_request_tracked = AsyncMock(return_value=(200, {"jsonrpc": "2.0", "result": {}}, {}))
     _test_policies = [
-        {"name": "allow-all", "enabled": True, "priority": 0,
-         "expression": "true", "expression_ast": None, "action": "allow"},
+        {
+            "name": "allow-all",
+            "enabled": True,
+            "priority": 0,
+            "expression": "true",
+            "expression_ast": None,
+            "action": "allow",
+        },
     ]
     protocol.get_config = lambda: {"policies": _test_policies, "default_rpm": 60}
 
@@ -321,6 +391,7 @@ async def test_protocol_event_logged_on_allow(tmp_path):
     protocol.check_rate_limit = lambda identity_id, tool, max_rpm: (True, max_rpm)
 
     from types import SimpleNamespace
+
     auth_ctx = SimpleNamespace(name="alice", kind="pat", team_id=10, identity_id=1, claims={})
 
     await protocol._route_call("sess1", auth_ctx, "tools/call", {"name": "jira__search"}, 1, {}, "tool")
@@ -336,11 +407,12 @@ async def test_protocol_event_logged_on_allow(tmp_path):
 
 # ---- Metrics sampler tests ----
 
+
 def test_mcp_metrics_sampler_stores_events(tmp_path, db):
     """sample_mcp_metrics reads NDJSON and stores McpEvent rows."""
-    from app.services import mcp_metrics
     from app.core.config import get_settings
     from app.models.mcp import McpEvent
+    from app.services import mcp_metrics
 
     settings = get_settings()
     log_file = tmp_path / "events.ndjson"
@@ -348,12 +420,31 @@ def test_mcp_metrics_sampler_stores_events(tmp_path, db):
 
     # Write some events
     events = [
-        {"ts": datetime.now(timezone.utc).isoformat(), "request_id": "r1", "session_id": "s1",
-         "identity_id": 1, "team_id": 10, "server_id": 5, "method": "tools/call",
-         "tool": "jira__search", "action": "allow", "status": "ok", "latency_ms": 42},
-        {"ts": datetime.now(timezone.utc).isoformat(), "request_id": "r2", "session_id": "s1",
-         "identity_id": 1, "team_id": 10, "server_id": 5, "method": "tools/call",
-         "tool": "jira__delete", "action": "deny", "status": "policy_denied"},
+        {
+            "ts": datetime.now(UTC).isoformat(),
+            "request_id": "r1",
+            "session_id": "s1",
+            "identity_id": 1,
+            "team_id": 10,
+            "server_id": 5,
+            "method": "tools/call",
+            "tool": "jira__search",
+            "action": "allow",
+            "status": "ok",
+            "latency_ms": 42,
+        },
+        {
+            "ts": datetime.now(UTC).isoformat(),
+            "request_id": "r2",
+            "session_id": "s1",
+            "identity_id": 1,
+            "team_id": 10,
+            "server_id": 5,
+            "method": "tools/call",
+            "tool": "jira__delete",
+            "action": "deny",
+            "status": "policy_denied",
+        },
     ]
     with open(log_file, "w") as f:
         for e in events:
@@ -388,9 +479,9 @@ def test_mcp_metrics_sampler_ingests_rust_events(tmp_path, db):
     prompts/get methods — not just tools/call.  They also include
     identity_name, team_name, server_name resolved from the config bundle.
     """
-    from app.services import mcp_metrics
     from app.core.config import get_settings
     from app.models.mcp import McpEvent
+    from app.services import mcp_metrics
 
     settings = get_settings()
     log_file = tmp_path / "events.ndjson"
@@ -399,31 +490,75 @@ def test_mcp_metrics_sampler_ingests_rust_events(tmp_path, db):
     # Write Rust-format events: RFC3339 with 'Z' suffix, various methods,
     # with name fields resolved from the config bundle.
     events = [
-        {"ts": "2026-09-09T17:28:26.437304Z", "request_id": "rust1", "session_id": "sess1",
-         "identity_id": 1, "identity_name": "ci-bot",
-         "team_id": 10, "team_name": "Engineering",
-         "server_id": 3, "server_name": "jira",
-         "method": "tools/call",
-         "tool": "jira__search", "resource_uri": None, "prompt": None,
-         "action": "allow", "status": "ok", "latency_ms": 15, "error": None,
-         "bytes_in": None, "bytes_out": None, "dlp_hits": None, "guardrail_hits": None},
-        {"ts": "2026-09-09T17:28:27.123456Z", "request_id": "rust2", "session_id": "sess1",
-         "identity_id": 1, "identity_name": "ci-bot",
-         "team_id": 10, "team_name": "Engineering",
-         "server_id": 3, "server_name": "jira",
-         "method": "resources/read",
-         "tool": None, "resource_uri": "file__example", "prompt": None,
-         "action": "allow", "status": "ok", "latency_ms": 8, "error": None,
-         "bytes_in": None, "bytes_out": None, "dlp_hits": None, "guardrail_hits": None},
-        {"ts": "2026-09-09T17:28:28.000000Z", "request_id": "rust3", "session_id": "sess1",
-         "identity_id": 1, "identity_name": "ci-bot",
-         "team_id": 10, "team_name": "Engineering",
-         "server_id": 3, "server_name": "jira",
-         "method": "prompts/get",
-         "tool": None, "resource_uri": None, "prompt": "skill__summarize",
-         "action": "deny", "status": "policy_denied", "latency_ms": None,
-         "error": "Policy denied: restricted", "bytes_in": None, "bytes_out": None,
-         "dlp_hits": None, "guardrail_hits": None},
+        {
+            "ts": "2026-09-09T17:28:26.437304Z",
+            "request_id": "rust1",
+            "session_id": "sess1",
+            "identity_id": 1,
+            "identity_name": "ci-bot",
+            "team_id": 10,
+            "team_name": "Engineering",
+            "server_id": 3,
+            "server_name": "jira",
+            "method": "tools/call",
+            "tool": "jira__search",
+            "resource_uri": None,
+            "prompt": None,
+            "action": "allow",
+            "status": "ok",
+            "latency_ms": 15,
+            "error": None,
+            "bytes_in": None,
+            "bytes_out": None,
+            "dlp_hits": None,
+            "guardrail_hits": None,
+        },
+        {
+            "ts": "2026-09-09T17:28:27.123456Z",
+            "request_id": "rust2",
+            "session_id": "sess1",
+            "identity_id": 1,
+            "identity_name": "ci-bot",
+            "team_id": 10,
+            "team_name": "Engineering",
+            "server_id": 3,
+            "server_name": "jira",
+            "method": "resources/read",
+            "tool": None,
+            "resource_uri": "file__example",
+            "prompt": None,
+            "action": "allow",
+            "status": "ok",
+            "latency_ms": 8,
+            "error": None,
+            "bytes_in": None,
+            "bytes_out": None,
+            "dlp_hits": None,
+            "guardrail_hits": None,
+        },
+        {
+            "ts": "2026-09-09T17:28:28.000000Z",
+            "request_id": "rust3",
+            "session_id": "sess1",
+            "identity_id": 1,
+            "identity_name": "ci-bot",
+            "team_id": 10,
+            "team_name": "Engineering",
+            "server_id": 3,
+            "server_name": "jira",
+            "method": "prompts/get",
+            "tool": None,
+            "resource_uri": None,
+            "prompt": "skill__summarize",
+            "action": "deny",
+            "status": "policy_denied",
+            "latency_ms": None,
+            "error": "Policy denied: restricted",
+            "bytes_in": None,
+            "bytes_out": None,
+            "dlp_hits": None,
+            "guardrail_hits": None,
+        },
     ]
     with open(log_file, "w") as f:
         for e in events:
@@ -471,19 +606,28 @@ def test_mcp_metrics_sampler_ingests_rust_events(tmp_path, db):
 
 def test_mcp_metrics_sampler_handles_rotation(tmp_path, db):
     """When the event file shrinks (rotation), the sampler resets offset to 0."""
-    from app.services import mcp_metrics
     from app.core.config import get_settings
     from app.models.mcp import McpEvent
+    from app.services import mcp_metrics
 
     settings = get_settings()
     log_file = tmp_path / "events.ndjson"
     offset_file = tmp_path / ".mcp_metrics_offset"
 
     # First batch: write a large event and sample it
-    old_event = {"ts": datetime.now(timezone.utc).isoformat(), "request_id": "old1",
-                 "session_id": "s1", "identity_id": 1, "team_id": 10, "server_id": 1,
-                 "method": "tools/call", "tool": "old__tool", "action": "allow",
-                 "status": "ok", "latency_ms": 1}
+    old_event = {
+        "ts": datetime.now(UTC).isoformat(),
+        "request_id": "old1",
+        "session_id": "s1",
+        "identity_id": 1,
+        "team_id": 10,
+        "server_id": 1,
+        "method": "tools/call",
+        "tool": "old__tool",
+        "action": "allow",
+        "status": "ok",
+        "latency_ms": 1,
+    }
     with open(log_file, "w") as f:
         f.write(json.dumps(old_event) + "\n")
         f.write(json.dumps(old_event).replace("old1", "old2") + "\n")
@@ -498,10 +642,19 @@ def test_mcp_metrics_sampler_handles_rotation(tmp_path, db):
         assert db.query(McpEvent).count() == 2
 
         # Simulate rotation: file is replaced with a smaller new file
-        new_event = {"ts": datetime.now(timezone.utc).isoformat(), "request_id": "new1",
-                     "session_id": "s2", "identity_id": 1, "team_id": 10, "server_id": 1,
-                     "method": "tools/call", "tool": "new__tool", "action": "allow",
-                     "status": "ok", "latency_ms": 2}
+        new_event = {
+            "ts": datetime.now(UTC).isoformat(),
+            "request_id": "new1",
+            "session_id": "s2",
+            "identity_id": 1,
+            "team_id": 10,
+            "server_id": 1,
+            "method": "tools/call",
+            "tool": "new__tool",
+            "action": "allow",
+            "status": "ok",
+            "latency_ms": 2,
+        }
         with open(log_file, "w") as f:
             f.write(json.dumps(new_event) + "\n")
 
@@ -517,15 +670,21 @@ def test_mcp_metrics_sampler_handles_rotation(tmp_path, db):
 
 def test_mcp_metrics_sampler_prune_old(db):
     """prune_mcp_metrics deletes rows older than retention."""
-    from app.services import mcp_metrics
     from app.models.mcp import McpEvent
+    from app.services import mcp_metrics
 
-    old_date = datetime.now(timezone.utc) - timedelta(days=30)
+    old_date = datetime.now(UTC) - timedelta(days=30)
     old_event = McpEvent(
         captured_at=old_date.replace(tzinfo=None),
-        request_id="old", session_id="s1", identity_id=1, team_id=10,
-        server_id=5, jsonrpc_method="tools/call", tool="old__tool",
-        action="allow", status="ok",
+        request_id="old",
+        session_id="s1",
+        identity_id=1,
+        team_id=10,
+        server_id=5,
+        jsonrpc_method="tools/call",
+        tool="old__tool",
+        action="allow",
+        status="ok",
     )
     db.add(old_event)
     db.commit()
@@ -538,28 +697,49 @@ def test_mcp_metrics_sampler_prune_old(db):
 
 def test_mcp_metrics_aggregation(db):
     """get_mcp_metrics returns time-bucketed series with breakdown."""
-    from app.services import mcp_metrics
     from app.models.mcp import McpEvent
+    from app.services import mcp_metrics
 
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(UTC).replace(tzinfo=None)
     for i in range(5):
-        db.add(McpEvent(
-            captured_at=now - timedelta(minutes=i),
-            request_id=f"r{i}", session_id="s1", identity_id=1, team_id=10,
-            server_id=5, jsonrpc_method="tools/call", tool="jira__search",
-            action="allow", status="ok", latency_ms=10 + i * 5,
-        ))
+        db.add(
+            McpEvent(
+                captured_at=now - timedelta(minutes=i),
+                request_id=f"r{i}",
+                session_id="s1",
+                identity_id=1,
+                team_id=10,
+                server_id=5,
+                jsonrpc_method="tools/call",
+                tool="jira__search",
+                action="allow",
+                status="ok",
+                latency_ms=10 + i * 5,
+            )
+        )
     for i in range(3):
-        db.add(McpEvent(
-            captured_at=now - timedelta(minutes=i),
-            request_id=f"d{i}", session_id="s1", identity_id=1, team_id=10,
-            server_id=5, jsonrpc_method="tools/call", tool="jira__delete",
-            action="deny", status="policy_denied",
-        ))
+        db.add(
+            McpEvent(
+                captured_at=now - timedelta(minutes=i),
+                request_id=f"d{i}",
+                session_id="s1",
+                identity_id=1,
+                team_id=10,
+                server_id=5,
+                jsonrpc_method="tools/call",
+                tool="jira__delete",
+                action="deny",
+                status="policy_denied",
+            )
+        )
     db.commit()
 
     result = mcp_metrics.get_mcp_metrics(
-        db, start=now - timedelta(hours=1), end=now, step=300, breakdown="action",
+        db,
+        start=now - timedelta(hours=1),
+        end=now,
+        step=300,
+        breakdown="action",
     )
     assert "allow" in result["totals"]
     assert "deny" in result["totals"]
@@ -582,28 +762,50 @@ def test_mcp_metrics_aggregation(db):
 def test_mcp_metrics_continuous_time_axis_sparse_events(db):
     """get_mcp_metrics fills empty buckets so sparse traffic produces a
     continuous time axis, not a single bar."""
-    from app.services import mcp_metrics
     from app.models.mcp import McpEvent
+    from app.services import mcp_metrics
 
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(UTC).replace(tzinfo=None)
     # Only 2 events, both in the same 5-minute bucket near "now"
-    db.add(McpEvent(
-        captured_at=now - timedelta(seconds=10),
-        request_id="r1", session_id="s1", identity_id=1, team_id=10,
-        server_id=5, jsonrpc_method="tools/call", tool="jira__search",
-        action="allow", status="ok", latency_ms=20,
-    ))
-    db.add(McpEvent(
-        captured_at=now - timedelta(seconds=5),
-        request_id="r2", session_id="s1", identity_id=1, team_id=10,
-        server_id=5, jsonrpc_method="tools/call", tool="jira__search",
-        action="allow", status="ok", latency_ms=30,
-    ))
+    db.add(
+        McpEvent(
+            captured_at=now - timedelta(seconds=10),
+            request_id="r1",
+            session_id="s1",
+            identity_id=1,
+            team_id=10,
+            server_id=5,
+            jsonrpc_method="tools/call",
+            tool="jira__search",
+            action="allow",
+            status="ok",
+            latency_ms=20,
+        )
+    )
+    db.add(
+        McpEvent(
+            captured_at=now - timedelta(seconds=5),
+            request_id="r2",
+            session_id="s1",
+            identity_id=1,
+            team_id=10,
+            server_id=5,
+            jsonrpc_method="tools/call",
+            tool="jira__search",
+            action="allow",
+            status="ok",
+            latency_ms=30,
+        )
+    )
     db.commit()
 
     # 1-hour range with 300s (5 min) step => 13 buckets (inclusive)
     result = mcp_metrics.get_mcp_metrics(
-        db, start=now - timedelta(hours=1), end=now, step=300, breakdown="action",
+        db,
+        start=now - timedelta(hours=1),
+        end=now,
+        step=300,
+        breakdown="action",
     )
     assert len(result["time"]) == 13
     # Only the last bucket should have non-zero counts
@@ -624,9 +826,13 @@ def test_mcp_metrics_aggregation_empty(db):
     """get_mcp_metrics returns empty arrays (not dicts) when there are no events."""
     from app.services import mcp_metrics
 
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(UTC).replace(tzinfo=None)
     result = mcp_metrics.get_mcp_metrics(
-        db, start=now - timedelta(hours=1), end=now, step=300, breakdown="action",
+        db,
+        start=now - timedelta(hours=1),
+        end=now,
+        step=300,
+        breakdown="action",
     )
     assert result["time"] == []
     assert result["series"] == []
@@ -636,17 +842,27 @@ def test_mcp_metrics_aggregation_empty(db):
 
 # ---- Metrics API test ----
 
+
 def test_mcp_metrics_api(client, db):
     """GET /mcp/metrics returns aggregated metrics."""
     from app.models.mcp import McpEvent
 
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
-    db.add(McpEvent(
-        captured_at=now, request_id="r1", session_id="s1",
-        identity_id=1, team_id=10, server_id=5,
-        jsonrpc_method="tools/call", tool="jira__search",
-        action="allow", status="ok", latency_ms=15,
-    ))
+    now = datetime.now(UTC).replace(tzinfo=None)
+    db.add(
+        McpEvent(
+            captured_at=now,
+            request_id="r1",
+            session_id="s1",
+            identity_id=1,
+            team_id=10,
+            server_id=5,
+            jsonrpc_method="tools/call",
+            tool="jira__search",
+            action="allow",
+            status="ok",
+            latency_ms=15,
+        )
+    )
     db.commit()
 
     resp = client.get("/api/v1/mcp/metrics?breakdown=action")
@@ -660,10 +876,12 @@ def test_mcp_metrics_api(client, db):
 
 # ---- Payload logging off by default ----
 
+
 def test_payload_logging_off_by_default():
     """MCP_LOG_PAYLOADS defaults to false."""
     import importlib
-    events = importlib.import_module('events')
+
+    events = importlib.import_module("events")
     events._log_path = None
     events._log_payloads = False
     # Re-init from env

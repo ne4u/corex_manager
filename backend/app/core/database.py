@@ -1,6 +1,8 @@
 import os
+
 from sqlalchemy import create_engine, event, inspect
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import declarative_base, sessionmaker
+
 from .config import get_settings
 
 settings = get_settings()
@@ -31,6 +33,7 @@ else:
 # WAL mode allows concurrent readers alongside a single writer, preventing
 # API requests from blocking when background samplers write to the DB.
 if _is_sqlite:
+
     @event.listens_for(engine, "connect")
     def _set_sqlite_pragmas(dbapi_conn, _conn_record):
         cursor = dbapi_conn.cursor()
@@ -38,6 +41,7 @@ if _is_sqlite:
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.execute("PRAGMA wal_autocheckpoint=1000")
         cursor.close()
+
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -55,8 +59,9 @@ def _ensure_admin_user():
     """Create an admin user on first startup using ADMIN_PASSWORD env var or a generated value."""
     import os
     import secrets
-    from .security import get_password_hash
+
     from ..models.models import User
+    from .security import get_password_hash
 
     admin_password = os.environ.get("ADMIN_PASSWORD")
     generated = False
@@ -84,11 +89,13 @@ def _ensure_admin_user():
 def init_db():
     """Run Alembic migrations to bring the database to the latest revision."""
     import logging
+
     _log = logging.getLogger(__name__)
 
-    from ..models import models as _  # noqa: F401 — register all models on Base.metadata
     from alembic import command
     from alembic.config import Config
+
+    from ..models import models as _  # noqa: F401 — register all models on Base.metadata
 
     db_dir = os.path.dirname(os.path.abspath(__file__))
     alembic_ini_path = os.path.join(db_dir, "..", "db", "alembic.ini")
@@ -108,6 +115,7 @@ def init_db():
         tables = set(inspector.get_table_names())
         if "alembic_version" in tables:
             from sqlalchemy import text
+
             row = conn.execute(text("SELECT version_num FROM alembic_version")).fetchone()
             if row:
                 current_version = row[0]
@@ -125,6 +133,7 @@ def init_db():
     # because the alembic env.py creates a separate engine that may
     # deadlock with disposed app connections.
     from alembic.script import ScriptDirectory
+
     script_dir = ScriptDirectory.from_config(alembic_cfg)
     head_revision = script_dir.get_current_head()
     _log.info("init_db: head_revision=%s", head_revision)
@@ -150,6 +159,7 @@ def _migrate_stale_beacon_paths():
     new defaults so the UI and HAProxy config use the non-blocked paths.
     """
     from ..models.models import Setting
+
     db = SessionLocal()
     try:
         renames = {
@@ -162,9 +172,8 @@ def _migrate_stale_beacon_paths():
                 row.value = new_val
                 db.commit()
                 import logging
-                logging.getLogger(__name__).info(
-                    "Migrated %s: %s → %s", key, old_val, new_val
-                )
+
+                logging.getLogger(__name__).info("Migrated %s: %s → %s", key, old_val, new_val)
     except Exception:
         db.rollback()
     finally:

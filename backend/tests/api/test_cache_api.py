@@ -1,11 +1,12 @@
 """Tests for cache API endpoints (CRUD + clear + metrics)."""
-from datetime import datetime, timedelta, timezone
+
+from datetime import UTC, datetime, timedelta
 
 from tests.factories import (
     make_backend,
-    make_server,
     make_cache_config,
     make_cache_metric_snapshot,
+    make_server,
 )
 
 
@@ -20,12 +21,15 @@ def test_create_cache_config(client, db):
     """Creating a cache config returns 201 and the config."""
     backend = make_backend(db, name="web")
     make_server(db, backend.id)
-    r = client.post("/api/v1/cache/configs", json={
-        "backend_id": backend.id,
-        "haproxy_enabled": True,
-        "haproxy_total_max_size": 200,
-        "haproxy_max_age": 600,
-    })
+    r = client.post(
+        "/api/v1/cache/configs",
+        json={
+            "backend_id": backend.id,
+            "haproxy_enabled": True,
+            "haproxy_total_max_size": 200,
+            "haproxy_max_age": 600,
+        },
+    )
     assert r.status_code == 201
     data = r.json()
     assert data["backend_id"] == backend.id
@@ -39,10 +43,13 @@ def test_create_duplicate_returns_409(client, db):
     backend = make_backend(db)
     make_server(db, backend.id)
     make_cache_config(db, backend.id, haproxy_enabled=True)
-    r = client.post("/api/v1/cache/configs", json={
-        "backend_id": backend.id,
-        "haproxy_enabled": True,
-    })
+    r = client.post(
+        "/api/v1/cache/configs",
+        json={
+            "backend_id": backend.id,
+            "haproxy_enabled": True,
+        },
+    )
     assert r.status_code == 409
 
 
@@ -50,10 +57,13 @@ def test_create_for_tcp_backend_returns_400(client, db):
     """Creating a cache config for a TCP backend returns 400."""
     backend = make_backend(db, protocol="tcp", mode="tcp")
     make_server(db, backend.id)
-    r = client.post("/api/v1/cache/configs", json={
-        "backend_id": backend.id,
-        "haproxy_enabled": True,
-    })
+    r = client.post(
+        "/api/v1/cache/configs",
+        json={
+            "backend_id": backend.id,
+            "haproxy_enabled": True,
+        },
+    )
     assert r.status_code == 400
     assert "TCP" in r.json()["detail"]
 
@@ -61,13 +71,17 @@ def test_create_for_tcp_backend_returns_400(client, db):
 def test_create_disk_cache_without_global_toggle_returns_400(client, db):
     """Creating a disk cache config when the global toggle is off returns 400."""
     from app.services.settings import set_setting
+
     set_setting(db, "disk_cache_enabled", "false")
     backend = make_backend(db)
     make_server(db, backend.id)
-    r = client.post("/api/v1/cache/configs", json={
-        "backend_id": backend.id,
-        "disk_cache_enabled": True,
-    })
+    r = client.post(
+        "/api/v1/cache/configs",
+        json={
+            "backend_id": backend.id,
+            "disk_cache_enabled": True,
+        },
+    )
     assert r.status_code == 400
     assert "Disk cache" in r.json()["detail"]
 
@@ -96,10 +110,13 @@ def test_update_cache_config(client, db):
     backend = make_backend(db)
     make_server(db, backend.id)
     make_cache_config(db, backend.id, haproxy_enabled=False, haproxy_max_age=300)
-    r = client.put(f"/api/v1/cache/configs/{backend.id}", json={
-        "haproxy_enabled": True,
-        "haproxy_max_age": 600,
-    })
+    r = client.put(
+        f"/api/v1/cache/configs/{backend.id}",
+        json={
+            "haproxy_enabled": True,
+            "haproxy_max_age": 600,
+        },
+    )
     assert r.status_code == 200
     data = r.json()
     assert data["haproxy_enabled"] is True
@@ -121,6 +138,7 @@ def test_delete_cache_config(client, db):
 def test_cache_status(client, db):
     """The status endpoint returns the global disk cache toggle state."""
     from app.services.settings import set_setting
+
     set_setting(db, "disk_cache_enabled", "false")
     r = client.get("/api/v1/cache/status")
     assert r.status_code == 200
@@ -130,6 +148,7 @@ def test_cache_status(client, db):
 def test_cache_status_enabled(client, db):
     """The status endpoint returns True when the global toggle is on."""
     from app.services.settings import set_setting
+
     set_setting(db, "disk_cache_enabled", "true")
     r = client.get("/api/v1/cache/status")
     assert r.status_code == 200
@@ -157,7 +176,6 @@ def test_clear_backend_cache_uses_haproxy_section_name(db, monkeypatch):
     when the backend name contains characters that _safe_name and _safe_vcl_name
     handle differently, or when uniqueness suffixes were appended."""
     from app.services import cache as cache_service
-    from app.models.models import Listener
 
     # Create a backend with a name that contains a dot (valid in _safe_name,
     # but stripped by _safe_vcl_name — the old bug)
@@ -166,6 +184,7 @@ def test_clear_backend_cache_uses_haproxy_section_name(db, monkeypatch):
     make_cache_config(db, backend.id, disk_cache_enabled=True)
     # Need a listener so _get_section_names has a frontend
     from tests.factories import make_listener
+
     make_listener(db, backend=backend)
     db.commit()
 
@@ -196,6 +215,7 @@ def test_clear_backend_cache_memory_reloads_haproxy(db, monkeypatch):
     make_cache_config(db, backend.id, haproxy_enabled=True)
     # Need a listener so _get_section_names has a frontend
     from tests.factories import make_listener
+
     make_listener(db, backend=backend)
     db.commit()
 
@@ -222,6 +242,7 @@ def test_clear_backend_cache_memory_reload_failure(db, monkeypatch):
     make_server(db, backend.id)
     make_cache_config(db, backend.id, haproxy_enabled=True)
     from tests.factories import make_listener
+
     make_listener(db, backend=backend)
     db.commit()
 
@@ -240,11 +261,14 @@ def test_clear_backend_cache_only_disk_no_reload(db, monkeypatch):
     make_server(db, backend.id)
     make_cache_config(db, backend.id, haproxy_enabled=False, disk_cache_enabled=True)
     from tests.factories import make_listener
+
     make_listener(db, backend=backend)
     db.commit()
 
     reload_called = []
-    monkeypatch.setattr("app.services.haproxy.reload_haproxy", lambda: reload_called.append(True) or {"status": "ok", "message": ""})
+    monkeypatch.setattr(
+        "app.services.haproxy.reload_haproxy", lambda: reload_called.append(True) or {"status": "ok", "message": ""}
+    )
     monkeypatch.setattr(cache_service.varnish, "purge_backend", lambda name: True)
     result = cache_service.clear_backend_cache(db, backend.id)
     assert result["disk_cleared"] is True
@@ -280,7 +304,7 @@ def test_cache_metrics_haproxy_deltas(client, db):
     make_cache_config(db, backend.id, haproxy_enabled=True)
     db.commit()
 
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(UTC).replace(tzinfo=None)
     # Three samples with cumulative counters: hits 10→25→40, misses 5→8→12
     # Expected deltas: hits 15,15  misses 3,4
     for i, (hit, miss) in enumerate([(10, 5), (25, 8), (40, 12)]):
@@ -316,7 +340,7 @@ def test_cache_metrics_disk_dedup_across_backends(client, db):
     make_cache_config(db, be2.id, disk_cache_enabled=True)
     db.commit()
 
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(UTC).replace(tzinfo=None)
     # Two sample times, each stored on BOTH backend rows (same disk stats).
     # Cumulative: hit 100→150, miss 20→30
     # Expected delta: hit 50, miss 10  (NOT 100, 20 which is what you'd get
@@ -350,7 +374,7 @@ def test_cache_metrics_disk_grace_hitpass_hitmiss(client, db):
     make_cache_config(db, backend.id, disk_cache_enabled=True)
     db.commit()
 
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(UTC).replace(tzinfo=None)
     # Two samples (cumulative counters):
     #   Sample 1: hit=100, miss=20, grace=10, hitpass=5, hitmiss=5
     #   Sample 2: hit=150, miss=30, grace=25, hitpass=15, hitmiss=10
@@ -400,7 +424,7 @@ def test_cache_metrics_disk_health_check_no_phantom_saved(client, db):
     make_cache_config(db, backend.id, disk_cache_enabled=True)
     db.commit()
 
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(UTC).replace(tzinfo=None)
     # Two samples: s_resp_bodybytes increments (health check synth bodies)
     # but cache_hit/miss/etc stay at 0 — no real traffic.
     for t_min, s_body in [(-10, 0), (-5, 14069)]:
@@ -438,7 +462,7 @@ def test_cache_metrics_disk_bytes_saved_with_real_traffic(client, db):
     make_cache_config(db, backend.id, disk_cache_enabled=True)
     db.commit()
 
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(UTC).replace(tzinfo=None)
     # Two samples with real cache hits:
     #   s_resp_bodybytes: 0 → 50000 (bytes sent to clients)
     #   b_resp_bodybytes: 0 → 10000 (bytes fetched from backend)
@@ -476,11 +500,15 @@ def test_cache_metrics_counter_reset(client, db):
     make_cache_config(db, backend.id, haproxy_enabled=True)
     db.commit()
 
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(UTC).replace(tzinfo=None)
     # Cumulative hits: 100 → 5 (reset) → 15
     # Expected deltas: 5 (reset → current), 10
-    make_cache_metric_snapshot(db, backend.id, now - timedelta(minutes=10), haproxy_stats={"cache_hit": 100, "cache_miss": 50})
-    make_cache_metric_snapshot(db, backend.id, now - timedelta(minutes=5), haproxy_stats={"cache_hit": 5, "cache_miss": 2})
+    make_cache_metric_snapshot(
+        db, backend.id, now - timedelta(minutes=10), haproxy_stats={"cache_hit": 100, "cache_miss": 50}
+    )
+    make_cache_metric_snapshot(
+        db, backend.id, now - timedelta(minutes=5), haproxy_stats={"cache_hit": 5, "cache_miss": 2}
+    )
     make_cache_metric_snapshot(db, backend.id, now, haproxy_stats={"cache_hit": 15, "cache_miss": 6})
     db.commit()
 
@@ -498,12 +526,20 @@ def test_cache_metrics_per_bucket_hit_rate(client, db):
     make_cache_config(db, backend.id, haproxy_enabled=True)
     db.commit()
 
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(UTC).replace(tzinfo=None)
     # Bucket 1: 80 hits, 20 misses (80%); Bucket 2: 40 hits, 60 misses (40%)
-    make_cache_metric_snapshot(db, backend.id, now - timedelta(minutes=10), haproxy_stats={"cache_hit": 0, "cache_miss": 0})
-    make_cache_metric_snapshot(db, backend.id, now - timedelta(minutes=9), haproxy_stats={"cache_hit": 80, "cache_miss": 20})
-    make_cache_metric_snapshot(db, backend.id, now - timedelta(minutes=5), haproxy_stats={"cache_hit": 80, "cache_miss": 20})
-    make_cache_metric_snapshot(db, backend.id, now - timedelta(minutes=4), haproxy_stats={"cache_hit": 120, "cache_miss": 80})
+    make_cache_metric_snapshot(
+        db, backend.id, now - timedelta(minutes=10), haproxy_stats={"cache_hit": 0, "cache_miss": 0}
+    )
+    make_cache_metric_snapshot(
+        db, backend.id, now - timedelta(minutes=9), haproxy_stats={"cache_hit": 80, "cache_miss": 20}
+    )
+    make_cache_metric_snapshot(
+        db, backend.id, now - timedelta(minutes=5), haproxy_stats={"cache_hit": 80, "cache_miss": 20}
+    )
+    make_cache_metric_snapshot(
+        db, backend.id, now - timedelta(minutes=4), haproxy_stats={"cache_hit": 120, "cache_miss": 80}
+    )
     db.commit()
 
     r = client.get("/api/v1/cache/metrics?step=300")
@@ -518,6 +554,7 @@ def test_cache_metrics_per_bucket_hit_rate(client, db):
 
 # Cacheability rules
 # ---------------------------------------------------------------------------
+
 
 def _config_for(client, db, name="rules_be"):
     backend = make_backend(db, name=name)
@@ -544,36 +581,46 @@ def test_list_rules_without_config_returns_404(client, db):
 def test_create_rule_normalizes_pattern(client, db):
     """Patterns are stored canonically so '/downloads/*' and '*.png' work as typed."""
     backend = _config_for(client, db, name="norm_be")
-    r = client.post(f"/api/v1/cache/configs/{backend.id}/rules",
-                    json={"match_type": "path", "pattern": "/downloads/*", "action": "cache", "tier": "memory"})
+    r = client.post(
+        f"/api/v1/cache/configs/{backend.id}/rules",
+        json={"match_type": "path", "pattern": "/downloads/*", "action": "cache", "tier": "memory"},
+    )
     assert r.status_code == 201
     assert r.json()["pattern"] == "/downloads/"
 
-    r = client.post(f"/api/v1/cache/configs/{backend.id}/rules",
-                    json={"match_type": "extension", "pattern": "*.PNG", "action": "cache", "tier": "memory"})
+    r = client.post(
+        f"/api/v1/cache/configs/{backend.id}/rules",
+        json={"match_type": "extension", "pattern": "*.PNG", "action": "cache", "tier": "memory"},
+    )
     assert r.status_code == 201
     assert r.json()["pattern"] == "png"
 
 
 def test_create_rule_rejects_invalid_pattern(client, db):
     backend = _config_for(client, db, name="bad_be")
-    r = client.post(f"/api/v1/cache/configs/{backend.id}/rules",
-                    json={"match_type": "path", "pattern": "downloads/", "action": "cache", "tier": "memory"})
+    r = client.post(
+        f"/api/v1/cache/configs/{backend.id}/rules",
+        json={"match_type": "path", "pattern": "downloads/", "action": "cache", "tier": "memory"},
+    )
     assert r.status_code == 422
 
 
 def test_create_rule_rejects_invalid_action(client, db):
     backend = _config_for(client, db, name="badact_be")
-    r = client.post(f"/api/v1/cache/configs/{backend.id}/rules",
-                    json={"match_type": "extension", "pattern": "png", "action": "explode", "tier": "memory"})
+    r = client.post(
+        f"/api/v1/cache/configs/{backend.id}/rules",
+        json={"match_type": "extension", "pattern": "png", "action": "explode", "tier": "memory"},
+    )
     assert r.status_code == 422
 
 
 def test_create_rule_appends_to_end(client, db):
     backend = _config_for(client, db, name="append_be")
     for ext in ("png", "jpg", "gif"):
-        client.post(f"/api/v1/cache/configs/{backend.id}/rules",
-                    json={"match_type": "extension", "pattern": ext, "tier": "memory"})
+        client.post(
+            f"/api/v1/cache/configs/{backend.id}/rules",
+            json={"match_type": "extension", "pattern": ext, "tier": "memory"},
+        )
     rules = client.get(f"/api/v1/cache/configs/{backend.id}/rules").json()
     assert [x["pattern"] for x in rules] == ["png", "jpg", "gif"]
 
@@ -581,49 +628,58 @@ def test_create_rule_appends_to_end(client, db):
 def test_update_rule_partial_renormalizes(client, db):
     """Changing only the pattern still normalizes against the stored match_type."""
     backend = _config_for(client, db, name="upd_be")
-    created = client.post(f"/api/v1/cache/configs/{backend.id}/rules",
-                          json={"match_type": "extension", "pattern": "png", "tier": "memory"}).json()
-    r = client.put(f"/api/v1/cache/configs/{backend.id}/rules/{created['id']}",
-                   json={"pattern": "*.WEBP"})
+    created = client.post(
+        f"/api/v1/cache/configs/{backend.id}/rules",
+        json={"match_type": "extension", "pattern": "png", "tier": "memory"},
+    ).json()
+    r = client.put(f"/api/v1/cache/configs/{backend.id}/rules/{created['id']}", json={"pattern": "*.WEBP"})
     assert r.status_code == 200
     assert r.json()["pattern"] == "webp"
 
 
 def test_update_rule_invalid_pattern_returns_400(client, db):
     backend = _config_for(client, db, name="updbad_be")
-    created = client.post(f"/api/v1/cache/configs/{backend.id}/rules",
-                          json={"match_type": "path", "pattern": "/a/", "tier": "memory"}).json()
-    r = client.put(f"/api/v1/cache/configs/{backend.id}/rules/{created['id']}",
-                   json={"pattern": "relative/"})
+    created = client.post(
+        f"/api/v1/cache/configs/{backend.id}/rules", json={"match_type": "path", "pattern": "/a/", "tier": "memory"}
+    ).json()
+    r = client.put(f"/api/v1/cache/configs/{backend.id}/rules/{created['id']}", json={"pattern": "relative/"})
     assert r.status_code == 400
 
 
 def test_delete_rule(client, db):
     backend = _config_for(client, db, name="del_be")
-    created = client.post(f"/api/v1/cache/configs/{backend.id}/rules",
-                          json={"match_type": "extension", "pattern": "png", "tier": "memory"}).json()
+    created = client.post(
+        f"/api/v1/cache/configs/{backend.id}/rules",
+        json={"match_type": "extension", "pattern": "png", "tier": "memory"},
+    ).json()
     assert client.delete(f"/api/v1/cache/configs/{backend.id}/rules/{created['id']}").status_code == 200
     assert client.get(f"/api/v1/cache/configs/{backend.id}/rules").json() == []
 
 
 def test_reorder_rules(client, db):
     backend = _config_for(client, db, name="reorder_be")
-    ids = [client.post(f"/api/v1/cache/configs/{backend.id}/rules",
-                       json={"match_type": "extension", "pattern": e, "tier": "memory"}).json()["id"]
-           for e in ("png", "jpg", "gif")]
-    r = client.post(f"/api/v1/cache/configs/{backend.id}/rules/reorder",
-                    json={"rule_ids": list(reversed(ids))})
+    ids = [
+        client.post(
+            f"/api/v1/cache/configs/{backend.id}/rules",
+            json={"match_type": "extension", "pattern": e, "tier": "memory"},
+        ).json()["id"]
+        for e in ("png", "jpg", "gif")
+    ]
+    r = client.post(f"/api/v1/cache/configs/{backend.id}/rules/reorder", json={"rule_ids": list(reversed(ids))})
     assert r.status_code == 200
     assert [x["pattern"] for x in r.json()] == ["gif", "jpg", "png"]
 
 
 def test_reorder_rejects_incomplete_list(client, db):
     backend = _config_for(client, db, name="badorder_be")
-    ids = [client.post(f"/api/v1/cache/configs/{backend.id}/rules",
-                       json={"match_type": "extension", "pattern": e, "tier": "memory"}).json()["id"]
-           for e in ("png", "jpg")]
-    r = client.post(f"/api/v1/cache/configs/{backend.id}/rules/reorder",
-                    json={"rule_ids": ids[:1]})
+    ids = [
+        client.post(
+            f"/api/v1/cache/configs/{backend.id}/rules",
+            json={"match_type": "extension", "pattern": e, "tier": "memory"},
+        ).json()["id"]
+        for e in ("png", "jpg")
+    ]
+    r = client.post(f"/api/v1/cache/configs/{backend.id}/rules/reorder", json={"rule_ids": ids[:1]})
     assert r.status_code == 400
 
 
@@ -631,8 +687,8 @@ def test_rules_are_scoped_to_their_backend(client, db):
     """A rule id from another backend must not be reachable."""
     a = _config_for(client, db, name="scope_a")
     b = _config_for(client, db, name="scope_b")
-    rule = client.post(f"/api/v1/cache/configs/{a.id}/rules",
-                       json={"match_type": "extension", "pattern": "png", "tier": "memory"}).json()
-    assert client.put(f"/api/v1/cache/configs/{b.id}/rules/{rule['id']}",
-                      json={"enabled": False}).status_code == 404
+    rule = client.post(
+        f"/api/v1/cache/configs/{a.id}/rules", json={"match_type": "extension", "pattern": "png", "tier": "memory"}
+    ).json()
+    assert client.put(f"/api/v1/cache/configs/{b.id}/rules/{rule['id']}", json={"enabled": False}).status_code == 404
     assert client.delete(f"/api/v1/cache/configs/{b.id}/rules/{rule['id']}").status_code == 404

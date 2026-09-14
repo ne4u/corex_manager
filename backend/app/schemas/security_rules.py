@@ -1,20 +1,26 @@
 from datetime import datetime
-from typing import Optional, List, Dict, Any, Type, TypeVar
-from pydantic import BaseModel, Field, model_validator, field_validator, ConfigDict
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
+
 from ._base import _optional_update
+
 
 class SecurityRuleBase(BaseModel):
     name: str
     enabled: bool = True
-    listener_ids: Optional[List[int]] = []
+    listener_ids: list[int] | None = []
     expression: str
-    action: str = Field(default="block", pattern="^(block|allow|redirect|custom_response|challenge|log|skip_rules|skip_rules_ratelimit|skip_rules_waf|skip_all)$")
+    action: str = Field(
+        default="block",
+        pattern="^(block|allow|redirect|custom_response|challenge|log|skip_rules|skip_rules_ratelimit|skip_rules_waf|skip_all)$",
+    )
     log: bool = True
     no_log: bool = False
-    status_code: Optional[int] = Field(default=None, ge=100, le=599)
-    redirect_url: Optional[str] = None
-    redirect_code: Optional[int] = Field(default=None, ge=300, le=399)
-    error_page_id: Optional[int] = None
+    status_code: int | None = Field(default=None, ge=100, le=599)
+    redirect_url: str | None = None
+    redirect_code: int | None = Field(default=None, ge=300, le=399)
+    error_page_id: int | None = None
 
 
 class SecurityRuleCreate(SecurityRuleBase):
@@ -27,7 +33,7 @@ SecurityRuleUpdate = _optional_update(SecurityRuleBase)
 class SecurityRuleResponse(SecurityRuleBase):
     id: int
     priority: int
-    expression_ast: Optional[Dict[str, Any]] = None
+    expression_ast: dict[str, Any] | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -35,7 +41,7 @@ class SecurityRuleResponse(SecurityRuleBase):
 
 
 class SecurityRuleReorder(BaseModel):
-    ordered_ids: List[int]
+    ordered_ids: list[int]
 
 
 class SecurityRuleValidateRequest(BaseModel):
@@ -44,21 +50,22 @@ class SecurityRuleValidateRequest(BaseModel):
 
 class SecurityRuleValidateResponse(BaseModel):
     ok: bool
-    ast: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
+    ast: dict[str, Any] | None = None
+    error: str | None = None
 
 
 # ---------------------------------------------------------------------------
 # Risk Rules
 # ---------------------------------------------------------------------------
 
+
 class RiskRuleBase(BaseModel):
     name: str
     enabled: bool = True
-    listener_ids: Optional[List[int]] = []
+    listener_ids: list[int] | None = []
     expression: str
     points: int = Field(default=0, ge=-99, le=99)
-    category: Optional[str] = None
+    category: str | None = None
     log: bool = True
     ruleset_id: int = 1  # default ruleset
 
@@ -73,7 +80,7 @@ RiskRuleUpdate = _optional_update(RiskRuleBase)
 class RiskRuleResponse(RiskRuleBase):
     id: int
     priority: int
-    expression_ast: Optional[Dict[str, Any]] = None
+    expression_ast: dict[str, Any] | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -81,7 +88,7 @@ class RiskRuleResponse(RiskRuleBase):
 
 
 class RiskRuleReorder(BaseModel):
-    ordered_ids: List[int]
+    ordered_ids: list[int]
 
 
 class RiskRuleValidateRequest(BaseModel):
@@ -90,9 +97,9 @@ class RiskRuleValidateRequest(BaseModel):
 
 class RiskRuleValidateResponse(BaseModel):
     ok: bool
-    ast: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
-    suggested_category: Optional[str] = None
+    ast: dict[str, Any] | None = None
+    error: str | None = None
+    suggested_category: str | None = None
 
 
 class RiskSeedBaselineResponse(BaseModel):
@@ -106,9 +113,10 @@ class RiskSeedBaselineResponse(BaseModel):
 # Risk Ruleset schemas
 # ---------------------------------------------------------------------------
 
+
 class RiskRulesetBase(BaseModel):
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     enabled: bool = True
 
 
@@ -124,18 +132,30 @@ class RiskRulesetResponse(RiskRulesetBase):
     slug: str
     priority: int
     rule_count: int = 0
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
 
 __all__ = [
-    'RiskRuleBase', 'RiskRuleCreate', 'RiskRuleReorder', 'RiskRuleResponse',
-    'RiskRuleUpdate', 'RiskRuleValidateRequest', 'RiskRuleValidateResponse',
-    'RiskRulesetBase', 'RiskRulesetCreate', 'RiskRulesetResponse', 'RiskRulesetUpdate',
-    'RiskSeedBaselineResponse',
-    'SecurityRuleBase', 'SecurityRuleCreate', 'SecurityRuleReorder',
-    'SecurityRuleResponse', 'SecurityRuleUpdate', 'SecurityRuleValidateRequest',
-    'SecurityRuleValidateResponse',
+    "RiskRuleBase",
+    "RiskRuleCreate",
+    "RiskRuleReorder",
+    "RiskRuleResponse",
+    "RiskRuleUpdate",
+    "RiskRuleValidateRequest",
+    "RiskRuleValidateResponse",
+    "RiskRulesetBase",
+    "RiskRulesetCreate",
+    "RiskRulesetResponse",
+    "RiskRulesetUpdate",
+    "RiskSeedBaselineResponse",
+    "SecurityRuleBase",
+    "SecurityRuleCreate",
+    "SecurityRuleReorder",
+    "SecurityRuleResponse",
+    "SecurityRuleUpdate",
+    "SecurityRuleValidateRequest",
+    "SecurityRuleValidateResponse",
 ]

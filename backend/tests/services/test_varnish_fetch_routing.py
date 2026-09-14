@@ -8,13 +8,16 @@ own, so the generator queries BackendRules from all other enabled HTTP-mode
 listeners and emits their ACLs + use_backend rules conditioned on
 is_varnish_fetch.
 """
-from app.services import haproxy
+
 from app.models.models import BackendRule, CacheRule
+from app.services import haproxy
 from app.services.settings import set_setting
-from tests.factories import make_backend, make_server, make_cache_config, make_listener
+from tests.factories import make_backend, make_cache_config, make_listener, make_server
 
 
-def _make_backend_rule(db, listener_id, backend_id, condition_type="host", operator="reg", value="example\\.com", priority=100):
+def _make_backend_rule(
+    db, listener_id, backend_id, condition_type="host", operator="reg", value="example\\.com", priority=100
+):
     rule = BackendRule(
         listener_id=listener_id,
         backend_id=backend_id,
@@ -45,7 +48,15 @@ def test_force_https_listener_emits_varnish_fetch_routing(db):
 
     # Enable disk cache
     cc = make_cache_config(db, backend.id, disk_cache_enabled=True, haproxy_enabled=False)
-    rule = CacheRule(cache_config_id=cc.id, tier="disk", match_type="path", pattern="/static", action="cache", priority=1, enabled=True)
+    rule = CacheRule(
+        cache_config_id=cc.id,
+        tier="disk",
+        match_type="path",
+        pattern="/static",
+        action="cache",
+        priority=1,
+        enabled=True,
+    )
     db.add(rule)
     db.commit()
     set_setting(db, "disk_cache_enabled", "true")
@@ -94,7 +105,15 @@ def test_ssl_listener_not_affected_by_varnish_fetch_routing(db):
     http_listener.force_https = True
 
     cc = make_cache_config(db, backend.id, disk_cache_enabled=True, haproxy_enabled=False)
-    rule = CacheRule(cache_config_id=cc.id, tier="disk", match_type="path", pattern="/static", action="cache", priority=1, enabled=True)
+    rule = CacheRule(
+        cache_config_id=cc.id,
+        tier="disk",
+        match_type="path",
+        pattern="/static",
+        action="cache",
+        priority=1,
+        enabled=True,
+    )
     db.add(rule)
     db.commit()
     set_setting(db, "disk_cache_enabled", "true")

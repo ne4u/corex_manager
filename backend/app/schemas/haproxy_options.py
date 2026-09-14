@@ -1,7 +1,5 @@
-from datetime import datetime
-from typing import Optional, List, Dict, Any, Type, TypeVar
-from pydantic import BaseModel, Field, model_validator, field_validator, ConfigDict
-from ._base import _optional_update
+from pydantic import BaseModel, Field
+
 
 class HaproxyOption(BaseModel):
     target: str = Field(default="section", pattern="^(section|bind)$")
@@ -10,4 +8,4 @@ class HaproxyOption(BaseModel):
     enabled: bool = True
 
 
-__all__ = ['HaproxyOption']
+__all__ = ["HaproxyOption"]

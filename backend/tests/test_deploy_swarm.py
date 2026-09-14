@@ -8,13 +8,12 @@ Covers:
 - _detect_swarm_active exists
 - SWARM_IMAGE_NAMES mapping is correct
 """
+
 import inspect
 import os
 import sys
 
-import pytest
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import deploy
 
@@ -80,7 +79,6 @@ class TestStackCmd:
 class TestSwarmArgparse:
     def test_swarm_in_target_choices(self):
         """The argparse --target should accept 'swarm'."""
-        import argparse
         src = inspect.getsource(deploy.main)
         assert '"swarm"' in src or "'swarm'" in src
 

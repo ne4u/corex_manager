@@ -1,11 +1,11 @@
 """Integration tests for the /security-lists endpoints."""
+
 from unittest.mock import patch
 
-import pytest
 import requests
 
-
 # --- Network lists ----------------------------------------------------------
+
 
 def test_create_and_list_network_list(client, db):
     res = client.post("/api/v1/security-lists/network", json={"name": "net1", "description": "desc"})
@@ -98,6 +98,7 @@ def test_delete_network_entry(client, db):
 
 # --- ASN lists --------------------------------------------------------------
 
+
 def test_asn_entry_normalizes(client, db):
     r = client.post("/api/v1/security-lists/asn", json={"name": "asn1"})
     lid = r.json()["id"]
@@ -122,6 +123,7 @@ def test_asn_entry_invalid(client, db):
 
 
 # --- GeoIP lists ------------------------------------------------------------
+
 
 def test_geo_entry_uppercases(client, db):
     r = client.post("/api/v1/security-lists/geo", json={"name": "geo1"})
@@ -210,7 +212,9 @@ def test_ja4_entry_valid(client, db):
 def test_ja4_entry_uppercase_normalizes(client, db):
     r = client.post("/api/v1/security-lists/ja4", json={"name": "ja4_1"})
     lid = r.json()["id"]
-    res = client.post(f"/api/v1/security-lists/ja4/{lid}/entries", json={"value": "T13D1516H2_8DAAF6152771_B186095E22B6"})
+    res = client.post(
+        f"/api/v1/security-lists/ja4/{lid}/entries", json={"value": "T13D1516H2_8DAAF6152771_B186095E22B6"}
+    )
     assert res.status_code == 200
     assert res.json()["value"] == VALID_JA4
 
@@ -225,7 +229,9 @@ def test_ja4_entry_invalid_format(client, db):
 def test_ja4_entry_invalid_proto(client, db):
     r = client.post("/api/v1/security-lists/ja4", json={"name": "ja4_1"})
     lid = r.json()["id"]
-    res = client.post(f"/api/v1/security-lists/ja4/{lid}/entries", json={"value": "x13d1516h2_8daaf6152771_b186095e22b6"})
+    res = client.post(
+        f"/api/v1/security-lists/ja4/{lid}/entries", json={"value": "x13d1516h2_8daaf6152771_b186095e22b6"}
+    )
     assert res.status_code == 400
 
 
@@ -275,6 +281,7 @@ def test_delete_ja4_entry(client, db):
 
 
 # --- Dynamic feeds ----------------------------------------------------------
+
 
 def test_create_feed_creates_target_list(client, db):
     with patch("app.services.security_list_feeds.requests.get") as mock_get:
@@ -473,7 +480,9 @@ def test_create_ja4_feed_with_existing_target_list(client, db):
 def test_ja4_feed_skips_invalid_entries(client, db):
     with patch("app.services.security_list_feeds.requests.get") as mock_get:
         mock_get.return_value.status_code = 200
-        mock_get.return_value.text = "t13d1516h2_8daaf6152771_b186095e22b6\nnot-a-ja4\nx13d1516h2_8daaf6152771_b186095e22b6\n"
+        mock_get.return_value.text = (
+            "t13d1516h2_8daaf6152771_b186095e22b6\nnot-a-ja4\nx13d1516h2_8daaf6152771_b186095e22b6\n"
+        )
         mock_get.return_value.raise_for_status = lambda: None
         res = client.post(
             "/api/v1/security-lists/feeds",
@@ -525,12 +534,14 @@ def test_old_acl_routes_removed(client, db):
 
 # --- updated_at bumping on entry changes ------------------------------------
 
+
 def test_entry_create_bumps_list_updated_at(client, db):
     r = client.post("/api/v1/security-lists/network", json={"name": "net1"})
     lid = r.json()["id"]
     original_updated = r.json()["updated_at"]
 
     import time
+
     time.sleep(0.01)
     client.post(f"/api/v1/security-lists/network/{lid}/entries", json={"value": "10.0.0.1"})
 
@@ -549,6 +560,7 @@ def test_entry_delete_bumps_list_updated_at(client, db):
     original_updated = next(l for l in lists if l["id"] == lid)["updated_at"]
 
     import time
+
     time.sleep(0.01)
     client.delete(f"/api/v1/security-lists/network/{lid}/entries/{eid}")
 
@@ -572,6 +584,7 @@ def test_feed_refresh_bumps_list_updated_at(client, db):
     original_updated = next(l for l in lists if l["id"] == lid)["updated_at"]
 
     import time
+
     time.sleep(0.01)
     with patch("app.services.security_list_feeds.requests.get") as mock_get2:
         mock_get2.return_value.status_code = 200
@@ -598,6 +611,7 @@ def test_feed_refresh_failure_does_not_update_last_updated_at(client, db):
     assert original_last_updated is not None
 
     import time
+
     time.sleep(0.01)
     with patch("app.services.security_list_feeds.requests.get") as mock_get2:
         mock_get2.side_effect = requests.RequestException("network error")
@@ -611,6 +625,7 @@ def test_feed_refresh_failure_does_not_update_last_updated_at(client, db):
 
 
 # --- Pattern lists ----------------------------------------------------------
+
 
 def test_create_and_list_pattern_list(client, db):
     res = client.post("/api/v1/security-lists/pattern", json={"name": "pat1", "description": "bad bots"})
@@ -678,20 +693,25 @@ def test_pattern_entry_crud(client, db):
 
 # --- "In use" delete protection -------------------------------------------
 
+
 def test_delete_network_list_referenced_by_rule_returns_409(client, db):
     """A network list referenced by a security rule cannot be deleted."""
     from app.models.models import NetworkList
+
     nl = NetworkList(name="referenced_net")
     db.add(nl)
     db.commit()
     db.refresh(nl)
 
     # Create a security rule that references the list
-    r = client.post("/api/v1/security-rules", json={
-        "name": "Block via list",
-        "expression": "ip.src in $network:referenced_net",
-        "action": "block",
-    })
+    r = client.post(
+        "/api/v1/security-rules",
+        json={
+            "name": "Block via list",
+            "expression": "ip.src in $network:referenced_net",
+            "action": "block",
+        },
+    )
     assert r.status_code == 200
 
     # Deleting the list should 409
@@ -708,14 +728,14 @@ def test_delete_network_list_referenced_by_rule_returns_409(client, db):
 def test_delete_network_list_referenced_by_setting_returns_409(client, db):
     """A network list referenced by the trusted-source setting cannot be deleted."""
     from app.models.models import NetworkList
+
     nl = NetworkList(name="trusted_cdn")
     db.add(nl)
     db.commit()
     db.refresh(nl)
 
     # Set the trusted-source setting
-    r = client.put("/api/v1/settings/restore_client_ip_trusted_network_list",
-                   json={"value": "trusted_cdn"})
+    r = client.put("/api/v1/settings/restore_client_ip_trusted_network_list", json={"value": "trusted_cdn"})
     assert r.status_code == 200
 
     # Deleting the list should 409
@@ -731,14 +751,20 @@ def test_delete_network_list_referenced_by_setting_returns_409(client, db):
 
 def test_delete_network_list_with_feed_force_bypasses(client, db):
     """A network list with only a feed reference can be force-deleted (existing behavior)."""
-    from app.models.models import NetworkList, DynamicFeed
+    from app.models.models import DynamicFeed, NetworkList
+
     nl = NetworkList(name="feed_owned")
     db.add(nl)
     db.commit()
     db.refresh(nl)
 
-    feed = DynamicFeed(name="feed1", list_type="network", target_list_id=nl.id,
-                       url="http://example.com/list.txt", update_interval_hours=24)
+    feed = DynamicFeed(
+        name="feed1",
+        list_type="network",
+        target_list_id=nl.id,
+        url="http://example.com/list.txt",
+        update_interval_hours=24,
+    )
     db.add(feed)
     db.commit()
 
@@ -755,6 +781,7 @@ def test_delete_network_list_with_feed_force_bypasses(client, db):
 def test_delete_unreferenced_network_list_succeeds(client, db):
     """An unreferenced network list deletes normally (no regression)."""
     from app.models.models import NetworkList
+
     nl = NetworkList(name="free_net")
     db.add(nl)
     db.commit()
@@ -767,16 +794,20 @@ def test_delete_unreferenced_network_list_succeeds(client, db):
 def test_delete_geo_list_referenced_by_rule_returns_409(client, db):
     """A geo list referenced by a security rule cannot be deleted (new check)."""
     from app.models.models import GeoList
+
     gl = GeoList(name="blocked_countries")
     db.add(gl)
     db.commit()
     db.refresh(gl)
 
-    r = client.post("/api/v1/security-rules", json={
-        "name": "Block countries",
-        "expression": "ip.geoip.country in $geo:blocked_countries",
-        "action": "block",
-    })
+    r = client.post(
+        "/api/v1/security-rules",
+        json={
+            "name": "Block countries",
+            "expression": "ip.geoip.country in $geo:blocked_countries",
+            "action": "block",
+        },
+    )
     assert r.status_code == 200
 
     res = client.delete(f"/api/v1/security-lists/geo/{gl.id}")
@@ -787,16 +818,20 @@ def test_delete_geo_list_referenced_by_rule_returns_409(client, db):
 def test_delete_pattern_list_referenced_by_rule_returns_409(client, db):
     """A pattern list referenced by a security rule cannot be deleted (new check)."""
     from app.models.models import PatternList
+
     pl = PatternList(name="bad_bots")
     db.add(pl)
     db.commit()
     db.refresh(pl)
 
-    r = client.post("/api/v1/security-rules", json={
-        "name": "Block bots",
-        "expression": "http.request.user_agent in $pattern:bad_bots",
-        "action": "block",
-    })
+    r = client.post(
+        "/api/v1/security-rules",
+        json={
+            "name": "Block bots",
+            "expression": "http.request.user_agent in $pattern:bad_bots",
+            "action": "block",
+        },
+    )
     assert r.status_code == 200
 
     res = client.delete(f"/api/v1/security-lists/pattern/{pl.id}")

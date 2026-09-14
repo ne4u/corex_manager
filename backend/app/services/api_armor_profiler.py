@@ -15,20 +15,19 @@ observed normal values across multiple dimensions:
 When a request's dimension values are not in the learned baseline, an anomaly
 is recorded (if enforcement mode is active).
 """
+
 import json
 import logging
 import os
 import threading
-import time
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional, Set
-from collections import defaultdict
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from sqlalchemy.orm import Session
 
 from ..core.config import get_settings
 from ..core.database import SessionLocal
-from ..models.api_armor import ApiProfile, ApiAnomaly
+from ..models.api_armor import ApiAnomaly, ApiProfile
 from .settings import get_setting
 
 logger = logging.getLogger(__name__)
@@ -40,36 +39,31 @@ def prune_profiles(db: Session, retention_days: int) -> int:
     if retention_days <= 0:
         return 0
     from ..models.api_armor import ApiAnomaly
-    cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
+
+    cutoff = datetime.now(UTC) - timedelta(days=retention_days)
 
     # Delete related anomalies first.
-    deleted_anomalies = (
-        db.query(ApiAnomaly)
-        .filter(ApiAnomaly.created_at < cutoff)
-        .delete(synchronize_session=False)
-    )
+    deleted_anomalies = db.query(ApiAnomaly).filter(ApiAnomaly.created_at < cutoff).delete(synchronize_session=False)
 
-    deleted_profiles = (
-        db.query(ApiProfile)
-        .filter(ApiProfile.last_seen < cutoff)
-        .delete(synchronize_session=False)
-    )
+    deleted_profiles = db.query(ApiProfile).filter(ApiProfile.last_seen < cutoff).delete(synchronize_session=False)
 
     logger.info(
         "Pruned %d profiles and %d anomalies older than %s days",
-        deleted_profiles, deleted_anomalies, retention_days,
+        deleted_profiles,
+        deleted_anomalies,
+        retention_days,
     )
     return deleted_profiles
 
 
 # Dimensions tracked per endpoint
 DIMENSIONS = [
-    "body_structure",      # top-level JSON keys
-    "graphql",             # operation, depth, complexity, query_hash
-    "content_type",        # request content type
-    "auth_type",           # auth type (jwt, api_key, n)
-    "req_fp",              # full request fingerprint
-    "req_fp_param_keys",   # parameter key names
+    "body_structure",  # top-level JSON keys
+    "graphql",  # operation, depth, complexity, query_hash
+    "content_type",  # request content type
+    "auth_type",  # auth type (jwt, api_key, n)
+    "req_fp",  # full request fingerprint
+    "req_fp_param_keys",  # parameter key names
     "req_fp_param_types",  # parameter type signature
 ]
 
@@ -77,10 +71,12 @@ DIMENSIONS = [
 class ApiArmorProfiler:
     """Background thread that tails the API Armor profiling log and upserts profiles."""
 
-    def __init__(self, log_path: Optional[str] = None, sample_interval: float = 5.0):
-        self.log_path = log_path or getattr(settings, "API_ARMOR_PROFILING_LOG_PATH", "/app/data/api-armor/profiling.log")
+    def __init__(self, log_path: str | None = None, sample_interval: float = 5.0):
+        self.log_path = log_path or getattr(
+            settings, "API_ARMOR_PROFILING_LOG_PATH", "/app/data/api-armor/profiling.log"
+        )
         self.sample_interval = sample_interval
-        self._thread: Optional[threading.Thread] = None
+        self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
         self._offset = 0  # byte offset in the log file
 
@@ -144,7 +140,7 @@ class ApiArmorProfiler:
 
         count = 0
         try:
-            with open(self.log_path, "r") as f:
+            with open(self.log_path) as f:
                 f.seek(self._offset)
                 for line in f:
                     line = line.strip()
@@ -162,7 +158,7 @@ class ApiArmorProfiler:
 
         return count
 
-    def _process_entry(self, entry: Dict) -> None:
+    def _process_entry(self, entry: dict) -> None:
         """Process a single profiling log entry — upsert the endpoint profile."""
         db = SessionLocal()
         try:
@@ -175,7 +171,7 @@ class ApiArmorProfiler:
             db.close()
 
 
-def ingest_profiling_entry(db: Session, entry: Dict) -> None:
+def ingest_profiling_entry(db: Session, entry: dict) -> None:
     """Process a single profiling log entry — upsert the endpoint profile and record anomalies.
 
     This is public so it can be called both by the background sampler and by
@@ -191,10 +187,7 @@ def ingest_profiling_entry(db: Session, entry: Dict) -> None:
 
     # Find or create the profile
     profile = (
-        db.query(ApiProfile)
-        .filter(ApiProfile.method == method)
-        .filter(ApiProfile.path == normalized_path)
-        .first()
+        db.query(ApiProfile).filter(ApiProfile.method == method).filter(ApiProfile.path == normalized_path).first()
     )
 
     if not profile:
@@ -224,7 +217,7 @@ def ingest_profiling_entry(db: Session, entry: Dict) -> None:
 
     profile.dimensions = dims
     profile.sample_count = (profile.sample_count or 0) + 1
-    profile.last_seen = datetime.now(timezone.utc)
+    profile.last_seen = datetime.now(UTC)
 
     # Update status codes
     status = entry.get("response_status")
@@ -257,6 +250,7 @@ def normalize_path(path: str) -> str:
     Example: /api/v1/users/123/posts/456 → /api/v1/users/:id/posts/:id
     """
     import re
+
     # Replace UUIDs first (most specific pattern)
     path = re.sub(r"/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", "/:id", path, flags=re.IGNORECASE)
     # Replace hex IDs (24-char MongoDB ObjectIds) before numeric IDs
@@ -266,7 +260,7 @@ def normalize_path(path: str) -> str:
     return path
 
 
-def extract_dimension(entry: Dict, dimension: str) -> Any:
+def extract_dimension(entry: dict, dimension: str) -> Any:
     """Extract a dimension value from a profiling log entry."""
     if dimension == "body_structure":
         bs = entry.get("body_structure")
@@ -296,7 +290,7 @@ def extract_dimension(entry: Dict, dimension: str) -> Any:
     return None
 
 
-def check_anomaly(profile: ApiProfile, entry: Dict) -> Optional[str]:
+def check_anomaly(profile: ApiProfile, entry: dict) -> str | None:
     """Check if a request entry is anomalous compared to the learned profile.
 
     Returns the dimension name that is anomalous, or None if no anomaly.
@@ -330,7 +324,7 @@ def finalize_profile(db: Session, profile_id: int, min_samples: int = 100) -> bo
 
 
 # Singleton instance
-_profiler: Optional[ApiArmorProfiler] = None
+_profiler: ApiArmorProfiler | None = None
 
 
 def start_profiler() -> None:
@@ -339,7 +333,11 @@ def start_profiler() -> None:
     db = SessionLocal()
     try:
         enabled = get_setting(db, "api_armor_enabled", str(settings.API_ARMOR_ENABLED)).lower() in ("true", "1", "yes")
-        profiling_enabled = get_setting(db, "api_armor_profiling_learning_enabled", "false").lower() in ("true", "1", "yes")
+        profiling_enabled = get_setting(db, "api_armor_profiling_learning_enabled", "false").lower() in (
+            "true",
+            "1",
+            "yes",
+        )
         if enabled and profiling_enabled:
             interval = float(get_setting(db, "api_armor_profiler_interval", "5"))
             _profiler = ApiArmorProfiler(sample_interval=interval)

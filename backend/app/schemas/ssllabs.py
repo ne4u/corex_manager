@@ -1,6 +1,7 @@
 from datetime import datetime
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, ConfigDict
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class SslLabsScanCreate(BaseModel):
@@ -12,14 +13,14 @@ class SslLabsScanResponse(BaseModel):
     certificate_id: int
     host: str
     status: str
-    status_message: Optional[str] = None
-    grade: Optional[str] = None
-    report: Optional[Dict[str, Any]] = None
-    start_time: Optional[int] = None
-    test_time: Optional[int] = None
-    engine_version: Optional[str] = None
-    criteria_version: Optional[str] = None
-    error: Optional[str] = None
+    status_message: str | None = None
+    grade: str | None = None
+    report: dict[str, Any] | None = None
+    start_time: int | None = None
+    test_time: int | None = None
+    engine_version: str | None = None
+    criteria_version: str | None = None
+    error: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -27,7 +28,7 @@ class SslLabsScanResponse(BaseModel):
 
 
 class SslLabsHostsResponse(BaseModel):
-    hosts: List[str]
+    hosts: list[str]
 
 
 class SslLabsSettingsResponse(BaseModel):
@@ -39,9 +40,9 @@ class SslLabsSettingsUpdate(BaseModel):
 
 
 __all__ = [
-    'SslLabsScanCreate',
-    'SslLabsScanResponse',
-    'SslLabsHostsResponse',
-    'SslLabsSettingsResponse',
-    'SslLabsSettingsUpdate',
+    "SslLabsScanCreate",
+    "SslLabsScanResponse",
+    "SslLabsHostsResponse",
+    "SslLabsSettingsResponse",
+    "SslLabsSettingsUpdate",
 ]

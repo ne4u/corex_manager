@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, Boolean, Text, DateTime, ForeignKey, JSON
+from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
+
 from .base import Base, utcnow
 
 
@@ -115,4 +116,4 @@ class ChallengeEvent(Base):
     request_id = Column(String, nullable=True, index=True)  # HAProxy unique-id for cross-system correlation
 
 
-__all__ = ['ChallengeEvent', 'WafException', 'WafMetric', 'WafRule', 'WafRuleVersion']
+__all__ = ["ChallengeEvent", "WafException", "WafMetric", "WafRule", "WafRuleVersion"]

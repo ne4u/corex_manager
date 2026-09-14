@@ -7,6 +7,7 @@ directives like:
     http-request add-header X-Forwarded-For %[src] if !{ hdr_val(X-Forwarded-For) -m found }
     http-request set-header X-Forwarded-For %[hdr(X-Forwarded-For)] ,%[src] if { hdr_val(X-Forwarded-For) -m found }
 """
+
 from app.services import haproxy
 from tests.factories import make_backend, make_request_header, make_server
 
@@ -42,7 +43,10 @@ def test_request_header_concatenated_samples_in_value(db):
         condition="{ hdr_val(X-Forwarded-For) -m found }",
     )
     cfg = haproxy.generate_config(db)
-    assert 'http-request set-header X-Forwarded-For "%[hdr(X-Forwarded-For)] ,%[src]" if { hdr_val(X-Forwarded-For) -m found }' in cfg
+    assert (
+        'http-request set-header X-Forwarded-For "%[hdr(X-Forwarded-For)] ,%[src]" if { hdr_val(X-Forwarded-For) -m found }'
+        in cfg
+    )
 
 
 def test_request_header_del_action(db):

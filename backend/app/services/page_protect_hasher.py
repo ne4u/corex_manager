@@ -5,13 +5,13 @@ a SHA-256 hash of its content, and compares it to the last-known hash. When a
 change is detected, the script's hash_changed flag is set. The decoded body is
 persisted so an AI agent or user can later inspect the actual content.
 """
+
 import hashlib
 import logging
 import threading
 import time
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -28,9 +28,10 @@ settings = get_settings()
 @dataclass
 class FetchResult:
     """Result of a successful asset fetch."""
+
     hash: str
-    content: Optional[str]
-    content_type: Optional[str]
+    content: str | None
+    content_type: str | None
 
 
 # Content types we are willing to store as text for AI/manual analysis.
@@ -53,7 +54,7 @@ _TEXT_CONTENT_TYPES = {
 }
 
 
-def _decode_text_content(resp) -> Optional[str]:
+def _decode_text_content(resp) -> str | None:
     """Decode response bytes to text if the content type looks text-ish.
 
     Returns None for obvious binary payloads (images, fonts, etc.) or if the
@@ -100,7 +101,7 @@ def _hasher_headers() -> dict:
     }
 
 
-def hash_script(script: PageProtectScript) -> Optional[FetchResult]:
+def hash_script(script: PageProtectScript) -> FetchResult | None:
     """Fetch a script URL and return its hash, decoded text, and content type.
 
     Returns None on error or if the URL is not HTTP(S). The decoded text is
@@ -160,7 +161,7 @@ def hash_script(script: PageProtectScript) -> Optional[FetchResult]:
         return None
 
 
-def check_script(db: Session, script: PageProtectScript) -> Optional[str]:
+def check_script(db: Session, script: PageProtectScript) -> str | None:
     """Hash a single script and update its hash fields. Returns the new hash or None.
 
     On a successful fetch the decoded body is also persisted (when the hash
@@ -178,7 +179,7 @@ def check_script(db: Session, script: PageProtectScript) -> Optional[str]:
     if script.ignored:
         return None
     result = hash_script(script)
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(UTC).replace(tzinfo=None)
     if result is None:
         # Record that a check was attempted even on failure
         script.hash_checked_at = now
@@ -239,7 +240,7 @@ def check_all_scripts(db: Session, force: bool = False) -> int:
     """
     pp_settings = get_page_protect_settings(db)
     interval_hours = pp_settings.get("change_detection_interval_hours", 24)
-    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=interval_hours)
+    cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=interval_hours)
 
     scripts = db.query(PageProtectScript).filter(PageProtectScript.ignored == False).all()  # noqa: E712
     checked = 0

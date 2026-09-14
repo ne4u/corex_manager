@@ -1,20 +1,19 @@
-from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from ..deps import get_db, get_current_user, require_write, rate_limit
+
 from ...schemas.rate_limits import RateLimitCreate, RateLimitResponse, RateLimitUpdate
 from ...services.rate_limits import (
     create_rate_limit,
     delete_rate_limit,
-    get_rate_limit,
     list_rate_limits,
     update_rate_limit,
 )
+from ..deps import get_current_user, get_db, rate_limit, require_write
 
 router = APIRouter()
 
 
-@router.get("/rate-limits", response_model=List[RateLimitResponse])
+@router.get("/rate-limits", response_model=list[RateLimitResponse])
 def list_rate_limits_endpoint(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),

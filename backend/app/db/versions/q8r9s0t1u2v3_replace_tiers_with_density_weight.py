@@ -8,17 +8,17 @@ Replaces hit_multiplier_tiers (JSON) with density_weight (Float) on
 risk_rulesets. The tier-based multiplier was replaced by a simpler
 additive formula: final = raw + floor(density * density_weight).
 """
-from typing import Sequence, Union
 
-from alembic import op
+from collections.abc import Sequence
+
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = 'q8r9s0t1u2v3'
-down_revision: Union[str, Sequence[str], None] = 'p7q8r9s0t1u2'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision: str = "q8r9s0t1u2v3"
+down_revision: str | Sequence[str] | None = "p7q8r9s0t1u2"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -27,22 +27,17 @@ def upgrade() -> None:
 
     bind = op.get_bind()
     inspector = sa_inspect(bind)
-    existing_cols = [c['name'] for c in inspector.get_columns('risk_rulesets')]
+    existing_cols = [c["name"] for c in inspector.get_columns("risk_rulesets")]
 
-    with op.batch_alter_table('risk_rulesets', schema=None) as batch_op:
-        if 'density_weight' not in existing_cols:
-            batch_op.add_column(
-                sa.Column('density_weight', sa.Float(),
-                          nullable=True, server_default=sa.text('0.0'))
-            )
-        if 'hit_multiplier_tiers' in existing_cols:
-            batch_op.drop_column('hit_multiplier_tiers')
+    with op.batch_alter_table("risk_rulesets", schema=None) as batch_op:
+        if "density_weight" not in existing_cols:
+            batch_op.add_column(sa.Column("density_weight", sa.Float(), nullable=True, server_default=sa.text("0.0")))
+        if "hit_multiplier_tiers" in existing_cols:
+            batch_op.drop_column("hit_multiplier_tiers")
 
 
 def downgrade() -> None:
     """Restore hit_multiplier_tiers, drop density_weight."""
-    with op.batch_alter_table('risk_rulesets', schema=None) as batch_op:
-        batch_op.add_column(
-            sa.Column('hit_multiplier_tiers', sa.JSON(), nullable=True)
-        )
-        batch_op.drop_column('density_weight')
+    with op.batch_alter_table("risk_rulesets", schema=None) as batch_op:
+        batch_op.add_column(sa.Column("hit_multiplier_tiers", sa.JSON(), nullable=True))
+        batch_op.drop_column("density_weight")

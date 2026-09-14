@@ -3,21 +3,18 @@
 Search npm and PyPI for MCP server packages, install them as stdio MCP servers,
 and track installation status. Supports env var discovery from package READMEs.
 """
-import asyncio
+
 import json
 import logging
-import os
 import re
-import time
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 import httpx
 from sqlalchemy.orm import Session
 
-from ..models.mcp import McpServer, McpInstallation
-from .mcp_secrets import encrypt_secret
+from ..models.mcp import McpInstallation, McpServer
 from .mcp_config import write_config_bundle
+from .mcp_secrets import encrypt_secret
 
 logger = logging.getLogger(__name__)
 
@@ -50,18 +47,22 @@ async def search_npm(query: str, limit: int = 20) -> list[dict]:
                 # Filter for MCP-related packages
                 if not _is_mcp_package_npm(name, pkg.get("keywords", [])):
                     continue
-                results.append({
-                    "name": name,
-                    "description": pkg.get("description"),
-                    "version": pkg.get("version"),
-                    "homepage": pkg.get("links", {}).get("homepage"),
-                    "repository_url": pkg.get("links", {}).get("repository"),
-                    "author": pkg.get("publisher", {}).get("username") if isinstance(pkg.get("publisher"), dict) else str(pkg.get("author", "")),
-                    "license": pkg.get("license"),
-                    "keywords": pkg.get("keywords", []),
-                    "downloads": None,
-                    "score": obj.get("searchScore", 0),
-                })
+                results.append(
+                    {
+                        "name": name,
+                        "description": pkg.get("description"),
+                        "version": pkg.get("version"),
+                        "homepage": pkg.get("links", {}).get("homepage"),
+                        "repository_url": pkg.get("links", {}).get("repository"),
+                        "author": pkg.get("publisher", {}).get("username")
+                        if isinstance(pkg.get("publisher"), dict)
+                        else str(pkg.get("author", "")),
+                        "license": pkg.get("license"),
+                        "keywords": pkg.get("keywords", []),
+                        "downloads": None,
+                        "score": obj.get("searchScore", 0),
+                    }
+                )
                 if len(results) >= limit:
                     break
     except Exception as e:
@@ -86,7 +87,7 @@ async def search_pypi(query: str, limit: int = 20) -> list[dict]:
             # Parse the HTML search results (PyPI search returns HTML)
             text = resp.text
             # Extract package names from the search results page
-            package_links = re.findall(r'/package/([a-zA-Z0-9_.-]+)/?', text)
+            package_links = re.findall(r"/package/([a-zA-Z0-9_.-]+)/?", text)
             seen = set()
             for name in package_links:
                 if name in seen:
@@ -100,18 +101,22 @@ async def search_pypi(query: str, limit: int = 20) -> list[dict]:
                     if meta_resp.status_code == 200:
                         meta = meta_resp.json()
                         info = meta.get("info", {})
-                        results.append({
-                            "name": name,
-                            "description": info.get("summary"),
-                            "version": info.get("version"),
-                            "homepage": info.get("home_page"),
-                            "repository_url": info.get("project_urls", {}).get("Source", info.get("project_urls", {}).get("Repository")),
-                            "author": info.get("author"),
-                            "license": info.get("license"),
-                            "keywords": (info.get("keywords") or "").split(",") if info.get("keywords") else [],
-                            "downloads": None,
-                            "score": None,
-                        })
+                        results.append(
+                            {
+                                "name": name,
+                                "description": info.get("summary"),
+                                "version": info.get("version"),
+                                "homepage": info.get("home_page"),
+                                "repository_url": info.get("project_urls", {}).get(
+                                    "Source", info.get("project_urls", {}).get("Repository")
+                                ),
+                                "author": info.get("author"),
+                                "license": info.get("license"),
+                                "keywords": (info.get("keywords") or "").split(",") if info.get("keywords") else [],
+                                "downloads": None,
+                                "score": None,
+                            }
+                        )
                 except Exception:
                     pass
                 if len(results) >= limit:
@@ -159,7 +164,7 @@ async def search_marketplace(query: str, manager: str = "npm", limit: int = 20) 
         return npm_results + pypi_results
 
 
-async def get_package_details(manager: str, name: str) -> Optional[dict]:
+async def get_package_details(manager: str, name: str) -> dict | None:
     """Get detailed package information including README and discovered env vars."""
     if manager == "all":
         # Try npm first, then pypi
@@ -187,7 +192,9 @@ async def get_package_details(manager: str, name: str) -> Optional[dict]:
                     "version": latest,
                     "description": data.get("description"),
                     "homepage": data.get("homepage"),
-                    "repository_url": data.get("repository", {}).get("url") if isinstance(data.get("repository"), dict) else str(data.get("repository", "")),
+                    "repository_url": data.get("repository", {}).get("url")
+                    if isinstance(data.get("repository"), dict)
+                    else str(data.get("repository", "")),
                     "author": _extract_author(data.get("author")),
                     "license": data.get("license"),
                     "keywords": data.get("keywords", []),
@@ -211,7 +218,9 @@ async def get_package_details(manager: str, name: str) -> Optional[dict]:
                     "version": info.get("version"),
                     "description": info.get("summary"),
                     "homepage": info.get("home_page"),
-                    "repository_url": info.get("project_urls", {}).get("Source", info.get("project_urls", {}).get("Repository")),
+                    "repository_url": info.get("project_urls", {}).get(
+                        "Source", info.get("project_urls", {}).get("Repository")
+                    ),
                     "author": info.get("author"),
                     "license": info.get("license"),
                     "keywords": (info.get("keywords") or "").split(",") if info.get("keywords") else [],
@@ -244,16 +253,36 @@ def _discover_env_vars_from_readme(readme: str) -> list[str]:
     # and standalone UPPERCASE_WITH_UNDERSCORES assignments
     patterns = [
         r'"([A-Z][A-Z0-9_]{2,})"\s*:\s*["\']',  # JSON: "VAR_NAME": "value"
-        r'(?:export\s+)?([A-Z][A-Z0-9_]{2,})\s*=',  # export VAR= or VAR=
-        r'--env\s+([A-Z][A-Z0-9_]{2,})',           # --env VAR
-        r'`([A-Z][A-Z0-9_]{2,})`\s*[:=]',          # `VAR`: or `VAR`=
+        r"(?:export\s+)?([A-Z][A-Z0-9_]{2,})\s*=",  # export VAR= or VAR=
+        r"--env\s+([A-Z][A-Z0-9_]{2,})",  # --env VAR
+        r"`([A-Z][A-Z0-9_]{2,})`\s*[:=]",  # `VAR`: or `VAR`=
     ]
 
     for pattern in patterns:
         for match in re.finditer(pattern, readme):
             var_name = match.group(1).upper()
             # Filter out common false positives
-            if var_name in ("README", "MIT", "APACHE", "GPL", "BSD", "JSON", "HTTP", "HTTPS", "URL", "API", "ID", "UUID", "TRUE", "FALSE", "NULL", "NONE", "ENV", "YAML", "XML"):
+            if var_name in (
+                "README",
+                "MIT",
+                "APACHE",
+                "GPL",
+                "BSD",
+                "JSON",
+                "HTTP",
+                "HTTPS",
+                "URL",
+                "API",
+                "ID",
+                "UUID",
+                "TRUE",
+                "FALSE",
+                "NULL",
+                "NONE",
+                "ENV",
+                "YAML",
+                "XML",
+            ):
                 continue
             if var_name not in seen:
                 seen.add(var_name)
@@ -270,7 +299,9 @@ async def discover_env_vars(manager: str, package_name: str) -> list[str]:
     return []
 
 
-def _build_command_for_package(manager: str, package_name: str, version: Optional[str] = None, custom_args: Optional[list[str]] = None) -> tuple[str, list[str]]:
+def _build_command_for_package(
+    manager: str, package_name: str, version: str | None = None, custom_args: list[str] | None = None
+) -> tuple[str, list[str]]:
     """Build the command and args for running an MCP server package."""
     if manager == "npm":
         command = "npx"
@@ -300,13 +331,13 @@ async def install_package(
     manager: str,
     package_name: str,
     team_id: int,
-    name: Optional[str] = None,
-    namespace: Optional[str] = None,
-    display_name: Optional[str] = None,
-    env_vars: Optional[dict[str, str]] = None,
-    custom_args: Optional[list[str]] = None,
-    version: Optional[str] = None,
-    user_id: Optional[int] = None,
+    name: str | None = None,
+    namespace: str | None = None,
+    display_name: str | None = None,
+    env_vars: dict[str, str] | None = None,
+    custom_args: list[str] | None = None,
+    version: str | None = None,
+    user_id: int | None = None,
 ) -> McpServer:
     """Install a package as a new stdio MCP server.
 
@@ -319,7 +350,7 @@ async def install_package(
         # Remove common prefixes
         for prefix in ("mcp-server-", "mcp-", "model-context-protocol-"):
             if name.startswith(prefix):
-                name = name[len(prefix):]
+                name = name[len(prefix) :]
                 break
         name = f"mcp-{name}"
 
@@ -379,8 +410,8 @@ async def install_package(
         package_name=package_name,
         version=version,
         status="completed",  # Package is installed via npx/uvx at runtime
-        started_at=datetime.now(timezone.utc),
-        completed_at=datetime.now(timezone.utc),
+        started_at=datetime.now(UTC),
+        completed_at=datetime.now(UTC),
         output=f"Server created with command: {command} {' '.join(args)}",
     )
     db.add(installation)
@@ -422,11 +453,16 @@ def uninstall_package(db: Session, server_id: int) -> bool:
     return True
 
 
-def get_installation_status(db: Session, installation_id: int) -> Optional[McpInstallation]:
+def get_installation_status(db: Session, installation_id: int) -> McpInstallation | None:
     """Get the status of an installation task."""
     return db.query(McpInstallation).filter(McpInstallation.id == installation_id).first()
 
 
 def get_server_installations(db: Session, server_id: int) -> list[McpInstallation]:
     """Get all installation records for a server."""
-    return db.query(McpInstallation).filter(McpInstallation.server_id == server_id).order_by(McpInstallation.created_at.desc()).all()
+    return (
+        db.query(McpInstallation)
+        .filter(McpInstallation.server_id == server_id)
+        .order_by(McpInstallation.created_at.desc())
+        .all()
+    )

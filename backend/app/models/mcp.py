@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, Text, DateTime, ForeignKey, JSON, UniqueConstraint
+from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from .base import Base, utcnow
@@ -145,7 +145,9 @@ class McpDlpRule(Base):
     enabled = Column(Boolean, default=True)
     priority = Column(Integer, default=0)
     direction = Column(String, default="both")  # request | response | both
-    detector = Column(String, nullable=False)  # email|phone|ssn|credit_card|ip|aws_key|private_key|github_token|slack_token|custom
+    detector = Column(
+        String, nullable=False
+    )  # email|phone|ssn|credit_card|ip|aws_key|private_key|github_token|slack_token|custom
     find_regex = Column(Text, nullable=True)  # if detector=custom
     action = Column(String, default="block")  # block | redact | tokenize
     token_prefix = Column(String, nullable=True)
@@ -171,7 +173,9 @@ class McpSkill(Base):
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
-    versions = relationship("McpSkillVersion", back_populates="skill", cascade="all, delete-orphan", foreign_keys="McpSkillVersion.skill_id")
+    versions = relationship(
+        "McpSkillVersion", back_populates="skill", cascade="all, delete-orphan", foreign_keys="McpSkillVersion.skill_id"
+    )
     team = relationship("Team")
 
 
@@ -200,7 +204,9 @@ class McpGuardrail(Base):
     enabled = Column(Boolean, default=True)
     priority = Column(Integer, default=0)
     direction = Column(String, default="both")  # request | response | both
-    pack = Column(String, default="custom")  # builtin:jailbreak_v1 | builtin:instruction_override | builtin:obfuscation | custom
+    pack = Column(
+        String, default="custom"
+    )  # builtin:jailbreak_v1 | builtin:instruction_override | builtin:obfuscation | custom
     find_regex = Column(Text, nullable=True)
     action = Column(String, default="block")  # block | redact | log
     created_at = Column(DateTime, default=utcnow)

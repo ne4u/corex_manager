@@ -1,9 +1,7 @@
 """Restart-safety tests for the GeoIpDownloader."""
-import os
-from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, patch
 
-import pytest
+from datetime import UTC, datetime, timedelta
+from unittest.mock import MagicMock, patch
 
 from app.services import geoip
 from app.services.geoip import GeoIpDownloader
@@ -12,9 +10,8 @@ from app.services.geoip import GeoIpDownloader
 def _set_last_run_at(db, dt):
     """Write the geoip_download_last_run_at setting directly."""
     from app.models.models import Setting
-    row = db.query(Setting).filter(
-        Setting.key == "geoip_download_last_run_at"
-    ).first()
+
+    row = db.query(Setting).filter(Setting.key == "geoip_download_last_run_at").first()
     if not row:
         row = Setting(key="geoip_download_last_run_at", value=dt.isoformat())
         db.add(row)
@@ -47,7 +44,7 @@ def test_geoip_downloader_skips_download_when_recently_downloaded(db, tmp_path, 
     # Re-instantiate so files_required picks up the monkeypatched paths.
     downloader = GeoIpDownloader(interval_hours=24.0)
 
-    recent = datetime.now(timezone.utc) - timedelta(seconds=60)
+    recent = datetime.now(UTC) - timedelta(seconds=60)
     _set_last_run_at(db, recent)
 
     mock_download = MagicMock(return_value={"ok": True, "results": []})
@@ -73,7 +70,7 @@ def test_geoip_downloader_downloads_when_files_missing(db, tmp_path, monkeypatch
 
     downloader = GeoIpDownloader(interval_hours=24.0)
 
-    recent = datetime.now(timezone.utc) - timedelta(seconds=60)
+    recent = datetime.now(UTC) - timedelta(seconds=60)
     _set_last_run_at(db, recent)
 
     mock_download = MagicMock(return_value={"ok": True, "results": []})
@@ -131,9 +128,8 @@ def test_geoip_downloader_stamps_on_success(db, tmp_path, monkeypatch):
                 downloader._run_tick()
 
     from app.models.models import Setting
-    row = db.query(Setting).filter(
-        Setting.key == "geoip_download_last_run_at"
-    ).first()
+
+    row = db.query(Setting).filter(Setting.key == "geoip_download_last_run_at").first()
     assert row is not None
     assert row.value is not None
 
@@ -162,9 +158,8 @@ def test_geoip_downloader_no_stamp_on_failure(db, tmp_path, monkeypatch):
                 downloader._run_tick()
 
     from app.models.models import Setting
-    row = db.query(Setting).filter(
-        Setting.key == "geoip_download_last_run_at"
-    ).first()
+
+    row = db.query(Setting).filter(Setting.key == "geoip_download_last_run_at").first()
     assert row is None
 
 

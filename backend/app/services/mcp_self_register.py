@@ -7,6 +7,7 @@ Called from main.py lifespan when MCP_GATEWAY_ENABLED is True. Ensures:
 3. An McpSkill ("corex-manager") with a published version containing the skill guide.
 4. The config bundle is regenerated so the gateway picks up the changes.
 """
+
 import hashlib
 import logging
 import os
@@ -15,7 +16,7 @@ import secrets as _secrets
 from sqlalchemy.orm import Session
 
 from ..core.config import get_settings
-from ..models.mcp import Team, McpServer, McpSkill, McpSkillVersion
+from ..models.mcp import McpServer, McpSkill, McpSkillVersion, Team
 from .mcp_secrets import encrypt_secret, has_secrets_key
 
 logger = logging.getLogger(__name__)
@@ -185,6 +186,7 @@ def ensure_self_registration(db: Session) -> None:
         if os.environ.get("COREX_MCP_TOKEN"):
             try:
                 from .mcp_secrets import decrypt_secret
+
                 existing = decrypt_secret(server.auth_secret_enc) if server.auth_secret_enc else ""
                 if existing != mcp_token:
                     server.auth_secret_enc = encrypt_secret(mcp_token)
@@ -220,11 +222,7 @@ def ensure_self_registration(db: Session) -> None:
         .first()
     )
 
-    needs_new_version = (
-        not latest
-        or latest.body != SKILL_BODY
-        or (latest.frontmatter or {}) != SKILL_FRONTMATTER
-    )
+    needs_new_version = not latest or latest.body != SKILL_BODY or (latest.frontmatter or {}) != SKILL_FRONTMATTER
 
     if needs_new_version:
         version_num = (latest.version + 1) if latest else 1
@@ -246,6 +244,7 @@ def ensure_self_registration(db: Session) -> None:
     # 4. Regenerate config bundle
     try:
         from .mcp_config import write_config_bundle
+
         write_config_bundle(db)
         logger.info("MCP config bundle regenerated after self-registration")
     except Exception as e:
@@ -257,6 +256,7 @@ def ensure_self_registration(db: Session) -> None:
     # gateway's 60-second refresh cycle.
     try:
         from .mcp_policies import trigger_background_catalog_refresh
+
         trigger_background_catalog_refresh([server.id], max_attempts=12, interval_seconds=5)
         logger.info("Triggered catalog refresh for coreX Manager (id=%d)", server.id)
     except Exception as e:

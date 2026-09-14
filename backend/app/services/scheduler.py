@@ -13,11 +13,11 @@ original schedule across restarts. ``last_run_at`` is stamped only when
 ``_tick`` returns ``True`` (success), so a failed run retries on the next
 interval or restart rather than resetting the clock.
 """
+
 import logging
 import os
 import threading
-from datetime import datetime, timezone
-from typing import List, Optional
+from datetime import UTC, datetime
 
 from ..core.database import SessionLocal
 from .settings import get_setting, set_setting
@@ -26,17 +26,17 @@ logger = logging.getLogger(__name__)
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
-def _parse_iso(value: str) -> Optional[datetime]:
+def _parse_iso(value: str) -> datetime | None:
     """Parse an ISO-8601 timestamp (with or without tzinfo) into a datetime."""
     try:
         dt = datetime.fromisoformat(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
     return dt
 
 
@@ -53,14 +53,14 @@ class PeriodicTask:
         self,
         name: str,
         interval_seconds: float,
-        files_required: Optional[List[str]] = None,
+        files_required: list[str] | None = None,
         skip_initial_if_not_due: bool = True,
     ):
         self.name = name
         self.interval_seconds = interval_seconds
-        self.files_required: List[str] = list(files_required or [])
+        self.files_required: list[str] = list(files_required or [])
         self.skip_initial_if_not_due = skip_initial_if_not_due
-        self.thread: Optional[threading.Thread] = None
+        self.thread: threading.Thread | None = None
         self._stop_event = threading.Event()
 
     # --- subclass hook -------------------------------------------------
@@ -73,7 +73,7 @@ class PeriodicTask:
     def _setting_key(self) -> str:
         return f"{self.name}_last_run_at"
 
-    def _last_run_at(self) -> Optional[datetime]:
+    def _last_run_at(self) -> datetime | None:
         with SessionLocal() as db:
             value = get_setting(db, self._setting_key)
         if not value:

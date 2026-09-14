@@ -1,21 +1,18 @@
 """Tests for the full-system export/restore backup service."""
+
 import io
 import json
 import os
 import zipfile
 
 import pytest
-
+from app.models.models import Backend, Certificate, Setting, User
 from app.services.backup import (
+    _ENC_MAGIC,
+    _serialize_db,
     create_export,
     restore_export,
-    _serialize_db,
-    _decrypt_archive,
-    _ENC_MAGIC,
-    SECRET_FIELDS,
-    SECRET_SETTING_KEYS,
 )
-from app.models.models import Backend, Certificate, Setting, User
 from tests.factories import make_backend, make_server
 
 
@@ -35,6 +32,7 @@ def _export_to_bytes(db, **kwargs):
 # ---------------------------------------------------------------------------
 # Serialization
 # ---------------------------------------------------------------------------
+
 
 def test_serialize_db_includes_config_tables(db):
     backend = make_backend(db, name="web")
@@ -61,13 +59,15 @@ def test_serialize_db_includes_users_with_secrets(db):
 
 
 def test_serialize_db_redacts_secret_fields(db):
-    db.add(Certificate(
-        name="test-cert",
-        domain="example.com",
-        provider="custom",
-        dns_provider="cloudflare",
-        dns_credentials={"CF_API_TOKEN": "super-secret-token"},
-    ))
+    db.add(
+        Certificate(
+            name="test-cert",
+            domain="example.com",
+            provider="custom",
+            dns_provider="cloudflare",
+            dns_credentials={"CF_API_TOKEN": "super-secret-token"},
+        )
+    )
     db.commit()
     # Without secrets — dns_credentials should be redacted to None.
     snapshot = _serialize_db(db, include_secrets=False, include_metrics=False)
@@ -77,13 +77,15 @@ def test_serialize_db_redacts_secret_fields(db):
 
 
 def test_serialize_db_preserves_secret_fields_with_secrets(db):
-    db.add(Certificate(
-        name="test-cert",
-        domain="example.com",
-        provider="custom",
-        dns_provider="cloudflare",
-        dns_credentials={"CF_API_TOKEN": "super-secret-token"},
-    ))
+    db.add(
+        Certificate(
+            name="test-cert",
+            domain="example.com",
+            provider="custom",
+            dns_provider="cloudflare",
+            dns_credentials={"CF_API_TOKEN": "super-secret-token"},
+        )
+    )
     db.commit()
     snapshot = _serialize_db(db, include_secrets=True, include_metrics=False)
     cert_rows = snapshot.get("certificates", [])
@@ -114,11 +116,10 @@ def test_serialize_db_redacts_vector_sink_secrets(db):
     are excluded, but the sink row itself is kept (topology preserved)."""
     from app.models.logging import VectorSink
     from app.services import vector_pipeline as vp
-    opts = vp.encrypt_sink_options("splunk_hec_logs", {
-        "endpoint": "https://splunk:8088", "token": "hec-secret"})
+
+    opts = vp.encrypt_sink_options("splunk_hec_logs", {"endpoint": "https://splunk:8088", "token": "hec-secret"})
     assert opts["token"].startswith("enc:")
-    db.add(VectorSink(name="hec", type="splunk_hec_logs", source="corex",
-                      options=opts))
+    db.add(VectorSink(name="hec", type="splunk_hec_logs", source="corex", options=opts))
     db.commit()
 
     snapshot = _serialize_db(db, include_secrets=False, include_metrics=False)
@@ -137,6 +138,7 @@ def test_export_without_secrets_excludes_vector_toml(db, tmp_path, monkeypatch):
     """vector.toml embeds plaintext sink credentials — it must not appear in
     a backup that excludes secrets."""
     from app.core.config import get_settings
+
     s = get_settings()
     vpath = tmp_path / "vector" / "vector.toml"
     vpath.parent.mkdir(parents=True)
@@ -155,7 +157,8 @@ def test_export_without_secrets_excludes_vector_toml(db, tmp_path, monkeypatch):
 
 
 def test_serialize_db_excludes_metrics_by_default(db):
-    from app.models.models import MetricSnapshot, WafMetric, AuditEvent
+    from app.models.models import AuditEvent, MetricSnapshot, WafMetric
+
     db.add(MetricSnapshot(process_info={}, stats=[]))
     db.add(WafMetric(action="deny"))
     db.add(AuditEvent(action="test", method="POST", path="/api/v1/test"))
@@ -168,6 +171,7 @@ def test_serialize_db_excludes_metrics_by_default(db):
 
 def test_serialize_db_includes_metrics_when_requested(db):
     from app.models.models import MetricSnapshot, WafMetric
+
     db.add(MetricSnapshot(process_info={}, stats=[]))
     db.add(WafMetric(action="deny"))
     db.commit()
@@ -179,6 +183,7 @@ def test_serialize_db_includes_metrics_when_requested(db):
 # ---------------------------------------------------------------------------
 # Export / Restore roundtrip
 # ---------------------------------------------------------------------------
+
 
 def test_export_returns_valid_zip(db):
     backend = make_backend(db, name="web")
@@ -245,6 +250,7 @@ def test_export_with_secrets_includes_users(db):
 # Password encryption
 # ---------------------------------------------------------------------------
 
+
 def test_password_encryption_roundtrip(db):
     backend = make_backend(db, name="web")
     make_server(db, backend.id)
@@ -252,7 +258,7 @@ def test_password_encryption_roundtrip(db):
 
     archive = _export_to_bytes(db, include_secrets=True, include_metrics=False, password="my-secret-pass")
     # Should start with the encryption magic header.
-    assert archive[:len(_ENC_MAGIC)] == _ENC_MAGIC
+    assert archive[: len(_ENC_MAGIC)] == _ENC_MAGIC
 
     # Restore with correct password.
     result = restore_export(db, archive, password="my-secret-pass", apply_config=False)
@@ -288,7 +294,7 @@ def test_unencrypted_archive_with_password_ignored(db):
 
     archive = _export_to_bytes(db, include_secrets=True, include_metrics=False, password=None)
     # Should NOT start with magic header.
-    assert archive[:len(_ENC_MAGIC)] != _ENC_MAGIC
+    assert archive[: len(_ENC_MAGIC)] != _ENC_MAGIC
     result = restore_export(db, archive, password="unused-password", apply_config=False)
     assert result["status"] == "ok"
 
@@ -296,6 +302,7 @@ def test_unencrypted_archive_with_password_ignored(db):
 # ---------------------------------------------------------------------------
 # Restore replaces config
 # ---------------------------------------------------------------------------
+
 
 def test_restore_replaces_config(db):
     backend1 = make_backend(db, name="web1")

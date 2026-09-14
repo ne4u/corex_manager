@@ -10,23 +10,23 @@ the last successful hash was computed. This distinguishes a failed check
 successful one (both timestamps match), so the UI can show "Error" status
 after a connection failure even if a previous check succeeded.
 """
-from typing import Sequence, Union
 
-from alembic import op
+from collections.abc import Sequence
+
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = 'z7a8b9c0d1e2'
-down_revision: Union[str, Sequence[str], None] = 'y6z7a8b9c0d1'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision: str = "z7a8b9c0d1e2"
+down_revision: str | Sequence[str] | None = "y6z7a8b9c0d1"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
     """Add last_hash_at column to page_protect_scripts."""
-    with op.batch_alter_table('page_protect_scripts') as batch_op:
-        batch_op.add_column(sa.Column('last_hash_at', sa.DateTime(), nullable=True))
+    with op.batch_alter_table("page_protect_scripts") as batch_op:
+        batch_op.add_column(sa.Column("last_hash_at", sa.DateTime(), nullable=True))
 
     # Backfill: existing rows with a last_hash already had a successful check,
     # so set last_hash_at = hash_checked_at for those rows.
@@ -38,5 +38,5 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Remove last_hash_at column from page_protect_scripts."""
-    with op.batch_alter_table('page_protect_scripts') as batch_op:
-        batch_op.drop_column('last_hash_at')
+    with op.batch_alter_table("page_protect_scripts") as batch_op:
+        batch_op.drop_column("last_hash_at")

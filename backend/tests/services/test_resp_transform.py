@@ -1,5 +1,10 @@
 """Tests for the response transform service layer."""
-import pytest
+
+from app.schemas.resp_transform import (
+    ResponseTransformCreate,
+    ResponseTransformUpdate,
+    ResponseTransformValidateRequest,
+)
 from app.services import resp_transform as rt_svc
 from app.services.resp_transform import (
     create_response_transform,
@@ -10,11 +15,6 @@ from app.services.resp_transform import (
     update_response_transform,
     validate_regex,
     validate_response_transform,
-)
-from app.schemas.resp_transform import (
-    ResponseTransformCreate,
-    ResponseTransformUpdate,
-    ResponseTransformValidateRequest,
 )
 from tests.factories import make_backend, make_response_transform, make_server
 
@@ -77,8 +77,12 @@ def test_delete_not_found(db):
 
 
 def test_reorder(db):
-    rt1 = make_response_transform(db, name="rt_r1", transform_type="replace", find_regex="a", replace_string="b", priority=0)
-    rt2 = make_response_transform(db, name="rt_r2", transform_type="replace", find_regex="c", replace_string="d", priority=1)
+    rt1 = make_response_transform(
+        db, name="rt_r1", transform_type="replace", find_regex="a", replace_string="b", priority=0
+    )
+    rt2 = make_response_transform(
+        db, name="rt_r2", transform_type="replace", find_regex="c", replace_string="d", priority=1
+    )
     reorder_response_transforms(db, [rt2.id, rt1.id])
     db.expire_all()
     assert get_response_transform(db, rt2.id).priority == 0
@@ -122,7 +126,9 @@ def test_backends_with_transforms_scoped(db):
     make_server(db, be_a.id)
     be_b = make_backend(db, name="be_b")
     make_server(db, be_b.id)
-    make_response_transform(db, name="rt_a", backend_id=be_a.id, transform_type="replace", find_regex="x", replace_string="y")
+    make_response_transform(
+        db, name="rt_a", backend_id=be_a.id, transform_type="replace", find_regex="x", replace_string="y"
+    )
     ids = rt_svc.backends_with_transforms(db)
     assert be_a.id in ids
     assert be_b.id not in ids
@@ -133,7 +139,9 @@ def test_backends_with_transforms_via_ids(db):
     make_server(db, be_a.id)
     be_b = make_backend(db, name="be_b")
     make_server(db, be_b.id)
-    make_response_transform(db, name="rt_both", backend_ids=[be_a.id, be_b.id], transform_type="replace", find_regex="x", replace_string="y")
+    make_response_transform(
+        db, name="rt_both", backend_ids=[be_a.id, be_b.id], transform_type="replace", find_regex="x", replace_string="y"
+    )
     ids = rt_svc.backends_with_transforms(db)
     assert be_a.id in ids
     assert be_b.id in ids
@@ -142,7 +150,15 @@ def test_backends_with_transforms_via_ids(db):
 def test_backends_with_transforms_disabled_excluded(db):
     be_a = make_backend(db, name="be_a")
     make_server(db, be_a.id)
-    make_response_transform(db, name="rt_dis", backend_id=be_a.id, transform_type="replace", find_regex="x", replace_string="y", enabled=False)
+    make_response_transform(
+        db,
+        name="rt_dis",
+        backend_id=be_a.id,
+        transform_type="replace",
+        find_regex="x",
+        replace_string="y",
+        enabled=False,
+    )
     ids = rt_svc.backends_with_transforms(db)
     assert be_a.id not in ids
 
@@ -152,7 +168,9 @@ def test_matches_backend_any_with_scoped_rule(db):
     make_server(db, be_a.id)
     be_b = make_backend(db, name="be_b")
     make_server(db, be_b.id)
-    make_response_transform(db, name="rt_a", backend_id=be_a.id, transform_type="replace", find_regex="x", replace_string="y")
+    make_response_transform(
+        db, name="rt_a", backend_id=be_a.id, transform_type="replace", find_regex="x", replace_string="y"
+    )
     assert rt_svc._matches_backend_any(db, be_a) is True
     assert rt_svc._matches_backend_any(db, be_b) is False
 
@@ -212,10 +230,11 @@ def _baseline_configs(db, tmp_path, monkeypatch):
     """Point config paths at tmp_path and write .applied baselines for every
     generated config so get_config_status starts False. Only resp-transform
     edits can subsequently move it."""
+    import os
+
     from app.core.config import get_settings
     from app.services import haproxy
     from app.services.settings import set_setting
-    import os
 
     s = get_settings()
     rt_dir = tmp_path / "resp-transform"
@@ -239,7 +258,8 @@ def _baseline_configs(db, tmp_path, monkeypatch):
 
     # Risk rules data file baseline (if risk scoring is importable).
     try:
-        from app.services.risk_scoring import generate_risk_rules_data, _risk_rules_data_path
+        from app.services.risk_scoring import _risk_rules_data_path, generate_risk_rules_data
+
         rrd_path = _risk_rules_data_path()
         rrd = generate_risk_rules_data(db)
         os.makedirs(os.path.dirname(rrd_path), exist_ok=True)
@@ -260,8 +280,12 @@ def test_config_status_detects_resp_transform_edit(db, tmp_path, monkeypatch):
     be = make_backend(db, name="be_rt")
     make_server(db, be.id)
     make_response_transform(
-        db, name="rt1", backend_id=be.id, transform_type="replace",
-        find_regex="foo", replace_string="bar",
+        db,
+        name="rt1",
+        backend_id=be.id,
+        transform_type="replace",
+        find_regex="foo",
+        replace_string="bar",
     )
 
     _baseline_configs(db, tmp_path, monkeypatch)
@@ -291,8 +315,12 @@ def test_config_status_detects_resp_transform_add(db, tmp_path, monkeypatch):
     be = make_backend(db, name="be_rt2")
     make_server(db, be.id)
     make_response_transform(
-        db, name="rt1", backend_id=be.id, transform_type="replace",
-        find_regex="foo", replace_string="bar",
+        db,
+        name="rt1",
+        backend_id=be.id,
+        transform_type="replace",
+        find_regex="foo",
+        replace_string="bar",
     )
 
     _baseline_configs(db, tmp_path, monkeypatch)
@@ -302,8 +330,13 @@ def test_config_status_detects_resp_transform_add(db, tmp_path, monkeypatch):
     # Add a second transform to the same backend. haproxy.cfg's filter line is
     # unchanged; only the JSON rules array grows.
     make_response_transform(
-        db, name="rt2", backend_id=be.id, transform_type="replace",
-        find_regex="a", replace_string="b", priority=1,
+        db,
+        name="rt2",
+        backend_id=be.id,
+        transform_type="replace",
+        find_regex="a",
+        replace_string="b",
+        priority=1,
     )
     assert get_config_status(db) is True
 
@@ -319,8 +352,12 @@ def test_config_status_detects_resp_transform_delete(db, tmp_path, monkeypatch):
     be = make_backend(db, name="be_rt3")
     make_server(db, be.id)
     rt = make_response_transform(
-        db, name="rt1", backend_id=be.id, transform_type="replace",
-        find_regex="foo", replace_string="bar",
+        db,
+        name="rt1",
+        backend_id=be.id,
+        transform_type="replace",
+        find_regex="foo",
+        replace_string="bar",
     )
 
     _baseline_configs(db, tmp_path, monkeypatch)
@@ -337,6 +374,7 @@ def test_generate_resp_transform_file_contents_matches_write(db, tmp_path, monke
     write_resp_transform_files writes to disk."""
     import json
     import os
+
     from app.core.config import get_settings
     from app.services.resp_transform import (
         generate_resp_transform_file_contents,
@@ -351,8 +389,12 @@ def test_generate_resp_transform_file_contents_matches_write(db, tmp_path, monke
     be = make_backend(db, name="be_match")
     make_server(db, be.id)
     make_response_transform(
-        db, name="rt1", backend_id=be.id, transform_type="replace",
-        find_regex="foo", replace_string="bar",
+        db,
+        name="rt1",
+        backend_id=be.id,
+        transform_type="replace",
+        find_regex="foo",
+        replace_string="bar",
     )
 
     generated = generate_resp_transform_file_contents(db)
@@ -524,6 +566,7 @@ def test_write_query_detokenize_config_writes_file(db, tmp_path, monkeypatch):
     """write_query_detokenize_config writes the global JSON config file."""
     import json
     import os
+
     from app.core.config import get_settings
 
     s = get_settings()
@@ -612,6 +655,7 @@ def test_mask_detokenize_prefixes_for_backend_multiple(db):
 def test_generate_resp_transform_file_contents_includes_query_detokenize(db, tmp_path, monkeypatch):
     """generate_resp_transform_file_contents includes query_detokenize.json."""
     import json
+
     from app.core.config import get_settings
 
     s = get_settings()

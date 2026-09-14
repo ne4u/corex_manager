@@ -1,16 +1,16 @@
 """Endpoint router."""
-import os
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from ..deps import get_current_user, get_db, require_admin, require_write, rate_limit
+
 from ...core.config import get_settings
 from ...models.models import *
 from ...schemas.cache import *
 from ...services.cache import *
 from ...services.settings import get_setting
-from ...services.tasks import queue_task
+from ..deps import get_current_user, get_db, rate_limit, require_write
 
 settings = get_settings()
 router = APIRouter()
@@ -18,6 +18,7 @@ router = APIRouter()
 
 # Caching
 # ---------------------------------------------------------------------------
+
 
 def _disk_cache_globally_enabled(db: Session) -> bool:
     return get_setting(db, "disk_cache_enabled", str(settings.DISK_CACHE_ENABLED)).lower() in ("true", "1", "yes")
@@ -33,7 +34,7 @@ def get_cache_status(db: Session = Depends(get_db), user=Depends(get_current_use
     return CacheStatusResponse(disk_cache_globally_enabled=_disk_cache_globally_enabled(db))
 
 
-@router.get("/cache/configs", response_model=List[CacheConfigResponse])
+@router.get("/cache/configs", response_model=list[CacheConfigResponse])
 def list_cache_configs(db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
     """List all cache configurations (with backend name)."""
     configs = db.query(CacheConfig).all()
@@ -48,7 +49,9 @@ def list_cache_configs(db: Session = Depends(get_db), user=Depends(get_current_u
 
 
 @router.post("/cache/configs", response_model=CacheConfigResponse, status_code=201)
-def create_cache_config(cc_in: CacheConfigCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def create_cache_config(
+    cc_in: CacheConfigCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     """Create a cache configuration for a backend."""
     backend = db.get(Backend, cc_in.backend_id)
     if not backend:
@@ -71,7 +74,9 @@ def create_cache_config(cc_in: CacheConfigCreate, db: Session = Depends(get_db),
 
 
 @router.get("/cache/configs/{backend_id}", response_model=CacheConfigResponse)
-def get_cache_config(backend_id: int, db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
+def get_cache_config(
+    backend_id: int, db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)
+):
     """Get the cache configuration for a specific backend."""
     cc = db.query(CacheConfig).filter(CacheConfig.backend_id == backend_id).first()
     if not cc:
@@ -84,7 +89,13 @@ def get_cache_config(backend_id: int, db: Session = Depends(get_db), user=Depend
 
 
 @router.put("/cache/configs/{backend_id}", response_model=CacheConfigResponse)
-def update_cache_config(backend_id: int, cc_in: CacheConfigUpdate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def update_cache_config(
+    backend_id: int,
+    cc_in: CacheConfigUpdate,
+    db: Session = Depends(get_db),
+    user=Depends(require_write),
+    _=Depends(rate_limit),
+):
     """Update the cache configuration for a specific backend."""
     cc = db.query(CacheConfig).filter(CacheConfig.backend_id == backend_id).first()
     if not cc:
@@ -111,22 +122,34 @@ def _get_config_or_404(db: Session, backend_id: int) -> CacheConfig:
     return cc
 
 
-@router.get("/cache/configs/{backend_id}/rules", response_model=List[CacheRuleResponse])
-def list_cache_rules(backend_id: int, db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
+@router.get("/cache/configs/{backend_id}/rules", response_model=list[CacheRuleResponse])
+def list_cache_rules(
+    backend_id: int, db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)
+):
     """List a backend's cacheability rules in evaluation order."""
     cc = _get_config_or_404(db, backend_id)
-    rules = db.query(CacheRule).filter(CacheRule.cache_config_id == cc.id).order_by(CacheRule.priority, CacheRule.id).all()
+    rules = (
+        db.query(CacheRule).filter(CacheRule.cache_config_id == cc.id).order_by(CacheRule.priority, CacheRule.id).all()
+    )
     return rules
 
 
 @router.post("/cache/configs/{backend_id}/rules", response_model=CacheRuleResponse, status_code=201)
-def create_cache_rule(backend_id: int, rule_in: CacheRuleCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def create_cache_rule(
+    backend_id: int,
+    rule_in: CacheRuleCreate,
+    db: Session = Depends(get_db),
+    user=Depends(require_write),
+    _=Depends(rate_limit),
+):
     """Append a cacheability rule to a backend's cache config."""
     cc = _get_config_or_404(db, backend_id)
     data = rule_in.model_dump()
     # Append to the end unless an explicit priority was supplied.
     if not data.get("priority"):
-        highest = db.query(CacheRule).filter(CacheRule.cache_config_id == cc.id).order_by(CacheRule.priority.desc()).first()
+        highest = (
+            db.query(CacheRule).filter(CacheRule.cache_config_id == cc.id).order_by(CacheRule.priority.desc()).first()
+        )
         data["priority"] = (highest.priority + 1) if highest else 0
     rule = CacheRule(cache_config_id=cc.id, **data)
     db.add(rule)
@@ -136,7 +159,14 @@ def create_cache_rule(backend_id: int, rule_in: CacheRuleCreate, db: Session = D
 
 
 @router.put("/cache/configs/{backend_id}/rules/{rule_id}", response_model=CacheRuleResponse)
-def update_cache_rule(backend_id: int, rule_id: int, rule_in: CacheRuleUpdate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def update_cache_rule(
+    backend_id: int,
+    rule_id: int,
+    rule_in: CacheRuleUpdate,
+    db: Session = Depends(get_db),
+    user=Depends(require_write),
+    _=Depends(rate_limit),
+):
     """Update a cacheability rule."""
     from ...services.cache_rules import normalize_pattern
 
@@ -162,7 +192,9 @@ def update_cache_rule(backend_id: int, rule_id: int, rule_in: CacheRuleUpdate, d
 
 
 @router.delete("/cache/configs/{backend_id}/rules/{rule_id}")
-def delete_cache_rule(backend_id: int, rule_id: int, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def delete_cache_rule(
+    backend_id: int, rule_id: int, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     """Delete a cacheability rule."""
     cc = _get_config_or_404(db, backend_id)
     rule = db.query(CacheRule).filter(CacheRule.id == rule_id, CacheRule.cache_config_id == cc.id).first()
@@ -173,8 +205,14 @@ def delete_cache_rule(backend_id: int, rule_id: int, db: Session = Depends(get_d
     return {"detail": "Cache rule deleted"}
 
 
-@router.post("/cache/configs/{backend_id}/rules/reorder", response_model=List[CacheRuleResponse])
-def reorder_cache_rules(backend_id: int, payload: CacheRuleReorder, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+@router.post("/cache/configs/{backend_id}/rules/reorder", response_model=list[CacheRuleResponse])
+def reorder_cache_rules(
+    backend_id: int,
+    payload: CacheRuleReorder,
+    db: Session = Depends(get_db),
+    user=Depends(require_write),
+    _=Depends(rate_limit),
+):
     """Reorder rules. Evaluation is first-match-wins, so order is significant."""
     cc = _get_config_or_404(db, backend_id)
     rules = db.query(CacheRule).filter(CacheRule.cache_config_id == cc.id).all()
@@ -184,11 +222,15 @@ def reorder_cache_rules(backend_id: int, payload: CacheRuleReorder, db: Session 
     for position, rule_id in enumerate(payload.rule_ids):
         by_id[rule_id].priority = position
     db.commit()
-    return db.query(CacheRule).filter(CacheRule.cache_config_id == cc.id).order_by(CacheRule.priority, CacheRule.id).all()
+    return (
+        db.query(CacheRule).filter(CacheRule.cache_config_id == cc.id).order_by(CacheRule.priority, CacheRule.id).all()
+    )
 
 
 @router.delete("/cache/configs/{backend_id}")
-def delete_cache_config(backend_id: int, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def delete_cache_config(
+    backend_id: int, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     """Delete the cache configuration for a backend (disables caching)."""
     cc = db.query(CacheConfig).filter(CacheConfig.backend_id == backend_id).first()
     if not cc:
@@ -199,9 +241,12 @@ def delete_cache_config(backend_id: int, db: Session = Depends(get_db), user=Dep
 
 
 @router.post("/cache/{backend_id}/clear", response_model=CacheClearResponse)
-def clear_backend_cache(backend_id: int, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def clear_backend_cache(
+    backend_id: int, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     """Clear the cache for a specific backend (memory + disk)."""
     from ...services.cache import clear_backend_cache as _clear
+
     return CacheClearResponse(**_clear(db, backend_id))
 
 
@@ -209,19 +254,21 @@ def clear_backend_cache(backend_id: int, db: Session = Depends(get_db), user=Dep
 def clear_all_caches(db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
     """Clear all caches (memory + disk) for all backends."""
     from ...services.cache import clear_all_caches as _clear_all
+
     return CacheClearResponse(**_clear_all(db))
 
 
 @router.get("/cache/metrics", response_model=CacheMetricsResponse)
 def get_cache_metrics(
-    from_ts: Optional[datetime] = Query(None, alias="from"),
-    to_ts: Optional[datetime] = Query(None, alias="to"),
-    step: Optional[int] = Query(None),
-    backend_id: Optional[int] = Query(None),
+    from_ts: datetime | None = Query(None, alias="from"),
+    to_ts: datetime | None = Query(None, alias="to"),
+    step: int | None = Query(None),
+    backend_id: int | None = Query(None),
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
     _=Depends(rate_limit),
 ):
     """Get time-series cache metrics."""
     from ...services.cache_metrics import get_cache_metrics as _get_metrics
+
     return CacheMetricsResponse(**_get_metrics(db, from_ts=from_ts, to_ts=to_ts, step=step, backend_id=backend_id))

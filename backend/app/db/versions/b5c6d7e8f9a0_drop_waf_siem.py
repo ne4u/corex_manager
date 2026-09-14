@@ -10,17 +10,17 @@ column. The WAF SIEM forwarding feature (SiemForwarder background thread and
 
 Idempotent and safe to run on any DB that has reached the baseline revision.
 """
-from typing import Sequence, Union
 
-from alembic import op
+from collections.abc import Sequence
+
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = 'b5c6d7e8f9a0'
-down_revision: Union[str, Sequence[str], None] = 'a9b8c7d6e5f4'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision: str = "b5c6d7e8f9a0"
+down_revision: str | Sequence[str] | None = "a9b8c7d6e5f4"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -30,14 +30,14 @@ def upgrade() -> None:
     existing_tables = set(inspector.get_table_names())
 
     # Drop the FK column first so the table drop can't trip on the reference.
-    if 'waf_rules' in existing_tables:
-        cols = [c['name'] for c in inspector.get_columns('waf_rules')]
-        if 'siem_integration_id' in cols:
-            with op.batch_alter_table('waf_rules', schema=None) as batch_op:
-                batch_op.drop_column('siem_integration_id')
+    if "waf_rules" in existing_tables:
+        cols = [c["name"] for c in inspector.get_columns("waf_rules")]
+        if "siem_integration_id" in cols:
+            with op.batch_alter_table("waf_rules", schema=None) as batch_op:
+                batch_op.drop_column("siem_integration_id")
 
-    if 'waf_siem_integrations' in existing_tables:
-        op.drop_table('waf_siem_integrations')
+    if "waf_siem_integrations" in existing_tables:
+        op.drop_table("waf_siem_integrations")
 
 
 def downgrade() -> None:

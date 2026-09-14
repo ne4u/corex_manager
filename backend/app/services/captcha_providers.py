@@ -9,12 +9,13 @@ Each provider contributes: widget HTML, script tags, CSP directives, token
 field name, verify logic, and whether it needs the HAProxy service proxy.
 The surrounding challenge page template is shared via render_challenge_page().
 """
+
 from __future__ import annotations
 
 import hashlib
 import html as _html
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 import httpx
 
@@ -24,6 +25,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Client-binding hash for the _cv captcha validation cookie
 # ---------------------------------------------------------------------------
+
 
 def compute_cv_binding_hash(ip: str, user_agent: str, ja4: str) -> str:
     """Compute the client-binding hash for a solved captcha cookie.
@@ -50,6 +52,7 @@ def compute_cv_binding_hash(ip: str, user_agent: str, ja4: str) -> str:
 # ---------------------------------------------------------------------------
 # Base class
 # ---------------------------------------------------------------------------
+
 
 class CaptchaProvider:
     """Base CAPTCHA provider interface."""
@@ -81,7 +84,7 @@ class CaptchaProvider:
         """True if the widget makes API calls that need HAProxy proxying."""
         return False
 
-    async def verify(self, token: str, secret: str, remote_ip: Optional[str] = None) -> bool:
+    async def verify(self, token: str, secret: str, remote_ip: str | None = None) -> bool:
         """Verify a captcha token. Returns True on success."""
         raise NotImplementedError
 
@@ -89,6 +92,7 @@ class CaptchaProvider:
 # ---------------------------------------------------------------------------
 # Cap (Native) provider
 # ---------------------------------------------------------------------------
+
 
 class CapProvider(CaptchaProvider):
     name = "cap"
@@ -109,29 +113,29 @@ class CapProvider(CaptchaProvider):
     def render_script_html(self, cfg: Any) -> str:
         widget_cdn = cfg.CAPTCHA_WIDGET_CDN_URL
         return (
-            '<script>window.CAP_CUSTOM_WASM_URL = '
+            "<script>window.CAP_CUSTOM_WASM_URL = "
             '"https://cdn.jsdelivr.net/npm/@cap.js/wasm@0.0.7/browser/cap_wasm_bg.wasm";</script>\n'
             f'  <script src="{_html.escape(widget_cdn)}" async defer></script>\n'
-            '  <script>\n'
-            '  // The Cap widget clears its light DOM children on init, so the\n'
-            '  // hidden cap_token input lives outside the widget. Listen for\n'
+            "  <script>\n"
+            "  // The Cap widget clears its light DOM children on init, so the\n"
+            "  // hidden cap_token input lives outside the widget. Listen for\n"
             '  // the widget\'s "solve" event to populate it.\n'
-            '  (function() {\n'
+            "  (function() {\n"
             '    var form = document.getElementById("captcha-form");\n'
-            '    if (!form) return;\n'
+            "    if (!form) return;\n"
             '    var widget = form.querySelector("cap-widget");\n'
-            '    var tokenInput = form.querySelector(\'input[name="cap_token"]\');\n'
-            '    if (!widget || !tokenInput) return;\n'
+            "    var tokenInput = form.querySelector('input[name=\"cap_token\"]');\n"
+            "    if (!widget || !tokenInput) return;\n"
             '    widget.addEventListener("solve", function(e) {\n'
-            '      if (e.detail && e.detail.token) {\n'
-            '        tokenInput.value = e.detail.token;\n'
-            '      }\n'
-            '    });\n'
+            "      if (e.detail && e.detail.token) {\n"
+            "        tokenInput.value = e.detail.token;\n"
+            "      }\n"
+            "    });\n"
             '    widget.addEventListener("reset", function() {\n'
             '      tokenInput.value = "";\n'
-            '    });\n'
-            '  })();\n'
-            '  </script>'
+            "    });\n"
+            "  })();\n"
+            "  </script>"
         )
 
     def get_csp_directives(self) -> str:
@@ -155,7 +159,7 @@ class CapProvider(CaptchaProvider):
     def needs_service_proxy(self) -> bool:
         return True
 
-    async def verify(self, token: str, secret: str, remote_ip: Optional[str] = None) -> bool:
+    async def verify(self, token: str, secret: str, remote_ip: str | None = None) -> bool:
         if not token or not secret:
             return False
         cfg = _get_settings()
@@ -166,8 +170,9 @@ class CapProvider(CaptchaProvider):
         # because the siteverify URL contains the wrong site key.
         site_key = ""
         try:
-            from ..services.settings import get_setting as _gs
             from ..core.database import SessionLocal
+            from ..services.settings import get_setting as _gs
+
             _db = SessionLocal()
             try:
                 site_key = _gs(_db, "cap_site_key") or ""
@@ -178,7 +183,9 @@ class CapProvider(CaptchaProvider):
         if not site_key:
             site_key = getattr(cfg, "CAPTCHA_SITE_KEY", None) or ""
         # Cap API expects POST /{siteKey}/siteverify with JSON body
-        url = f"{service_url.rstrip('/')}/{site_key}/siteverify" if site_key else f"{service_url.rstrip('/')}/siteverify"
+        url = (
+            f"{service_url.rstrip('/')}/{site_key}/siteverify" if site_key else f"{service_url.rstrip('/')}/siteverify"
+        )
         try:
             async with httpx.AsyncClient() as client:
                 res = await client.post(
@@ -192,7 +199,9 @@ class CapProvider(CaptchaProvider):
         if res.status_code != 200:
             logger.warning(
                 "Cap verify: %s returned status %s, body: %s",
-                url, res.status_code, res.text[:500],
+                url,
+                res.status_code,
+                res.text[:500],
             )
             return False
         try:
@@ -204,7 +213,9 @@ class CapProvider(CaptchaProvider):
         if not success:
             logger.info(
                 "Cap verify: token rejected by %s. success=%s, error=%s",
-                url, data.get("success"), data.get("error"),
+                url,
+                data.get("success"),
+                data.get("error"),
             )
         return success
 
@@ -212,6 +223,7 @@ class CapProvider(CaptchaProvider):
 # ---------------------------------------------------------------------------
 # reCAPTCHA provider
 # ---------------------------------------------------------------------------
+
 
 class RecaptchaProvider(CaptchaProvider):
     name = "recaptcha"
@@ -226,15 +238,10 @@ class RecaptchaProvider(CaptchaProvider):
             # v3 is invisible — the token is obtained via JS callback
             return f'<div id="recaptcha-container" data-sitekey="{_html.escape(site_key)}"></div>'
         # v2 — checkbox/image challenge
-        return (
-            f'<div class="g-recaptcha" data-sitekey="{_html.escape(site_key)}" '
-            f'style="display:inline-block;"></div>'
-        )
+        return f'<div class="g-recaptcha" data-sitekey="{_html.escape(site_key)}" style="display:inline-block;"></div>'
 
     def render_script_html(self, cfg: Any) -> str:
-        return (
-            '<script src="https://www.google.com/recaptcha/api.js" async defer></script>'
-        )
+        return '<script src="https://www.google.com/recaptcha/api.js" async defer></script>'
 
     def get_csp_directives(self) -> str:
         return (
@@ -252,11 +259,11 @@ class RecaptchaProvider(CaptchaProvider):
     def is_invisible(self) -> bool:
         return self._version == "v3"
 
-    async def verify(self, token: str, secret: str, remote_ip: Optional[str] = None) -> bool:
+    async def verify(self, token: str, secret: str, remote_ip: str | None = None) -> bool:
         if not token or not secret:
             return False
         async with httpx.AsyncClient() as client:
-            data: Dict[str, Any] = {"secret": secret, "response": token}
+            data: dict[str, Any] = {"secret": secret, "response": token}
             if remote_ip:
                 data["remoteip"] = remote_ip
             res = await client.post(
@@ -279,20 +286,16 @@ class RecaptchaProvider(CaptchaProvider):
 # Turnstile provider
 # ---------------------------------------------------------------------------
 
+
 class TurnstileProvider(CaptchaProvider):
     name = "turnstile"
     display_name = "Turnstile"
 
     def render_widget_html(self, site_key: str, proxy_path: str) -> str:
-        return (
-            f'<div class="cf-turnstile" data-sitekey="{_html.escape(site_key)}" '
-            f'style="display:inline-block;"></div>'
-        )
+        return f'<div class="cf-turnstile" data-sitekey="{_html.escape(site_key)}" style="display:inline-block;"></div>'
 
     def render_script_html(self, cfg: Any) -> str:
-        return (
-            '<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>'
-        )
+        return '<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>'
 
     def get_csp_directives(self) -> str:
         return (
@@ -306,11 +309,11 @@ class TurnstileProvider(CaptchaProvider):
     def get_token_field_name(self) -> str:
         return "cf-turnstile-response"
 
-    async def verify(self, token: str, secret: str, remote_ip: Optional[str] = None) -> bool:
+    async def verify(self, token: str, secret: str, remote_ip: str | None = None) -> bool:
         if not token or not secret:
             return False
         async with httpx.AsyncClient() as client:
-            data: Dict[str, Any] = {"secret": secret, "response": token}
+            data: dict[str, Any] = {"secret": secret, "response": token}
             if remote_ip:
                 data["remoteip"] = remote_ip
             res = await client.post(
@@ -357,12 +360,13 @@ def get_provider_display_name(name: str) -> str:
 # Shared challenge page template
 # ---------------------------------------------------------------------------
 
+
 def render_challenge_page(
     widget_html: str,
     script_html: str,
     csp: str,
     form_action: str,
-    hidden_fields: Dict[str, str],
+    hidden_fields: dict[str, str],
     request_id: str,
     is_invisible: bool,
 ) -> str:
@@ -376,9 +380,7 @@ def render_challenge_page(
         f'    <input type="hidden" name="{_html.escape(k)}" value="{_html.escape(v)}" />'
         for k, v in hidden_fields.items()
     )
-    button_html = "" if is_invisible else (
-        '<br/>\n    <button type="submit" class="btn">Continue</button>'
-    )
+    button_html = "" if is_invisible else ('<br/>\n    <button type="submit" class="btn">Continue</button>')
     auto_submit_js = ""
     if is_invisible:
         # Auto-submit when a token appears in the form (reCAPTCHA v3 / Turnstile invisible)
@@ -552,7 +554,9 @@ def render_error_page(title: str, message: str, request_id: str, status: int = 4
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _get_settings():
     """Lazy import to avoid circular imports."""
     from ..core.config import get_settings
+
     return get_settings()

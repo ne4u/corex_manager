@@ -2,12 +2,17 @@
 derivation, score budget enforcement, emission, data file generation,
 baseline seeding idempotency).
 """
-import os
-import pytest
 
+import os
+
+import pytest
 from app.models.models import (
-    RiskRule, RiskRuleset, NetworkList, NetworkListEntry, AsnList, AsnListEntry,
-    GeoList, GeoListEntry, Ja4List, Ja4ListEntry,
+    AsnList,
+    GeoList,
+    Ja4List,
+    NetworkList,
+    RiskRule,
+    RiskRuleset,
 )
 from app.services import risk_scoring
 
@@ -51,7 +56,7 @@ class TestCategoryDerivation:
         assert risk_scoring.derive_category(ast, 5) == "list"
 
     def test_no_match_custom(self):
-        ast = risk_scoring.parse_expression("http.request.method = \"GET\"")
+        ast = risk_scoring.parse_expression('http.request.method = "GET"')
         assert risk_scoring.derive_category(ast, 5) == "custom"
 
     def test_none_ast(self):
@@ -111,8 +116,14 @@ class TestEmission:
         `{ { ... } }` is rejected by HAProxy with "missing fetch method in
         ACL expression '{'".
         """
-        rule = RiskRule(name="test", expression='http.request.version_numeric < 11',
-                        points=4, enabled=True, priority=0, ruleset_id=1)
+        rule = RiskRule(
+            name="test",
+            expression="http.request.version_numeric < 11",
+            points=4,
+            enabled=True,
+            priority=0,
+            ruleset_id=1,
+        )
         db.add(rule)
         db.commit()
         listener = type("Listener", (), {"id": 1})()
@@ -130,7 +141,9 @@ class TestEmission:
 class TestDataFile:
     def test_write_data_file(self, db, tmp_path, monkeypatch):
         monkeypatch.setattr(risk_scoring.settings, "SECURITY_LISTS_DIR", str(tmp_path / "lists"))
-        rule = RiskRule(name="test rule", expression='http.host = "a"', points=15, enabled=True, priority=0, log=True, ruleset_id=1)
+        rule = RiskRule(
+            name="test rule", expression='http.host = "a"', points=15, enabled=True, priority=0, log=True, ruleset_id=1
+        )
         db.add(rule)
         db.commit()
         path = risk_scoring.write_risk_rules_data_file(db)
@@ -190,11 +203,15 @@ class TestBaselineSeeding:
         for slug in ("default",):
             rs = db.query(RiskRuleset).filter(RiskRuleset.slug == slug).first()
             assert rs is not None, f"Ruleset {slug} not found"
-            rules = db.query(RiskRule).filter(
-                RiskRule.ruleset_id == rs.id,
-                RiskRule.enabled == True,
-                RiskRule.points > 0,
-            ).all()
+            rules = (
+                db.query(RiskRule)
+                .filter(
+                    RiskRule.ruleset_id == rs.id,
+                    RiskRule.enabled == True,
+                    RiskRule.points > 0,
+                )
+                .all()
+            )
             assert len(rules) > 0, f"Ruleset {slug} has no positive-point rules"
             total = sum(r.points for r in rules)
             assert total > 0, f"Ruleset {slug} has {total} positive points"
@@ -301,8 +318,9 @@ class TestRulesetCRUD:
 
     def test_delete_ruleset_cascades_rules(self, db):
         rs = risk_scoring.create_ruleset(db, name="ToDelete", description="")
-        rule = RiskRule(name="test", expression="http.host = \"a\"", points=10,
-                        enabled=True, priority=0, ruleset_id=rs.id)
+        rule = RiskRule(
+            name="test", expression='http.host = "a"', points=10, enabled=True, priority=0, ruleset_id=rs.id
+        )
         db.add(rule)
         db.commit()
         rule_id = rule.id

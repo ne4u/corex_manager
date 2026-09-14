@@ -1,10 +1,10 @@
 """Tests for the API Armor data-file writer."""
+
 import json
 import os
 
-from app.models.api_armor import ApiKeyList, ApiKeyListEntry, ApiProfile, ApiSchema, AuthPolicy, OpenApiSpec
+from app.models.api_armor import ApiKeyList, ApiKeyListEntry, ApiProfile, ApiSchema, AuthPolicy
 from app.services.api_armor_writer import write_api_armor_files
-
 
 SAMPLE_SCHEMA = {
     "type": "object",
@@ -18,42 +18,46 @@ SAMPLE_SCHEMA = {
 
 def _import_spec(db):
     from app.services.api_armor_schemas import import_openapi_spec
-    spec_text = json.dumps({
-        "openapi": "3.0.3",
-        "info": {"title": "Test API", "version": "1.0.0"},
-        "paths": {
-            "/api/v1/users": {
-                "post": {
-                    "operationId": "createUser",
-                    "requestBody": {
-                        "content": {
-                            "application/json": {
-                                "schema": SAMPLE_SCHEMA,
+
+    spec_text = json.dumps(
+        {
+            "openapi": "3.0.3",
+            "info": {"title": "Test API", "version": "1.0.0"},
+            "paths": {
+                "/api/v1/users": {
+                    "post": {
+                        "operationId": "createUser",
+                        "requestBody": {
+                            "content": {
+                                "application/json": {
+                                    "schema": SAMPLE_SCHEMA,
+                                }
                             }
-                        }
+                        },
                     }
-                }
-            },
-            "/api/v1/users/{id}": {
-                "put": {
-                    "operationId": "updateUser",
-                    "requestBody": {
-                        "content": {
-                            "application/json": {
-                                "schema": SAMPLE_SCHEMA,
+                },
+                "/api/v1/users/{id}": {
+                    "put": {
+                        "operationId": "updateUser",
+                        "requestBody": {
+                            "content": {
+                                "application/json": {
+                                    "schema": SAMPLE_SCHEMA,
+                                }
                             }
-                        }
+                        },
                     }
-                }
+                },
             },
-        },
-    })
+        }
+    )
     return import_openapi_spec(db, name="test-spec", spec_text=spec_text)
 
 
 def test_write_api_armor_files_creates_schema_index(db, monkeypatch):
     """Writer creates schema-index.json and per-endpoint schema files."""
     import tempfile
+
     tmp = tempfile.mkdtemp()
     monkeypatch.setattr("app.services.api_armor_writer.settings.API_ARMOR_DIR", tmp)
 
@@ -87,6 +91,7 @@ def test_write_api_armor_files_creates_schema_index(db, monkeypatch):
 def test_write_api_armor_files_creates_api_key_files(db, monkeypatch):
     """Writer creates one .lst file per API key list."""
     import tempfile
+
     tmp = tempfile.mkdtemp()
     monkeypatch.setattr("app.services.api_armor_writer.settings.API_ARMOR_DIR", tmp)
 
@@ -111,6 +116,7 @@ def test_write_api_armor_files_creates_api_key_files(db, monkeypatch):
 def test_write_api_armor_files_creates_auth_policies(db, monkeypatch):
     """Writer creates auth-policies.json with enabled policies."""
     import tempfile
+
     tmp = tempfile.mkdtemp()
     monkeypatch.setattr("app.services.api_armor_writer.settings.API_ARMOR_DIR", tmp)
 
@@ -141,6 +147,7 @@ def test_write_api_armor_files_creates_auth_policies(db, monkeypatch):
 def test_write_api_armor_files_creates_profiles(db, monkeypatch):
     """Writer writes learned profiles to profiles.json."""
     import tempfile
+
     tmp = tempfile.mkdtemp()
     monkeypatch.setattr("app.services.api_armor_writer.settings.API_ARMOR_DIR", tmp)
 
@@ -170,6 +177,7 @@ def test_write_api_armor_files_creates_profiles(db, monkeypatch):
 def test_write_api_armor_files_removes_stale_schemas(db, monkeypatch):
     """Writer removes schema files for schemas that no longer exist."""
     import tempfile
+
     tmp = tempfile.mkdtemp()
     monkeypatch.setattr("app.services.api_armor_writer.settings.API_ARMOR_DIR", tmp)
 
@@ -192,6 +200,7 @@ def test_write_api_armor_files_removes_stale_schemas(db, monkeypatch):
 def test_write_api_armor_files_disabled_schemas_excluded(db, monkeypatch):
     """Disabled schemas are not included in the index."""
     import tempfile
+
     tmp = tempfile.mkdtemp()
     monkeypatch.setattr("app.services.api_armor_writer.settings.API_ARMOR_DIR", tmp)
 

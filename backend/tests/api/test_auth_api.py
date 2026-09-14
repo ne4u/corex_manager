@@ -1,10 +1,10 @@
 """Integration tests for /auth endpoints: preferences (language) and change-password."""
-from datetime import datetime, timedelta, timezone
+
+from datetime import UTC, datetime, timedelta
 
 import pytest
-
 from app.core.dependencies import get_current_user
-from app.core.security import create_access_token, get_password_hash, verify_password
+from app.core.security import get_password_hash, verify_password
 from app.main import app
 from app.models.models import Setting, User, UserPreference
 
@@ -194,6 +194,7 @@ def test_change_password_endpoint_short_new_rejected(client, db, real_user):
 # Login: last_login_at tracking + password_expired response
 # ---------------------------------------------------------------------------
 
+
 def test_login_sets_last_login_at(client, db):
     """A successful /auth/token login records last_login_at on the user."""
     user = User(
@@ -224,7 +225,7 @@ def test_login_response_includes_password_expired_false(client, db):
         role="admin",
         is_admin=True,
         hashed_password=get_password_hash("GoodPass123"),
-        password_changed_at=datetime.now(timezone.utc),
+        password_changed_at=datetime.now(UTC),
     )
     db.add(user)
     db.commit()
@@ -247,7 +248,7 @@ def test_login_response_password_expired_true(client, db):
         role="admin",
         is_admin=True,
         hashed_password=get_password_hash("GoodPass123"),
-        password_changed_at=datetime.now(timezone.utc) - timedelta(days=60),
+        password_changed_at=datetime.now(UTC) - timedelta(days=60),
     )
     db.add(user)
     db.commit()
@@ -275,6 +276,7 @@ def test_session_endpoint_reports_password_expired(client, db, real_user):
 # Password expiry middleware (403 password_change_required)
 # ---------------------------------------------------------------------------
 
+
 def test_expired_password_blocks_non_auth_endpoint(client, db):
     """A JWT with pwd_exp=true gets 403 on a non-auth endpoint."""
     db.add(Setting(key="password_rotation_months", value="1"))
@@ -283,7 +285,7 @@ def test_expired_password_blocks_non_auth_endpoint(client, db):
         role="admin",
         is_admin=True,
         hashed_password=get_password_hash("GoodPass123"),
-        password_changed_at=datetime.now(timezone.utc) - timedelta(days=60),
+        password_changed_at=datetime.now(UTC) - timedelta(days=60),
     )
     db.add(user)
     db.commit()
@@ -310,7 +312,7 @@ def test_expired_password_allows_change_password(client, db):
         role="admin",
         is_admin=True,
         hashed_password=get_password_hash("GoodPass123"),
-        password_changed_at=datetime.now(timezone.utc) - timedelta(days=60),
+        password_changed_at=datetime.now(UTC) - timedelta(days=60),
     )
     db.add(user)
     db.commit()
@@ -334,7 +336,6 @@ def test_expired_password_allows_change_password(client, db):
         assert changed.status_code == 200
     finally:
         # Restore the default override
-        from app.core.dependencies import get_current_user as _gcu
         app.dependency_overrides[get_current_user] = lambda: User(
             username="test-admin", role="admin", is_admin=True, hashed_password="x"
         )
@@ -349,7 +350,7 @@ def test_change_password_clears_expiry_and_refresh_yields_clean_token(client, db
         role="admin",
         is_admin=True,
         hashed_password=get_password_hash("GoodPass123"),
-        password_changed_at=datetime.now(timezone.utc) - timedelta(days=60),
+        password_changed_at=datetime.now(UTC) - timedelta(days=60),
     )
     db.add(user)
     db.commit()
@@ -392,6 +393,7 @@ def test_change_password_clears_expiry_and_refresh_yields_clean_token(client, db
 # ---------------------------------------------------------------------------
 # Complexity validation on change-password
 # ---------------------------------------------------------------------------
+
 
 def test_change_password_rejects_missing_uppercase(client, db, real_user):
     db.add(Setting(key="password_require_uppercase", value="true"))

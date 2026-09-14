@@ -4,16 +4,17 @@ Handles OpenAPI spec import (parsing OpenAPI 3.x JSON/YAML into per-endpoint
 JSON Schemas) and learned schema inference (merging observed request bodies
 into per-endpoint schemas).
 """
+
 import json
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from sqlalchemy.orm import Session
 
-from ..models.api_armor import OpenApiSpec, ApiSchema
+from ..models.api_armor import ApiSchema, OpenApiSpec
 
 
-def parse_openapi_spec(spec_text: str) -> Tuple[Dict, str]:
+def parse_openapi_spec(spec_text: str) -> tuple[dict, str]:
     """Parse an OpenAPI spec string (JSON or YAML) into a dict.
 
     Returns (parsed_spec, version_string).
@@ -26,6 +27,7 @@ def parse_openapi_spec(spec_text: str) -> Tuple[Dict, str]:
         # Try YAML (simple fallback — requires PyYAML)
         try:
             import yaml
+
             spec = yaml.safe_load(spec_text)
         except ImportError:
             raise ValueError("Spec is not valid JSON and PyYAML is not installed for YAML parsing")
@@ -46,7 +48,7 @@ def parse_openapi_spec(spec_text: str) -> Tuple[Dict, str]:
     return spec, version
 
 
-def extract_schemas_from_openapi(spec: Dict) -> List[Dict]:
+def extract_schemas_from_openapi(spec: dict) -> list[dict]:
     """Extract per-endpoint request body schemas from an OpenAPI spec.
 
     Returns a list of dicts with keys: method, path, schema, name.
@@ -82,17 +84,19 @@ def extract_schemas_from_openapi(spec: Dict) -> List[Dict]:
             operation_id = operation.get("operationId", "")
             name = operation_id or f"{method.upper()} {path}"
 
-            schemas.append({
-                "name": name,
-                "method": method.upper(),
-                "path": normalize_path(path),
-                "schema": resolved_schema,
-            })
+            schemas.append(
+                {
+                    "name": name,
+                    "method": method.upper(),
+                    "path": normalize_path(path),
+                    "schema": resolved_schema,
+                }
+            )
 
     return schemas
 
 
-def resolve_ref(schema: Dict, components: Dict) -> Dict:
+def resolve_ref(schema: dict, components: dict) -> dict:
     """Resolve a $ref reference in an OpenAPI schema.
 
     Supports both OpenAPI 3.x (#/components/schemas/Name) and
@@ -123,7 +127,7 @@ def resolve_ref(schema: Dict, components: Dict) -> Dict:
     return schema
 
 
-def resolve_nested_refs(schema: Any, components: Dict) -> Any:
+def resolve_nested_refs(schema: Any, components: dict) -> Any:
     """Recursively resolve all $ref references in a schema."""
     if isinstance(schema, dict):
         if "$ref" in schema:
@@ -147,9 +151,9 @@ def import_openapi_spec(
     db: Session,
     name: str,
     spec_text: str,
-    listener_ids: Optional[List[int]] = None,
-    backend_ids: Optional[List[int]] = None,
-) -> Tuple[OpenApiSpec, List[ApiSchema]]:
+    listener_ids: list[int] | None = None,
+    backend_ids: list[int] | None = None,
+) -> tuple[OpenApiSpec, list[ApiSchema]]:
     """Import an OpenAPI spec and create per-endpoint ApiSchema rows.
 
     Returns (spec, schemas).
@@ -205,7 +209,7 @@ def get_schema_for_endpoint(
     db: Session,
     method: str,
     path: str,
-) -> Optional[Dict]:
+) -> dict | None:
     """Look up the JSON Schema for a given method + path.
 
     Returns the schema dict, or None if no matching schema exists.
@@ -254,8 +258,8 @@ def merge_learned_schema(
     db: Session,
     method: str,
     path: str,
-    body: Dict,
-) -> Optional[ApiSchema]:
+    body: dict,
+) -> ApiSchema | None:
     """Merge an observed request body into a learned schema for the endpoint.
 
     If no learned schema exists, creates one. If one exists, merges the
@@ -304,7 +308,7 @@ def merge_learned_schema(
         return schema
 
 
-def _infer_schema_python(value: Any) -> Dict:
+def _infer_schema_python(value: Any) -> dict:
     """Python equivalent of the Rust infer_schema function."""
     if value is None:
         return {"type": "null"}
@@ -331,7 +335,7 @@ def _infer_schema_python(value: Any) -> Dict:
     return {}
 
 
-def _merge_schemas_python(s1: Dict, s2: Dict) -> Dict:
+def _merge_schemas_python(s1: dict, s2: dict) -> dict:
     """Python equivalent of the Rust merge_schemas function."""
     t1 = s1.get("type")
     t2 = s2.get("type")

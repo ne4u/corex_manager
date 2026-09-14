@@ -1,9 +1,10 @@
 """Tests for the Page Protect hasher (code change detection)."""
-from unittest.mock import patch, MagicMock
-import hashlib
 
-from app.services.page_protect_hasher import hash_script, check_script, check_all_scripts, reset_script_hash
+import hashlib
+from unittest.mock import MagicMock, patch
+
 from app.models.models import PageProtectScript
+from app.services.page_protect_hasher import check_all_scripts, check_script, hash_script, reset_script_hash
 
 
 def _mock_response(content=b"console.log(1);", status_code=200, content_type="text/javascript"):
@@ -111,6 +112,7 @@ def test_check_script_success_then_failure_shows_error(db):
 
     # Second check: failure
     import time
+
     time.sleep(0.01)  # ensure hash_checked_at is strictly newer
     with patch("httpx.Client", return_value=_mock_httpx_client(side_effect=Exception("connection refused"))):
         result = check_script(db, script)
@@ -187,6 +189,7 @@ def test_check_script_no_change(db):
 def test_check_script_ignored_is_skipped(db):
     """Ignored scripts are not fetched and do not update hash fields."""
     from tests.factories import make_page_protect_script
+
     script = make_page_protect_script(db, url="https://cdn.example.com/ignored.js", ignored=True)
     db.commit()
     with patch("httpx.Client") as mock_client_cls:
@@ -198,16 +201,16 @@ def test_check_script_ignored_is_skipped(db):
 
 def test_check_all_scripts_force(db, monkeypatch):
     from tests.factories import make_page_protect_script
+
     s1 = make_page_protect_script(db, url="https://cdn1.example.com/a.js")
     s2 = make_page_protect_script(db, url="https://cdn2.example.com/b.js")
     s3 = make_page_protect_script(db, url="https://cdn3.example.com/c.js", ignored=True)
     db.commit()
 
     # Mock settings to enable change detection
-    from app.services.page_protect import get_page_protect_settings
     monkeypatch.setattr(
         "app.services.page_protect_hasher.get_page_protect_settings",
-        lambda db: {"change_detection_enabled": True, "change_detection_interval_hours": 24}
+        lambda db: {"change_detection_enabled": True, "change_detection_interval_hours": 24},
     )
 
     mock_response = MagicMock()
@@ -225,6 +228,7 @@ def test_check_all_scripts_commits_on_all_failures(db, monkeypatch):
     """Even when every fetch fails, hash_checked_at updates are committed
     so the UI can show 'Error' instead of 'Unchecked'."""
     from tests.factories import make_page_protect_script
+
     s1 = make_page_protect_script(db, url="https://cdn1.example.com/a.js")
     db.commit()
 
@@ -247,6 +251,7 @@ def test_check_all_scripts_commits_on_all_failures(db, monkeypatch):
 def test_reset_script_hash_clears_fields(db):
     """reset_script_hash clears all hash fields so the next check is a fresh baseline."""
     from tests.factories import make_page_protect_script
+
     s = make_page_protect_script(
         db,
         url="https://cdn.example.com/lib.js",
@@ -271,6 +276,7 @@ def test_reset_script_hash_clears_fields(db):
 def test_reset_then_check_establishes_new_baseline(db, monkeypatch):
     """After reset, the next check sets a fresh first_hash with hash_changed=False."""
     from tests.factories import make_page_protect_script
+
     s = make_page_protect_script(
         db,
         url="https://cdn.example.com/lib.js",

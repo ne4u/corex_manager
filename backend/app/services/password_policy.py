@@ -4,8 +4,8 @@ Settings are stored in the ``settings`` table (overridable at runtime by an
 admin) with env/config fallback defaults from :class:`Settings`. All values
 are read as strings from the settings table and normalized here.
 """
-from datetime import datetime, timezone
-from typing import Optional
+
+from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
@@ -25,18 +25,18 @@ KEY_REQUIRE_SYMBOL = "password_require_symbol"
 KEY_ROTATION_MONTHS = "password_rotation_months"
 
 
-def _to_bool(value: Optional[str], default: bool) -> bool:
+def _to_bool(value: str | None, default: bool) -> bool:
     if value is None:
         return default
-    return (str(value).strip().lower() in ("true", "1", "yes", "on"))
+    return str(value).strip().lower() in ("true", "1", "yes", "on")
 
 
-def _to_int(value: Optional[str], default: int) -> int:
+def _to_int(value: str | None, default: int) -> int:
     if value is None:
         return default
     try:
         return int(str(value).strip())
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 
@@ -92,13 +92,14 @@ def is_password_expired(user: User, db: Session) -> bool:
 
     # Normalize naive datetimes (SQLite stores tz-naive) to UTC for comparison.
     if anchor.tzinfo is None:
-        anchor = anchor.replace(tzinfo=timezone.utc)
+        anchor = anchor.replace(tzinfo=UTC)
 
-    expiry = anchor.replace(tzinfo=timezone.utc) + _months_to_timedelta(months)
-    return datetime.now(timezone.utc) >= expiry
+    expiry = anchor.replace(tzinfo=UTC) + _months_to_timedelta(months)
+    return datetime.now(UTC) >= expiry
 
 
 def _months_to_timedelta(months: int):
     """Approximate a month as 30 days for expiry comparison."""
     from datetime import timedelta
+
     return timedelta(days=30 * months)

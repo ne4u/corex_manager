@@ -1,9 +1,9 @@
-from typing import Optional
 from zoneinfo import available_timezones
+
 from fastapi import APIRouter, Depends, Form, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from ..deps import get_current_user, get_db, oauth2_scheme, rate_limit, rate_limit_by_ip
+
 from ...models.auth import UserPreference
 from ...schemas.users import (
     ChangePasswordRequest,
@@ -26,6 +26,7 @@ from ...services.auth import (
     setup_totp,
     verify_totp,
 )
+from ..deps import get_current_user, get_db, oauth2_scheme, rate_limit, rate_limit_by_ip
 
 # IANA timezones available on this system (cached at import time).
 _IANA_TIMEZONES: frozenset[str] = frozenset(available_timezones())
@@ -55,13 +56,14 @@ def _validate_datetime_format(value: str) -> None:
             detail="datetime_format must be 64 characters or fewer",
         )
 
+
 router = APIRouter()
 
 
 @router.post("/auth/token", response_model=LoginResponse)
 def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
-    totp_code: Optional[str] = Form(None),
+    totp_code: str | None = Form(None),
     db: Session = Depends(get_db),
     _=Depends(rate_limit_by_ip),
 ):
@@ -168,6 +170,7 @@ def get_session_settings_endpoint(
 # ---------------------------------------------------------------------------
 # User preferences (theme + custom themes + language + date/time format)
 # ---------------------------------------------------------------------------
+
 
 def _get_or_create_pref(db: Session, user_id: int) -> UserPreference:
     pref = db.query(UserPreference).filter(UserPreference.user_id == user_id).first()

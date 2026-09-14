@@ -1,4 +1,5 @@
 """Tests for ACME HTTP-01 challenge HAProxy config generation."""
+
 from app.services import haproxy
 from tests.factories import make_backend, make_listener, make_server
 
@@ -41,7 +42,10 @@ def test_acme_frontend_lua_content_serve(db):
     make_server(db, backend.id)
     cfg = haproxy.generate_config(db)
     assert "http-request set-var(txn.acme_content) lua.acme_challenge_file if is_acme_challenge" in cfg
-    assert 'http-request return status 200 content-type "application/octet-stream" lf-string "%[var(txn.acme_content)]"' in cfg
+    assert (
+        'http-request return status 200 content-type "application/octet-stream" lf-string "%[var(txn.acme_content)]"'
+        in cfg
+    )
     assert "var(txn.acme_content) -m found" in cfg
 
 

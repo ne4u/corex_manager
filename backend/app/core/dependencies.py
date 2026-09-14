@@ -1,4 +1,5 @@
 """Back-compat re-export of shared route dependencies from api.deps."""
+
 from ..api.deps import (  # noqa: F401
     get_current_user,
     get_or_404,

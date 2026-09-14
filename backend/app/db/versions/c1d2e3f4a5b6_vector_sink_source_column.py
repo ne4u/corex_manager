@@ -9,8 +9,9 @@ has exactly one source, and sources are auto-enabled when a sink references
 them. This replaces the previous model where each sink had a list of sources
 and sources were enabled via separate toggles.
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 
 revision = "c1d2e3f4a5b6"
 down_revision = "b0c1d2e3f4a5"
@@ -29,9 +30,10 @@ def upgrade():
         sources = row[1] if row[1] else []
         if isinstance(sources, str):
             import json
+
             try:
                 sources = json.loads(sources)
-            except (json.JSONDecodeError, TypeError):
+            except json.JSONDecodeError, TypeError:
                 sources = []
         first = sources[0] if sources else "corex"
         conn.execute(
@@ -55,6 +57,7 @@ def downgrade():
     rows = conn.execute(sa.text("SELECT id, source FROM vector_sinks")).fetchall()
     for row in rows:
         import json
+
         sources = json.dumps([row[1]] if row[1] else [])
         conn.execute(
             sa.text("UPDATE vector_sinks SET sources = :srcs WHERE id = :id"),

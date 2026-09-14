@@ -1,5 +1,5 @@
-from sqlalchemy import Column, Integer, String, Boolean, Text, DateTime, ForeignKey, JSON
-from sqlalchemy.orm import relationship
+from sqlalchemy import JSON, Column, DateTime, Integer, String, Text
+
 from .base import Base, utcnow
 
 
@@ -27,4 +27,4 @@ class ConfigSnapshot(Base):
     snapshot_path = Column(String, nullable=False)
 
 
-__all__ = ['ConfigSnapshot', 'Task']
+__all__ = ["ConfigSnapshot", "Task"]

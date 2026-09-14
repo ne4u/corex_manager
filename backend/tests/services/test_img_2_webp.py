@@ -9,6 +9,7 @@ The filter performs content negotiation based on the Accept header — no
 rewrite rules or src-link replacement needed. Converted responses include
 `Vary: Accept` for correct caching.
 """
+
 from app.services import haproxy
 from tests.factories import make_backend, make_fcgi_app, make_server
 
@@ -133,7 +134,7 @@ def test_global_section_no_module_when_disabled(db):
     # The combined loader may still be emitted if other modules (geoip, etc.)
     # are enabled, but img_2_webp should not be in the loader content.
     # We check that the img_2_webp require line is not present.
-    assert 'haproxy_img_2_webp_module' not in cfg
+    assert "haproxy_img_2_webp_module" not in cfg
 
 
 def test_different_backends_different_settings(db):
@@ -150,7 +151,7 @@ def test_different_backends_different_settings(db):
     assert "filter lua.img_2_webp" in cfg
     assert "quality:90" in cfg
     # be2 should not have the filter
-    be2_section = cfg[cfg.index("backend be_without_convert"):]
+    be2_section = cfg[cfg.index("backend be_without_convert") :]
     be2_section_end = be2_section.find("\n\n")
     be2_section = be2_section[:be2_section_end] if be2_section_end != -1 else be2_section
     assert "filter lua.img_2_webp" not in be2_section

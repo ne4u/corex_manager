@@ -7,20 +7,18 @@ Backend/Server/CacheConfig models so there is no duplicate configuration.
 The Varnish implementation detail is NOT exposed in the GUI — all user-facing
 text refers to "Disk Cache".
 """
-import json
+
 import logging
 import os
 import re
 import subprocess
 import tempfile
-import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from sqlalchemy.orm import Session
 
 from ..core.config import get_settings
-from ..models.models import Backend, CacheConfig, Listener, ResponseHeader, PageProtectPolicy
-from .cache_rules import emit_vcl_decision
+from ..models.models import Backend, CacheConfig, Listener, PageProtectPolicy, ResponseHeader
 from .runtime import get_runtime
 
 logger = logging.getLogger(__name__)
@@ -45,7 +43,7 @@ def _safe_vcl_string(value: str) -> str:
     return _VCL_VALUE_RE.sub("", value)
 
 
-def _haproxy_managed_response_headers(db: Session) -> List[str]:
+def _haproxy_managed_response_headers(db: Session) -> list[str]:
     """Return HTTP header names that HAProxy adds to responses via config.
 
     These are stripped from Varnish cached objects in vcl_backend_response so
@@ -78,7 +76,7 @@ def _haproxy_managed_response_headers(db: Session) -> List[str]:
     return sorted(names)
 
 
-def _disk_cache_backends(db: Session) -> List[Tuple[Backend, CacheConfig, str, str]]:
+def _disk_cache_backends(db: Session) -> list[tuple[Backend, CacheConfig, str, str]]:
     """Return (backend, cache_config, vcl_name, haproxy_name) for disk-cached backends.
 
     `vcl_name` is a VCL identifier (letters/digits/underscore only) used to
@@ -92,7 +90,7 @@ def _disk_cache_backends(db: Session) -> List[Tuple[Backend, CacheConfig, str, s
 
     _, backend_names, _, _ = _get_section_names(db)
 
-    result: List[Tuple[Backend, CacheConfig, str, str]] = []
+    result: list[tuple[Backend, CacheConfig, str, str]] = []
     used: set = set()
     for cc in db.query(CacheConfig).filter(CacheConfig.disk_cache_enabled == True).all():  # noqa: E712
         backend = db.get(Backend, cc.backend_id)
@@ -190,7 +188,7 @@ sub vcl_recv {
     haproxy_host = _safe_vcl_string(settings.HAPROXY_CONTAINER_NAME)
     haproxy_port = _haproxy_internal_port(db)
 
-    lines: List[str] = ["vcl 4.1;", ""]
+    lines: list[str] = ["vcl 4.1;", ""]
 
     # Purge ACL — allows purges from the Docker network (haproxy-net).
     any_purge = any(cc.disk_cache_purge_enabled for _, cc, _, _ in entries)
@@ -217,13 +215,13 @@ sub vcl_recv {
     lines.append("sub vcl_recv {")
     if any_purge:
         lines.append("    # PURGE/BAN handling")
-        lines.append("    if (req.method == \"PURGE\") {")
+        lines.append('    if (req.method == "PURGE") {')
         lines.append("        if (!client.ip ~ purge) {")
         lines.append('            return(synth(405, "Not allowed."));')
         lines.append("        }")
         lines.append("        return(purge);")
         lines.append("    }")
-        lines.append("    if (req.method == \"BAN\") {")
+        lines.append('    if (req.method == "BAN") {')
         lines.append("        if (!client.ip ~ purge) {")
         lines.append('            return(synth(405, "Not allowed."));')
         lines.append("        }")
@@ -263,7 +261,7 @@ sub vcl_recv {
     lines.append("")
 
     # Cache GET/HEAD, pass everything else
-    lines.append("    if (req.method != \"GET\" && req.method != \"HEAD\") {")
+    lines.append('    if (req.method != "GET" && req.method != "HEAD") {')
     lines.append("        return(pass);")
     lines.append("    }")
     lines.append("")
@@ -284,7 +282,7 @@ sub vcl_recv {
     lines.append("    } else {")
     lines.append("        hash_data(server.ip);")
     lines.append("    }")
-    lines.append("    if (req.http.Accept ~ \"(?i)image/webp\") {")
+    lines.append('    if (req.http.Accept ~ "(?i)image/webp") {')
     lines.append('        hash_data("webp");')
     lines.append("    }")
     lines.append("    return(lookup);")
@@ -353,7 +351,7 @@ sub vcl_recv {
     lines.append("    # Strip internal headers so they don't leak to clients.")
     lines.append("    unset resp.http.X-Cache-Backend;")
     lines.append("    # Strip the Varnish Via header so the proxy hop is not exposed")
-    lines.append("    # to clients (e.g. \"Via: 1.1 <hostname> (Varnish/7.6)\").")
+    lines.append('    # to clients (e.g. "Via: 1.1 <hostname> (Varnish/7.6)").')
     lines.append("    unset resp.http.Via;")
     lines.append("    # Rename the X-Varnish debug header to a neutral name so the")
     lines.append("    # underlying cache software is not advertised to clients.")
@@ -396,7 +394,7 @@ def _get_container():
     return runtime if runtime.is_available() else None
 
 
-def validate_vcl(vcl_text: str) -> Tuple[bool, str]:
+def validate_vcl(vcl_text: str) -> tuple[bool, str]:
     """Validate VCL syntax using varnishd -C in the Varnish container.
 
     Falls back to local varnishd if available. Returns (is_valid, details).
@@ -431,10 +429,7 @@ def validate_vcl(vcl_text: str) -> Tuple[bool, str]:
         f.write(vcl_text)
         tmp_path = f.name
     try:
-        result = subprocess.run(
-            [varnishd_bin, "-C", "-f", tmp_path],
-            capture_output=True, text=True
-        )
+        result = subprocess.run([varnishd_bin, "-C", "-f", tmp_path], capture_output=True, text=True)
         output = (result.stdout or "") + (result.stderr or "")
         return result.returncode == 0, output.strip()
     except Exception as e:
@@ -446,9 +441,10 @@ def validate_vcl(vcl_text: str) -> Tuple[bool, str]:
             pass
 
 
-def _which(binary: str) -> Optional[str]:
+def _which(binary: str) -> str | None:
     """Find a binary on PATH."""
     import shutil
+
     return shutil.which(binary)
 
 
@@ -512,7 +508,7 @@ def purge_all() -> bool:
     return runtime.purge_all()
 
 
-def get_stats() -> Dict[str, Any]:
+def get_stats() -> dict[str, Any]:
     """Fetch disk cache statistics via varnishstat -j.
 
     Returns a dict with key counters: cache_hit, cache_miss, n_object,

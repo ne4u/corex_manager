@@ -1,12 +1,12 @@
 import ipaddress
 import json
 import logging
-from typing import Optional
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import StreamingResponse
-from .security import decode_access_token
+
+from ..core.config import get_settings
 from ..services.audit import (
     derive_action,
     enqueue_audit_event,
@@ -15,7 +15,7 @@ from ..services.audit import (
     truncate_payload,
     write_audit_event,
 )
-from ..core.config import get_settings
+from .security import decode_access_token
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -29,7 +29,7 @@ def _is_service_call(request: Request) -> bool:
     return request.headers.get("x-mcp-service-token") == token
 
 
-def _is_trusted_proxy(host: Optional[str]) -> bool:
+def _is_trusted_proxy(host: str | None) -> bool:
     if not host:
         return False
     try:
@@ -38,7 +38,7 @@ def _is_trusted_proxy(host: Optional[str]) -> bool:
         return False
 
 
-def _get_forwarded_client(request: Request) -> Optional[str]:
+def _get_forwarded_client(request: Request) -> str | None:
     if not _is_trusted_proxy(request.client.host if request.client else None):
         return None
     x_forwarded_for = request.headers.get("x-forwarded-for")
@@ -96,6 +96,7 @@ class AuditEventMiddleware(BaseHTTPMiddleware):
             # /config/status flag even though the request skips auditing.
             if is_config_change(method, path):
                 from ..services.config import invalidate_config_status
+
                 invalidate_config_status()
             return response
 
@@ -121,7 +122,7 @@ class AuditEventMiddleware(BaseHTTPMiddleware):
 
         # For POST creates, try to extract resource_id from response body
         is_post = method == "POST"
-        response_body_bytes: Optional[bytes] = None
+        response_body_bytes: bytes | None = None
         if is_post and resource_id is None and response.status_code < 400:
             try:
                 response_body_bytes = await _buffer_response_body(response)
@@ -129,7 +130,7 @@ class AuditEventMiddleware(BaseHTTPMiddleware):
                     resp_json = json.loads(response_body_bytes.decode("utf-8"))
                     if isinstance(resp_json, dict) and "id" in resp_json:
                         resource_id = str(resp_json["id"])
-                except (json.JSONDecodeError, UnicodeDecodeError):
+                except json.JSONDecodeError, UnicodeDecodeError:
                     pass
             except Exception:
                 logger.debug("Could not buffer POST response body for audit", exc_info=True)
@@ -164,6 +165,7 @@ class AuditEventMiddleware(BaseHTTPMiddleware):
             # unconditional — a failed request costs one extra regeneration,
             # which is cheaper than a missed invalidation.
             from ..services.config import invalidate_config_status
+
             invalidate_config_status()
 
         # If we buffered the response body, re-wrap it

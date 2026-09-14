@@ -14,23 +14,22 @@ Secrets (API keys, passwords, tokens) are stored Fernet-encrypted inside the
 and inlined into the generated TOML on the shared data volume. The plaintext
 is collected and returned so API surfaces can redact it.
 """
+
 from __future__ import annotations
 
 import base64
 import hashlib
-import json
 import logging
 import os
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from cryptography.fernet import Fernet, InvalidToken
 from sqlalchemy.orm import Session
 
 from ..core.config import get_settings
 from ..models.logging import VectorSink
-from ..schemas.vector import REQUIRED_OPTIONS, SECRET_MASK, SECRET_OPTIONS, VALID_SOURCES
-from .settings import get_setting, set_setting
+from ..schemas.vector import SECRET_MASK, SECRET_OPTIONS, VALID_SOURCES
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -57,7 +56,7 @@ ENC_PREFIX = "enc:"
 # Secrets
 # ---------------------------------------------------------------------------
 
-_fernet: Optional[Fernet] = None
+_fernet: Fernet | None = None
 
 
 def _get_fernet() -> Fernet:
@@ -90,7 +89,7 @@ def is_encrypted(value: Any) -> bool:
     return isinstance(value, str) and value.startswith(ENC_PREFIX)
 
 
-def encrypt_sink_options(sink_type: str, options: Dict[str, Any]) -> Dict[str, Any]:
+def encrypt_sink_options(sink_type: str, options: dict[str, Any]) -> dict[str, Any]:
     """Encrypt secret option fields in-place-safe; returns a new dict.
 
     Values that are already ``enc:``-prefixed or equal to the mask sentinel
@@ -104,20 +103,20 @@ def encrypt_sink_options(sink_type: str, options: Dict[str, Any]) -> Dict[str, A
     return out
 
 
-def decrypt_sink_options(sink_type: str, options: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
+def decrypt_sink_options(sink_type: str, options: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
     """Return (options with decrypted secret fields, [decrypted plaintexts])."""
     out = dict(options or {})
-    plaintexts: List[str] = []
+    plaintexts: list[str] = []
     for key in SECRET_OPTIONS.get(sink_type, []):
         v = out.get(key)
         if is_encrypted(v):
-            plain = decrypt_secret(v[len(ENC_PREFIX):])
+            plain = decrypt_secret(v[len(ENC_PREFIX) :])
             out[key] = plain
             plaintexts.append(plain)
     return out, plaintexts
 
 
-def mask_sink_options(sink_type: str, options: Dict[str, Any]) -> Dict[str, Any]:
+def mask_sink_options(sink_type: str, options: dict[str, Any]) -> dict[str, Any]:
     out = dict(options or {})
     for key in SECRET_OPTIONS.get(sink_type, []):
         v = out.get(key)
@@ -126,7 +125,7 @@ def mask_sink_options(sink_type: str, options: Dict[str, Any]) -> Dict[str, Any]
     return out
 
 
-def redact_text(text: str, secrets: List[str]) -> str:
+def redact_text(text: str, secrets: list[str]) -> str:
     out = text
     for s in secrets:
         if s:
@@ -138,13 +137,17 @@ def redact_text(text: str, secrets: List[str]) -> str:
 # credentials never appear in API responses (covers previously-applied files
 # whose plaintext may differ from the current DB values).
 _TOML_SECRET_KEYS = (
-    "default_api_key", "secret_access_key", "session_token",
-    "client_secret", "password", "api_key", "license_key",
-    "default_token", "token",
+    "default_api_key",
+    "secret_access_key",
+    "session_token",
+    "client_secret",
+    "password",
+    "api_key",
+    "license_key",
+    "default_token",
+    "token",
 )
-_TOML_SECRET_RE = re.compile(
-    r'(?m)^(\s*(?:' + "|".join(_TOML_SECRET_KEYS) + r')\s*=\s*)"[^"]*"'
-)
+_TOML_SECRET_RE = re.compile(r"(?m)^(\s*(?:" + "|".join(_TOML_SECRET_KEYS) + r')\s*=\s*)"[^"]*"')
 
 
 def redact_vector_text(text: str) -> str:
@@ -156,7 +159,8 @@ def redact_vector_text(text: str) -> str:
 # Sources setting
 # ---------------------------------------------------------------------------
 
-def get_vector_sources(db: Session) -> Dict[str, bool]:
+
+def get_vector_sources(db: Session) -> dict[str, bool]:
     """Derive the active sources from enabled sinks.
 
     A source is 'active' when at least one enabled sink references it.
@@ -164,10 +168,17 @@ def get_vector_sources(db: Session) -> Dict[str, bool]:
     selected and auto-enabled when a sink is configured for it.
     """
     from ..models.logging import VectorSink
+
     try:
-        active = {s.source for s in db.query(VectorSink).filter(
-            VectorSink.enabled == True  # noqa: E712
-        ).all() if s.source}
+        active = {
+            s.source
+            for s in db.query(VectorSink)
+            .filter(
+                VectorSink.enabled == True  # noqa: E712
+            )
+            .all()
+            if s.source
+        }
     except Exception:
         active = set()
     return {k: (k in active) for k in VALID_SOURCES}
@@ -184,7 +195,7 @@ def vector_syslog_target() -> str:
     return getattr(settings, "VECTOR_SYSLOG_TARGET", "vector:601")
 
 
-def corex_source_enabled(db: Optional[Session]) -> bool:
+def corex_source_enabled(db: Session | None) -> bool:
     if db is None:
         return False
     try:
@@ -193,7 +204,7 @@ def corex_source_enabled(db: Optional[Session]) -> bool:
         return False
 
 
-def vector_pipeline_active(db: Optional[Session]) -> bool:
+def vector_pipeline_active(db: Session | None) -> bool:
     """True when the pipeline is configured (any source enabled or sinks exist).
 
     Used to decide whether vector.toml participates in config status/diff so
@@ -205,6 +216,7 @@ def vector_pipeline_active(db: Optional[Session]) -> bool:
         if any(get_vector_sources(db).values()):
             return True
         from ..models.logging import VectorSink
+
         return db.query(VectorSink).count() > 0
     except Exception:
         return False
@@ -213,6 +225,7 @@ def vector_pipeline_active(db: Optional[Session]) -> bool:
 # ---------------------------------------------------------------------------
 # TOML helpers
 # ---------------------------------------------------------------------------
+
 
 def _toml_str(v: str) -> str:
     s = str(v).replace("\\", "\\\\").replace('"', '\\"')
@@ -237,7 +250,7 @@ def _component_name(name: str) -> str:
     return safe
 
 
-def _opt(options: Dict[str, Any], *keys: str, default: Any = None) -> Any:
+def _opt(options: dict[str, Any], *keys: str, default: Any = None) -> Any:
     for k in keys:
         v = options.get(k)
         if v is not None and v != "":
@@ -245,7 +258,7 @@ def _opt(options: Dict[str, Any], *keys: str, default: Any = None) -> Any:
     return default
 
 
-def _opt_bool(options: Dict[str, Any], key: str) -> Optional[bool]:
+def _opt_bool(options: dict[str, Any], key: str) -> bool | None:
     v = options.get(key)
     if v is None or v == "":
         return None
@@ -258,7 +271,7 @@ def _opt_bool(options: Dict[str, Any], key: str) -> Optional[bool]:
 # VRL transforms (ported verbatim from the corex-logging reference vector.toml)
 # ---------------------------------------------------------------------------
 
-_HAPROXY_PARSE_JSON = r'''
+_HAPROXY_PARSE_JSON = r"""
 # The syslog source puts the HAProxy JSON log line in .message
 parsed, err = parse_json(.message)
 if err == null {
@@ -354,9 +367,9 @@ if !exists(.haproxy_internal) || .haproxy_internal != true {
   del(.ts)
   del(.timestamp)
 }
-'''
+"""
 
-_DECODE_JA4 = r'''
+_DECODE_JA4 = r"""
 if !exists(.ja4) || .ja4 == null || .ja4 == "" || .ja4 == "-" {
   .ja4 = ""
 } else {
@@ -430,9 +443,9 @@ if !exists(.ja4) || .ja4 == null || .ja4 == "" || .ja4 == "-" {
     .ja4_alpn_decoded = .ja4_alpn
   }
 }
-'''
+"""
 
-_DECODE_REQ_FP = r'''
+_DECODE_REQ_FP = r"""
 # --- req_fp decode ---
 if !exists(.req_fp) || .req_fp == null || .req_fp == "" {
   .req_fp = ""
@@ -562,18 +575,18 @@ if exists(.unique_id) && .unique_id != null && .unique_id != "" {
     }
   }
 }
-'''
+"""
 
-_HAPROXY_FINALIZE = r'''
+_HAPROXY_FINALIZE = r"""
 if exists(.unique_id) && .unique_id != null && .unique_id != "" {
   ._doc_id = .unique_id
 } else {
   ._doc_id = uuid_v4()
 }
 .corex_source = "corex"
-'''
+"""
 
-_WAF_PARSE_JSON = r'''
+_WAF_PARSE_JSON = r"""
 parsed, err = parse_json(.message)
 if err == null {
   . = merge!(., parsed)
@@ -623,9 +636,9 @@ del(.timestamp)
 
 ._doc_id = uuid_v4()
 .corex_source = "waf"
-'''
+"""
 
-_MCP_PARSE_JSON = r'''
+_MCP_PARSE_JSON = r"""
 # MCP Gateway event log — one JSON object per line (events.ndjson).
 parsed, err = parse_json(.message)
 if err == null {
@@ -654,15 +667,16 @@ if exists(.request_id) && .request_id != null && .request_id != "" {
   ._doc_id = uuid_v4()
 }
 .corex_source = "mcp"
-'''
+"""
 
 
 # ---------------------------------------------------------------------------
 # Source blocks
 # ---------------------------------------------------------------------------
 
-def _source_blocks(sources: Dict[str, bool]) -> str:
-    parts: List[str] = []
+
+def _source_blocks(sources: dict[str, bool]) -> str:
+    parts: list[str] = []
     if sources.get("corex"):
         parts.append(
             "# coreX (HAProxy) request logs via TCP syslog.\n"
@@ -703,8 +717,8 @@ def _source_blocks(sources: Dict[str, bool]) -> str:
     return "\n".join(parts)
 
 
-def _transform_blocks(sources: Dict[str, bool]) -> str:
-    parts: List[str] = []
+def _transform_blocks(sources: dict[str, bool]) -> str:
+    parts: list[str] = []
     if sources.get("corex"):
         parts.append(
             "[transforms.haproxy_parse_json]\n"
@@ -751,26 +765,31 @@ def _transform_blocks(sources: Dict[str, bool]) -> str:
 # Sink block renderers
 # ---------------------------------------------------------------------------
 
-def _emit(lines: List[str], key: str, val: Any) -> None:
+
+def _emit(lines: list[str], key: str, val: Any) -> None:
     if val is None or val == "":
         return
     lines.append(f"{key} = {_toml_val(val)}")
 
 
-def _render_sink_block(sink_name: str, source: str, sink_type: str,
-                       options: Dict[str, Any], secrets: List[str],
-                       input_name: Optional[str] = None) -> str:
+def _render_sink_block(
+    sink_name: str,
+    source: str,
+    sink_type: str,
+    options: dict[str, Any],
+    secrets: list[str],
+    input_name: str | None = None,
+) -> str:
     """Render one [sinks.<name>_<source>] block. ``options`` already decrypted."""
     inputs = [input_name or TERMINAL_TRANSFORMS[source]]
     block = f"{sink_name}_{source}"
     lines = [f"[sinks.{block}]", f'type = "{sink_type}"', f"inputs = {_toml_val(inputs)}"]
-    sub: List[str] = []  # [sinks.<block>.<sub>] tables emitted after
+    sub: list[str] = []  # [sinks.<block>.<sub>] tables emitted after
 
     if sink_type == "aws_s3":
         _emit(lines, "bucket", options.get("bucket"))
         _emit(lines, "region", options.get("region"))
-        prefix = _opt(options, f"key_prefix_{source}", "key_prefix",
-                      default=f"corex/{source}/%Y/%m/%d/")
+        prefix = _opt(options, f"key_prefix_{source}", "key_prefix", default=f"corex/{source}/%Y/%m/%d/")
         _emit(lines, "key_prefix", str(prefix).replace("{source}", source))
         _emit(lines, "compression", options.get("compression", "gzip"))
         _emit(lines, "endpoint", options.get("endpoint"))
@@ -820,8 +839,7 @@ def _render_sink_block(sink_name: str, source: str, sink_type: str,
             _emit(lines, "tls.verify_certificate", vc)
         if vh is not None:
             _emit(lines, "tls.verify_hostname", vh)
-        except_fields = ["_doc_id", "_syslog_facility", "_syslog_severity",
-                         "_syslog_hostname", "corex_source"]
+        except_fields = ["_doc_id", "_syslog_facility", "_syslog_severity", "_syslog_hostname", "corex_source"]
         _emit(lines, "encoding.except_fields", except_fields)
         strategy = options.get("auth_strategy", "none")
         if strategy in ("basic", "api_key"):
@@ -840,8 +858,7 @@ def _render_sink_block(sink_name: str, source: str, sink_type: str,
         vc = _opt_bool(options, "tls_verify_certificate")
         if vc is not None:
             _emit(lines, "tls.verify_certificate", vc)
-        sub.append(f"[sinks.{block}.encoding]\n" +
-                   f'codec = {_toml_str(options.get("encoding", "ndjson"))}')
+        sub.append(f"[sinks.{block}.encoding]\n" + f"codec = {_toml_str(options.get('encoding', 'ndjson'))}")
         strategy = options.get("auth_strategy", "none")
         if strategy in ("basic", "bearer"):
             auth = [f"[sinks.{block}.auth]", f'strategy = "{strategy}"']
@@ -887,14 +904,14 @@ def _render_sink_block(sink_name: str, source: str, sink_type: str,
     return out
 
 
-def _enabled_sinks(db: Session) -> List[VectorSink]:
+def _enabled_sinks(db: Session) -> list[VectorSink]:
     return db.query(VectorSink).filter(VectorSink.enabled == True).all()  # noqa: E712
 
 
-def generate_vector_toml(db: Session) -> Tuple[str, List[str]]:
+def generate_vector_toml(db: Session) -> tuple[str, list[str]]:
     """Generate vector.toml; returns (toml_text, secret_plaintexts)."""
     sources = get_vector_sources(db)
-    secrets: List[str] = []
+    secrets: list[str] = []
     parts = [
         "# Generated by coreX Manager — do not edit",
         "# Vector log pipeline (sources: coreX/HAProxy, WAF/Coraza, MCP Gateway)",
@@ -953,15 +970,17 @@ def generate_vector_toml_redacted(db: Session) -> str:
 # Staging config for sink testing
 # ---------------------------------------------------------------------------
 
-def generate_staging_sink_toml(db: Session, sink_type: str, sink_source: str,
-                               options: Dict[str, Any], send_test_event: bool) -> Tuple[str, List[str]]:
+
+def generate_staging_sink_toml(
+    db: Session, sink_type: str, sink_source: str, options: dict[str, Any], send_test_event: bool
+) -> tuple[str, list[str]]:
     """Build a standalone vector.toml that exercises a single candidate sink.
 
     Wired to the enabled source transforms when available; otherwise (and for
     ``send_test_event``) a demo_logs source is used so the check works before
     the pipeline is fully configured.
     """
-    secrets: List[str] = []
+    secrets: list[str] = []
     options = dict(options or {})
     for key in SECRET_OPTIONS.get(sink_type, []):
         v = options.get(key)
@@ -978,28 +997,23 @@ def generate_staging_sink_toml(db: Session, sink_type: str, sink_source: str,
     sources = get_vector_sources(db)
     if send_test_event or not any(sources.values()):
         test_input = "test_events"
-        parts.append(
-            "[sources.test_events]\n"
-            'type = "demo_logs"\n'
-            'format = "json"\n'
-            'interval = 0.5\n'
-            'count = 5\n'
-        )
+        parts.append('[sources.test_events]\ntype = "demo_logs"\nformat = "json"\ninterval = 0.5\ncount = 5\n')
     else:
         parts.append(_source_blocks(sources))
         parts.append(_transform_blocks(sources))
         # Feed the sink from the candidate's source transform if that source
         # is active; otherwise fall back to any enabled source's transform.
-        src = sink_source if sink_source in TERMINAL_TRANSFORMS and sources.get(sink_source) else next(
-            (s for s in VALID_SOURCES if sources.get(s)), "corex")
+        src = (
+            sink_source
+            if sink_source in TERMINAL_TRANSFORMS and sources.get(sink_source)
+            else next((s for s in VALID_SOURCES if sources.get(s)), "corex")
+        )
         test_input = TERMINAL_TRANSFORMS[src]
 
     # Render with the candidate source for per-source option resolution
     # (index naming etc.), overridden to consume the staging input.
     src_for_options = sink_source if sink_source in VALID_SOURCES else "corex"
-    block = _render_sink_block(
-        "check", src_for_options, sink_type, options, secrets,
-        input_name=test_input)
+    block = _render_sink_block("check", src_for_options, sink_type, options, secrets, input_name=test_input)
     parts.append(block)
 
     return "\n".join(parts) + "\n", secrets
@@ -1008,6 +1022,7 @@ def generate_staging_sink_toml(db: Session, sink_type: str, sink_source: str,
 # ---------------------------------------------------------------------------
 # File lifecycle
 # ---------------------------------------------------------------------------
+
 
 def _write_file(path: str, content: str) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -1033,7 +1048,7 @@ def write_vector_config(db: Session, restart: bool = True, only_if_missing: bool
     existing = None
     if os.path.exists(path):
         try:
-            with open(path, "r", encoding="utf-8", errors="replace") as f:
+            with open(path, encoding="utf-8", errors="replace") as f:
                 existing = f.read()
         except OSError:
             existing = None
@@ -1049,6 +1064,7 @@ def write_vector_config(db: Session, restart: bool = True, only_if_missing: bool
     if restart:
         try:
             from .runtime import get_runtime
+
             get_runtime().restart_vector()
         except Exception as exc:
             logger.warning("vector restart failed (config written): %s", exc)

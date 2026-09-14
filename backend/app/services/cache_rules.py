@@ -25,8 +25,8 @@ A trailing ``*`` on a path (``/downloads/*``) and a leading ``*.`` or ``.`` on a
 extension (``*.png``, ``.png``) are accepted and normalized away, so the
 examples users naturally type all work.
 """
+
 import re
-from typing import Iterable, List, Optional, Tuple
 
 MATCH_TYPES = ("path", "filename", "extension", "method", "query_string", "content_type", "status_code")
 ACTIONS = ("cache", "bypass")
@@ -94,14 +94,14 @@ def normalize_pattern(match_type: str, pattern: str) -> str:
         if not _EXTENSION_RE.match(value):
             raise ValueError("Extension must be alphanumeric (e.g. png, iso, woff2)")
         return value.lower()
-    
+
     if match_type == "method":
         # HTTP method (GET, POST, PUT, DELETE, HEAD, OPTIONS, PATCH)
         value = value.upper()
         if not _METHOD_RE.match(value):
             raise ValueError("Method must be a valid HTTP method (e.g. GET, POST, PUT)")
         return value
-    
+
     if match_type == "query_string":
         # Query string parameter (param or param=value or * for any query string)
         if value == "*":
@@ -109,20 +109,20 @@ def normalize_pattern(match_type: str, pattern: str) -> str:
         if not _QUERY_PARAM_RE.match(value):
             raise ValueError("Query string must be 'param' or 'param=value' or '*' (e.g. nocache, format=json)")
         return value
-    
+
     if match_type == "content_type":
         # Content-Type header (e.g., application/json, image/*, text/html)
         value = value.lower()
         if not _CONTENT_TYPE_RE.match(value):
             raise ValueError("Content-Type must be a valid MIME type (e.g. application/json, image/*, text/html)")
         return value
-    
+
     if match_type == "status_code":
         # HTTP status code (200, 404, 5xx, or comma-separated list)
         if not _STATUS_CODE_RE.match(value):
             raise ValueError("Status code must be specific (200, 404) or range (4xx, 5xx) or list (200,301,404)")
         return value
-    
+
     # Should never reach here due to match_type validation above
     raise ValueError(f"Unhandled match type: {match_type}")
 
@@ -133,7 +133,7 @@ def validate_action(action: str) -> str:
     return action
 
 
-def active_rules(cache_config) -> List:
+def active_rules(cache_config) -> list:
     """Return enabled rules for a cache config in evaluation order."""
     if cache_config is None:
         return []
@@ -144,6 +144,7 @@ def active_rules(cache_config) -> List:
 # --------------------------------------------------------------------------
 # Varnish VCL
 # --------------------------------------------------------------------------
+
 
 def vcl_condition(rule) -> str:
     """Return a VCL boolean expression matching this rule.
@@ -182,19 +183,26 @@ def vcl_condition(rule) -> str:
         if "," in pattern:
             # Multiple codes: 200,301,404
             codes = pattern.split(",")
-            conditions = " || ".join([f"beresp.status == {c}" if c.isdigit() else f'beresp.status >= {c[0]}00 && beresp.status < {int(c[0])+1}00' for c in codes])
+            conditions = " || ".join(
+                [
+                    f"beresp.status == {c}"
+                    if c.isdigit()
+                    else f"beresp.status >= {c[0]}00 && beresp.status < {int(c[0]) + 1}00"
+                    for c in codes
+                ]
+            )
             return f"({conditions})"
         if pattern.endswith("xx"):
             # Range: 2xx, 4xx, 5xx
             first_digit = pattern[0]
-            return f"beresp.status >= {first_digit}00 && beresp.status < {int(first_digit)+1}00"
+            return f"beresp.status >= {first_digit}00 && beresp.status < {int(first_digit) + 1}00"
         # Specific code: 200, 404
         return f"beresp.status == {pattern}"
-    
+
     raise ValueError(f"Unsupported match_type for VCL: {rule.match_type}")
 
 
-def emit_vcl_decision(cache_config, indent: str = "        ") -> List[str]:
+def emit_vcl_decision(cache_config, indent: str = "        ") -> list[str]:
     """Emit the VCL decision chain for one backend.
 
     Sets `req.http.X-Cache-Decision` to "cache" or "bypass". The caller acts on
@@ -219,9 +227,10 @@ def emit_vcl_decision(cache_config, indent: str = "        ") -> List[str]:
 # HAProxy
 # --------------------------------------------------------------------------
 
+
 def haproxy_acl_criterion(rule) -> str:
     """Return the HAProxy ACL criterion + value for this rule.
-    
+
     Returns the criterion for request-phase rules. Response-phase rules
     (content_type, status_code) are handled separately in cache-store phase.
     """
@@ -249,7 +258,7 @@ def haproxy_acl_criterion(rule) -> str:
         # Response-phase rules don't generate ACLs in request phase
         # They're evaluated in http-response cache-store conditions
         raise ValueError(f"Response-phase match type {rule.match_type} should not generate request ACL")
-    
+
     raise ValueError(f"Unsupported match_type for HAProxy: {rule.match_type}")
 
 
@@ -257,10 +266,10 @@ def emit_haproxy_cache_rules(
     cache_config,
     cache_name: str,
     acl_prefix: str,
-    extra_condition: Optional[str] = None,
+    extra_condition: str | None = None,
     emit_acls: bool = True,
     indent: str = "    ",
-) -> Tuple[List[str], bool]:
+) -> tuple[list[str], bool]:
     """Emit ACLs and ordered `http-request cache-use` lines for the memory cache.
 
     HAProxy has no "do not cache" action, so first-match-wins is expressed by
@@ -283,13 +292,13 @@ def emit_haproxy_cache_rules(
     all_rules = active_rules(cache_config)
     # Filter for memory tier and request-phase match types only
     rules = [r for r in all_rules if r.tier == "memory" and r.match_type in REQUEST_PHASE_TYPES]
-    
+
     if not rules:
         return ([f"{indent}# No cacheability rules for memory tier — memory cache stores nothing"], False)
 
     acl_names = {}
-    lines: List[str] = []
-    
+    lines: list[str] = []
+
     # Emit ACLs if requested
     if emit_acls:
         for rule in rules:
@@ -301,8 +310,8 @@ def emit_haproxy_cache_rules(
         for rule in rules:
             acl_names[rule.id] = f"{acl_prefix}_{rule.id}"
 
-    use_lines: List[str] = []
-    preceding_bypass: List[str] = []
+    use_lines: list[str] = []
+    preceding_bypass: list[str] = []
     for rule in rules:
         if rule.action == "bypass":
             preceding_bypass.append(acl_names[rule.id])
@@ -323,33 +332,33 @@ def emit_response_phase_cache_store_condition(
     cache_config,
     cache_name: str,
     indent: str = "    ",
-) -> Optional[str]:
+) -> str | None:
     """Emit conditional http-response cache-store for response-phase rules.
-    
+
     Returns cache-store line with conditions if there are response-phase rules,
     or None if only request-phase rules exist (unconditional cache-store).
-    
+
     Response-phase rules (content_type, status_code) add conditions to cache-store
     to filter what gets cached based on the response.
     """
     all_rules = active_rules(cache_config)
     # Filter for memory tier and response-phase match types
     response_rules = [r for r in all_rules if r.tier == "memory" and r.match_type in RESPONSE_PHASE_TYPES]
-    
+
     if not response_rules:
         # No response-phase rules - return unconditional cache-store
         return None
-    
+
     # Build condition from response-phase rules (first-match-wins, with bypass negation)
     conditions = []
     preceding_bypass = []
-    
+
     for rule in response_rules:
         if rule.action == "bypass":
             # Track bypass conditions to negate in later cache rules
             preceding_bypass.append(haproxy_response_condition(rule))
             continue
-        
+
         # Cache rule - add condition with negation of earlier bypasses
         rule_cond = haproxy_response_condition(rule)
         if preceding_bypass:
@@ -358,11 +367,11 @@ def emit_response_phase_cache_store_condition(
             conditions.append(f"({rule_cond} && {negated})")
         else:
             conditions.append(f"({rule_cond})")
-    
+
     if not conditions:
         # All response rules are bypasses - don't cache anything
         return f"{indent}# All response-phase rules are bypass rules — nothing cached"
-    
+
     # Combine all cache conditions with OR
     combined = " || ".join(conditions)
     return f"{indent}http-response cache-store {cache_name} if {combined}"
@@ -372,33 +381,33 @@ def emit_cache_rule_acls(
     cache_config,
     acl_prefix: str,
     indent: str = "    ",
-) -> List[str]:
+) -> list[str]:
     """Emit ACL declarations for request-phase cache rules.
-    
+
     Only emits ACLs for rules that can be evaluated in the request phase.
     Response-phase rules (content_type, status_code) are handled inline
     in cache-store conditions.
-    
+
     Returns list of ACL declaration lines.
     """
     rules = active_rules(cache_config)
     if not rules:
         return []
-    
-    lines: List[str] = []
+
+    lines: list[str] = []
     for rule in rules:
         # Skip response-phase rules - they don't get ACLs
         if rule.match_type in RESPONSE_PHASE_TYPES:
             continue
         acl_name = f"{acl_prefix}_{rule.id}"
         lines.append(f"{indent}acl {acl_name} {haproxy_acl_criterion(rule)}")
-    
+
     return lines
 
 
 def haproxy_response_condition(rule) -> str:
     """Return HAProxy condition for response-phase rules (content_type, status_code).
-    
+
     These are used in http-response cache-store conditions.
     """
     pattern = rule.pattern
@@ -409,7 +418,7 @@ def haproxy_response_condition(rule) -> str:
             return f"res.hdr(Content-Type) -m beg {prefix}/"
         # Exact match
         return f"res.hdr(Content-Type) -m beg {pattern}"
-    
+
     if rule.match_type == "status_code":
         if "," in pattern:
             # Multiple codes: 200,301,404
@@ -428,7 +437,7 @@ def haproxy_response_condition(rule) -> str:
             return f"{{ status {first_digit}00:599 }}"
         # Specific code
         return f"{{ status {pattern} }}"
-    
+
     raise ValueError(f"Not a response-phase match type: {rule.match_type}")
 
 
@@ -437,7 +446,7 @@ def emit_disk_cache_use_server_directives(
     varnish_server_name: str,
     acl_prefix: str,
     indent: str = "    ",
-) -> Tuple[List[str], List[str]]:
+) -> tuple[list[str], list[str]]:
     """Emit `use-server` directives for disk cache routing to Varnish.
 
     Routes cache-eligible requests to the Varnish server based on cache rules.
@@ -459,7 +468,7 @@ def emit_disk_cache_use_server_directives(
     all_rules = active_rules(cache_config)
     # Filter for disk tier and request-phase match types only
     rules = [r for r in all_rules if r.tier == "disk" and r.match_type in REQUEST_PHASE_TYPES]
-    
+
     if not rules:
         return ([], [])
 
@@ -468,24 +477,24 @@ def emit_disk_cache_use_server_directives(
     for rule in rules:
         acl_names[rule.id] = f"{acl_prefix}_{rule.id}"
 
-    use_server_lines: List[str] = []
-    acl_conditions: List[str] = []
-    preceding_bypass: List[str] = []
-    
+    use_server_lines: list[str] = []
+    acl_conditions: list[str] = []
+    preceding_bypass: list[str] = []
+
     for rule in rules:
         acl_name = acl_names[rule.id]
-        
+
         if rule.action == "bypass":
             # Bypass rules don't generate use-server directives, but they
             # negate later cache rules
             preceding_bypass.append(acl_name)
             continue
-        
+
         # Cache rule: generate use-server directive with negation of earlier bypass rules
         conditions = [acl_name] + [f"!{name}" for name in preceding_bypass]
         use_server_lines.append(f"{indent}use-server {varnish_server_name} if {' '.join(conditions)}")
-        
+
         # Track conditions for X-Cache-Backend header (OR'd together)
-        acl_conditions.append(' '.join(conditions))
+        acl_conditions.append(" ".join(conditions))
 
     return (use_server_lines, acl_conditions)

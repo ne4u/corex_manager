@@ -9,11 +9,11 @@ Verifies that:
 - Custom header names flow through.
 - TCP-mode listeners skip set-src entirely.
 """
-from app.services import haproxy
-from app.services.settings import set_setting
-from tests.factories import make_backend, make_server, make_listener
 
 from app.models.models import BackendRule, NetworkList, NetworkListEntry
+from app.services import haproxy
+from app.services.settings import set_setting
+from tests.factories import make_backend, make_listener, make_server
 
 
 def _make_backend_rule(db, listener_id, backend_id, condition_type="path", operator="beg", value="/cdn", priority=100):
@@ -63,6 +63,7 @@ def test_cdn_backend_rule_emits_set_src(db):
 def test_cdn_backend_with_trusted_list_gates_on_src(db, tmp_path, monkeypatch):
     """Trusted network list adds { src -f <path> } to the set-src condition."""
     from app.core.config import get_settings
+
     settings = get_settings()
     monkeypatch.setattr(settings, "SECURITY_LISTS_DIR", str(tmp_path))
 
@@ -94,6 +95,7 @@ def test_cdn_backend_with_trusted_list_gates_on_src(db, tmp_path, monkeypatch):
 def test_cdn_backend_with_multiple_trusted_lists_gates_on_src(db, tmp_path, monkeypatch):
     """Multiple trusted network lists emit multiple -f flags (OR'd by HAProxy)."""
     from app.core.config import get_settings
+
     settings = get_settings()
     monkeypatch.setattr(settings, "SECURITY_LISTS_DIR", str(tmp_path))
 
@@ -130,6 +132,7 @@ def test_cdn_backend_with_multiple_trusted_lists_gates_on_src(db, tmp_path, monk
 def test_trusted_multiple_lists_one_deleted_skips_only_deleted(db, tmp_path, monkeypatch):
     """If one of multiple trusted lists is deleted, only the deleted one is skipped."""
     from app.core.config import get_settings
+
     settings = get_settings()
     monkeypatch.setattr(settings, "SECURITY_LISTS_DIR", str(tmp_path))
 
@@ -160,6 +163,7 @@ def test_trusted_multiple_lists_one_deleted_skips_only_deleted(db, tmp_path, mon
 def test_trusted_list_deleted_falls_back_to_ungated(db, tmp_path, monkeypatch):
     """If the trusted list is deleted, set-src falls back to ungated (no -f path)."""
     from app.core.config import get_settings
+
     settings = get_settings()
     monkeypatch.setattr(settings, "SECURITY_LISTS_DIR", str(tmp_path))
 
@@ -308,6 +312,7 @@ def test_force_https_listener_with_no_backends_emits_catch_all_set_src(db, tmp_p
     default backend, but if a trusted network list is configured it should
     still restore the client IP so the redirect log shows the real client."""
     from app.core.config import get_settings
+
     settings = get_settings()
     monkeypatch.setattr(settings, "SECURITY_LISTS_DIR", str(tmp_path))
 

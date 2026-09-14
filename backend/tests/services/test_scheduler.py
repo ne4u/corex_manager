@@ -1,9 +1,7 @@
 """Tests for the PeriodicTask restart-safe scheduler base class."""
-import os
-from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, patch
 
-import pytest
+from datetime import UTC, datetime, timedelta
+from unittest.mock import MagicMock, patch
 
 from app.services.scheduler import PeriodicTask, _parse_iso
 
@@ -11,10 +9,10 @@ from app.services.scheduler import PeriodicTask, _parse_iso
 class _RecordingTask(PeriodicTask):
     """Test double that records _tick calls and returns a configurable result."""
 
-    def __init__(self, name="test_task", interval_seconds=3600,
-                 files_required=None, tick_return=True, tick_raises=None):
-        super().__init__(name=name, interval_seconds=interval_seconds,
-                         files_required=files_required)
+    def __init__(
+        self, name="test_task", interval_seconds=3600, files_required=None, tick_return=True, tick_raises=None
+    ):
+        super().__init__(name=name, interval_seconds=interval_seconds, files_required=files_required)
         self.tick_calls = 0
         self._tick_return = tick_return
         self._tick_raises = tick_raises
@@ -29,6 +27,7 @@ class _RecordingTask(PeriodicTask):
 def _set_last_run_at(db, key, dt):
     """Write a last_run_at setting directly."""
     from app.models.models import Setting
+
     row = db.query(Setting).filter(Setting.key == key).first()
     if not row:
         row = Setting(key=key, value=dt.isoformat())
@@ -63,7 +62,7 @@ def test_parse_iso_with_and_without_tzinfo():
 def test_periodic_task_skips_initial_tick_when_not_due(db):
     """When last_run_at is recent, _tick is not called on the initial _run tick."""
     task = _RecordingTask(name="test_skip", interval_seconds=3600)
-    recent = datetime.now(timezone.utc) - timedelta(seconds=10)
+    recent = datetime.now(UTC) - timedelta(seconds=10)
     _set_last_run_at(db, "test_skip_last_run_at", recent)
 
     with _patch_sessionlocal(db):
@@ -98,7 +97,7 @@ def test_periodic_task_runs_when_required_file_missing(db):
         interval_seconds=3600,
         files_required=["/nonexistent/path/that/does/not/exist.mmdb"],
     )
-    recent = datetime.now(timezone.utc) - timedelta(seconds=10)
+    recent = datetime.now(UTC) - timedelta(seconds=10)
     _set_last_run_at(db, "test_file_missing_last_run_at", recent)
 
     with _patch_sessionlocal(db):
@@ -107,16 +106,14 @@ def test_periodic_task_runs_when_required_file_missing(db):
 
 def test_periodic_task_stamps_on_success(db):
     """_tick returning True stamps last_run_at in the settings table."""
-    task = _RecordingTask(name="test_stamp_ok", interval_seconds=3600,
-                          tick_return=True)
+    task = _RecordingTask(name="test_stamp_ok", interval_seconds=3600, tick_return=True)
 
     with _patch_sessionlocal(db):
         task._run_tick()
 
     from app.models.models import Setting
-    row = db.query(Setting).filter(
-        Setting.key == "test_stamp_ok_last_run_at"
-    ).first()
+
+    row = db.query(Setting).filter(Setting.key == "test_stamp_ok_last_run_at").first()
     assert row is not None
     assert row.value is not None
     # The stamped value should be a parseable ISO timestamp
@@ -125,23 +122,20 @@ def test_periodic_task_stamps_on_success(db):
 
 def test_periodic_task_does_not_stamp_on_failure(db):
     """_tick returning False does not stamp last_run_at."""
-    task = _RecordingTask(name="test_stamp_fail", interval_seconds=3600,
-                          tick_return=False)
+    task = _RecordingTask(name="test_stamp_fail", interval_seconds=3600, tick_return=False)
 
     with _patch_sessionlocal(db):
         task._run_tick()
 
     from app.models.models import Setting
-    row = db.query(Setting).filter(
-        Setting.key == "test_stamp_fail_last_run_at"
-    ).first()
+
+    row = db.query(Setting).filter(Setting.key == "test_stamp_fail_last_run_at").first()
     assert row is None
 
 
 def test_periodic_task_does_not_stamp_on_exception(db):
     """_tick raising an exception does not stamp and does not crash."""
-    task = _RecordingTask(name="test_stamp_exc", interval_seconds=3600,
-                          tick_raises=RuntimeError("boom"))
+    task = _RecordingTask(name="test_stamp_exc", interval_seconds=3600, tick_raises=RuntimeError("boom"))
 
     with _patch_sessionlocal(db):
         # Should not raise
@@ -149,9 +143,8 @@ def test_periodic_task_does_not_stamp_on_exception(db):
 
     assert task.tick_calls == 1
     from app.models.models import Setting
-    row = db.query(Setting).filter(
-        Setting.key == "test_stamp_exc_last_run_at"
-    ).first()
+
+    row = db.query(Setting).filter(Setting.key == "test_stamp_exc_last_run_at").first()
     assert row is None
 
 
@@ -159,7 +152,7 @@ def test_periodic_task_remaining_seconds_when_not_due(db):
     """_remaining_seconds returns the time left until due."""
     task = _RecordingTask(name="test_remaining", interval_seconds=3600)
     # Set last_run_at to 10 seconds ago -> ~3590s remaining
-    recent = datetime.now(timezone.utc) - timedelta(seconds=10)
+    recent = datetime.now(UTC) - timedelta(seconds=10)
     _set_last_run_at(db, "test_remaining_last_run_at", recent)
 
     with _patch_sessionlocal(db):

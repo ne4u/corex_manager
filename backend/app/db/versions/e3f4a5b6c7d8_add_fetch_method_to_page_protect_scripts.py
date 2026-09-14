@@ -14,24 +14,24 @@ GET then POST on 405/403 and persist the working method), ``GET``, or
 ``POST``. ``last_fetch_method`` records the method used by the last
 successful check so the auto-probe cost is one-time.
 """
-from typing import Sequence, Union
 
-from alembic import op
+from collections.abc import Sequence
+
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = 'e3f4a5b6c7d8'
-down_revision: Union[str, Sequence[str], None] = 'd1e2f3a4b5c6'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision: str = "e3f4a5b6c7d8"
+down_revision: str | Sequence[str] | None = "d1e2f3a4b5c6"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
     """Add fetch_method and last_fetch_method columns to page_protect_scripts."""
-    with op.batch_alter_table('page_protect_scripts') as batch_op:
-        batch_op.add_column(sa.Column('fetch_method', sa.String(), nullable=True))
-        batch_op.add_column(sa.Column('last_fetch_method', sa.String(), nullable=True))
+    with op.batch_alter_table("page_protect_scripts") as batch_op:
+        batch_op.add_column(sa.Column("fetch_method", sa.String(), nullable=True))
+        batch_op.add_column(sa.Column("last_fetch_method", sa.String(), nullable=True))
 
     # Backfill: existing rows default to 'auto' (probe GET then POST).
     op.execute("UPDATE page_protect_scripts SET fetch_method = 'auto' WHERE fetch_method IS NULL")
@@ -39,6 +39,6 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Remove fetch_method and last_fetch_method columns from page_protect_scripts."""
-    with op.batch_alter_table('page_protect_scripts') as batch_op:
-        batch_op.drop_column('last_fetch_method')
-        batch_op.drop_column('fetch_method')
+    with op.batch_alter_table("page_protect_scripts") as batch_op:
+        batch_op.drop_column("last_fetch_method")
+        batch_op.drop_column("fetch_method")

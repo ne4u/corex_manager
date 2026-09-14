@@ -1,4 +1,5 @@
 """Tests for API Armor settings API endpoints."""
+
 from app.services.settings import get_setting
 
 
@@ -25,6 +26,7 @@ def test_update_api_armor_enabled(client, db):
     subfields at runtime). Enable req_fp before enabling api_armor.
     """
     from app.services.settings import set_setting
+
     set_setting(db, "req_fp_enabled", "true")
     db.commit()
     resp = client.put(
@@ -96,6 +98,7 @@ def test_update_api_armor_retention_invalid(client):
 def test_update_api_armor_scope(client, db):
     """PUT /api-armor/settings updates scope, backend IDs, and path patterns."""
     from app.services.settings import set_setting
+
     set_setting(db, "req_fp_enabled", "true")
     db.commit()
     resp = client.put(
@@ -131,6 +134,7 @@ def test_update_api_armor_scope_invalid(client):
 
 # ----- Preset rules -----
 
+
 def test_list_preset_rules(client):
     """GET /api-armor/presets returns the list of preset rules."""
     resp = client.get("/api/v1/api-armor/presets")
@@ -144,6 +148,7 @@ def test_list_preset_rules(client):
 def test_apply_preset_rules(client, db):
     """POST /api-armor/presets/apply creates security rules."""
     from app.models.models import SecurityRule
+
     existing = db.query(SecurityRule).count()
     resp = client.post("/api/v1/api-armor/presets/apply", json={})
     assert resp.status_code == 200
@@ -166,6 +171,7 @@ def test_apply_preset_rules_idempotent(client, db):
 def test_apply_preset_rules_with_listeners(client, db):
     """POST /api-armor/presets/apply with listener_ids scopes rules."""
     from app.models.models import SecurityRule
+
     resp = client.post("/api/v1/api-armor/presets/apply", json={"listener_ids": [1, 2]})
     assert resp.status_code == 200
     data = resp.json()
@@ -180,31 +186,30 @@ def test_apply_preset_rules_with_listeners(client, db):
 
 import json
 
-SAMPLE_OPENAPI = json.dumps({
-    "openapi": "3.0.3",
-    "info": {"title": "Test API", "version": "1.0.0"},
-    "paths": {
-        "/api/v1/users": {
-            "post": {
-                "operationId": "createUser",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "name": {"type": "string"},
-                                    "email": {"type": "string"}
-                                },
-                                "required": ["name", "email"]
+SAMPLE_OPENAPI = json.dumps(
+    {
+        "openapi": "3.0.3",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "paths": {
+            "/api/v1/users": {
+                "post": {
+                    "operationId": "createUser",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"name": {"type": "string"}, "email": {"type": "string"}},
+                                    "required": ["name", "email"],
+                                }
                             }
                         }
-                    }
+                    },
                 }
             }
-        }
+        },
     }
-})
+)
 
 
 def test_list_specs_empty(client):
@@ -216,10 +221,13 @@ def test_list_specs_empty(client):
 
 def test_create_spec(client, db):
     """POST /api-armor/specs imports an OpenAPI spec."""
-    resp = client.post("/api/v1/api-armor/specs", json={
-        "name": "test-spec",
-        "spec": SAMPLE_OPENAPI,
-    })
+    resp = client.post(
+        "/api/v1/api-armor/specs",
+        json={
+            "name": "test-spec",
+            "spec": SAMPLE_OPENAPI,
+        },
+    )
     assert resp.status_code == 200
     data = resp.json()
     assert data["name"] == "test-spec"
@@ -258,7 +266,8 @@ def test_list_spec_schemas(client, db):
 
 def test_delete_spec(client, db):
     """DELETE /api-armor/specs/{sid} removes the spec and its schemas."""
-    from app.models.api_armor import OpenApiSpec, ApiSchema
+    from app.models.api_armor import ApiSchema, OpenApiSpec
+
     create_resp = client.post("/api/v1/api-armor/specs", json={"name": "test-spec", "spec": SAMPLE_OPENAPI})
     sid = create_resp.json()["id"]
     resp = client.delete(f"/api/v1/api-armor/specs/{sid}")
@@ -290,6 +299,7 @@ def test_list_schemas_filter_by_method(client, db):
 
 # ----- Auth Policies -----
 
+
 def test_list_auth_policies_empty(client):
     """GET /api-armor/auth-policies returns empty list initially."""
     resp = client.get("/api/v1/api-armor/auth-policies")
@@ -299,14 +309,17 @@ def test_list_auth_policies_empty(client):
 
 def test_create_auth_policy(client, db):
     """POST /api-armor/auth-policies creates a policy."""
-    resp = client.post("/api/v1/api-armor/auth-policies", json={
-        "name": "test-jwt-policy",
-        "auth_type": "jwt",
-        "jwt_algorithm": "hs256",
-        "jwt_secret_env": "JWT_SECRET",
-        "jwt_issuer": "test-issuer",
-        "on_failure": "block",
-    })
+    resp = client.post(
+        "/api/v1/api-armor/auth-policies",
+        json={
+            "name": "test-jwt-policy",
+            "auth_type": "jwt",
+            "jwt_algorithm": "hs256",
+            "jwt_secret_env": "JWT_SECRET",
+            "jwt_issuer": "test-issuer",
+            "on_failure": "block",
+        },
+    )
     assert resp.status_code == 200
     data = resp.json()
     assert data["name"] == "test-jwt-policy"
@@ -323,13 +336,14 @@ def test_create_auth_policy_duplicate(client, db):
 
 def test_update_auth_policy(client, db):
     """PUT /api-armor/auth-policies/{pid} updates a policy."""
-    create_resp = client.post("/api/v1/api-armor/auth-policies", json={
-        "name": "test-policy", "auth_type": "jwt", "jwt_issuer": "old-issuer"
-    })
+    create_resp = client.post(
+        "/api/v1/api-armor/auth-policies", json={"name": "test-policy", "auth_type": "jwt", "jwt_issuer": "old-issuer"}
+    )
     pid = create_resp.json()["id"]
-    resp = client.put(f"/api/v1/api-armor/auth-policies/{pid}", json={
-        "name": "test-policy", "auth_type": "jwt", "jwt_issuer": "new-issuer"
-    })
+    resp = client.put(
+        f"/api/v1/api-armor/auth-policies/{pid}",
+        json={"name": "test-policy", "auth_type": "jwt", "jwt_issuer": "new-issuer"},
+    )
     assert resp.status_code == 200
     assert resp.json()["jwt_issuer"] == "new-issuer"
 
@@ -337,6 +351,7 @@ def test_update_auth_policy(client, db):
 def test_delete_auth_policy(client, db):
     """DELETE /api-armor/auth-policies/{pid} removes a policy."""
     from app.models.api_armor import AuthPolicy
+
     create_resp = client.post("/api/v1/api-armor/auth-policies", json={"name": "test-policy", "auth_type": "jwt"})
     pid = create_resp.json()["id"]
     resp = client.delete(f"/api/v1/api-armor/auth-policies/{pid}")
@@ -345,6 +360,7 @@ def test_delete_auth_policy(client, db):
 
 
 # ----- API Key Lists -----
+
 
 def test_list_api_key_lists_empty(client):
     """GET /api-armor/api-key-lists returns empty list initially."""
@@ -355,11 +371,14 @@ def test_list_api_key_lists_empty(client):
 
 def test_create_api_key_list(client, db):
     """POST /api-armor/api-key-lists creates a list with entries."""
-    resp = client.post("/api/v1/api-armor/api-key-lists", json={
-        "name": "test-keys",
-        "description": "Test API keys",
-        "entries": ["key1", "key2", "key3"],
-    })
+    resp = client.post(
+        "/api/v1/api-armor/api-key-lists",
+        json={
+            "name": "test-keys",
+            "description": "Test API keys",
+            "entries": ["key1", "key2", "key3"],
+        },
+    )
     assert resp.status_code == 200
     data = resp.json()
     assert data["name"] == "test-keys"
@@ -376,6 +395,7 @@ def test_create_api_key_list_duplicate(client, db):
 def test_delete_api_key_list(client, db):
     """DELETE /api-armor/api-key-lists/{lid} removes a list."""
     from app.models.api_armor import ApiKeyList
+
     create_resp = client.post("/api/v1/api-armor/api-key-lists", json={"name": "test-keys", "entries": ["k1"]})
     lid = create_resp.json()["id"]
     resp = client.delete(f"/api/v1/api-armor/api-key-lists/{lid}")
@@ -397,13 +417,17 @@ def test_get_api_key_list(client, db):
 def test_update_api_key_list(client, db):
     """PUT /api-armor/api-key-lists/{lid} replaces entries."""
     from app.models.api_armor import ApiKeyListEntry
+
     create_resp = client.post("/api/v1/api-armor/api-key-lists", json={"name": "test-keys", "entries": ["k1"]})
     lid = create_resp.json()["id"]
-    resp = client.put(f"/api/v1/api-armor/api-key-lists/{lid}", json={
-        "name": "updated-keys",
-        "description": "Updated",
-        "entries": ["new1", "new2"],
-    })
+    resp = client.put(
+        f"/api/v1/api-armor/api-key-lists/{lid}",
+        json={
+            "name": "updated-keys",
+            "description": "Updated",
+            "entries": ["new1", "new2"],
+        },
+    )
     assert resp.status_code == 200
     data = resp.json()
     assert data["name"] == "updated-keys"
@@ -446,22 +470,26 @@ def test_delete_api_key_entry(client, db):
 
 # ----- Schema update / learn -----
 
+
 def test_update_schema(client, db):
     """PUT /api-armor/schemas/{sid} updates a schema."""
     client.post("/api/v1/api-armor/specs", json={"name": "test-spec", "spec": SAMPLE_OPENAPI})
     schema_resp = client.get("/api/v1/api-armor/schemas")
     sid = schema_resp.json()[0]["id"]
     new_schema = {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}
-    resp = client.put(f"/api/v1/api-armor/schemas/{sid}", json={
-        "id": sid,
-        "name": "updated",
-        "method": "POST",
-        "path": "/api/v1/users",
-        "schema_def": new_schema,
-        "enabled": True,
-        "sample_count": 0,
-        "source": "openapi",
-    })
+    resp = client.put(
+        f"/api/v1/api-armor/schemas/{sid}",
+        json={
+            "id": sid,
+            "name": "updated",
+            "method": "POST",
+            "path": "/api/v1/users",
+            "schema_def": new_schema,
+            "enabled": True,
+            "sample_count": 0,
+            "source": "openapi",
+        },
+    )
     assert resp.status_code == 200
     assert resp.json()["schema_def"] == new_schema
     assert "schema_json" not in resp.json()
@@ -469,11 +497,14 @@ def test_update_schema(client, db):
 
 def test_learn_schema(client, db):
     """POST /api-armor/schemas/learn merges an observation into a learned schema."""
-    resp = client.post("/api/v1/api-armor/schemas/learn", json={
-        "method": "POST",
-        "path": "/api/v1/users",
-        "body": {"name": "alice", "email": "alice@example.com"},
-    })
+    resp = client.post(
+        "/api/v1/api-armor/schemas/learn",
+        json={
+            "method": "POST",
+            "path": "/api/v1/users",
+            "body": {"name": "alice", "email": "alice@example.com"},
+        },
+    )
     assert resp.status_code == 200
     assert resp.json()["source"] == "learned"
     assert resp.json()["sample_count"] == 1
@@ -482,16 +513,20 @@ def test_learn_schema(client, db):
     assert "name" in schema_def["properties"]
 
     # Second observation merges.
-    resp2 = client.post("/api/v1/api-armor/schemas/learn", json={
-        "method": "POST",
-        "path": "/api/v1/users",
-        "body": {"name": "bob", "age": 30},
-    })
+    resp2 = client.post(
+        "/api/v1/api-armor/schemas/learn",
+        json={
+            "method": "POST",
+            "path": "/api/v1/users",
+            "body": {"name": "bob", "age": 30},
+        },
+    )
     assert resp2.status_code == 200
     assert resp2.json()["sample_count"] == 2
 
 
 # ----- Profiles & Anomalies -----
+
 
 def test_list_profiles_empty(client):
     """GET /api-armor/profiles returns an empty list initially."""
@@ -503,6 +538,7 @@ def test_list_profiles_empty(client):
 def test_finalize_profile(client, db):
     """POST /api-armor/profiles/{pid}/finalize marks a profile learned."""
     from app.models.api_armor import ApiProfile
+
     profile = ApiProfile(method="POST", path="/api/v1/users", dimensions={}, sample_count=150, learned=False)
     db.add(profile)
     db.commit()
@@ -515,6 +551,7 @@ def test_finalize_profile(client, db):
 def test_delete_profile(client, db):
     """DELETE /api-armor/profiles/{pid} removes a profile."""
     from app.models.api_armor import ApiProfile
+
     profile = ApiProfile(method="POST", path="/api/v1/users", dimensions={}, sample_count=1, learned=False)
     db.add(profile)
     db.commit()
@@ -534,6 +571,7 @@ def test_list_anomalies_empty(client):
 def test_clear_anomalies(client, db):
     """DELETE /api-armor/anomalies clears all anomalies."""
     from app.models.api_armor import ApiAnomaly
+
     for i in range(3):
         db.add(ApiAnomaly(method="POST", path="/api/v1/users", dimension="content_type"))
     db.commit()
@@ -544,15 +582,20 @@ def test_clear_anomalies(client, db):
 
 # ----- Manual ingestion endpoints -----
 
+
 def test_ingest_profile(client, db):
     """POST /api-armor/profiles/ingest creates/updates a profile."""
     from app.models.api_armor import ApiProfile
-    resp = client.post("/api/v1/api-armor/profiles/ingest", json={
-        "method": "POST",
-        "path": "/api/v1/users",
-        "content_type": "application/json",
-        "response_status": 201,
-    })
+
+    resp = client.post(
+        "/api/v1/api-armor/profiles/ingest",
+        json={
+            "method": "POST",
+            "path": "/api/v1/users",
+            "content_type": "application/json",
+            "response_status": 201,
+        },
+    )
     assert resp.status_code == 200
     assert db.query(ApiProfile).count() == 1
     profile = db.query(ApiProfile).first()
@@ -564,13 +607,17 @@ def test_ingest_profile(client, db):
 def test_ingest_anomaly(client, db):
     """POST /api-armor/anomalies/ingest records an anomaly."""
     from app.models.api_armor import ApiAnomaly
-    resp = client.post("/api/v1/api-armor/anomalies/ingest", json={
-        "method": "POST",
-        "path": "/api/v1/users",
-        "dimension": "content_type",
-        "observed_value": "text/xml",
-        "expected_values": {"values": ["application/json"]},
-    })
+
+    resp = client.post(
+        "/api/v1/api-armor/anomalies/ingest",
+        json={
+            "method": "POST",
+            "path": "/api/v1/users",
+            "dimension": "content_type",
+            "observed_value": "text/xml",
+            "expected_values": {"values": ["application/json"]},
+        },
+    )
     assert resp.status_code == 200
     assert db.query(ApiAnomaly).count() == 1
     data = resp.json()

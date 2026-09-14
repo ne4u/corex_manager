@@ -1,40 +1,44 @@
 import json
 import os
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
-import geoip2
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse
 from sqlalchemy import func
-from starlette.background import BackgroundTask
 from sqlalchemy.orm import Session
-from ..deps import get_current_user, get_db, require_admin, rate_limit
+from starlette.background import BackgroundTask
+
 from ...core.config import get_settings
 from ...models.models import MetricSnapshot, Setting
 from ...schemas.haproxy_options import HaproxyOption
-from ...schemas.settings import AsnLookupResponse, GeoIpDownloadResponse, GeoIpStatusResponse, SettingCreate, SettingResponse
+from ...schemas.settings import (
+    AsnLookupResponse,
+    GeoIpDownloadResponse,
+    GeoIpStatusResponse,
+    SettingCreate,
+    SettingResponse,
+)
 from ...schemas.stats import (
     MetricsResponse,
     StatsResponse,
-    WafMetricsResponse,
-    StickTableSummary,
-    StickTableDetail,
     StickTableClearResponse,
-    ValkeyServerInfo,
-    ValkeyNamespaceSummary,
-    ValkeyKeyEntry,
-    ValkeyNamespaceDetail,
+    StickTableDetail,
+    StickTableSummary,
     ValkeyDeleteResponse,
+    ValkeyNamespaceDetail,
+    ValkeyNamespaceSummary,
+    ValkeyServerInfo,
+    WafMetricsResponse,
 )
+from ...services import stick_tables, valkey_inspect
 from ...services.geoip import download_maxmind_dbs
 from ...services.metrics import get_metrics
-from ...services.settings import get_maxmind_license_key, get_setting, list_settings, set_setting
+from ...services.runtime import get_runtime
+from ...services.settings import get_maxmind_license_key, get_setting, set_setting
 from ...services.stats import _send_command, get_stats
 from ...services.waf_metrics import get_waf_metrics
-from ...services.runtime import get_runtime
-from ...services import stick_tables
-from ...services import valkey_inspect
+from ..deps import get_current_user, get_db, rate_limit, require_admin
 
 router = APIRouter()
 settings = get_settings()
@@ -68,7 +72,9 @@ def system_health(
     # GeoIP DB status
     geoip = {
         "country_db_exists": os.path.exists(settings.GEOIP_DB_PATH),
-        "city_db_exists": os.path.exists(settings.GEOIP_CITY_DB_PATH) if hasattr(settings, "GEOIP_CITY_DB_PATH") else False,
+        "city_db_exists": os.path.exists(settings.GEOIP_CITY_DB_PATH)
+        if hasattr(settings, "GEOIP_CITY_DB_PATH")
+        else False,
         "asn_db_exists": os.path.exists(settings.ASN_DB_PATH) if hasattr(settings, "ASN_DB_PATH") else False,
     }
 
@@ -108,7 +114,7 @@ def metrics_debug(
     total = db.query(func.count(MetricSnapshot.id)).scalar() or 0
     latest = db.query(func.max(MetricSnapshot.captured_at)).scalar()
     oldest = db.query(func.min(MetricSnapshot.captured_at)).scalar()
-    server_now = datetime.now(timezone.utc).replace(tzinfo=None)
+    server_now = datetime.now(UTC).replace(tzinfo=None)
 
     return {
         "socket_path": socket_path,
@@ -124,29 +130,29 @@ def metrics_debug(
 
 @router.get("/haproxy-stats", response_model=MetricsResponse)
 def metrics(
-    from_: Optional[datetime] = Query(None, alias="from"),
-    to: Optional[datetime] = Query(None),
-    step: Optional[int] = Query(None),
+    from_: datetime | None = Query(None, alias="from"),
+    to: datetime | None = Query(None),
+    step: int | None = Query(None),
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
     _=Depends(rate_limit),
 ):
-    end = to or datetime.now(timezone.utc)
+    end = to or datetime.now(UTC)
     start = from_ or (end - timedelta(minutes=5))
     return MetricsResponse(data=get_metrics(db, start, end, step))
 
 
 @router.get("/waf/haproxy-stats", response_model=WafMetricsResponse)
 def waf_metrics(
-    from_: Optional[datetime] = Query(None, alias="from"),
-    to: Optional[datetime] = Query(None),
-    step: Optional[int] = Query(None),
+    from_: datetime | None = Query(None, alias="from"),
+    to: datetime | None = Query(None),
+    step: int | None = Query(None),
     breakdown: str = Query("action"),
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
     _=Depends(rate_limit),
 ):
-    end = to or datetime.now(timezone.utc)
+    end = to or datetime.now(UTC)
     start = from_ or (end - timedelta(minutes=5))
     return WafMetricsResponse(**get_waf_metrics(db, start, end, step, breakdown))
 
@@ -224,7 +230,7 @@ def get_recent_logs(limit: int = Query(100, le=1000), user=Depends(get_current_u
         # and are filtered out.
         try:
             parsed = json.loads(log_line)
-        except (json.JSONDecodeError, ValueError):
+        except json.JSONDecodeError, ValueError:
             skipped_non_json += 1
             continue
 
@@ -269,10 +275,7 @@ def get_logs_health(db: Session = Depends(get_db), user=Depends(get_current_user
         "sources": sources,
         "enabled_sources": sum(1 for v in sources.values() if v),
         "enabled_sinks": len(enabled_sinks),
-        "sinks": [
-            {"name": s.name, "type": s.type, "enabled": bool(s.enabled)}
-            for s in sinks
-        ],
+        "sinks": [{"name": s.name, "type": s.type, "enabled": bool(s.enabled)} for s in sinks],
         # stdout is always emitted (managed) so the live log viewer keeps working
         "has_stdout_target": getattr(settings, "HAPROXY_LOG_DEFAULT_STDOUT", True),
         "log_format_mode": "json_default",
@@ -291,7 +294,9 @@ def get_maxmind_license_key_route(db: Session = Depends(get_db), user=Depends(re
 
 
 @router.put("/settings/maxmind/license-key", response_model=SettingResponse)
-def update_maxmind_license_key(s_in: SettingCreate, db: Session = Depends(get_db), user=Depends(require_admin), _=Depends(rate_limit)):
+def update_maxmind_license_key(
+    s_in: SettingCreate, db: Session = Depends(get_db), user=Depends(require_admin), _=Depends(rate_limit)
+):
     return set_setting(db, "maxmind_license_key", s_in.value)
 
 
@@ -304,18 +309,19 @@ def trigger_geoip_download(db: Session = Depends(get_db), user=Depends(require_a
 def get_geoip_status(db: Session = Depends(get_db), user=Depends(require_admin), _=Depends(rate_limit)):
     """Return the last successful MaxMind download timestamp and per-DB file info."""
     last_download = get_setting(db, "geoip_download_last_run_at")
-    from datetime import datetime, timezone
+    from datetime import datetime
+
     dbs = []
     for name, path in [
         ("Country", settings.GEOIP_DB_PATH),
         ("City", settings.GEOIP_CITY_DB_PATH),
         ("ASN", settings.ASN_DB_PATH),
     ]:
-        info: Dict[str, Any] = {"name": name, "path": path, "exists": os.path.exists(path)}
+        info: dict[str, Any] = {"name": name, "path": path, "exists": os.path.exists(path)}
         if info["exists"]:
             try:
                 mtime = os.path.getmtime(path)
-                info["modified"] = datetime.fromtimestamp(mtime, tz=timezone.utc).isoformat()
+                info["modified"] = datetime.fromtimestamp(mtime, tz=UTC).isoformat()
                 info["size_bytes"] = os.path.getsize(path)
             except OSError:
                 pass
@@ -324,9 +330,14 @@ def get_geoip_status(db: Session = Depends(get_db), user=Depends(require_admin),
 
 
 @router.get("/geoip/asn", response_model=AsnLookupResponse)
-def lookup_asn(ip: str = Query(..., pattern=r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$|^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$"), user=Depends(require_admin), _=Depends(rate_limit)):
+def lookup_asn(
+    ip: str = Query(..., pattern=r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$|^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$"),
+    user=Depends(require_admin),
+    _=Depends(rate_limit),
+):
     """Look up ASN organization/network and city/country for a given IP using GeoLite2 databases."""
     import geoip2
+
     asn_path = settings.ASN_DB_PATH
     city_path = settings.GEOIP_CITY_DB_PATH
     result = AsnLookupResponse(ip=ip)
@@ -339,7 +350,7 @@ def lookup_asn(ip: str = Query(..., pattern=r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3
                 result.asn = r.autonomous_system_number
                 result.organization = r.autonomous_system_organization
                 result.network = str(r.network) if r.network else None
-        except (geoip2.errors.AddressNotFoundError, ValueError):
+        except geoip2.errors.AddressNotFoundError, ValueError:
             pass
         except Exception:
             pass
@@ -352,7 +363,7 @@ def lookup_asn(ip: str = Query(..., pattern=r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3
                 result.city = r.city.name
                 result.country = r.country.name
                 result.country_code = r.country.iso_code
-        except (geoip2.errors.AddressNotFoundError, ValueError):
+        except geoip2.errors.AddressNotFoundError, ValueError:
             pass
         except Exception:
             pass
@@ -363,7 +374,7 @@ def lookup_asn(ip: str = Query(..., pattern=r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3
                 r = reader.country(ip)
                 result.country = r.country.name
                 result.country_code = r.country.iso_code
-        except (geoip2.errors.AddressNotFoundError, ValueError):
+        except geoip2.errors.AddressNotFoundError, ValueError:
             pass
         except Exception:
             pass
@@ -371,18 +382,20 @@ def lookup_asn(ip: str = Query(..., pattern=r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3
     return result
 
 
-@router.get("/haproxy/global-options", response_model=List[HaproxyOption])
+@router.get("/haproxy/global-options", response_model=list[HaproxyOption])
 def get_haproxy_global_options(db: Session = Depends(get_db), user=Depends(require_admin), _=Depends(rate_limit)):
     raw = get_setting(db, "haproxy_global_options", "[]")
     try:
         opts = json.loads(raw) if isinstance(raw, str) and raw else []
-    except (json.JSONDecodeError, TypeError):
+    except json.JSONDecodeError, TypeError:
         opts = []
     return [HaproxyOption(**o) for o in opts if isinstance(o, dict)]
 
 
-@router.put("/haproxy/global-options", response_model=List[HaproxyOption])
-def update_haproxy_global_options(opts: List[HaproxyOption], db: Session = Depends(get_db), user=Depends(require_admin), _=Depends(rate_limit)):
+@router.put("/haproxy/global-options", response_model=list[HaproxyOption])
+def update_haproxy_global_options(
+    opts: list[HaproxyOption], db: Session = Depends(get_db), user=Depends(require_admin), _=Depends(rate_limit)
+):
     set_setting(db, "haproxy_global_options", json.dumps([o.model_dump() for o in opts]))
     return opts
 
@@ -392,7 +405,7 @@ def update_haproxy_global_options(opts: List[HaproxyOption], db: Session = Depen
 def system_export(
     include_secrets: bool = Query(True),
     include_metrics: bool = Query(False),
-    password: Optional[str] = Query(None),
+    password: str | None = Query(None),
     db: Session = Depends(get_db),
     user=Depends(require_admin),
     _=Depends(rate_limit),
@@ -403,11 +416,14 @@ def system_export(
     building the entire ZIP in memory first (which caused proxy timeouts
     with large GeoIP databases).
     """
-    from ...services.backup import create_export
     import os as _os
 
-    tmp_path, encrypted = create_export(db, include_secrets=include_secrets, include_metrics=include_metrics, password=password)
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    from ...services.backup import create_export
+
+    tmp_path, encrypted = create_export(
+        db, include_secrets=include_secrets, include_metrics=include_metrics, password=password
+    )
+    timestamp = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
     filename = f"haproxy-manager-export-{timestamp}.zip"
     media_type = "application/octet-stream" if encrypted else "application/zip"
 
@@ -456,7 +472,7 @@ def export_terraform(
         include_users_identities=include_users_identities,
         include_system_secrets=include_system_secrets,
     )
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    timestamp = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
     return Response(
         content=zip_bytes,
         media_type="application/zip",
@@ -469,7 +485,7 @@ def export_terraform(
 @router.post("/system/restore")
 async def system_restore(
     file: UploadFile = File(...),
-    password: Optional[str] = Form(None),
+    password: str | None = Form(None),
     db: Session = Depends(get_db),
     user=Depends(require_admin),
     _=Depends(rate_limit),
@@ -495,7 +511,8 @@ async def system_restore(
 # HAProxy stick-table viewer (System → Tables tab)
 # ---------------------------------------------------------------------------
 
-@router.get("/haproxy/tables", response_model=List[StickTableSummary])
+
+@router.get("/haproxy/tables", response_model=list[StickTableSummary])
 def list_stick_tables(
     user=Depends(get_current_user),
     _=Depends(rate_limit),
@@ -509,7 +526,7 @@ def get_stick_table(
     name: str,
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
-    search: Optional[str] = Query(None),
+    search: str | None = Query(None),
     user=Depends(get_current_user),
     _=Depends(rate_limit),
 ):
@@ -551,6 +568,7 @@ def clear_stick_table_entry(
 # decodes back to a literal `/`.
 # ---------------------------------------------------------------------------
 
+
 @router.get("/valkey/info", response_model=ValkeyServerInfo)
 def valkey_info(
     user=Depends(get_current_user),
@@ -560,7 +578,7 @@ def valkey_info(
     return valkey_inspect.server_info()
 
 
-@router.get("/valkey/namespaces", response_model=List[ValkeyNamespaceSummary])
+@router.get("/valkey/namespaces", response_model=list[ValkeyNamespaceSummary])
 def valkey_namespaces(
     user=Depends(get_current_user),
     _=Depends(rate_limit),
@@ -574,7 +592,7 @@ def valkey_namespace(
     prefix: str,
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
-    search: Optional[str] = Query(None),
+    search: str | None = Query(None),
     user=Depends(get_current_user),
     _=Depends(rate_limit),
 ):

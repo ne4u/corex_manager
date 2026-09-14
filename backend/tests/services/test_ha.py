@@ -8,21 +8,20 @@ Covers:
 - is_ha_enabled() respects DB setting and env fallback
 - push_config_to_all_instances pushes to all configured instances
 """
+
 import os
 import sys
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-import pytest
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 from app.services import ha as ha_service
-from app.services.ha import HaproxyInstance, _parse_instances, _instances_to_str
-
+from app.services.ha import HaproxyInstance, _instances_to_str, _parse_instances
 
 # ---------------------------------------------------------------------------
 # Instance parsing
 # ---------------------------------------------------------------------------
+
 
 class TestInstanceParsing:
     def test_parse_empty(self):
@@ -83,25 +82,34 @@ class TestInstanceParsing:
 # Peers section generation
 # ---------------------------------------------------------------------------
 
+
 class TestPeersSection:
     def test_empty_when_ha_disabled(self):
-        with patch.object(ha_service, 'is_ha_enabled', return_value=False):
+        with patch.object(ha_service, "is_ha_enabled", return_value=False):
             assert ha_service.generate_peers_section(None) == ""
 
     def test_empty_when_single_instance(self):
-        with patch.object(ha_service, 'is_ha_enabled', return_value=True):
-            with patch.object(ha_service, 'get_haproxy_instances', return_value=[
-                HaproxyInstance("corex", "https://haproxy:5555/v3"),
-            ]):
+        with patch.object(ha_service, "is_ha_enabled", return_value=True):
+            with patch.object(
+                ha_service,
+                "get_haproxy_instances",
+                return_value=[
+                    HaproxyInstance("corex", "https://haproxy:5555/v3"),
+                ],
+            ):
                 assert ha_service.generate_peers_section(None) == ""
 
     def test_populated_when_ha_enabled_multiple(self):
-        with patch.object(ha_service, 'is_ha_enabled', return_value=True):
-            with patch.object(ha_service, 'get_haproxy_instances', return_value=[
-                HaproxyInstance("corex", "https://haproxy:5555/v3"),
-                HaproxyInstance("corex2", "https://haproxy2:5555/v3"),
-            ]):
-                with patch.object(ha_service.settings, 'HAPROXY_PEER_PORT', 10000):
+        with patch.object(ha_service, "is_ha_enabled", return_value=True):
+            with patch.object(
+                ha_service,
+                "get_haproxy_instances",
+                return_value=[
+                    HaproxyInstance("corex", "https://haproxy:5555/v3"),
+                    HaproxyInstance("corex2", "https://haproxy2:5555/v3"),
+                ],
+            ):
+                with patch.object(ha_service.settings, "HAPROXY_PEER_PORT", 10000):
                     result = ha_service.generate_peers_section(None)
                     assert "peers corex-peers" in result
                     assert "peer corex haproxy:10000" in result
@@ -110,22 +118,30 @@ class TestPeersSection:
 
 class TestMaybePeers:
     def test_empty_when_ha_disabled(self):
-        with patch.object(ha_service, 'is_ha_enabled', return_value=False):
+        with patch.object(ha_service, "is_ha_enabled", return_value=False):
             assert ha_service.maybe_peers(None) == ""
 
     def test_empty_when_single_instance(self):
-        with patch.object(ha_service, 'is_ha_enabled', return_value=True):
-            with patch.object(ha_service, 'get_haproxy_instances', return_value=[
-                HaproxyInstance("corex", "https://haproxy:5555/v3"),
-            ]):
+        with patch.object(ha_service, "is_ha_enabled", return_value=True):
+            with patch.object(
+                ha_service,
+                "get_haproxy_instances",
+                return_value=[
+                    HaproxyInstance("corex", "https://haproxy:5555/v3"),
+                ],
+            ):
                 assert ha_service.maybe_peers(None) == ""
 
     def test_peers_directive_when_ha_enabled(self):
-        with patch.object(ha_service, 'is_ha_enabled', return_value=True):
-            with patch.object(ha_service, 'get_haproxy_instances', return_value=[
-                HaproxyInstance("corex", "https://haproxy:5555/v3"),
-                HaproxyInstance("corex2", "https://haproxy2:5555/v3"),
-            ]):
+        with patch.object(ha_service, "is_ha_enabled", return_value=True):
+            with patch.object(
+                ha_service,
+                "get_haproxy_instances",
+                return_value=[
+                    HaproxyInstance("corex", "https://haproxy:5555/v3"),
+                    HaproxyInstance("corex2", "https://haproxy2:5555/v3"),
+                ],
+            ):
                 result = ha_service.maybe_peers(None)
                 assert result == " peers corex-peers"
 
@@ -134,30 +150,33 @@ class TestMaybePeers:
 # Keepalived config generation
 # ---------------------------------------------------------------------------
 
+
 class TestKeepalivedConfig:
     def test_empty_when_ha_disabled(self):
-        with patch.object(ha_service, 'is_ha_enabled', return_value=False):
+        with patch.object(ha_service, "is_ha_enabled", return_value=False):
             assert ha_service.generate_keepalived_config(None) == ""
 
     def test_empty_when_no_vip(self):
-        with patch.object(ha_service, 'is_ha_enabled', return_value=True):
-            with patch.object(ha_service, '_get_keepalived_setting', return_value=""):
+        with patch.object(ha_service, "is_ha_enabled", return_value=True):
+            with patch.object(ha_service, "_get_keepalived_setting", return_value=""):
                 assert ha_service.generate_keepalived_config(None) == ""
 
     def test_generates_valid_config(self):
         settings_map = {
-            'keepalived_vip': '10.0.0.100',
-            'keepalived_virtual_router_id': '51',
-            'keepalived_priority': '100',
-            'keepalived_interface': 'eth0',
-            'keepalived_auth_password': 'secret',
-            'keepalived_peer_addresses': '10.0.0.2',
-            'keepalived_advert_int': '1',
-            'keepalived_preempt': 'true',
-            'keepalived_track_script': '',
+            "keepalived_vip": "10.0.0.100",
+            "keepalived_virtual_router_id": "51",
+            "keepalived_priority": "100",
+            "keepalived_interface": "eth0",
+            "keepalived_auth_password": "secret",
+            "keepalived_peer_addresses": "10.0.0.2",
+            "keepalived_advert_int": "1",
+            "keepalived_preempt": "true",
+            "keepalived_track_script": "",
         }
-        with patch.object(ha_service, 'is_ha_enabled', return_value=True):
-            with patch.object(ha_service, '_get_keepalived_setting', side_effect=lambda db, k, d: settings_map.get(k, d)):
+        with patch.object(ha_service, "is_ha_enabled", return_value=True):
+            with patch.object(
+                ha_service, "_get_keepalived_setting", side_effect=lambda db, k, d: settings_map.get(k, d)
+            ):
                 config = ha_service.generate_keepalived_config(None)
                 assert "vrrp_instance VI_1" in config
                 assert "10.0.0.100" in config
@@ -172,24 +191,25 @@ class TestKeepalivedConfig:
 # is_ha_enabled
 # ---------------------------------------------------------------------------
 
+
 class TestIsHaEnabled:
     def test_false_when_no_db_and_env_false(self):
-        with patch.object(ha_service.settings, 'HA_ENABLED', False):
+        with patch.object(ha_service.settings, "HA_ENABLED", False):
             assert ha_service.is_ha_enabled(None) is False
 
     def test_true_when_env_true(self):
-        with patch.object(ha_service.settings, 'HA_ENABLED', True):
+        with patch.object(ha_service.settings, "HA_ENABLED", True):
             assert ha_service.is_ha_enabled(None) is True
 
     def test_true_when_db_setting_true(self):
         mock_db = MagicMock()
-        with patch.object(ha_service, 'get_setting', return_value='true'):
+        with patch.object(ha_service, "get_setting", return_value="true"):
             assert ha_service.is_ha_enabled(mock_db) is True
 
     def test_false_when_db_setting_false(self):
         mock_db = MagicMock()
-        with patch.object(ha_service, 'get_setting', return_value='false'):
-            with patch.object(ha_service.settings, 'HA_ENABLED', True):
+        with patch.object(ha_service, "get_setting", return_value="false"):
+            with patch.object(ha_service.settings, "HA_ENABLED", True):
                 assert ha_service.is_ha_enabled(mock_db) is False
 
 
@@ -197,17 +217,22 @@ class TestIsHaEnabled:
 # Push config to all instances
 # ---------------------------------------------------------------------------
 
+
 class TestPushConfigToAll:
     def test_pushes_to_all_instances(self):
         instances = [
             HaproxyInstance("corex", "https://haproxy:5555/v3"),
             HaproxyInstance("corex2", "https://haproxy2:5555/v3"),
         ]
-        with patch.object(ha_service, 'get_haproxy_instances', return_value=instances):
-            with patch.object(ha_service.dataplane, 'push_config', side_effect=[
-                {"status": "ok", "message": "pushed"},
-                {"status": "ok", "message": "pushed"},
-            ]) as mock_push:
+        with patch.object(ha_service, "get_haproxy_instances", return_value=instances):
+            with patch.object(
+                ha_service.dataplane,
+                "push_config",
+                side_effect=[
+                    {"status": "ok", "message": "pushed"},
+                    {"status": "ok", "message": "pushed"},
+                ],
+            ) as mock_push:
                 results = ha_service.push_config_to_all_instances(None, "config text")
                 assert len(results) == 2
                 assert results["corex"]["status"] == "ok"
@@ -216,16 +241,18 @@ class TestPushConfigToAll:
 
     def test_handles_push_failure(self):
         instances = [HaproxyInstance("corex", "https://haproxy:5555/v3")]
-        with patch.object(ha_service, 'get_haproxy_instances', return_value=instances):
-            with patch.object(ha_service.dataplane, 'push_config', return_value={"status": "error", "message": "connection refused"}):
+        with patch.object(ha_service, "get_haproxy_instances", return_value=instances):
+            with patch.object(
+                ha_service.dataplane, "push_config", return_value={"status": "error", "message": "connection refused"}
+            ):
                 results = ha_service.push_config_to_all_instances(None, "config text")
                 assert results["corex"]["status"] == "error"
                 assert "connection refused" in results["corex"]["message"]
 
     def test_handles_exception(self):
         instances = [HaproxyInstance("corex", "https://haproxy:5555/v3")]
-        with patch.object(ha_service, 'get_haproxy_instances', return_value=instances):
-            with patch.object(ha_service.dataplane, 'push_config', side_effect=Exception("network error")):
+        with patch.object(ha_service, "get_haproxy_instances", return_value=instances):
+            with patch.object(ha_service.dataplane, "push_config", side_effect=Exception("network error")):
                 results = ha_service.push_config_to_all_instances(None, "config text")
                 assert results["corex"]["status"] == "error"
                 assert "network error" in results["corex"]["message"]

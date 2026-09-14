@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, Boolean, Text, DateTime, ForeignKey, JSON
+from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
+
 from .base import Base, utcnow
 
 
@@ -28,4 +29,4 @@ class CustomErrorPage(Base):
     listener = relationship("Listener")
 
 
-__all__ = ['CustomErrorPage', 'VectorSink']
+__all__ = ["CustomErrorPage", "VectorSink"]

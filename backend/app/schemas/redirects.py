@@ -1,11 +1,11 @@
-from datetime import datetime
-from typing import Optional, List, Dict, Any, Type, TypeVar
-from pydantic import BaseModel, Field, model_validator, field_validator, ConfigDict
+from pydantic import BaseModel, ConfigDict
+
 from ._base import _optional_update
 
+
 class RedirectBase(BaseModel):
-    listener_id: Optional[int] = None
-    listener_ids: Optional[List[int]] = None
+    listener_id: int | None = None
+    listener_ids: list[int] | None = None
     priority: int = 0
     name: str
     source: str
@@ -13,8 +13,8 @@ class RedirectBase(BaseModel):
     type: str = "permanent"
     code: int = 301
     preserve_query: bool = True
-    error_page_id: Optional[int] = None
-    error_page_query: Optional[str] = None
+    error_page_id: int | None = None
+    error_page_query: str | None = None
 
 
 class RedirectCreate(RedirectBase):
@@ -31,11 +31,11 @@ class RedirectResponse(RedirectBase):
 
 
 class RewriteBase(BaseModel):
-    listener_id: Optional[int] = None
-    listener_ids: Optional[List[int]] = None
+    listener_id: int | None = None
+    listener_ids: list[int] | None = None
     priority: int = 0
     name: str
-    host_match: Optional[str] = None
+    host_match: str | None = None
     source_regex: str
     target: str
     type: str = "path"
@@ -54,4 +54,13 @@ class RewriteResponse(RewriteBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-__all__ = ['RedirectBase', 'RedirectCreate', 'RedirectResponse', 'RedirectUpdate', 'RewriteBase', 'RewriteCreate', 'RewriteResponse', 'RewriteUpdate']
+__all__ = [
+    "RedirectBase",
+    "RedirectCreate",
+    "RedirectResponse",
+    "RedirectUpdate",
+    "RewriteBase",
+    "RewriteCreate",
+    "RewriteResponse",
+    "RewriteUpdate",
+]

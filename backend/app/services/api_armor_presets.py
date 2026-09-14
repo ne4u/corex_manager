@@ -3,14 +3,12 @@
 Provides ready-to-use security rules for common API/GraphQL protection patterns.
 Users can apply these presets from the API Armor page (Phase 7) or via the API.
 """
-from typing import List, Optional
 
 from sqlalchemy.orm import Session
 
 from ..models.models import SecurityRule
 
-
-PRESET_RULES: List[dict] = [
+PRESET_RULES: list[dict] = [
     {
         "name": "API Armor: Block invalid GraphQL queries",
         "description": "Blocks requests where GraphQL parsing fails (invalid syntax).",
@@ -78,12 +76,12 @@ PRESET_RULES: List[dict] = [
 ]
 
 
-def get_preset_rules() -> List[dict]:
+def get_preset_rules() -> list[dict]:
     """Return the list of preset API Armor security rules."""
     return [r.copy() for r in PRESET_RULES]
 
 
-def apply_preset_rules(db: Session, listener_ids: Optional[List[int]] = None) -> List[SecurityRule]:
+def apply_preset_rules(db: Session, listener_ids: list[int] | None = None) -> list[SecurityRule]:
     """Apply all preset API Armor security rules that don't already exist.
 
     Args:
@@ -99,7 +97,7 @@ def apply_preset_rules(db: Session, listener_ids: Optional[List[int]] = None) ->
 
     # Get the max priority to append after existing rules
     max_priority = db.query(SecurityRule).order_by(SecurityRule.priority.desc()).first()
-    next_priority = (max_priority.priority + 1 if max_priority else 0)
+    next_priority = max_priority.priority + 1 if max_priority else 0
 
     for preset in PRESET_RULES:
         if preset["name"] in existing_names:

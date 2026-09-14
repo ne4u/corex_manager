@@ -1,4 +1,5 @@
 """Tests for the restore_client_ip_trusted_network_list setting validation."""
+
 from app.models.models import NetworkList
 
 
@@ -57,6 +58,7 @@ def test_set_trusted_network_list_empty_clears(client, db):
 # ---------------------------------------------------------------------------
 # Password policy setting validation
 # ---------------------------------------------------------------------------
+
 
 def test_set_password_min_length_valid(client, db):
     r = client.put("/api/v1/settings/password_min_length", json={"value": "12"})

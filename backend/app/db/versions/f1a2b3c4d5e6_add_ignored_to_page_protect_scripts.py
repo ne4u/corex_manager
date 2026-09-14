@@ -10,23 +10,23 @@ periodically hashed or included in CSP policy recommendations.
 
 Existing rows are backfilled to ``false``.
 """
-from typing import Sequence, Union
 
-from alembic import op
+from collections.abc import Sequence
+
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = 'f1a2b3c4d5e6'
-down_revision: Union[str, Sequence[str], None] = 'e3f4a5b6c7d8'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision: str = "f1a2b3c4d5e6"
+down_revision: str | Sequence[str] | None = "e3f4a5b6c7d8"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
     """Add ignored column to page_protect_scripts and backfill existing rows."""
-    with op.batch_alter_table('page_protect_scripts') as batch_op:
-        batch_op.add_column(sa.Column('ignored', sa.Boolean(), nullable=True))
+    with op.batch_alter_table("page_protect_scripts") as batch_op:
+        batch_op.add_column(sa.Column("ignored", sa.Boolean(), nullable=True))
 
     # Existing rows default to not ignored.
     op.execute("UPDATE page_protect_scripts SET ignored = false WHERE ignored IS NULL")
@@ -34,5 +34,5 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Remove ignored column from page_protect_scripts."""
-    with op.batch_alter_table('page_protect_scripts') as batch_op:
-        batch_op.drop_column('ignored')
+    with op.batch_alter_table("page_protect_scripts") as batch_op:
+        batch_op.drop_column("ignored")

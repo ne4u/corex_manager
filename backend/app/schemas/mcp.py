@@ -1,15 +1,17 @@
 from datetime import datetime
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, ConfigDict
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
+
 from ._base import _optional_update
 
-
 # --- Team ---
+
 
 class TeamBase(BaseModel):
     name: str
     slug: str = Field(pattern=r"^[a-z0-9-]+$")
-    description: Optional[str] = None
+    description: str | None = None
 
 
 class TeamCreate(TeamBase):
@@ -28,6 +30,7 @@ class TeamResponse(TeamBase):
 
 # --- UserTeam ---
 
+
 class UserTeamBase(BaseModel):
     user_id: int
     team_id: int
@@ -45,35 +48,36 @@ class UserTeamResponse(UserTeamBase):
 
 # --- McpServer ---
 
+
 class McpServerBase(BaseModel):
     team_id: int
     name: str
-    display_name: Optional[str] = None
-    description: Optional[str] = None
-    url: Optional[str] = None
+    display_name: str | None = None
+    description: str | None = None
+    url: str | None = None
     enabled: bool = True
     verify_tls: bool = True
     auth_type: str = Field(default="none", pattern="^(none|bearer|header|oauth)$")
-    auth_header: Optional[str] = None
-    auth_secret: Optional[str] = None  # plaintext, write-only; never returned
+    auth_header: str | None = None
+    auth_secret: str | None = None  # plaintext, write-only; never returned
     timeout_ms: int = 30000
     max_body_bytes: int = 1048576
-    namespace: Optional[str] = None
+    namespace: str | None = None
     # stdio transport
     transport_type: str = Field(default="streamable_http", pattern="^(streamable_http|stdio)$")
-    command: Optional[str] = None
-    args: Optional[List[str]] = None
-    env_vars: Optional[Dict[str, str]] = None
+    command: str | None = None
+    args: list[str] | None = None
+    env_vars: dict[str, str] | None = None
     # marketplace
-    package_manager: Optional[str] = None
-    source_package_name: Optional[str] = None
+    package_manager: str | None = None
+    source_package_name: str | None = None
     # OAuth
     oauth_enabled: bool = False
-    oauth_client_id: Optional[str] = None
-    oauth_client_secret: Optional[str] = None  # write-only
-    oauth_scopes: Optional[str] = None
-    oauth_auth_server_metadata_url: Optional[str] = None
-    oauth_protected_resource_metadata_url: Optional[str] = None
+    oauth_client_id: str | None = None
+    oauth_client_secret: str | None = None  # write-only
+    oauth_scopes: str | None = None
+    oauth_auth_server_metadata_url: str | None = None
+    oauth_protected_resource_metadata_url: str | None = None
 
 
 class McpServerCreate(McpServerBase):
@@ -87,41 +91,42 @@ class McpServerResponse(BaseModel):
     id: int
     team_id: int
     name: str
-    display_name: Optional[str] = None
-    description: Optional[str] = None
-    url: Optional[str] = None
+    display_name: str | None = None
+    description: str | None = None
+    url: str | None = None
     enabled: bool
     verify_tls: bool
     auth_type: str
-    auth_header: Optional[str] = None
+    auth_header: str | None = None
     has_secret: bool = False
     timeout_ms: int
     max_body_bytes: int
     namespace: str
-    health_status: Optional[str] = None
-    last_seen_at: Optional[datetime] = None
-    last_error: Optional[str] = None
-    last_catalog_at: Optional[datetime] = None
+    health_status: str | None = None
+    last_seen_at: datetime | None = None
+    last_error: str | None = None
+    last_catalog_at: datetime | None = None
     transport_type: str = "streamable_http"
-    command: Optional[str] = None
-    args: Optional[List[str]] = None
+    command: str | None = None
+    args: list[str] | None = None
     has_env_vars: bool = False
-    env_var_names: Optional[List[str]] = None
-    package_manager: Optional[str] = None
-    source_package_name: Optional[str] = None
-    installed_version: Optional[str] = None
+    env_var_names: list[str] | None = None
+    package_manager: str | None = None
+    source_package_name: str | None = None
+    installed_version: str | None = None
     oauth_enabled: bool = False
-    oauth_auth_status: Optional[str] = None
-    oauth_client_id: Optional[str] = None
-    oauth_scopes: Optional[str] = None
-    oauth_auth_server_metadata_url: Optional[str] = None
-    oauth_protected_resource_metadata_url: Optional[str] = None
+    oauth_auth_status: str | None = None
+    oauth_client_id: str | None = None
+    oauth_scopes: str | None = None
+    oauth_auth_server_metadata_url: str | None = None
+    oauth_protected_resource_metadata_url: str | None = None
     created_at: datetime
     updated_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
 
 # --- McpServerReplica ---
+
 
 class McpServerReplicaBase(BaseModel):
     url: str
@@ -149,20 +154,21 @@ class McpServerReplicaResponse(BaseModel):
 
 # --- McpIdentity ---
 
+
 class McpIdentityBase(BaseModel):
     team_id: int
     name: str
-    description: Optional[str] = None
-    subject: Optional[str] = None
+    description: str | None = None
+    subject: str | None = None
     kind: str = Field(default="pat", pattern="^(pat|jwt)$")
-    jwt_issuer: Optional[str] = None
-    jwt_audience: Optional[str] = None
-    jwt_jwks_url: Optional[str] = None
+    jwt_issuer: str | None = None
+    jwt_audience: str | None = None
+    jwt_jwks_url: str | None = None
     enabled: bool = True
-    expires_at: Optional[datetime] = None
+    expires_at: datetime | None = None
     idp_source: str = Field(default="manual", pattern="^(manual|auth0)$")
-    idp_external_id: Optional[str] = None
-    idp_user_info: Optional[Dict[str, Any]] = None
+    idp_external_id: str | None = None
+    idp_user_info: dict[str, Any] | None = None
 
 
 class McpIdentityCreate(McpIdentityBase):
@@ -176,20 +182,20 @@ class McpIdentityResponse(BaseModel):
     id: int
     team_id: int
     name: str
-    description: Optional[str] = None
-    subject: Optional[str] = None
+    description: str | None = None
+    subject: str | None = None
     kind: str
-    pat_prefix: Optional[str] = None
-    jwt_issuer: Optional[str] = None
-    jwt_audience: Optional[str] = None
-    jwt_jwks_url: Optional[str] = None
+    pat_prefix: str | None = None
+    jwt_issuer: str | None = None
+    jwt_audience: str | None = None
+    jwt_jwks_url: str | None = None
     enabled: bool
-    expires_at: Optional[datetime] = None
+    expires_at: datetime | None = None
     idp_source: str
-    idp_external_id: Optional[str] = None
-    idp_user_info: Optional[Dict[str, Any]] = None
+    idp_external_id: str | None = None
+    idp_user_info: dict[str, Any] | None = None
     created_at: datetime
-    last_used_at: Optional[datetime] = None
+    last_used_at: datetime | None = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -200,6 +206,7 @@ class PatCreateResponse(BaseModel):
 
 
 # --- Auth0 IdP sync ---
+
 
 class McpAuth0SyncRequest(BaseModel):
     team_id: int
@@ -212,12 +219,13 @@ class McpAuth0SyncResponse(BaseModel):
     updated: int
     skipped: int
     total_users: int
-    errors: List[str]
+    errors: list[str]
     dry_run: bool
     team_id: int
 
 
 # --- McpPolicy ---
+
 
 class McpPolicyBase(BaseModel):
     team_id: int
@@ -243,7 +251,7 @@ class McpPolicyResponse(BaseModel):
     enabled: bool
     priority: int
     expression: str
-    expression_ast: Optional[Dict[str, Any]] = None
+    expression_ast: dict[str, Any] | None = None
     action: str
     log: bool
     no_log: bool
@@ -254,16 +262,19 @@ class McpPolicyResponse(BaseModel):
 
 # --- McpDlpRule ---
 
+
 class McpDlpRuleBase(BaseModel):
     team_id: int
     name: str
     enabled: bool = True
     direction: str = Field(default="both", pattern="^(request|response|both)$")
-    detector: str = Field(pattern="^(email|phone|ssn|credit_card|ip|aws_key|private_key|github_token|slack_token|custom)$")
-    find_regex: Optional[str] = None
+    detector: str = Field(
+        pattern="^(email|phone|ssn|credit_card|ip|aws_key|private_key|github_token|slack_token|custom)$"
+    )
+    find_regex: str | None = None
     action: str = Field(default="block", pattern="^(block|redact|tokenize)$")
-    token_prefix: Optional[str] = None
-    token_ttl: Optional[int] = None
+    token_prefix: str | None = None
+    token_ttl: int | None = None
     apply_to: str = Field(default="json_strings", pattern="^(json_strings|all_text)$")
 
 
@@ -282,10 +293,10 @@ class McpDlpRuleResponse(BaseModel):
     priority: int
     direction: str
     detector: str
-    find_regex: Optional[str] = None
+    find_regex: str | None = None
     action: str
-    token_prefix: Optional[str] = None
-    token_ttl: Optional[int] = None
+    token_prefix: str | None = None
+    token_ttl: int | None = None
     apply_to: str
     created_at: datetime
     updated_at: datetime
@@ -294,13 +305,14 @@ class McpDlpRuleResponse(BaseModel):
 
 # --- McpSkill ---
 
+
 class McpSkillBase(BaseModel):
     team_id: int
     name: str = Field(pattern=r"^[a-z0-9-]+$")
-    description: Optional[str] = None
+    description: str | None = None
     enabled: bool = True
-    enable_when: Optional[str] = None
-    tags: Optional[List[str]] = None
+    enable_when: str | None = None
+    tags: list[str] | None = None
 
 
 class McpSkillCreate(McpSkillBase):
@@ -314,12 +326,12 @@ class McpSkillResponse(BaseModel):
     id: int
     team_id: int
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     enabled: bool
-    enable_when: Optional[str] = None
-    enable_when_ast: Optional[Dict[str, Any]] = None
-    tags: Optional[List[str]] = None
-    published_version_id: Optional[int] = None
+    enable_when: str | None = None
+    enable_when_ast: dict[str, Any] | None = None
+    tags: list[str] | None = None
+    published_version_id: int | None = None
     created_at: datetime
     updated_at: datetime
     model_config = ConfigDict(from_attributes=True)
@@ -327,10 +339,11 @@ class McpSkillResponse(BaseModel):
 
 # --- McpSkillVersion ---
 
+
 class McpSkillVersionBase(BaseModel):
-    frontmatter: Optional[Dict[str, Any]] = None
+    frontmatter: dict[str, Any] | None = None
     body: str
-    files: Optional[List[Dict[str, Any]]] = None
+    files: list[dict[str, Any]] | None = None
 
 
 class McpSkillVersionCreate(McpSkillVersionBase):
@@ -346,11 +359,12 @@ class McpSkillImportRequest(BaseModel):
     - Full GitHub URL to a skill directory or repo root
     - URL to a ZIP archive containing SKILL.md at the root or in a skills/ subdir
     """
+
     url: str = Field(description="URL to import from (raw SKILL.md, GitHub repo, or ZIP archive)")
     team_id: int
-    name: Optional[str] = Field(None, description="Override skill name (defaults to frontmatter name or repo name)")
-    description: Optional[str] = None
-    tags: Optional[List[str]] = None
+    name: str | None = Field(None, description="Override skill name (defaults to frontmatter name or repo name)")
+    description: str | None = None
+    tags: list[str] | None = None
     auto_publish: bool = True
 
 
@@ -358,23 +372,26 @@ class McpSkillVersionResponse(BaseModel):
     id: int
     skill_id: int
     version: int
-    frontmatter: Optional[Dict[str, Any]] = None
+    frontmatter: dict[str, Any] | None = None
     body: str
-    files: Optional[List[Dict[str, Any]]] = None
-    created_by: Optional[str] = None
+    files: list[dict[str, Any]] | None = None
+    created_by: str | None = None
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
 
 # --- McpGuardrail ---
 
+
 class McpGuardrailBase(BaseModel):
     team_id: int
     name: str
     enabled: bool = True
     direction: str = Field(default="both", pattern="^(request|response|both)$")
-    pack: str = Field(default="custom", pattern="^(builtin:jailbreak_v1|builtin:instruction_override|builtin:obfuscation|custom)$")
-    find_regex: Optional[str] = None
+    pack: str = Field(
+        default="custom", pattern="^(builtin:jailbreak_v1|builtin:instruction_override|builtin:obfuscation|custom)$"
+    )
+    find_regex: str | None = None
     action: str = Field(default="block", pattern="^(block|redact|log)$")
 
 
@@ -393,7 +410,7 @@ class McpGuardrailResponse(BaseModel):
     priority: int
     direction: str
     pack: str
-    find_regex: Optional[str] = None
+    find_regex: str | None = None
     action: str
     created_at: datetime
     updated_at: datetime
@@ -402,60 +419,62 @@ class McpGuardrailResponse(BaseModel):
 
 # --- McpInstallation ---
 
+
 class McpInstallationResponse(BaseModel):
     id: int
     server_id: int
     package_manager: str
     package_name: str
-    version: Optional[str] = None
+    version: str | None = None
     status: str
-    output: Optional[str] = None
-    error: Optional[str] = None
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
+    output: str | None = None
+    error: str | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
 
 # --- Marketplace ---
 
+
 class MarketplaceSearchResult(BaseModel):
     name: str
-    description: Optional[str] = None
-    version: Optional[str] = None
-    homepage: Optional[str] = None
-    repository_url: Optional[str] = None
-    author: Optional[str] = None
-    license: Optional[str] = None
-    keywords: Optional[List[str]] = None
-    downloads: Optional[int] = None
-    score: Optional[float] = None
+    description: str | None = None
+    version: str | None = None
+    homepage: str | None = None
+    repository_url: str | None = None
+    author: str | None = None
+    license: str | None = None
+    keywords: list[str] | None = None
+    downloads: int | None = None
+    score: float | None = None
 
 
 class MarketplacePackageDetails(BaseModel):
     name: str
-    version: Optional[str] = None
-    description: Optional[str] = None
-    homepage: Optional[str] = None
-    repository_url: Optional[str] = None
-    author: Optional[str] = None
-    license: Optional[str] = None
-    keywords: Optional[List[str]] = None
-    dependencies: Optional[Dict[str, str]] = None
-    readme: Optional[str] = None
-    required_env_vars: Optional[List[str]] = None
+    version: str | None = None
+    description: str | None = None
+    homepage: str | None = None
+    repository_url: str | None = None
+    author: str | None = None
+    license: str | None = None
+    keywords: list[str] | None = None
+    dependencies: dict[str, str] | None = None
+    readme: str | None = None
+    required_env_vars: list[str] | None = None
 
 
 class MarketplaceInstallRequest(BaseModel):
     package_manager: str = Field(pattern="^(npm|pypi)$")
     package_name: str
-    version: Optional[str] = None
+    version: str | None = None
     team_id: int
-    name: Optional[str] = None  # server name, defaults to package name
-    namespace: Optional[str] = None
-    display_name: Optional[str] = None
-    env_vars: Optional[Dict[str, str]] = None
-    custom_args: Optional[List[str]] = None
+    name: str | None = None  # server name, defaults to package name
+    namespace: str | None = None
+    display_name: str | None = None
+    env_vars: dict[str, str] | None = None
+    custom_args: list[str] | None = None
 
 
 class MarketplaceUninstallRequest(BaseModel):
@@ -468,10 +487,11 @@ class DiscoverEnvVarsRequest(BaseModel):
 
 
 class DiscoverEnvVarsResponse(BaseModel):
-    env_vars: List[str] = []
+    env_vars: list[str] = []
 
 
 # --- Upstream OAuth ---
+
 
 class OAuthDiscoverRequest(BaseModel):
     url: str
@@ -479,29 +499,29 @@ class OAuthDiscoverRequest(BaseModel):
 
 
 class OAuthDiscoverResponse(BaseModel):
-    authorization_servers: Optional[List[str]] = None
-    authorization_endpoint: Optional[str] = None
-    token_endpoint: Optional[str] = None
-    registration_endpoint: Optional[str] = None
-    scopes_supported: Optional[List[str]] = None
-    grant_types_supported: Optional[List[str]] = None
+    authorization_servers: list[str] | None = None
+    authorization_endpoint: str | None = None
+    token_endpoint: str | None = None
+    registration_endpoint: str | None = None
+    scopes_supported: list[str] | None = None
+    grant_types_supported: list[str] | None = None
 
 
 class OAuthConfigureRequest(BaseModel):
     client_id: str
     client_secret: str
-    scopes: Optional[str] = None
-    auth_server_metadata_url: Optional[str] = None
-    protected_resource_metadata_url: Optional[str] = None
+    scopes: str | None = None
+    auth_server_metadata_url: str | None = None
+    protected_resource_metadata_url: str | None = None
 
 
 class OAuthStatusResponse(BaseModel):
     enabled: bool = False
-    auth_status: Optional[str] = None
-    client_id: Optional[str] = None
-    scopes: Optional[str] = None
-    token_expires_at: Optional[datetime] = None
-    authorization_url: Optional[str] = None
+    auth_status: str | None = None
+    client_id: str | None = None
+    scopes: str | None = None
+    token_expires_at: datetime | None = None
+    authorization_url: str | None = None
 
 
 class OAuthAuthorizeResponse(BaseModel):
@@ -510,6 +530,7 @@ class OAuthAuthorizeResponse(BaseModel):
 
 # --- Skill Export ---
 
+
 class SkillExportResponse(BaseModel):
     download_url: str
     filename: str
@@ -517,71 +538,75 @@ class SkillExportResponse(BaseModel):
 
 # --- McpEvent ---
 
+
 class McpEventResponse(BaseModel):
     id: int
     captured_at: datetime
-    request_id: Optional[str] = None
-    session_id: Optional[str] = None
-    identity_id: Optional[int] = None
-    identity_name: Optional[str] = None
-    team_id: Optional[int] = None
-    team_name: Optional[str] = None
-    server_id: Optional[int] = None
-    server_name: Optional[str] = None
-    jsonrpc_method: Optional[str] = None
-    tool: Optional[str] = None
-    resource_uri: Optional[str] = None
-    prompt: Optional[str] = None
-    action: Optional[str] = None
-    status: Optional[str] = None
-    latency_ms: Optional[int] = None
-    error: Optional[str] = None
-    bytes_in: Optional[int] = None
-    bytes_out: Optional[int] = None
-    dlp_hits: Optional[Any] = None
-    guardrail_hits: Optional[Any] = None
+    request_id: str | None = None
+    session_id: str | None = None
+    identity_id: int | None = None
+    identity_name: str | None = None
+    team_id: int | None = None
+    team_name: str | None = None
+    server_id: int | None = None
+    server_name: str | None = None
+    jsonrpc_method: str | None = None
+    tool: str | None = None
+    resource_uri: str | None = None
+    prompt: str | None = None
+    action: str | None = None
+    status: str | None = None
+    latency_ms: int | None = None
+    error: str | None = None
+    bytes_in: int | None = None
+    bytes_out: int | None = None
+    dlp_hits: Any | None = None
+    guardrail_hits: Any | None = None
     model_config = ConfigDict(from_attributes=True)
 
 
 class McpEventListResponse(BaseModel):
-    events: List[McpEventResponse]
+    events: list[McpEventResponse]
     total: int
 
 
 # --- Session ---
 
+
 class SessionInfo(BaseModel):
     session_id: str
     identity_id: int
-    team_id: Optional[int] = None
+    team_id: int | None = None
     created_at: str
-    last_activity: Optional[str] = None
-    server_sessions: Optional[Dict[str, str]] = None
+    last_activity: str | None = None
+    server_sessions: dict[str, str] | None = None
 
 
 class SessionListResponse(BaseModel):
-    sessions: List[SessionInfo]
+    sessions: list[SessionInfo]
     total: int
 
 
 # --- Config Status ---
 
+
 class ConfigStatusResponse(BaseModel):
-    last_generated: Optional[str] = None
-    bundle_size: Optional[int] = None
-    config_path: Optional[str] = None
+    last_generated: str | None = None
+    bundle_size: int | None = None
+    config_path: str | None = None
 
 
 # --- Alert Config ---
 
+
 class AlertConfigResponse(BaseModel):
-    webhook_url: Optional[str] = None
-    thresholds: Dict[str, int] = {}
+    webhook_url: str | None = None
+    thresholds: dict[str, int] = {}
 
 
 class AlertConfigUpdate(BaseModel):
-    webhook_url: Optional[str] = None
-    thresholds: Dict[str, int] = {}
+    webhook_url: str | None = None
+    thresholds: dict[str, int] = {}
 
 
 class AlertHistoryItem(BaseModel):
@@ -590,28 +615,30 @@ class AlertHistoryItem(BaseModel):
     message: str
     created_at: datetime
     webhook_sent: bool = False
-    webhook_status: Optional[int] = None
+    webhook_status: int | None = None
 
 
 # --- Server Catalog ---
 
+
 class ServerCatalogResponse(BaseModel):
     server_id: int
-    tools: List[Dict[str, Any]] = []
-    resources: List[Dict[str, Any]] = []
-    prompts: List[Dict[str, Any]] = []
-    last_refresh: Optional[str] = None
+    tools: list[dict[str, Any]] = []
+    resources: list[dict[str, Any]] = []
+    prompts: list[dict[str, Any]] = []
+    last_refresh: str | None = None
 
 
 class McpServerTestResponse(BaseModel):
     ok: bool
-    error: Optional[str] = None
-    tools: List[Dict[str, Any]] = []
-    resources: List[Dict[str, Any]] = []
-    prompts: List[Dict[str, Any]] = []
+    error: str | None = None
+    tools: list[dict[str, Any]] = []
+    resources: list[dict[str, Any]] = []
+    prompts: list[dict[str, Any]] = []
 
 
 # --- Policy Validation ---
+
 
 class McpPolicyValidateRequest(BaseModel):
     expression: str
@@ -619,11 +646,12 @@ class McpPolicyValidateRequest(BaseModel):
 
 class McpPolicyValidateResponse(BaseModel):
     ok: bool
-    ast: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
+    ast: dict[str, Any] | None = None
+    error: str | None = None
 
 
 # --- Regex Validation (DLP / guardrail custom patterns) ---
+
 
 class McpRegexValidateRequest(BaseModel):
     pattern: str
@@ -636,7 +664,7 @@ class McpRegexValidateRequest(BaseModel):
 
 class McpRegexValidateResponse(BaseModel):
     ok: bool
-    error: Optional[str] = None
+    error: str | None = None
     """Human-readable reason when ok=False (invalid syntax, ReDoS risk, or
     unsupported Rust regex feature)."""
     redos_risk: bool = False
@@ -647,11 +675,12 @@ class McpRegexValidateResponse(BaseModel):
 
 # --- Policy Builder Metadata ---
 
+
 class McpPolicyBuilderServer(BaseModel):
     id: int
     namespace: str
     name: str
-    last_catalog_at: Optional[str] = None
+    last_catalog_at: str | None = None
     stale: bool = True
 
 
@@ -662,19 +691,20 @@ class McpPolicyBuilderTeam(BaseModel):
 
 
 class McpPolicyBuilderMetadataResponse(BaseModel):
-    methods: List[str] = []
-    servers: List[McpPolicyBuilderServer] = []
-    stale_servers: List[McpPolicyBuilderServer] = []
-    tools: List[str] = []
-    resources: List[str] = []
-    prompts: List[str] = []
-    identities: List[str] = []
-    identity_kinds: List[str] = []
-    teams: List[McpPolicyBuilderTeam] = []
+    methods: list[str] = []
+    servers: list[McpPolicyBuilderServer] = []
+    stale_servers: list[McpPolicyBuilderServer] = []
+    tools: list[str] = []
+    resources: list[str] = []
+    prompts: list[str] = []
+    identities: list[str] = []
+    identity_kinds: list[str] = []
+    teams: list[McpPolicyBuilderTeam] = []
     refreshing: bool = False
 
 
 # --- Gateway Status ---
+
 
 class GatewayMetricsSnapshot(BaseModel):
     requests_total: int = 0
@@ -689,7 +719,7 @@ class GatewayMetricsSnapshot(BaseModel):
     tools_called_total: int = 0
     latency_sum_ms: int = 0
     latency_count: int = 0
-    latency_buckets: List[Dict[str, Any]] = []
+    latency_buckets: list[dict[str, Any]] = []
     latency_inf_bucket: int = 0
 
 
@@ -711,7 +741,7 @@ class GatewayAlertState(BaseModel):
     event_type: str
     recent_count: int
     threshold: int
-    last_alert_ts: Optional[float] = None
+    last_alert_ts: float | None = None
 
 
 class GatewayStatusResponse(BaseModel):
@@ -719,49 +749,96 @@ class GatewayStatusResponse(BaseModel):
     configured: bool = False
     backend: str = "python"
     reachable: bool = False
-    metrics: Optional[GatewayMetricsSnapshot] = None
+    metrics: GatewayMetricsSnapshot | None = None
     active_sessions: int = 0
-    open_circuits: List[GatewayCircuitState] = []
-    catalog_freshness: List[GatewayCatalogFreshness] = []
-    alerts: List[GatewayAlertState] = []
-    error: Optional[str] = None
+    open_circuits: list[GatewayCircuitState] = []
+    catalog_freshness: list[GatewayCatalogFreshness] = []
+    alerts: list[GatewayAlertState] = []
+    error: str | None = None
 
 
 class ServerHealthResponse(BaseModel):
     server_id: int
     status: str = "unknown"
-    error: Optional[str] = None
-    checked_at: Optional[float] = None
+    error: str | None = None
+    checked_at: float | None = None
 
 
 __all__ = [
-    "TeamBase", "TeamCreate", "TeamUpdate", "TeamResponse",
-    "UserTeamBase", "UserTeamCreate", "UserTeamResponse",
-    "McpServerBase", "McpServerCreate", "McpServerUpdate", "McpServerResponse",
-    "McpServerReplicaBase", "McpServerReplicaCreate", "McpServerReplicaUpdate", "McpServerReplicaResponse",
-    "McpIdentityBase", "McpIdentityCreate", "McpIdentityUpdate", "McpIdentityResponse",
+    "TeamBase",
+    "TeamCreate",
+    "TeamUpdate",
+    "TeamResponse",
+    "UserTeamBase",
+    "UserTeamCreate",
+    "UserTeamResponse",
+    "McpServerBase",
+    "McpServerCreate",
+    "McpServerUpdate",
+    "McpServerResponse",
+    "McpServerReplicaBase",
+    "McpServerReplicaCreate",
+    "McpServerReplicaUpdate",
+    "McpServerReplicaResponse",
+    "McpIdentityBase",
+    "McpIdentityCreate",
+    "McpIdentityUpdate",
+    "McpIdentityResponse",
     "PatCreateResponse",
-    "McpPolicyBase", "McpPolicyCreate", "McpPolicyUpdate", "McpPolicyResponse",
-    "McpDlpRuleBase", "McpDlpRuleCreate", "McpDlpRuleUpdate", "McpDlpRuleResponse",
-    "McpSkillBase", "McpSkillCreate", "McpSkillUpdate", "McpSkillResponse",
-    "McpSkillVersionBase", "McpSkillVersionCreate", "McpSkillVersionResponse",
+    "McpPolicyBase",
+    "McpPolicyCreate",
+    "McpPolicyUpdate",
+    "McpPolicyResponse",
+    "McpDlpRuleBase",
+    "McpDlpRuleCreate",
+    "McpDlpRuleUpdate",
+    "McpDlpRuleResponse",
+    "McpSkillBase",
+    "McpSkillCreate",
+    "McpSkillUpdate",
+    "McpSkillResponse",
+    "McpSkillVersionBase",
+    "McpSkillVersionCreate",
+    "McpSkillVersionResponse",
     "McpSkillImportRequest",
-    "McpGuardrailBase", "McpGuardrailCreate", "McpGuardrailUpdate", "McpGuardrailResponse",
+    "McpGuardrailBase",
+    "McpGuardrailCreate",
+    "McpGuardrailUpdate",
+    "McpGuardrailResponse",
     "McpInstallationResponse",
-    "MarketplaceSearchResult", "MarketplacePackageDetails",
-    "MarketplaceInstallRequest", "MarketplaceUninstallRequest",
-    "DiscoverEnvVarsRequest", "DiscoverEnvVarsResponse",
-    "OAuthDiscoverRequest", "OAuthDiscoverResponse",
-    "OAuthConfigureRequest", "OAuthStatusResponse", "OAuthAuthorizeResponse",
+    "MarketplaceSearchResult",
+    "MarketplacePackageDetails",
+    "MarketplaceInstallRequest",
+    "MarketplaceUninstallRequest",
+    "DiscoverEnvVarsRequest",
+    "DiscoverEnvVarsResponse",
+    "OAuthDiscoverRequest",
+    "OAuthDiscoverResponse",
+    "OAuthConfigureRequest",
+    "OAuthStatusResponse",
+    "OAuthAuthorizeResponse",
     "SkillExportResponse",
-    "McpEventResponse", "McpEventListResponse",
-    "SessionInfo", "SessionListResponse",
+    "McpEventResponse",
+    "McpEventListResponse",
+    "SessionInfo",
+    "SessionListResponse",
     "ConfigStatusResponse",
-    "AlertConfigResponse", "AlertConfigUpdate", "AlertHistoryItem",
-    "ServerCatalogResponse", "McpServerTestResponse",
-    "McpPolicyValidateRequest", "McpPolicyValidateResponse",
-    "McpPolicyBuilderServer", "McpPolicyBuilderTeam", "McpPolicyBuilderMetadataResponse",
-    "McpRegexValidateRequest", "McpRegexValidateResponse",
-    "GatewayMetricsSnapshot", "GatewayCircuitState", "GatewayCatalogFreshness",
-    "GatewayAlertState", "GatewayStatusResponse", "ServerHealthResponse",
+    "AlertConfigResponse",
+    "AlertConfigUpdate",
+    "AlertHistoryItem",
+    "ServerCatalogResponse",
+    "McpServerTestResponse",
+    "McpPolicyValidateRequest",
+    "McpPolicyValidateResponse",
+    "McpPolicyBuilderServer",
+    "McpPolicyBuilderTeam",
+    "McpPolicyBuilderMetadataResponse",
+    "McpRegexValidateRequest",
+    "McpRegexValidateResponse",
+    "GatewayMetricsSnapshot",
+    "GatewayCircuitState",
+    "GatewayCatalogFreshness",
+    "GatewayAlertState",
+    "GatewayStatusResponse",
+    "ServerHealthResponse",
 ]

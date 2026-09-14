@@ -1,16 +1,17 @@
 from datetime import datetime
-from typing import Optional, List, Dict, Any, Type, TypeVar
-from pydantic import BaseModel, Field, model_validator, field_validator, ConfigDict
-from ._base import _optional_update
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
 
 class PageProtectPolicyBase(BaseModel):
     name: str
     enabled: bool = True
-    backend_ids: List[int] = Field(default_factory=list)  # [] = all backends
+    backend_ids: list[int] = Field(default_factory=list)  # [] = all backends
     mode: str = "monitor"  # "monitor" | "enforce"
     sample_rate_percent: int = Field(default=100, ge=1, le=100)
     report_path: str = "/_csp-report"
-    directives: Dict[str, List[str]] = Field(default_factory=dict)
+    directives: dict[str, list[str]] = Field(default_factory=dict)
 
 
 class PageProtectPolicyCreate(PageProtectPolicyBase):
@@ -18,13 +19,13 @@ class PageProtectPolicyCreate(PageProtectPolicyBase):
 
 
 class PageProtectPolicyUpdate(BaseModel):
-    name: Optional[str] = None
-    enabled: Optional[bool] = None
-    backend_ids: Optional[List[int]] = None
-    mode: Optional[str] = None
-    sample_rate_percent: Optional[int] = Field(default=None, ge=1, le=100)
-    report_path: Optional[str] = None
-    directives: Optional[Dict[str, List[str]]] = None
+    name: str | None = None
+    enabled: bool | None = None
+    backend_ids: list[int] | None = None
+    mode: str | None = None
+    sample_rate_percent: int | None = Field(default=None, ge=1, le=100)
+    report_path: str | None = None
+    directives: dict[str, list[str]] | None = None
 
 
 class PageProtectPolicyResponse(PageProtectPolicyBase):
@@ -37,23 +38,23 @@ class PageProtectPolicyResponse(PageProtectPolicyBase):
 
 class CspReportResponse(BaseModel):
     id: int
-    policy_id: Optional[int] = None
+    policy_id: int | None = None
     captured_at: datetime
-    client_ip: Optional[str] = None
-    document_uri: Optional[str] = None
-    referrer: Optional[str] = None
-    violated_directive: Optional[str] = None
-    effective_directive: Optional[str] = None
-    original_policy: Optional[str] = None
-    blocked_uri: Optional[str] = None
-    source_file: Optional[str] = None
-    line_number: Optional[int] = None
-    column_number: Optional[int] = None
-    status_code: Optional[int] = None
-    script_sample: Optional[str] = None
-    backend_name: Optional[str] = None
-    listener_name: Optional[str] = None
-    report_type: Optional[str] = None
+    client_ip: str | None = None
+    document_uri: str | None = None
+    referrer: str | None = None
+    violated_directive: str | None = None
+    effective_directive: str | None = None
+    original_policy: str | None = None
+    blocked_uri: str | None = None
+    source_file: str | None = None
+    line_number: int | None = None
+    column_number: int | None = None
+    status_code: int | None = None
+    script_sample: str | None = None
+    backend_name: str | None = None
+    listener_name: str | None = None
+    report_type: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -61,14 +62,14 @@ class CspReportResponse(BaseModel):
 class PageProtectScriptBase(BaseModel):
     url: str
     resource_type: str = "script"
-    domain: Optional[str] = None
-    notes: Optional[str] = None
+    domain: str | None = None
+    notes: str | None = None
 
 
 class PageProtectScriptCreate(BaseModel):
     url: str
     resource_type: str = "script"
-    notes: Optional[str] = None
+    notes: str | None = None
     fetch_method: str = "auto"  # auto | GET | POST
 
     @field_validator("fetch_method")
@@ -81,14 +82,14 @@ class PageProtectScriptCreate(BaseModel):
 
 
 class PageProtectScriptUpdate(BaseModel):
-    notes: Optional[str] = None
-    hash_changed: Optional[bool] = None
-    ignored: Optional[bool] = None
-    fetch_method: Optional[str] = None  # auto | GET | POST
+    notes: str | None = None
+    hash_changed: bool | None = None
+    ignored: bool | None = None
+    fetch_method: str | None = None  # auto | GET | POST
 
     @field_validator("fetch_method")
     @classmethod
-    def validate_fetch_method(cls, v: Optional[str]) -> Optional[str]:
+    def validate_fetch_method(cls, v: str | None) -> str | None:
         if v is None:
             return v
         v = v.upper()
@@ -100,23 +101,23 @@ class PageProtectScriptUpdate(BaseModel):
 class PageProtectScriptResponse(BaseModel):
     id: int
     url: str
-    resource_type: Optional[str] = None
+    resource_type: str | None = None
     first_seen: datetime
     last_seen: datetime
     occurrence_count: int
-    domain: Optional[str] = None
-    first_hash: Optional[str] = None
-    first_hash_at: Optional[datetime] = None
-    last_hash: Optional[str] = None
-    last_hash_at: Optional[datetime] = None
-    hash_checked_at: Optional[datetime] = None
+    domain: str | None = None
+    first_hash: str | None = None
+    first_hash_at: datetime | None = None
+    last_hash: str | None = None
+    last_hash_at: datetime | None = None
+    hash_checked_at: datetime | None = None
     hash_changed: bool
     ignored: bool = False
     has_content: bool = False
-    notes: Optional[str] = None
-    source: Optional[str] = None
-    fetch_method: Optional[str] = None
-    last_fetch_method: Optional[str] = None
+    notes: str | None = None
+    source: str | None = None
+    fetch_method: str | None = None
+    last_fetch_method: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -143,8 +144,8 @@ class PageProtectStats(BaseModel):
     changed_scripts: int = 0
     active_policies: int = 0
     reports_24h: int = 0
-    top_violated_directives: List[Dict[str, Any]] = Field(default_factory=list)
-    top_blocked_uris: List[Dict[str, Any]] = Field(default_factory=list)
+    top_violated_directives: list[dict[str, Any]] = Field(default_factory=list)
+    top_blocked_uris: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class PageProtectSampleResponse(BaseModel):
@@ -153,15 +154,15 @@ class PageProtectSampleResponse(BaseModel):
 
 class PageProtectBaselineStatus(BaseModel):
     status: str = "idle"  # idle | baselining | complete
-    start: Optional[str] = None
-    end: Optional[str] = None
+    start: str | None = None
+    end: str | None = None
     note: str = ""
-    elapsed_seconds: Optional[int] = None
-    duration_seconds: Optional[int] = None
-    scripts_count: Optional[int] = None
-    reports_count: Optional[int] = None
-    distinct_ips: Optional[int] = None
-    distinct_pages: Optional[int] = None
+    elapsed_seconds: int | None = None
+    duration_seconds: int | None = None
+    scripts_count: int | None = None
+    reports_count: int | None = None
+    distinct_ips: int | None = None
+    distinct_pages: int | None = None
 
 
 class PageProtectBaselineStartRequest(BaseModel):
@@ -181,14 +182,32 @@ class PageProtectRecommendSummary(BaseModel):
     baseline_start: str = ""
     baseline_end: str = ""
     directives_count: int = 0
-    backend_filter: Optional[List[str]] = None
+    backend_filter: list[str] | None = None
 
 
 class PageProtectRecommendResponse(BaseModel):
-    directives: Dict[str, List[str]] = Field(default_factory=dict)
-    warnings: List[str] = Field(default_factory=list)
-    sources: Dict[str, List[PageProtectRecommendSource]] = Field(default_factory=dict)
+    directives: dict[str, list[str]] = Field(default_factory=dict)
+    warnings: list[str] = Field(default_factory=list)
+    sources: dict[str, list[PageProtectRecommendSource]] = Field(default_factory=dict)
     summary: PageProtectRecommendSummary = Field(default_factory=PageProtectRecommendSummary)
 
 
-__all__ = ['CspReportResponse', 'PageProtectBaselineStartRequest', 'PageProtectBaselineStatus', 'PageProtectPolicyBase', 'PageProtectPolicyCreate', 'PageProtectPolicyResponse', 'PageProtectPolicyUpdate', 'PageProtectRecommendResponse', 'PageProtectRecommendSource', 'PageProtectRecommendSummary', 'PageProtectSampleResponse', 'PageProtectScriptBase', 'PageProtectScriptCreate', 'PageProtectScriptResponse', 'PageProtectScriptUpdate', 'PageProtectSettings', 'PageProtectStats']
+__all__ = [
+    "CspReportResponse",
+    "PageProtectBaselineStartRequest",
+    "PageProtectBaselineStatus",
+    "PageProtectPolicyBase",
+    "PageProtectPolicyCreate",
+    "PageProtectPolicyResponse",
+    "PageProtectPolicyUpdate",
+    "PageProtectRecommendResponse",
+    "PageProtectRecommendSource",
+    "PageProtectRecommendSummary",
+    "PageProtectSampleResponse",
+    "PageProtectScriptBase",
+    "PageProtectScriptCreate",
+    "PageProtectScriptResponse",
+    "PageProtectScriptUpdate",
+    "PageProtectSettings",
+    "PageProtectStats",
+]

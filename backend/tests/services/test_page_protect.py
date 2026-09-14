@@ -1,14 +1,16 @@
 """Unit tests for the Page Protect core service."""
+
 import json
+from datetime import UTC
 
 from app.services.page_protect import (
     build_csp_header,
     build_report_to_header,
-    parse_csp_report,
     extract_script_info,
-    upsert_script_inventory,
-    prune_stale_scripts,
     get_stats,
+    parse_csp_report,
+    prune_stale_scripts,
+    upsert_script_inventory,
 )
 
 
@@ -55,20 +57,22 @@ def test_build_report_to_header():
 
 
 def test_parse_csp_report_uri_format():
-    body = json.dumps({
-        "csp-report": {
-            "document-uri": "https://example.com/page",
-            "referrer": "https://google.com",
-            "violated-directive": "script-src",
-            "effective-directive": "script-src",
-            "original-policy": "default-src 'self'",
-            "blocked-uri": "https://evil.example.com/script.js",
-            "source-file": "https://example.com/page",
-            "line-number": 42,
-            "column-number": 10,
-            "status-code": 200,
+    body = json.dumps(
+        {
+            "csp-report": {
+                "document-uri": "https://example.com/page",
+                "referrer": "https://google.com",
+                "violated-directive": "script-src",
+                "effective-directive": "script-src",
+                "original-policy": "default-src 'self'",
+                "blocked-uri": "https://evil.example.com/script.js",
+                "source-file": "https://example.com/page",
+                "line-number": 42,
+                "column-number": 10,
+                "status-code": 200,
+            }
         }
-    })
+    )
     result = parse_csp_report(body)
     assert result is not None
     assert result["report_type"] == "csp"
@@ -79,20 +83,22 @@ def test_parse_csp_report_uri_format():
 
 
 def test_parse_csp_report_reporting_api_format():
-    body = json.dumps({
-        "type": "csp-violation",
-        "body": {
-            "documentURL": "https://example.com/page",
-            "referrer": "https://google.com",
-            "effectiveDirective": "script-src",
-            "originalPolicy": "default-src 'self'",
-            "blockedURL": "https://evil.example.com/script.js",
-            "lineNumber": 42,
-            "columnNumber": 10,
-            "statusCode": 200,
-            "sample": "console.log(1)",
+    body = json.dumps(
+        {
+            "type": "csp-violation",
+            "body": {
+                "documentURL": "https://example.com/page",
+                "referrer": "https://google.com",
+                "effectiveDirective": "script-src",
+                "originalPolicy": "default-src 'self'",
+                "blockedURL": "https://evil.example.com/script.js",
+                "lineNumber": 42,
+                "columnNumber": 10,
+                "statusCode": 200,
+                "sample": "console.log(1)",
+            },
         }
-    })
+    )
     result = parse_csp_report(body)
     assert result is not None
     assert result["report_type"] == "reporting-api"
@@ -103,10 +109,12 @@ def test_parse_csp_report_reporting_api_format():
 
 
 def test_parse_csp_report_array_batch():
-    body = json.dumps([
-        {"csp-report": {"violated-directive": "script-src", "blocked-uri": "https://evil1.example.com/a.js"}},
-        {"csp-report": {"violated-directive": "img-src", "blocked-uri": "https://evil2.example.com/b.png"}},
-    ])
+    body = json.dumps(
+        [
+            {"csp-report": {"violated-directive": "script-src", "blocked-uri": "https://evil1.example.com/a.js"}},
+            {"csp-report": {"violated-directive": "img-src", "blocked-uri": "https://evil2.example.com/b.png"}},
+        ]
+    )
     result = parse_csp_report(body)
     assert result is not None
     assert result["blocked_uri"] == "https://evil1.example.com/a.js"
@@ -118,11 +126,13 @@ def test_parse_csp_report_invalid_json():
 
 
 def test_parse_csp_report_bare_dict():
-    body = json.dumps({
-        "violated-directive": "script-src",
-        "blocked-uri": "https://evil.example.com/script.js",
-        "document-uri": "https://example.com/page",
-    })
+    body = json.dumps(
+        {
+            "violated-directive": "script-src",
+            "blocked-uri": "https://evil.example.com/script.js",
+            "document-uri": "https://example.com/page",
+        }
+    )
     result = parse_csp_report(body)
     assert result is not None
     assert result["violated_directive"] == "script-src"
@@ -175,6 +185,7 @@ def test_upsert_script_inventory_new(db):
 
 def test_upsert_script_inventory_existing(db):
     from app.models.models import PageProtectScript
+
     # First insert
     upsert_script_inventory(db, "https://cdn.example.com/a.js", "script", "cdn.example.com")
     db.commit()
@@ -197,6 +208,7 @@ def test_get_stats_empty(db):
 
 def test_get_stats_ignores_ignored_changed(db):
     from tests.factories import make_page_protect_script
+
     make_page_protect_script(db, hash_changed=True, ignored=True)
     make_page_protect_script(db, url="https://other.example.com/b.js", hash_changed=True, ignored=False)
     db.commit()
@@ -205,7 +217,8 @@ def test_get_stats_ignores_ignored_changed(db):
 
 
 def test_get_stats_with_data(db):
-    from tests.factories import make_page_protect_policy, make_csp_report, make_page_protect_script
+    from tests.factories import make_csp_report, make_page_protect_policy, make_page_protect_script
+
     make_page_protect_policy(db, enabled=True)
     make_page_protect_policy(db, name="p2", enabled=False)
     make_csp_report(db)
@@ -223,14 +236,17 @@ def test_get_stats_with_data(db):
 def test_parse_beacon_data_valid(db):
     """parse_beacon_data extracts resources from a beacon POST body."""
     from app.services.page_protect import parse_beacon_data
-    body = json.dumps({
-        "page": "https://example.com/app",
-        "resources": [
-            {"url": "https://cdn.example.com/a.js", "resource_type": "script", "domain": "cdn.example.com"},
-            {"url": "https://fonts.example.com/font.woff", "resource_type": "font", "domain": "fonts.example.com"},
-        ],
-        "ts": 1234567890,
-    })
+
+    body = json.dumps(
+        {
+            "page": "https://example.com/app",
+            "resources": [
+                {"url": "https://cdn.example.com/a.js", "resource_type": "script", "domain": "cdn.example.com"},
+                {"url": "https://fonts.example.com/font.woff", "resource_type": "font", "domain": "fonts.example.com"},
+            ],
+            "ts": 1234567890,
+        }
+    )
     resources = parse_beacon_data(body)
     assert len(resources) == 2
     assert resources[0]["url"] == "https://cdn.example.com/a.js"
@@ -241,6 +257,7 @@ def test_parse_beacon_data_valid(db):
 def test_parse_beacon_data_filters_non_http(db):
     """parse_beacon_data skips non-http URLs (data:, blob:, etc.)."""
     from app.services.page_protect import parse_beacon_data
+
     body = {
         "resources": [
             {"url": "https://cdn.example.com/a.js", "resource_type": "script"},
@@ -256,6 +273,7 @@ def test_parse_beacon_data_filters_non_http(db):
 def test_parse_beacon_data_invalid_json(db):
     """parse_beacon_data returns empty list for invalid JSON."""
     from app.services.page_protect import parse_beacon_data
+
     assert parse_beacon_data("not json") == []
     assert parse_beacon_data(None) == []
     assert parse_beacon_data({}) == []
@@ -263,8 +281,9 @@ def test_parse_beacon_data_invalid_json(db):
 
 def test_store_beacon_resources_upserts(db):
     """store_beacon_resources creates inventory entries with source='beacon'."""
-    from app.services.page_protect import store_beacon_resources
     from app.models.models import PageProtectScript
+    from app.services.page_protect import store_beacon_resources
+
     resources = [
         {"url": "https://cdn.example.com/a.js", "resource_type": "script", "domain": "cdn.example.com"},
         {"url": "https://cdn.example.com/b.js", "resource_type": "script", "domain": "cdn.example.com"},
@@ -279,6 +298,7 @@ def test_store_beacon_resources_upserts(db):
 def test_build_beacon_rule(db):
     """build_beacon_rule produces a valid resp_transform inject rule."""
     from app.services.page_protect import build_beacon_rule
+
     pp_settings = {
         "beacon_content_types": "text/html",
         "beacon_path_patterns": "/app,/dashboard",
@@ -288,18 +308,22 @@ def test_build_beacon_rule(db):
     assert rule["inject_position"] == "before"
     assert rule["content_types"] == ["text/html"]
     assert rule["path_patterns"] == ["/app", "/dashboard"]
-    assert "<script src=\"/_cx-assets.js?v=" in rule["inject_string"]
-    assert rule["inject_string"].endswith("\"></script>")
+    assert '<script src="/_cx-assets.js?v=' in rule["inject_string"]
+    assert rule["inject_string"].endswith('"></script>')
     assert rule["find_regex"] == "</head>|</body>"
 
 
 def test_prune_stale_scripts_deletes_old_unseen(db):
     """prune_stale_scripts deletes rows where both last_seen and last_hash_at are stale."""
-    from datetime import datetime, timezone, timedelta
-    from tests.factories import make_page_protect_script
+    from datetime import datetime, timedelta
+
     from app.models.models import PageProtectScript
-    old = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30)
-    s = make_page_protect_script(db, url="https://cdn.example.com/old.js", last_hash="abc", last_hash_at=old, last_seen=old)
+    from tests.factories import make_page_protect_script
+
+    old = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=30)
+    s = make_page_protect_script(
+        db, url="https://cdn.example.com/old.js", last_hash="abc", last_hash_at=old, last_seen=old
+    )
     db.commit()
     pruned = prune_stale_scripts(db, 7)
     assert pruned == 1
@@ -308,92 +332,151 @@ def test_prune_stale_scripts_deletes_old_unseen(db):
 
 def test_prune_stale_scripts_preserves_changed(db):
     """prune_stale_scripts preserves rows with hash_changed=True even if stale."""
-    from datetime import datetime, timezone, timedelta
-    from tests.factories import make_page_protect_script
+    from datetime import datetime, timedelta
+
     from app.models.models import PageProtectScript
-    old = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30)
-    s = make_page_protect_script(db, url="https://cdn.example.com/changed.js", hash_changed=True, last_hash="abc", last_hash_at=old, last_seen=old)
+    from tests.factories import make_page_protect_script
+
+    old = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=30)
+    s = make_page_protect_script(
+        db,
+        url="https://cdn.example.com/changed.js",
+        hash_changed=True,
+        last_hash="abc",
+        last_hash_at=old,
+        last_seen=old,
+    )
     db.commit()
     pruned = prune_stale_scripts(db, 7)
     assert pruned == 0
-    assert db.query(PageProtectScript).filter(PageProtectScript.url == "https://cdn.example.com/changed.js").first() is not None
+    assert (
+        db.query(PageProtectScript).filter(PageProtectScript.url == "https://cdn.example.com/changed.js").first()
+        is not None
+    )
 
 
 def test_prune_stale_scripts_preserves_recent_last_seen(db):
     """prune_stale_scripts preserves rows where last_seen is recent (still seen in traffic)."""
-    from datetime import datetime, timezone, timedelta
-    from tests.factories import make_page_protect_script
+    from datetime import datetime, timedelta
+
     from app.models.models import PageProtectScript
-    old = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30)
-    recent = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=1)
-    s = make_page_protect_script(db, url="https://cdn.example.com/recent.js", last_hash="abc", last_hash_at=old, last_seen=recent)
+    from tests.factories import make_page_protect_script
+
+    old = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=30)
+    recent = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=1)
+    s = make_page_protect_script(
+        db, url="https://cdn.example.com/recent.js", last_hash="abc", last_hash_at=old, last_seen=recent
+    )
     db.commit()
     pruned = prune_stale_scripts(db, 7)
     assert pruned == 0
-    assert db.query(PageProtectScript).filter(PageProtectScript.url == "https://cdn.example.com/recent.js").first() is not None
+    assert (
+        db.query(PageProtectScript).filter(PageProtectScript.url == "https://cdn.example.com/recent.js").first()
+        is not None
+    )
 
 
 def test_prune_stale_scripts_preserves_recent_last_hash_at(db):
     """prune_stale_scripts preserves rows where last_hash_at is recent (hasher can still fetch)."""
-    from datetime import datetime, timezone, timedelta
-    from tests.factories import make_page_protect_script
+    from datetime import datetime, timedelta
+
     from app.models.models import PageProtectScript
-    old = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30)
-    recent = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=1)
-    s = make_page_protect_script(db, url="https://cdn.example.com/still-live.js", last_hash="abc", last_hash_at=recent, last_seen=old)
+    from tests.factories import make_page_protect_script
+
+    old = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=30)
+    recent = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=1)
+    s = make_page_protect_script(
+        db, url="https://cdn.example.com/still-live.js", last_hash="abc", last_hash_at=recent, last_seen=old
+    )
     db.commit()
     pruned = prune_stale_scripts(db, 7)
     assert pruned == 0
-    assert db.query(PageProtectScript).filter(PageProtectScript.url == "https://cdn.example.com/still-live.js").first() is not None
+    assert (
+        db.query(PageProtectScript).filter(PageProtectScript.url == "https://cdn.example.com/still-live.js").first()
+        is not None
+    )
 
 
 def test_prune_stale_scripts_prunes_null_last_hash_at(db):
     """prune_stale_scripts prunes rows where last_hash_at is NULL (never successfully checked) and last_seen is stale."""
-    from datetime import datetime, timezone, timedelta
-    from tests.factories import make_page_protect_script
+    from datetime import datetime, timedelta
+
     from app.models.models import PageProtectScript
-    old = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30)
-    s = make_page_protect_script(db, url="https://cdn.example.com/never-checked.js", last_hash=None, last_hash_at=None, last_seen=old)
+    from tests.factories import make_page_protect_script
+
+    old = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=30)
+    s = make_page_protect_script(
+        db, url="https://cdn.example.com/never-checked.js", last_hash=None, last_hash_at=None, last_seen=old
+    )
     db.commit()
     pruned = prune_stale_scripts(db, 7)
     assert pruned == 1
-    assert db.query(PageProtectScript).filter(PageProtectScript.url == "https://cdn.example.com/never-checked.js").first() is None
+    assert (
+        db.query(PageProtectScript).filter(PageProtectScript.url == "https://cdn.example.com/never-checked.js").first()
+        is None
+    )
 
 
 def test_prune_stale_scripts_prunes_manual_source(db):
     """prune_stale_scripts prunes manually-added entries too (no source exemption)."""
-    from datetime import datetime, timezone, timedelta
-    from tests.factories import make_page_protect_script
+    from datetime import datetime, timedelta
+
     from app.models.models import PageProtectScript
-    old = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30)
-    s = make_page_protect_script(db, url="https://cdn.example.com/manual-old.js", source="manual", last_hash="abc", last_hash_at=old, last_seen=old)
+    from tests.factories import make_page_protect_script
+
+    old = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=30)
+    s = make_page_protect_script(
+        db,
+        url="https://cdn.example.com/manual-old.js",
+        source="manual",
+        last_hash="abc",
+        last_hash_at=old,
+        last_seen=old,
+    )
     db.commit()
     pruned = prune_stale_scripts(db, 7)
     assert pruned == 1
-    assert db.query(PageProtectScript).filter(PageProtectScript.url == "https://cdn.example.com/manual-old.js").first() is None
+    assert (
+        db.query(PageProtectScript).filter(PageProtectScript.url == "https://cdn.example.com/manual-old.js").first()
+        is None
+    )
 
 
 def test_prune_stale_scripts_preserves_ignored(db):
     """prune_stale_scripts preserves ignored rows even if stale."""
-    from datetime import datetime, timezone, timedelta
-    from tests.factories import make_page_protect_script
+    from datetime import datetime, timedelta
+
     from app.models.models import PageProtectScript
-    old = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30)
-    s = make_page_protect_script(db, url="https://cdn.example.com/ignored.js", ignored=True, last_hash="abc", last_hash_at=old, last_seen=old)
+    from tests.factories import make_page_protect_script
+
+    old = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=30)
+    s = make_page_protect_script(
+        db, url="https://cdn.example.com/ignored.js", ignored=True, last_hash="abc", last_hash_at=old, last_seen=old
+    )
     db.commit()
     pruned = prune_stale_scripts(db, 7)
     assert pruned == 0
-    assert db.query(PageProtectScript).filter(PageProtectScript.url == "https://cdn.example.com/ignored.js").first() is not None
+    assert (
+        db.query(PageProtectScript).filter(PageProtectScript.url == "https://cdn.example.com/ignored.js").first()
+        is not None
+    )
 
 
 def test_prune_stale_scripts_disabled_when_zero(db):
     """prune_stale_scripts with stale_days=0 disables pruning (no rows deleted)."""
-    from datetime import datetime, timezone, timedelta
-    from tests.factories import make_page_protect_script
+    from datetime import datetime, timedelta
+
     from app.models.models import PageProtectScript
-    old = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=365)
-    s = make_page_protect_script(db, url="https://cdn.example.com/very-old.js", last_hash="abc", last_hash_at=old, last_seen=old)
+    from tests.factories import make_page_protect_script
+
+    old = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=365)
+    s = make_page_protect_script(
+        db, url="https://cdn.example.com/very-old.js", last_hash="abc", last_hash_at=old, last_seen=old
+    )
     db.commit()
     pruned = prune_stale_scripts(db, 0)
     assert pruned == 0
-    assert db.query(PageProtectScript).filter(PageProtectScript.url == "https://cdn.example.com/very-old.js").first() is not None
+    assert (
+        db.query(PageProtectScript).filter(PageProtectScript.url == "https://cdn.example.com/very-old.js").first()
+        is not None
+    )

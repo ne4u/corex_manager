@@ -1,8 +1,9 @@
-from typing import List
 import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from ..deps import get_current_user, get_db, require_write, rate_limit
+
+from ..deps import get_current_user, get_db, rate_limit, require_write
 
 _logger = logging.getLogger(__name__)
 
@@ -61,7 +62,7 @@ def revert_config_endpoint(
     return _wrap_runtime(lambda: revert_config(db, user.username, s.confirm))
 
 
-@router.get("/config/snapshots", response_model=List[ConfigSnapshotResponse])
+@router.get("/config/snapshots", response_model=list[ConfigSnapshotResponse])
 def list_config_snapshots_endpoint(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),

@@ -15,12 +15,12 @@ Selects the appropriate ``RuntimeBackend`` implementation based on the
 
 The factory caches the singleton instance for the process lifetime.
 """
+
 from __future__ import annotations
 
 import logging
 import os
 from functools import lru_cache
-from typing import Optional
 
 from ...core.config import get_settings
 from .base import RuntimeBackend
@@ -34,13 +34,13 @@ class _NullRuntime(RuntimeBackend):
     def validate_haproxy_config(self, config_path: str) -> tuple[bool, str]:
         return False, "haproxy container check failed: no runtime backend"
 
-    def haproxy_version_verbose(self) -> Optional[str]:
+    def haproxy_version_verbose(self) -> str | None:
         return None
 
     def haproxy_logs(
         self,
-        tail: Optional[int] = None,
-        since: Optional[int] = None,
+        tail: int | None = None,
+        since: int | None = None,
         timestamps: bool = False,
     ) -> str:
         return ""
@@ -94,7 +94,7 @@ def _detect_runtime() -> str:
     return "none"
 
 
-@lru_cache()
+@lru_cache
 def get_runtime() -> RuntimeBackend:
     """Return the singleton RuntimeBackend instance for this process."""
     settings = get_settings()
@@ -106,9 +106,11 @@ def get_runtime() -> RuntimeBackend:
 
     if mode == "docker":
         from .docker_runtime import DockerRuntime
+
         return DockerRuntime()
     elif mode == "kubernetes":
         from .kubernetes_runtime import KubernetesRuntime
+
         return KubernetesRuntime()
     else:
         logger.info("Using null runtime backend (no container management)")

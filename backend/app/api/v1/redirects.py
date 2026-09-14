@@ -1,7 +1,6 @@
-from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from ..deps import get_db, get_current_user, require_write, rate_limit
+
 from ...schemas.redirects import (
     RedirectCreate,
     RedirectResponse,
@@ -15,18 +14,17 @@ from ...services.redirects import (
     create_rewrite,
     delete_redirect,
     delete_rewrite,
-    get_redirect,
-    get_rewrite,
     list_redirects,
     list_rewrites,
     update_redirect,
     update_rewrite,
 )
+from ..deps import get_current_user, get_db, rate_limit, require_write
 
 router = APIRouter()
 
 
-@router.get("/redirects", response_model=List[RedirectResponse])
+@router.get("/redirects", response_model=list[RedirectResponse])
 def list_redirects_endpoint(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
@@ -74,7 +72,7 @@ def delete_redirect_endpoint(
     return {"status": "ok"}
 
 
-@router.get("/rewrites", response_model=List[RewriteResponse])
+@router.get("/rewrites", response_model=list[RewriteResponse])
 def list_rewrites_endpoint(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),

@@ -4,67 +4,112 @@ Endpoints for teams, servers (+replicas), identities, policies, DLP rules,
 guardrails, and skills. All write operations require operator role + team
 membership (admin bypasses). Secrets are write-only (never returned).
 """
+
 import os
 import re
 import secrets
-import yaml
-from datetime import datetime, timezone, timedelta
-from typing import List, Optional, Dict, Any
+from datetime import UTC, datetime, timedelta
+from typing import Any
 from urllib.parse import urlparse
 
+import yaml
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from ..deps import get_current_user, get_db, require_write, rate_limit, get_user_team_ids
+from ...core.valkey_client import _get_client as get_valkey_client
 from ...models.mcp import (
-    Team, UserTeam, McpServer, McpServerReplica, McpIdentity,
-    McpPolicy, McpDlpRule, McpSkill, McpSkillVersion, McpGuardrail,
-    McpInstallation, McpEvent,
+    McpDlpRule,
+    McpEvent,
+    McpGuardrail,
+    McpIdentity,
+    McpPolicy,
+    McpServer,
+    McpServerReplica,
+    McpSkill,
+    McpSkillVersion,
+    Team,
+    UserTeam,
 )
 from ...models.models import User
 from ...schemas.mcp import (
-    TeamCreate, TeamUpdate, TeamResponse,
-    UserTeamCreate, UserTeamResponse,
-    McpServerCreate, McpServerUpdate, McpServerResponse,
-    McpServerReplicaCreate, McpServerReplicaUpdate, McpServerReplicaResponse,
-    McpIdentityCreate, McpIdentityUpdate, McpIdentityResponse,
-    PatCreateResponse,
-    McpAuth0SyncRequest, McpAuth0SyncResponse,
-    McpPolicyCreate, McpPolicyUpdate, McpPolicyResponse,
-    McpPolicyValidateRequest, McpPolicyValidateResponse,
-    McpDlpRuleCreate, McpDlpRuleUpdate, McpDlpRuleResponse,
-    McpSkillCreate, McpSkillUpdate, McpSkillResponse,
-    McpSkillVersionCreate, McpSkillVersionResponse,
-    McpSkillImportRequest,
-    McpGuardrailCreate, McpGuardrailUpdate, McpGuardrailResponse,
-    McpInstallationResponse,
-    MarketplaceSearchResult, MarketplacePackageDetails,
-    MarketplaceInstallRequest, MarketplaceUninstallRequest,
-    DiscoverEnvVarsRequest, DiscoverEnvVarsResponse,
-    OAuthDiscoverRequest, OAuthDiscoverResponse,
-    OAuthConfigureRequest, OAuthStatusResponse, OAuthAuthorizeResponse,
-    McpEventResponse, McpEventListResponse,
-    SessionInfo, SessionListResponse,
+    AlertConfigResponse,
+    AlertConfigUpdate,
+    AlertHistoryItem,
     ConfigStatusResponse,
-    AlertConfigResponse, AlertConfigUpdate, AlertHistoryItem,
-    ServerCatalogResponse, McpServerTestResponse,
+    DiscoverEnvVarsRequest,
+    DiscoverEnvVarsResponse,
+    GatewayAlertState,
+    GatewayCatalogFreshness,
+    GatewayCircuitState,
+    GatewayMetricsSnapshot,
+    GatewayStatusResponse,
+    MarketplaceInstallRequest,
+    MarketplacePackageDetails,
+    MarketplaceSearchResult,
+    MarketplaceUninstallRequest,
+    McpAuth0SyncRequest,
+    McpAuth0SyncResponse,
+    McpDlpRuleCreate,
+    McpDlpRuleResponse,
+    McpDlpRuleUpdate,
+    McpEventListResponse,
+    McpEventResponse,
+    McpGuardrailCreate,
+    McpGuardrailResponse,
+    McpGuardrailUpdate,
+    McpIdentityCreate,
+    McpIdentityResponse,
+    McpIdentityUpdate,
+    McpInstallationResponse,
     McpPolicyBuilderMetadataResponse,
-    McpRegexValidateRequest, McpRegexValidateResponse,
-    GatewayMetricsSnapshot, GatewayCircuitState, GatewayCatalogFreshness,
-    GatewayAlertState, GatewayStatusResponse, ServerHealthResponse,
+    McpPolicyCreate,
+    McpPolicyResponse,
+    McpPolicyUpdate,
+    McpPolicyValidateRequest,
+    McpPolicyValidateResponse,
+    McpRegexValidateRequest,
+    McpRegexValidateResponse,
+    McpServerCreate,
+    McpServerReplicaCreate,
+    McpServerReplicaResponse,
+    McpServerReplicaUpdate,
+    McpServerResponse,
+    McpServerTestResponse,
+    McpServerUpdate,
+    McpSkillCreate,
+    McpSkillImportRequest,
+    McpSkillResponse,
+    McpSkillUpdate,
+    McpSkillVersionCreate,
+    McpSkillVersionResponse,
+    OAuthAuthorizeResponse,
+    OAuthConfigureRequest,
+    OAuthDiscoverRequest,
+    OAuthDiscoverResponse,
+    OAuthStatusResponse,
+    PatCreateResponse,
+    ServerCatalogResponse,
+    ServerHealthResponse,
+    SessionInfo,
+    SessionListResponse,
+    TeamCreate,
+    TeamResponse,
+    TeamUpdate,
+    UserTeamCreate,
+    UserTeamResponse,
 )
-from ...services.mcp_secrets import encrypt_secret, has_secrets_key
 from ...services.mcp_auth0 import sync_auth0_identities
+from ...services.mcp_config import write_config_bundle
 from ...services.mcp_policies import (
-    parse_mcp_expression,
-    validate_mcp_expression,
+    _refreshing_server_ids,
     build_policy_builder_metadata,
+    parse_mcp_expression,
     refresh_server_catalog,
     trigger_background_catalog_refresh,
-    _refreshing_server_ids,
+    validate_mcp_expression,
 )
-from ...services.mcp_config import write_config_bundle
-from ...core.valkey_client import _get_client as get_valkey_client
+from ...services.mcp_secrets import encrypt_secret, has_secrets_key
+from ..deps import get_current_user, get_db, get_user_team_ids, rate_limit, require_write
 
 router = APIRouter(prefix="/mcp", tags=["mcp"])
 
@@ -80,7 +125,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def _read_server_health_from_valkey(server_id: int) -> Optional[str]:
+
+def _read_server_health_from_valkey(server_id: int) -> str | None:
     """Read live health status from Valkey (written by the gateway health checker).
 
     Tries the Rust gateway key (mcp:gw:health:{id}) first, then the Python
@@ -183,7 +229,8 @@ def _validate_replica_path(primary_url: str, replica_url: str) -> None:
 
 # ==================== Teams ====================
 
-@router.get("/teams", response_model=List[TeamResponse])
+
+@router.get("/teams", response_model=list[TeamResponse])
 def list_teams(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -264,9 +311,7 @@ def add_team_member(
     target_user = db.query(User).filter(User.id == m.user_id).first()
     if not target_user:
         raise HTTPException(status_code=404, detail="User not found")
-    existing = db.query(UserTeam).filter(
-        UserTeam.user_id == m.user_id, UserTeam.team_id == tid
-    ).first()
+    existing = db.query(UserTeam).filter(UserTeam.user_id == m.user_id, UserTeam.team_id == tid).first()
     if existing:
         raise HTTPException(status_code=409, detail="User already in team")
     obj = UserTeam(user_id=m.user_id, team_id=tid)
@@ -286,9 +331,7 @@ def remove_team_member(
 ):
     if not user.is_admin and user.role != "admin":
         raise HTTPException(status_code=403, detail="Only admins can remove team members")
-    obj = db.query(UserTeam).filter(
-        UserTeam.user_id == uid, UserTeam.team_id == tid
-    ).first()
+    obj = db.query(UserTeam).filter(UserTeam.user_id == uid, UserTeam.team_id == tid).first()
     if not obj:
         raise HTTPException(status_code=404, detail="Membership not found")
     db.delete(obj)
@@ -296,7 +339,7 @@ def remove_team_member(
     return {"ok": True}
 
 
-@router.get("/teams/{tid}/members", response_model=List[UserTeamResponse])
+@router.get("/teams/{tid}/members", response_model=list[UserTeamResponse])
 def list_team_members(
     tid: int,
     db: Session = Depends(get_db),
@@ -315,7 +358,8 @@ def list_team_members(
 
 # ==================== Servers ====================
 
-@router.get("/servers", response_model=List[McpServerResponse])
+
+@router.get("/servers", response_model=list[McpServerResponse])
 def list_servers(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -480,9 +524,7 @@ def update_server(
             raise HTTPException(status_code=400, detail="Namespace must match [a-z0-9_-]+")
         if "__" in ns:
             raise HTTPException(status_code=400, detail="Namespace cannot contain double underscore")
-        existing = db.query(McpServer).filter(
-            McpServer.namespace == ns, McpServer.id != sid
-        ).first()
+        existing = db.query(McpServer).filter(McpServer.namespace == ns, McpServer.id != sid).first()
         if existing:
             raise HTTPException(status_code=409, detail="Namespace already in use")
     for k, v in data.items():
@@ -525,7 +567,8 @@ def delete_server(
 
 # ==================== Server Replicas ====================
 
-@router.get("/servers/{sid}/replicas", response_model=List[McpServerReplicaResponse])
+
+@router.get("/servers/{sid}/replicas", response_model=list[McpServerReplicaResponse])
 def list_replicas(
     sid: int,
     db: Session = Depends(get_db),
@@ -638,7 +681,8 @@ def delete_replica(
 
 # ==================== Identities ====================
 
-@router.get("/identities", response_model=List[McpIdentityResponse])
+
+@router.get("/identities", response_model=list[McpIdentityResponse])
 def list_identities(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -742,6 +786,7 @@ def issue_pat(
 ):
     """Issue a PAT for a PAT-kind identity. Plaintext is shown once."""
     from ..deps import get_current_user as _gcu  # noqa
+
     obj = db.get(McpIdentity, iid)
     if not obj:
         raise HTTPException(status_code=404, detail="Identity not found")
@@ -756,6 +801,7 @@ def issue_pat(
     pat = f"mcp_{prefix}.{secret}"
     # Hash the full PAT for storage
     from ...core.security import get_password_hash
+
     obj.pat_hash = get_password_hash(pat)
     obj.pat_prefix = f"mcp_{prefix}"
     db.commit()
@@ -764,7 +810,8 @@ def issue_pat(
 
 # ==================== Policies ====================
 
-@router.get("/policies", response_model=List[McpPolicyResponse])
+
+@router.get("/policies", response_model=list[McpPolicyResponse])
 def list_policies(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -883,8 +930,8 @@ _RUST_UNSUPPORTED = [
 # ReDoS-vulnerable pattern fragments (checked at compile time). Uses [^)]* to
 # stay within a single group, matching shared/guardrails_core.py.
 _REGEX_REDOS_PATTERNS = [
-    re.compile(r"\([^)]*[+*][^)]*\)[+*]"),   # nested quantifiers like (a+)+
-    re.compile(r"\([^)]*\|[^)]*\)[+*]"),     # alternation with quantifier like (a|b)+
+    re.compile(r"\([^)]*[+*][^)]*\)[+*]"),  # nested quantifiers like (a+)+
+    re.compile(r"\([^)]*\|[^)]*\)[+*]"),  # alternation with quantifier like (a|b)+
 ]
 
 
@@ -1028,7 +1075,8 @@ def test_mcp_server(
 
 # ==================== DLP Rules ====================
 
-@router.get("/dlp-rules", response_model=List[McpDlpRuleResponse])
+
+@router.get("/dlp-rules", response_model=list[McpDlpRuleResponse])
 def list_dlp_rules(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -1114,7 +1162,8 @@ def delete_dlp_rule(
 
 # ==================== Guardrails ====================
 
-@router.get("/guardrails", response_model=List[McpGuardrailResponse])
+
+@router.get("/guardrails", response_model=list[McpGuardrailResponse])
 def list_guardrails(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -1197,7 +1246,8 @@ def delete_guardrail(
 
 # ==================== Skills ====================
 
-@router.get("/skills", response_model=List[McpSkillResponse])
+
+@router.get("/skills", response_model=list[McpSkillResponse])
 def list_skills(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -1272,7 +1322,7 @@ def delete_skill(
     return {"ok": True}
 
 
-@router.get("/skills/{sid}/versions", response_model=List[McpSkillVersionResponse])
+@router.get("/skills/{sid}/versions", response_model=list[McpSkillVersionResponse])
 def list_skill_versions(
     sid: int,
     db: Session = Depends(get_db),
@@ -1285,7 +1335,9 @@ def list_skill_versions(
     team_ids = get_user_team_ids(db, user)
     if skill.team_id not in team_ids:
         raise HTTPException(status_code=403, detail="Not a member of this team")
-    return db.query(McpSkillVersion).filter(McpSkillVersion.skill_id == sid).order_by(McpSkillVersion.version.desc()).all()
+    return (
+        db.query(McpSkillVersion).filter(McpSkillVersion.skill_id == sid).order_by(McpSkillVersion.version.desc()).all()
+    )
 
 
 @router.post("/skills/{sid}/versions", response_model=McpSkillVersionResponse)
@@ -1302,7 +1354,12 @@ def create_skill_version(
     team_ids = get_user_team_ids(db, user)
     if skill.team_id not in team_ids:
         raise HTTPException(status_code=403, detail="Not a member of this team")
-    last = db.query(McpSkillVersion).filter(McpSkillVersion.skill_id == sid).order_by(McpSkillVersion.version.desc()).first()
+    last = (
+        db.query(McpSkillVersion)
+        .filter(McpSkillVersion.skill_id == sid)
+        .order_by(McpSkillVersion.version.desc())
+        .first()
+    )
     version = (last.version + 1) if last else 1
     obj = McpSkillVersion(
         skill_id=sid,
@@ -1331,7 +1388,12 @@ def publish_skill(
     team_ids = get_user_team_ids(db, user)
     if skill.team_id not in team_ids:
         raise HTTPException(status_code=403, detail="Not a member of this team")
-    latest = db.query(McpSkillVersion).filter(McpSkillVersion.skill_id == sid).order_by(McpSkillVersion.version.desc()).first()
+    latest = (
+        db.query(McpSkillVersion)
+        .filter(McpSkillVersion.skill_id == sid)
+        .order_by(McpSkillVersion.version.desc())
+        .first()
+    )
     if not latest:
         raise HTTPException(status_code=400, detail="No versions to publish")
     skill.published_version_id = latest.id
@@ -1354,9 +1416,9 @@ def rollback_skill(
     team_ids = get_user_team_ids(db, user)
     if skill.team_id not in team_ids:
         raise HTTPException(status_code=403, detail="Not a member of this team")
-    target = db.query(McpSkillVersion).filter(
-        McpSkillVersion.skill_id == sid, McpSkillVersion.version == version
-    ).first()
+    target = (
+        db.query(McpSkillVersion).filter(McpSkillVersion.skill_id == sid, McpSkillVersion.version == version).first()
+    )
     if not target:
         raise HTTPException(status_code=404, detail="Version not found")
     skill.published_version_id = target.id
@@ -1367,11 +1429,12 @@ def rollback_skill(
 
 # ==================== Metrics ====================
 
+
 @router.get("/metrics")
 def get_mcp_metrics(
-    from_: Optional[datetime] = Query(None, alias="from"),
-    to: Optional[datetime] = Query(None),
-    step: Optional[int] = Query(None),
+    from_: datetime | None = Query(None, alias="from"),
+    to: datetime | None = Query(None),
+    step: int | None = Query(None),
     breakdown: str = Query("action"),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -1379,14 +1442,16 @@ def get_mcp_metrics(
 ):
     """Get time-series MCP gateway event metrics with breakdown."""
     from ...services.mcp_metrics import get_mcp_metrics as _get_metrics
-    end = to or datetime.now(timezone.utc)
+
+    end = to or datetime.now(UTC)
     start = from_ or (end - timedelta(minutes=5))
     return _get_metrics(db, start, end, step, breakdown)
 
 
 # ==================== Marketplace ====================
 
-@router.get("/marketplace/search", response_model=List[MarketplaceSearchResult])
+
+@router.get("/marketplace/search", response_model=list[MarketplaceSearchResult])
 async def marketplace_search(
     q: str = Query(..., min_length=1),
     manager: str = Query("npm", pattern="^(npm|pypi|all)$"),
@@ -1397,6 +1462,7 @@ async def marketplace_search(
 ):
     """Search npm/PyPI for MCP server packages."""
     from ...services.mcp_marketplace import search_marketplace
+
     results = await search_marketplace(q, manager, limit)
     return results
 
@@ -1411,6 +1477,7 @@ async def marketplace_package_details(
 ):
     """Get detailed package information including README and discovered env vars."""
     from ...services.mcp_marketplace import get_package_details
+
     details = await get_package_details(manager, name)
     if not details:
         raise HTTPException(status_code=404, detail="Package not found")
@@ -1426,6 +1493,7 @@ async def marketplace_install(
 ):
     """Install a package as a new stdio MCP server."""
     from ...services.mcp_marketplace import install_package
+
     team_ids = get_user_team_ids(db, user)
     if req.team_id not in team_ids:
         raise HTTPException(status_code=403, detail="Not a member of this team")
@@ -1457,6 +1525,7 @@ async def marketplace_uninstall(
 ):
     """Uninstall an MCP server package."""
     from ...services.mcp_marketplace import uninstall_package
+
     server = db.get(McpServer, req.server_id)
     if not server:
         raise HTTPException(status_code=404, detail="Server not found")
@@ -1478,11 +1547,12 @@ async def marketplace_discover_env_vars(
 ):
     """Discover required environment variables for a package."""
     from ...services.mcp_marketplace import discover_env_vars
+
     env_vars = await discover_env_vars(req.package_manager, req.package_name)
     return DiscoverEnvVarsResponse(env_vars=env_vars)
 
 
-@router.get("/installations/{sid}", response_model=List[McpInstallationResponse])
+@router.get("/installations/{sid}", response_model=list[McpInstallationResponse])
 def list_installations(
     sid: int,
     db: Session = Depends(get_db),
@@ -1497,10 +1567,12 @@ def list_installations(
     if server.team_id not in team_ids:
         raise HTTPException(status_code=403, detail="Not a member of this team")
     from ...services.mcp_marketplace import get_server_installations
+
     return get_server_installations(db, sid)
 
 
 # ==================== Upstream OAuth ====================
+
 
 @router.post("/servers/{sid}/oauth/discover", response_model=OAuthDiscoverResponse)
 async def oauth_discover(
@@ -1512,6 +1584,7 @@ async def oauth_discover(
 ):
     """Discover OAuth endpoints for an upstream MCP server."""
     import httpx
+
     server = db.get(McpServer, sid)
     if not server:
         raise HTTPException(status_code=404, detail="Server not found")
@@ -1594,6 +1667,7 @@ def oauth_configure(
 
     # Regenerate config bundle
     from ...services.mcp_config import write_config_bundle
+
     try:
         write_config_bundle(db)
     except Exception:
@@ -1626,13 +1700,15 @@ def oauth_status(
     auth_url = None
     if server.oauth_auth_status == "pending" and server.oauth_auth_server_metadata_url:
         import httpx as _httpx
+
         try:
             resp = _httpx.get(server.oauth_auth_server_metadata_url, timeout=10.0, follow_redirects=True)
             if resp.status_code == 200:
                 data = resp.json()
                 auth_ep = data.get("authorization_endpoint", "")
                 if auth_ep:
-                    from urllib.parse import urlencode, urlparse, parse_qs, urlunparse
+                    from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
+
                     params = {
                         "response_type": "code",
                         "client_id": server.oauth_client_id or "",
@@ -1679,7 +1755,9 @@ def oauth_authorize(
     # Get status which builds the auth URL
     status = oauth_status(sid, db, user)
     if not status.authorization_url:
-        raise HTTPException(status_code=400, detail="Could not build authorization URL. Ensure auth_server_metadata_url is set.")
+        raise HTTPException(
+            status_code=400, detail="Could not build authorization URL. Ensure auth_server_metadata_url is set."
+        )
     return OAuthAuthorizeResponse(authorization_url=status.authorization_url)
 
 
@@ -1687,12 +1765,13 @@ def oauth_authorize(
 async def oauth_callback(
     sid: int,
     code: str = Query(...),
-    state: Optional[str] = Query(None),
+    state: str | None = Query(None),
     db: Session = Depends(get_db),
     _=Depends(rate_limit),
 ):
     """OAuth callback — exchanges authorization code for access token."""
     import httpx
+
     server = db.get(McpServer, sid)
     if not server:
         raise HTTPException(status_code=404, detail="Server not found")
@@ -1713,18 +1792,22 @@ async def oauth_callback(
 
             # Decrypt client secret
             from ...services.mcp_secrets import decrypt_secret
+
             client_secret = None
             if server.oauth_client_secret_enc:
                 client_secret = decrypt_secret(server.oauth_client_secret_enc)
 
             # Exchange code for token
-            token_resp = await client.post(token_endpoint, data={
-                "grant_type": "authorization_code",
-                "code": code,
-                "client_id": server.oauth_client_id or "",
-                "client_secret": client_secret or "",
-                "redirect_uri": f"/api/v1/mcp/servers/{sid}/oauth/callback",
-            })
+            token_resp = await client.post(
+                token_endpoint,
+                data={
+                    "grant_type": "authorization_code",
+                    "code": code,
+                    "client_id": server.oauth_client_id or "",
+                    "client_secret": client_secret or "",
+                    "redirect_uri": f"/api/v1/mcp/servers/{sid}/oauth/callback",
+                },
+            )
             if token_resp.status_code != 200:
                 server.oauth_auth_status = "error"
                 db.commit()
@@ -1742,12 +1825,14 @@ async def oauth_callback(
                 server.oauth_refresh_token_enc = encrypt_secret(refresh_token)
             if expires_in:
                 from datetime import timedelta
-                server.oauth_token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=int(expires_in))
+
+                server.oauth_token_expires_at = datetime.now(UTC) + timedelta(seconds=int(expires_in))
             server.oauth_auth_status = "authorized"
             db.commit()
 
             # Regenerate config bundle
             from ...services.mcp_config import write_config_bundle
+
             try:
                 write_config_bundle(db)
             except Exception:
@@ -1785,6 +1870,7 @@ def oauth_disable(
     db.commit()
 
     from ...services.mcp_config import write_config_bundle
+
     try:
         write_config_bundle(db)
     except Exception:
@@ -1794,6 +1880,7 @@ def oauth_disable(
 
 
 # ==================== Skill Import ====================
+
 
 @router.post("/skills/import", response_model=McpSkillResponse)
 def import_skill_from_url(
@@ -1815,6 +1902,7 @@ def import_skill_from_url(
     """
     import io
     import zipfile
+
     import httpx
 
     team_ids = get_user_team_ids(db, user)
@@ -1831,7 +1919,7 @@ def import_skill_from_url(
         raise HTTPException(
             status_code=400,
             detail="Could not resolve URL. Provide a direct SKILL.md URL, "
-                   "GitHub owner/repo shorthand, or a ZIP archive URL.",
+            "GitHub owner/repo shorthand, or a ZIP archive URL.",
         )
 
     # Fetch the content
@@ -1845,9 +1933,9 @@ def import_skill_from_url(
     content_type = resp.headers.get("content-type", "")
 
     # Determine if we got a ZIP or a raw markdown file
-    frontmatter: Dict[str, Any] = {}
+    frontmatter: dict[str, Any] = {}
     body: str = ""
-    files: Optional[Dict[str, str]] = None
+    files: dict[str, str] | None = None
 
     if content_bytes[:4] == b"PK\x03\x04" or "zip" in content_type:
         # ZIP archive — find SKILL.md inside
@@ -1868,7 +1956,7 @@ def import_skill_from_url(
         frontmatter, body = _parse_skill_md(skill_content)
 
         # Collect other files (skip manifest.json and SKILL.md itself)
-        attached: Dict[str, str] = {}
+        attached: dict[str, str] = {}
         for name in zf.namelist():
             if name == skill_md_name or name.endswith("/") or name.startswith("__MACOSX"):
                 continue
@@ -1894,7 +1982,9 @@ def import_skill_from_url(
     skill_name = re.sub(r"[^a-z0-9-]", "-", skill_name.lower()).strip("-")
     skill_name = re.sub(r"-+", "-", skill_name)
     if not skill_name or not re.match(r"^[a-z0-9-]+$", skill_name):
-        raise HTTPException(status_code=400, detail=f"Invalid skill name derived: '{skill_name}'. Provide a name explicitly.")
+        raise HTTPException(
+            status_code=400, detail=f"Invalid skill name derived: '{skill_name}'. Provide a name explicitly."
+        )
 
     # Check for duplicate name
     existing = db.query(McpSkill).filter(McpSkill.name == skill_name).first()
@@ -1938,7 +2028,7 @@ def import_skill_from_url(
     return skill
 
 
-def _resolve_skill_url(url: str) -> Optional[str]:
+def _resolve_skill_url(url: str) -> str | None:
     """Resolve various URL formats to a fetchable URL.
 
     Returns a URL that can be fetched with httpx.get(), or None if the URL
@@ -1966,6 +2056,7 @@ def _resolve_skill_url(url: str) -> Optional[str]:
                 f"https://raw.githubusercontent.com/{owner}/{repo}/main/skills/{repo}/SKILL.md",
             ]
             import httpx
+
             for candidate in candidates:
                 try:
                     r = httpx.head(candidate, follow_redirects=True, timeout=10.0)
@@ -1982,6 +2073,7 @@ def _resolve_skill_url(url: str) -> Optional[str]:
             if not path.endswith("SKILL.md"):
                 candidate = f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}"
             import httpx
+
             try:
                 r = httpx.head(candidate, follow_redirects=True, timeout=10.0)
                 if r.status_code == 200:
@@ -2003,7 +2095,7 @@ def _parse_skill_md(content: str) -> tuple:
     ---
     # Markdown body...
     """
-    frontmatter: Dict[str, Any] = {}
+    frontmatter: dict[str, Any] = {}
     body = content
 
     if content.startswith("---"):
@@ -2023,7 +2115,8 @@ def _parse_skill_md(content: str) -> tuple:
 
 def _derive_name_from_url(url: str) -> str:
     """Derive a skill name from a URL path."""
-    from urllib.parse import urlparse, unquote
+    from urllib.parse import unquote, urlparse
+
     parsed = urlparse(url)
     path = unquote(parsed.path)
     # Get the last meaningful path segment
@@ -2039,6 +2132,7 @@ def _derive_name_from_url(url: str) -> str:
 
 
 # ==================== Skill Export ====================
+
 
 @router.post("/skills/{sid}/export")
 def export_skill(
@@ -2086,16 +2180,23 @@ def export_skill(
                 else:
                     zf.writestr(filename, _json.dumps(content, indent=2))
         # Include a manifest
-        zf.writestr("manifest.json", _json.dumps({
-            "skill_name": skill.name,
-            "version": pv.version,
-            "exported_at": datetime.now(timezone.utc).isoformat(),
-            "exported_by": user.username,
-        }, indent=2))
+        zf.writestr(
+            "manifest.json",
+            _json.dumps(
+                {
+                    "skill_name": skill.name,
+                    "version": pv.version,
+                    "exported_at": datetime.now(UTC).isoformat(),
+                    "exported_by": user.username,
+                },
+                indent=2,
+            ),
+        )
 
     buf.seek(0)
     filename = f"{skill.name}-v{pv.version}.zip"
     from fastapi import Response
+
     return Response(
         content=buf.getvalue(),
         media_type="application/zip",
@@ -2105,14 +2206,15 @@ def export_skill(
 
 # ==================== Events ====================
 
+
 @router.get("/events", response_model=McpEventListResponse)
 def list_events(
-    from_ts: Optional[str] = Query(None, alias="from"),
-    to_ts: Optional[str] = Query(None, alias="to"),
-    action: Optional[str] = Query(None),
-    method: Optional[str] = Query(None, alias="method"),
-    identity_id: Optional[int] = Query(None),
-    server_id: Optional[int] = Query(None),
+    from_ts: str | None = Query(None, alias="from"),
+    to_ts: str | None = Query(None, alias="to"),
+    action: str | None = Query(None),
+    method: str | None = Query(None, alias="method"),
+    identity_id: int | None = Query(None),
+    server_id: int | None = Query(None),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
@@ -2192,15 +2294,17 @@ def list_events(
 
 # ==================== Sessions ====================
 
+
 @router.get("/sessions", response_model=SessionListResponse)
 def list_sessions(
-    identity_id: Optional[int] = Query(None),
+    identity_id: int | None = Query(None),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
     _=Depends(rate_limit),
 ):
     """List active MCP gateway sessions from Valkey."""
     import json
+
     client = get_valkey_client()
     if not client:
         return SessionListResponse(sessions=[], total=0)
@@ -2213,14 +2317,16 @@ def list_sessions(
                 if identity_id and data.get("identity_id") != identity_id:
                     continue
                 session_id = key.split("mcp:sess:", 1)[1]
-                sessions.append(SessionInfo(
-                    session_id=session_id,
-                    identity_id=data.get("identity_id", 0),
-                    team_id=data.get("team_id"),
-                    created_at=data.get("created_at", ""),
-                    last_activity=data.get("last_activity"),
-                    server_sessions=data.get("server_sessions"),
-                ))
+                sessions.append(
+                    SessionInfo(
+                        session_id=session_id,
+                        identity_id=data.get("identity_id", 0),
+                        team_id=data.get("team_id"),
+                        created_at=data.get("created_at", ""),
+                        last_activity=data.get("last_activity"),
+                        server_sessions=data.get("server_sessions"),
+                    )
+                )
     except Exception:
         pass
     return SessionListResponse(sessions=sessions, total=len(sessions))
@@ -2264,6 +2370,7 @@ def revoke_identity_tokens(
     if client:
         import json
         import time
+
         try:
             # Set identity-level revocation
             client.set(f"mcp:rev:identity:{iid}", str(time.time()))
@@ -2322,6 +2429,7 @@ def sync_auth0(
 
 # ==================== Config Status ====================
 
+
 @router.get("/config/status", response_model=ConfigStatusResponse)
 def config_status(
     db: Session = Depends(get_db),
@@ -2335,7 +2443,7 @@ def config_status(
     try:
         if os.path.exists(config_path):
             stat = os.stat(config_path)
-            last_generated = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat()
+            last_generated = datetime.fromtimestamp(stat.st_mtime, tz=UTC).isoformat()
             bundle_size = stat.st_size
     except Exception:
         pass
@@ -2354,6 +2462,7 @@ def regenerate_config(
 ):
     """Manually regenerate the MCP config bundle."""
     from ...services.mcp_config import write_config_bundle
+
     try:
         write_config_bundle(db)
     except Exception as e:
@@ -2362,6 +2471,7 @@ def regenerate_config(
 
 
 # ==================== Alerts ====================
+
 
 @router.get("/alerts/config", response_model=AlertConfigResponse)
 def get_alert_config(
@@ -2375,6 +2485,7 @@ def get_alert_config(
     thresholds: dict[str, int] = {}
     try:
         from ...models.models import Setting
+
         row = db.query(Setting).filter(Setting.key == "mcp_alert_thresholds").first()
         if row and row.value:
             thresholds = _json.loads(row.value)
@@ -2392,6 +2503,7 @@ def update_alert_config(
 ):
     """Update alerting configuration."""
     from ...models.models import Setting
+
     # Store thresholds in settings table
     try:
         row = db.query(Setting).filter(Setting.key == "mcp_alert_thresholds").first()
@@ -2408,7 +2520,7 @@ def update_alert_config(
     return AlertConfigResponse(webhook_url=cfg.webhook_url, thresholds=cfg.thresholds)
 
 
-@router.get("/alerts/history", response_model=List[AlertHistoryItem])
+@router.get("/alerts/history", response_model=list[AlertHistoryItem])
 def alert_history(
     limit: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -2438,6 +2550,7 @@ def alert_history(
 
 # ==================== Server Catalog ====================
 
+
 @router.get("/servers/{sid}/catalog", response_model=ServerCatalogResponse)
 def get_server_catalog(
     sid: int,
@@ -2447,6 +2560,7 @@ def get_server_catalog(
 ):
     """Get cached catalog (tools/resources/prompts) for a server."""
     import json
+
     server = db.get(McpServer, sid)
     if not server:
         raise HTTPException(status_code=404, detail="Server not found")
@@ -2474,7 +2588,11 @@ def get_server_catalog(
 
     # Fallback: use last_catalog_at from server
     if server.last_catalog_at:
-        last_refresh = server.last_catalog_at.isoformat() if hasattr(server.last_catalog_at, 'isoformat') else str(server.last_catalog_at)
+        last_refresh = (
+            server.last_catalog_at.isoformat()
+            if hasattr(server.last_catalog_at, "isoformat")
+            else str(server.last_catalog_at)
+        )
 
     return ServerCatalogResponse(
         server_id=sid,
@@ -2487,6 +2605,7 @@ def get_server_catalog(
 
 # ==================== Gateway Status ====================
 
+
 def _gateway_status_url(db: Session) -> str:
     """Return the /status URL for the active MCP gateway backend.
 
@@ -2495,6 +2614,7 @@ def _gateway_status_url(db: Session) -> str:
     """
     from ...core.config import get_settings
     from .settings import get_setting
+
     settings = get_settings()
     backend = get_setting(db, "mcp_gateway_backend", settings.MCP_GATEWAY_BACKEND).lower()
     if backend in ("rust", "rs", "mcp-gateway-rs"):
@@ -2563,12 +2683,8 @@ def gateway_status(
             reachable=True,
             metrics=metrics,
             active_sessions=data.get("active_sessions", 0),
-            open_circuits=[
-                GatewayCircuitState(**c) for c in data.get("open_circuits", [])
-            ],
-            catalog_freshness=[
-                GatewayCatalogFreshness(**c) for c in data.get("catalog_freshness", [])
-            ],
+            open_circuits=[GatewayCircuitState(**c) for c in data.get("open_circuits", [])],
+            catalog_freshness=[GatewayCatalogFreshness(**c) for c in data.get("catalog_freshness", [])],
             alerts=[GatewayAlertState(**a) for a in data.get("alerts", [])],
         )
     except httpx.ConnectError:
@@ -2586,6 +2702,7 @@ def gateway_status(
 
 
 # ==================== Server Health ====================
+
 
 @router.get("/servers/{sid}/health", response_model=ServerHealthResponse)
 def server_health(

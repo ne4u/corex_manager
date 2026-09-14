@@ -1,7 +1,6 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
-
 from app.services import metrics
 
 
@@ -49,9 +48,9 @@ def test_per_proxy_byte_rates_populated():
     agg = metrics._aggregate(rows, first, 10.0)
     fe1 = agg["frontends"]["fe1"]
     fe2 = agg["frontends"]["fe2"]
-    assert fe1["bytes_in_rate"] == pytest.approx(300.0)   # (4000-1000)/10
+    assert fe1["bytes_in_rate"] == pytest.approx(300.0)  # (4000-1000)/10
     assert fe1["bytes_out_rate"] == pytest.approx(600.0)  # (8000-2000)/10
-    assert fe2["bytes_in_rate"] == pytest.approx(100.0)   # (1500-500)/10
+    assert fe2["bytes_in_rate"] == pytest.approx(100.0)  # (1500-500)/10
     assert fe2["bytes_out_rate"] == pytest.approx(100.0)  # (1700-700)/10
 
 
@@ -111,7 +110,7 @@ def test_per_server_rates_from_matched_first_row():
     rows = [_srv_row("be1", "srvA", hrsp_2xx="60", bin="600", bout="1200")]
     agg = metrics._aggregate(rows, first, 10.0)
     s = agg["servers"]["be1"]["srvA"]
-    assert s["requests_rate"] == pytest.approx(5.0)   # (60-10)/10
+    assert s["requests_rate"] == pytest.approx(5.0)  # (60-10)/10
     assert s["bytes_in_rate"] == pytest.approx(50.0)  # (600-100)/10
     assert s["bytes_out_rate"] == pytest.approx(100.0)  # (1200-200)/10
 
@@ -138,34 +137,56 @@ def test_per_server_matching_uses_pxname_svname_key():
     agg = metrics._aggregate(rows, first, 10.0)
     s1 = agg["servers"]["be1"]["srvA"]
     s2 = agg["servers"]["be2"]["srvA"]
-    assert s1["requests_rate"] == pytest.approx(5.0)     # be1 delta = 50
-    assert s2["requests_rate"] == pytest.approx(10.0)    # be2 delta = 100
+    assert s1["requests_rate"] == pytest.approx(5.0)  # be1 delta = 50
+    assert s2["requests_rate"] == pytest.approx(10.0)  # be2 delta = 100
     assert s1["bytes_in_rate"] == pytest.approx(50.0)
     assert s2["bytes_in_rate"] == pytest.approx(100.0)
 
 
 def test_get_metrics_end_to_end(tmp_path, monkeypatch):
     """Two snapshots 30s apart produce one bucket with derived rates."""
-    from app.models.models import MetricSnapshot
     from app.core.database import SessionLocal
+    from app.models.models import MetricSnapshot
 
     # Tables are created once at session scope by the _session_schema fixture.
     db = SessionLocal()
     try:
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = datetime.now(UTC).replace(tzinfo=None)
         first = MetricSnapshot(
             captured_at=now - timedelta(seconds=30),
             process_info={"Idle_pct": "80", "CurrConns": "5", "Maxconn": "100"},
-            stats=[_fe_row("fe1", req_rate="10", bin="1000", bout="2000",
-                           hrsp_2xx="100", hrsp_1xx="0", hrsp_3xx="0",
-                           hrsp_4xx="0", hrsp_5xx="0", hrsp_other="0")],
+            stats=[
+                _fe_row(
+                    "fe1",
+                    req_rate="10",
+                    bin="1000",
+                    bout="2000",
+                    hrsp_2xx="100",
+                    hrsp_1xx="0",
+                    hrsp_3xx="0",
+                    hrsp_4xx="0",
+                    hrsp_5xx="0",
+                    hrsp_other="0",
+                )
+            ],
         )
         second = MetricSnapshot(
             captured_at=now,
             process_info={"Idle_pct": "70", "CurrConns": "7", "Maxconn": "100"},
-            stats=[_fe_row("fe1", req_rate="12", bin="4000", bout="8000",
-                           hrsp_2xx="160", hrsp_1xx="0", hrsp_3xx="0",
-                           hrsp_4xx="0", hrsp_5xx="0", hrsp_other="0")],
+            stats=[
+                _fe_row(
+                    "fe1",
+                    req_rate="12",
+                    bin="4000",
+                    bout="8000",
+                    hrsp_2xx="160",
+                    hrsp_1xx="0",
+                    hrsp_3xx="0",
+                    hrsp_4xx="0",
+                    hrsp_5xx="0",
+                    hrsp_other="0",
+                )
+            ],
         )
         db.add_all([first, second])
         db.commit()
@@ -176,7 +197,7 @@ def test_get_metrics_end_to_end(tmp_path, monkeypatch):
         # responses_rate derived from hrsp_2xx delta of 60 over 30s = 2.0/s
         assert p["frontend"]["responses_rate"] == pytest.approx(2.0)
         # bytes rates derived from cumulative deltas
-        assert p["frontend"]["bytes_in_rate"] == pytest.approx(100.0)   # 3000/30
+        assert p["frontend"]["bytes_in_rate"] == pytest.approx(100.0)  # 3000/30
         assert p["frontend"]["bytes_out_rate"] == pytest.approx(200.0)  # 6000/30
         # per-proxy dict also populated
         assert p["frontends"]["fe1"]["responses_rate"] == pytest.approx(2.0)

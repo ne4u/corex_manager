@@ -1,11 +1,11 @@
 """Tests for the Page Protect sampler (CSP report collection from HAProxy logs)."""
+
 import json
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
-
-from app.services.page_protect_sampler import _parse_log_line, sample_csp_reports
 from app.models.models import CspReport, PageProtectScript
+from app.services.page_protect_sampler import _parse_log_line, sample_csp_reports
 
 
 @pytest.fixture
@@ -26,6 +26,7 @@ def mock_docker(monkeypatch):
 
     # Patch get_runtime in both the sampler module and the runtime package
     import app.services.runtime as runtime_mod
+
     monkeypatch.setattr(runtime_mod, "get_runtime", lambda: mock_runtime)
     monkeypatch.setattr("app.services.page_protect_sampler.get_runtime", lambda: mock_runtime)
 
@@ -44,13 +45,15 @@ def test_parse_log_line_with_csp_report():
         "client": "1.2.3.4",
         "frontend": "http_in",
         "backend": "be1",
-        "csp_report": json.dumps({
-            "csp-report": {
-                "document-uri": "https://example.com/page",
-                "violated-directive": "script-src",
-                "blocked-uri": "https://evil.example.com/script.js",
+        "csp_report": json.dumps(
+            {
+                "csp-report": {
+                    "document-uri": "https://example.com/page",
+                    "violated-directive": "script-src",
+                    "blocked-uri": "https://evil.example.com/script.js",
+                }
             }
-        }),
+        ),
     }
     line = f"2026-01-01T00:00:00.000000000Z {json.dumps(log_entry)}"
     result = _parse_log_line(line)
@@ -88,13 +91,15 @@ def test_sample_csp_reports_stores_reports(db, monkeypatch, mock_docker):
         "client": "1.2.3.4",
         "frontend": "http_in",
         "backend": "be1",
-        "csp_report": json.dumps({
-            "csp-report": {
-                "document-uri": "https://example.com/page",
-                "violated-directive": "script-src",
-                "blocked-uri": "https://evil.example.com/script.js",
+        "csp_report": json.dumps(
+            {
+                "csp-report": {
+                    "document-uri": "https://example.com/page",
+                    "violated-directive": "script-src",
+                    "blocked-uri": "https://evil.example.com/script.js",
+                }
             }
-        }),
+        ),
     }
     raw_logs = f"2026-01-01T00:00:00.000000000Z {json.dumps(log_entry)}\n"
     mock_container.logs.return_value = raw_logs.encode("utf-8")
@@ -123,12 +128,14 @@ def test_sample_csp_reports_upserts_scripts(db, monkeypatch, mock_docker):
         "client": "1.2.3.4",
         "frontend": "http_in",
         "backend": "be1",
-        "csp_report": json.dumps({
-            "csp-report": {
-                "violated-directive": "script-src",
-                "blocked-uri": "https://cdn.example.com/lib.js",
+        "csp_report": json.dumps(
+            {
+                "csp-report": {
+                    "violated-directive": "script-src",
+                    "blocked-uri": "https://cdn.example.com/lib.js",
+                }
             }
-        }),
+        ),
     }
     raw_logs = f"2026-01-01T00:00:00.000000000Z {json.dumps(log_entry)}\n"
     mock_container.logs.return_value = raw_logs.encode("utf-8")
@@ -152,11 +159,7 @@ def test_parse_log_line_rejects_unescaped_csp_report():
     format before the json converter) is not valid JSON and must be rejected.
     """
     raw_body = '{"csp-report":{"blocked-uri":"https://evil.com/x.js"}}'
-    broken = (
-        '{"ts":"2026-01-01T00:00:00Z","client":"1.2.3.4",'
-        f'"csp_report":"{raw_body}"'
-        '}'
-    )
+    broken = f'{{"ts":"2026-01-01T00:00:00Z","client":"1.2.3.4","csp_report":"{raw_body}"}}'
     result = _parse_log_line(broken)
     assert result is None
 
@@ -169,6 +172,7 @@ def test_sample_csp_reports_no_docker_sdk(db, monkeypatch):
     mock_runtime = MagicMock()
     mock_runtime.is_available.return_value = False
     import app.services.runtime as runtime_mod
+
     monkeypatch.setattr(runtime_mod, "get_runtime", lambda: mock_runtime)
     monkeypatch.setattr("app.services.page_protect_sampler.get_runtime", lambda: mock_runtime)
 

@@ -3,20 +3,19 @@
 Provides endpoints for viewing/updating HA configuration and monitoring
 the health of all HA instances (HAProxy, Valkey, Coraza).
 """
-from typing import Any, Dict
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from ..deps import get_current_user, get_db, require_admin, rate_limit
+from ...core.valkey_client import cache_get, cache_set
 from ...schemas.ha import (
+    HaApplyResponse,
     HaConfigResponse,
     HaConfigUpdate,
     HaHealthSummary,
-    HaApplyResponse,
 )
 from ...services import ha as ha_service
-from ...core.valkey_client import cache_get, cache_set
+from ..deps import get_current_user, get_db, rate_limit, require_admin
 
 router = APIRouter(prefix="/ha", tags=["ha"])
 
@@ -88,10 +87,12 @@ def apply_ha_config(
     Returns per-instance push results.
     """
     from ...services.haproxy import write_config
+
     try:
         config = write_config(db, created_by=getattr(user, "username", None))
         # write_config already pushed to all instances; collect results
         from ...services import ha as _ha
+
         push_results = _ha.push_config_to_all_instances(db, config)
         return HaApplyResponse(
             status="ok",

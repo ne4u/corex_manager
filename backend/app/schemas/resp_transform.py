@@ -1,9 +1,9 @@
-from datetime import datetime
-from typing import Optional, List
-from pydantic import BaseModel, field_validator, model_validator, ConfigDict
-from ._base import _optional_update
-
 import re as _re
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+
+from ._base import _optional_update
 
 _VALID_TRANSFORM_TYPES = {"replace", "inject", "mask"}
 _VALID_INJECT_POSITIONS = {"before", "after", "replace"}
@@ -13,27 +13,27 @@ _VALID_TOKEN_MODES = {"tokenize", "encrypt"}
 
 
 class ResponseTransformBase(BaseModel):
-    backend_id: Optional[int] = None
-    backend_ids: Optional[List[int]] = None
+    backend_id: int | None = None
+    backend_ids: list[int] | None = None
     priority: int = 0
     name: str
     enabled: bool = True
     transform_type: str
-    content_types: Optional[str] = None
+    content_types: str | None = None
     max_body_size: int = 1048576
     # replace / inject
-    find_regex: Optional[str] = None
-    replace_string: Optional[str] = None
+    find_regex: str | None = None
+    replace_string: str | None = None
     # inject mode
-    inject_string: Optional[str] = None
-    inject_position: Optional[str] = None
+    inject_string: str | None = None
+    inject_position: str | None = None
     # mask mode
-    mask_mode: Optional[str] = None
-    detector: Optional[str] = None
-    token_mode: Optional[str] = None
-    token_prefix: Optional[str] = None
-    token_ttl: Optional[int] = None
-    encrypt_key_env: Optional[str] = None
+    mask_mode: str | None = None
+    detector: str | None = None
+    token_mode: str | None = None
+    token_prefix: str | None = None
+    token_ttl: int | None = None
+    encrypt_key_env: str | None = None
     detokenize_query: bool = False
 
     @field_validator("find_regex")
@@ -101,35 +101,36 @@ ResponseTransformUpdate = _optional_update(ResponseTransformBase)
 
 class ResponseTransformResponse(ResponseTransformBase):
     id: int
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class ResponseTransformReorder(BaseModel):
-    ordered_ids: List[int]
+    ordered_ids: list[int]
 
 
 class ResponseTransformValidateRequest(BaseModel):
     """A subset of ResponseTransformBase for live validation without saving."""
+
     transform_type: str
-    find_regex: Optional[str] = None
-    replace_string: Optional[str] = None
-    inject_string: Optional[str] = None
-    inject_position: Optional[str] = None
-    mask_mode: Optional[str] = None
-    detector: Optional[str] = None
-    token_mode: Optional[str] = None
-    token_prefix: Optional[str] = None
-    token_ttl: Optional[int] = None
-    encrypt_key_env: Optional[str] = None
-    detokenize_query: Optional[bool] = None
+    find_regex: str | None = None
+    replace_string: str | None = None
+    inject_string: str | None = None
+    inject_position: str | None = None
+    mask_mode: str | None = None
+    detector: str | None = None
+    token_mode: str | None = None
+    token_prefix: str | None = None
+    token_ttl: int | None = None
+    encrypt_key_env: str | None = None
+    detokenize_query: bool | None = None
 
 
 class ResponseTransformValidateResponse(BaseModel):
     valid: bool
-    error: Optional[str] = None
+    error: str | None = None
 
 
 __all__ = [

@@ -13,29 +13,29 @@ Revises: 8b9ba74c6828
 Create Date: 2026-08-11 00:00:00.000000
 
 """
-from typing import Sequence, Union
 
-from alembic import op
+from collections.abc import Sequence
+
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = 'a1b2c3d4e5f6'
-down_revision: Union[str, Sequence[str], None] = '8b9ba74c6828'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision: str = "a1b2c3d4e5f6"
+down_revision: str | Sequence[str] | None = "8b9ba74c6828"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 # Legacy tables removed in favor of Security Lists (NetworkList/AsnList/GeoList)
 # and the audit_events system. Safe to drop if they still exist from older
 # schema versions.
 _LEGACY_TABLES = [
-    "audit_logs",        # replaced by audit_events
-    "network_acls",      # replaced by NetworkList
-    "geo_acls",          # replaced by GeoList
-    "asn_acls",          # replaced by AsnList
+    "audit_logs",  # replaced by audit_events
+    "network_acls",  # replaced by NetworkList
+    "geo_acls",  # replaced by GeoList
+    "asn_acls",  # replaced by AsnList
     "waf_threat_feeds",  # removed (Security Lists successor)
-    "waf_threat_ips",    # removed (Security Lists successor)
+    "waf_threat_ips",  # removed (Security Lists successor)
     "waf_geo_exceptions",  # removed (Security Lists successor)
 ]
 

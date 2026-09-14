@@ -1,6 +1,5 @@
 import os
 import re
-from typing import List, Optional
 
 from sqlalchemy.orm import Session
 
@@ -15,7 +14,7 @@ from . import coraza_watcher
 settings = get_settings()
 
 
-def _safe_token(value: Optional[str]) -> str:
+def _safe_token(value: str | None) -> str:
     """Sanitize a value used as a Coraza config token."""
     if not isinstance(value, str):
         value = str(value) if value is not None else ""
@@ -27,7 +26,7 @@ def _escape_pattern(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
-def _scope_check_lines(primary: WafRule) -> List[str]:
+def _scope_check_lines(primary: WafRule) -> list[str]:
     """Generate a skipAfter block if the rule has path/method/content type filters."""
     lines = []
     checks = []
@@ -51,9 +50,13 @@ def _scope_check_lines(primary: WafRule) -> List[str]:
             rule_id = 990102 + i
             is_last = i == len(ctypes_list) - 1
             if is_last:
-                checks.append(f'SecRule REQUEST_HEADERS:Content-Type "!@beginsWith {ct}" "id:{rule_id},phase:1,pass,nolog,skipAfter:{marker}"')
+                checks.append(
+                    f'SecRule REQUEST_HEADERS:Content-Type "!@beginsWith {ct}" "id:{rule_id},phase:1,pass,nolog,skipAfter:{marker}"'
+                )
             else:
-                checks.append(f'SecRule REQUEST_HEADERS:Content-Type "!@beginsWith {ct}" "id:{rule_id},phase:1,pass,nolog,chain"')
+                checks.append(
+                    f'SecRule REQUEST_HEADERS:Content-Type "!@beginsWith {ct}" "id:{rule_id},phase:1,pass,nolog,chain"'
+                )
 
     if checks:
         lines.append("# Scope / context filters")
@@ -72,12 +75,12 @@ _OP_MAP = {
 }
 
 
-def _coraza_op(op: Optional[str]) -> str:
+def _coraza_op(op: str | None) -> str:
     """Map a matcher/condition operator name to a Coraza @operator."""
     return _OP_MAP.get(_safe_token(op), "@streq")
 
 
-def _split_multi(value: Optional[str]) -> List[str]:
+def _split_multi(value: str | None) -> list[str]:
     """Split a multi-value exception field into clean, de-duplicated tokens.
 
     The UI stores multi-select values as comma-separated strings, but values
@@ -86,7 +89,7 @@ def _split_multi(value: Optional[str]) -> List[str]:
     tok = _safe_token(value)
     if not tok:
         return []
-    out: List[str] = []
+    out: list[str] = []
     seen = set()
     for part in re.split(r"[,\s]+", tok):
         part = part.strip()
@@ -96,7 +99,7 @@ def _split_multi(value: Optional[str]) -> List[str]:
     return out
 
 
-def _split_msgs(value: Optional[str]) -> List[str]:
+def _split_msgs(value: str | None) -> list[str]:
     """Split a multi-message field on commas only.
 
     Rule messages legitimately contain spaces ("Path Traversal Attack"), so
@@ -105,7 +108,7 @@ def _split_msgs(value: Optional[str]) -> List[str]:
     tok = _safe_token(value)
     if not tok:
         return []
-    out: List[str] = []
+    out: list[str] = []
     seen = set()
     for part in tok.split(","):
         part = part.strip()
@@ -115,7 +118,7 @@ def _split_msgs(value: Optional[str]) -> List[str]:
     return out
 
 
-def _exception_targets(zone: Optional[str], variable: Optional[str]) -> List[str]:
+def _exception_targets(zone: str | None, variable: str | None) -> list[str]:
     """Build exclusion target list ("ZONE:variable") from multi-zone + variable."""
     zones = _split_multi(zone)
     var = _safe_token(variable)
@@ -126,22 +129,18 @@ def _exception_targets(zone: Optional[str], variable: Optional[str]) -> List[str
 
 def _exception_ctl_actions(
     action: str,
-    rule_ids: List[str],
-    rule_tags: List[str],
-    rule_msgs: List[str],
-    targets: List[str],
-) -> List[str]:
+    rule_ids: list[str],
+    rule_tags: list[str],
+    rule_msgs: list[str],
+    targets: list[str],
+) -> list[str]:
     """Build the ctl: action strings for a conditional exception.
 
     Returns one ctl action per selector value (and per target for target
     exclusions), so a multi-value exception removes/excludes every selected
     rule and zone.
     """
-    selectors = (
-        [("Id", v) for v in rule_ids]
-        + [("Tag", v) for v in rule_tags]
-        + [("Msg", v) for v in rule_msgs]
-    )
+    selectors = [("Id", v) for v in rule_ids] + [("Tag", v) for v in rule_tags] + [("Msg", v) for v in rule_msgs]
     if action == "remove":
         if selectors:
             return [f"ctl:ruleRemoveBy{k}={v}" for k, v in selectors]
@@ -152,17 +151,13 @@ def _exception_ctl_actions(
         # silently dropped and never reached the generated config.
         return ["ctl:ruleEngine=Off"]
     elif action == "allow" and targets:
-        return [
-            f"ctl:ruleRemoveTargetBy{k}={v};{t}"
-            for k, v in selectors
-            for t in targets
-        ]
+        return [f"ctl:ruleRemoveTargetBy{k}={v};{t}" for k, v in selectors for t in targets]
     elif action == "comment":
         return [f"ctl:ruleRemoveBy{k}={v}" for k, v in selectors]
     return []
 
 
-def _exception_lines(exceptions: List[WafException]) -> tuple[List[str], List[str]]:
+def _exception_lines(exceptions: list[WafException]) -> tuple[list[str], list[str]]:
     """Split exception directives into conditional and unconditional groups.
 
     Returns ``(conditional_lines, unconditional_lines)``.
@@ -180,8 +175,8 @@ def _exception_lines(exceptions: List[WafException]) -> tuple[List[str], List[st
     includes (matching the CRS convention where ``crs-setup.conf`` removals
     appear before the rules, and post-include removals also work).
     """
-    conditional: List[str] = []
-    unconditional: List[str] = []
+    conditional: list[str] = []
+    unconditional: list[str] = []
 
     for ex in exceptions:
         action = _safe_token(ex.action) or "remove"
@@ -227,19 +222,15 @@ def _exception_lines(exceptions: List[WafException]) -> tuple[List[str], List[st
                         ex_id = id_base + id_seq
                         id_seq += 1
                         conditional.append(
-                            f'SecRule {cond_var} "{cond_operator} {cond_pattern}" '
-                            f'"id:{ex_id},phase:1,pass,nolog,chain"'
+                            f'SecRule {cond_var} "{cond_operator} {cond_pattern}" "id:{ex_id},phase:1,pass,nolog,chain"'
                         )
-                        conditional.append(
-                            f'    SecRule {target} "{matcher_op} {matcher_pattern}" "{ctl}"'
-                        )
+                        conditional.append(f'    SecRule {target} "{matcher_op} {matcher_pattern}" "{ctl}"')
             else:
                 for ctl in _exception_ctl_actions(action, rule_ids, rule_tags, rule_msgs, targets):
                     ex_id = id_base + id_seq
                     id_seq += 1
                     conditional.append(
-                        f'SecRule {cond_var} "{cond_operator} {cond_pattern}" '
-                        f'"id:{ex_id},phase:1,pass,nolog,{ctl}"'
+                        f'SecRule {cond_var} "{cond_operator} {cond_pattern}" "id:{ex_id},phase:1,pass,nolog,{ctl}"'
                     )
             if action == "comment":
                 conditional.append(f"# Exception '{_safe_token(ex.name)}': conditional {action} for {first_selector}")
@@ -255,8 +246,7 @@ def _exception_lines(exceptions: List[WafException]) -> tuple[List[str], List[st
                     ex_id = id_base + id_seq
                     id_seq += 1
                     conditional.append(
-                        f'SecRule {target} "{matcher_op} {matcher_pattern}" '
-                        f'"id:{ex_id},phase:1,pass,nolog,{ctl}"'
+                        f'SecRule {target} "{matcher_op} {matcher_pattern}" "id:{ex_id},phase:1,pass,nolog,{ctl}"'
                     )
             continue
 
@@ -271,7 +261,7 @@ def _exception_lines(exceptions: List[WafException]) -> tuple[List[str], List[st
                 for target in targets:
                     unconditional.append(f"SecRuleUpdateTargetById {rule_id} !{target}")
             elif action == "update" and update_target and update_action:
-                unconditional.append(f"SecRuleUpdateActionById {rule_id} \"{update_action}\"")
+                unconditional.append(f'SecRuleUpdateActionById {rule_id} "{update_action}"')
                 unconditional.append(f"SecRuleUpdateTargetById {rule_id} !{update_target}")
 
         for rule_tag in rule_tags:
@@ -281,7 +271,7 @@ def _exception_lines(exceptions: List[WafException]) -> tuple[List[str], List[st
                 for target in targets:
                     unconditional.append(f"SecRuleUpdateTargetByTag {rule_tag} !{target}")
             elif action == "update" and update_target and update_action:
-                unconditional.append(f"SecRuleUpdateActionByTag {rule_tag} \"{update_action}\"")
+                unconditional.append(f'SecRuleUpdateActionByTag {rule_tag} "{update_action}"')
                 unconditional.append(f"SecRuleUpdateTargetByTag {rule_tag} !{update_target}")
 
         for rule_msg in rule_msgs:
@@ -291,13 +281,13 @@ def _exception_lines(exceptions: List[WafException]) -> tuple[List[str], List[st
                 for target in targets:
                     unconditional.append(f"SecRuleUpdateTargetByMsg {rule_msg} !{target}")
             elif action == "update" and update_target and update_action:
-                unconditional.append(f"SecRuleUpdateActionByMsg {rule_msg} \"{update_action}\"")
+                unconditional.append(f'SecRuleUpdateActionByMsg {rule_msg} "{update_action}"')
                 unconditional.append(f"SecRuleUpdateTargetByMsg {rule_msg} !{update_target}")
 
     return conditional, unconditional
 
 
-def _rate_limit_lines(primary: WafRule) -> List[str]:
+def _rate_limit_lines(primary: WafRule) -> list[str]:
     """Generate Coraza rate-limiting directives using the IP collection.
 
     NOTE: Coraza's setvar action only supports the TX collection, so
@@ -311,8 +301,8 @@ def _rate_limit_lines(primary: WafRule) -> List[str]:
 
 def _app_directives(
     db: Session,
-    rules: List[WafRule],
-    exceptions: List[WafException],
+    rules: list[WafRule],
+    exceptions: list[WafException],
 ) -> str:
     """Build Coraza directives for one application as a multi-line string."""
     if not rules:
@@ -332,9 +322,9 @@ def _app_directives(
     outbound = int(primary.outbound_anomaly_threshold or 4)
 
     lines = [
-        f"SecAction \"id:900001,phase:1,nolog,pass,setvar:tx.paranoia_level={paranoia}\"",
-        f"SecAction \"id:900002,phase:1,nolog,pass,setvar:tx.inbound_anomaly_score_threshold={inbound}\"",
-        f"SecAction \"id:900003,phase:1,nolog,pass,setvar:tx.outbound_anomaly_score_threshold={outbound}\"",
+        f'SecAction "id:900001,phase:1,nolog,pass,setvar:tx.paranoia_level={paranoia}"',
+        f'SecAction "id:900002,phase:1,nolog,pass,setvar:tx.inbound_anomaly_score_threshold={inbound}"',
+        f'SecAction "id:900003,phase:1,nolog,pass,setvar:tx.outbound_anomaly_score_threshold={outbound}"',
     ]
 
     # Rule set version / plugin metadata
@@ -369,7 +359,8 @@ def _app_directives(
     # from the shared volume. Otherwise, fall back to the embedded @owasp_crs.
     rule_sets = {r.rule_set for r in rules}
     if rule_sets & {"coraza", "owasp-crs", "crs"}:
-        from .crs_downloader import get_active_crs_version, _crs_dir, _coraza_crs_path
+        from .crs_downloader import _coraza_crs_path, _crs_dir, get_active_crs_version
+
         active_crs = get_active_crs_version(db)
         if active_crs and os.path.exists(_crs_dir(active_crs)):
             crs_path = _coraza_crs_path(active_crs)
@@ -377,14 +368,17 @@ def _app_directives(
             lines.append(f"Include {crs_path}/crs-setup.conf.example")
             lines.append(f"Include {crs_path}/rules/*.conf")
         else:
-            lines.extend([
-                "Include @coraza.conf-recommended",
-                "Include @crs-setup.conf.example",
-                "Include @owasp_crs/*.conf",
-            ])
+            lines.extend(
+                [
+                    "Include @coraza.conf-recommended",
+                    "Include @crs-setup.conf.example",
+                    "Include @owasp_crs/*.conf",
+                ]
+            )
 
     # Remote rule sets: Include downloaded .conf files from the shared volume.
     from .rule_set_downloader import _coraza_include_path, _rule_file_path
+
     for r in rules:
         if r.rule_set == "remote" and r.rule_set_url:
             abs_path = _rule_file_path(r.name)
@@ -434,59 +428,52 @@ def _indent(text: str, width: int = 4) -> str:
     return "".join(f"{pad}{line}\n" for line in text.splitlines())
 
 
-def _enabled_rules(rules: List[WafRule]) -> List[WafRule]:
+def _enabled_rules(rules: list[WafRule]) -> list[WafRule]:
     return [r for r in rules if r.enabled]
 
 
-def _listener_default_backend_id(db: Session, listener_id: Optional[int]) -> Optional[int]:
+def _listener_default_backend_id(db: Session, listener_id: int | None) -> int | None:
     if listener_id is None:
         return None
     listener = db.get(Listener, listener_id)
     return listener.default_backend_id if listener else None
 
 
-def _rules_for_listener(db: Session, listener_id: Optional[int]) -> List[WafRule]:
+def _rules_for_listener(db: Session, listener_id: int | None) -> list[WafRule]:
     all_rules = db.query(WafRule).all()
     enabled = _enabled_rules(all_rules)
     default_backend_id = _listener_default_backend_id(db, listener_id)
 
     # Rules tied to this listener (no backend, or matching default backend)
     specific = [
-        r for r in enabled
-        if r.listener_id == listener_id
-        and (r.backend_id is None or r.backend_id == default_backend_id)
+        r
+        for r in enabled
+        if r.listener_id == listener_id and (r.backend_id is None or r.backend_id == default_backend_id)
     ]
     if specific:
         # Include this listener's specific rules plus any global rules
         global_rules = [
-            r for r in enabled
-            if r.listener_id is None
-            and (r.backend_id is None or r.backend_id == default_backend_id)
+            r for r in enabled if r.listener_id is None and (r.backend_id is None or r.backend_id == default_backend_id)
         ]
         return specific + global_rules
 
     # Fallback to global rules matching the default backend
     return [
-        r for r in enabled
-        if r.listener_id is None
-        and (r.backend_id is None or r.backend_id == default_backend_id)
+        r for r in enabled if r.listener_id is None and (r.backend_id is None or r.backend_id == default_backend_id)
     ]
 
 
-def _exceptions_for_rules(db: Session, rules: List[WafRule]) -> List[WafException]:
+def _exceptions_for_rules(db: Session, rules: list[WafRule]) -> list[WafException]:
     rule_ids = {r.id for r in rules}
     # Global exceptions (waf_rule_id is None) apply to every app block, matching
     # the nullable FK and the UI's "Global" option. Without this, a global
     # exception is silently dropped and never reaches the generated config, so
     # the on-disk file doesn't change and the "unapplied changes" banner never
     # appears after creating one.
-    return [
-        e for e in db.query(WafException).all()
-        if e.waf_rule_id is None or e.waf_rule_id in rule_ids
-    ]
+    return [e for e in db.query(WafException).all() if e.waf_rule_id is None or e.waf_rule_id in rule_ids]
 
 
-def rules_for_listener(db: Session, listener_id: Optional[int]) -> List[WafRule]:
+def rules_for_listener(db: Session, listener_id: int | None) -> list[WafRule]:
     """Return all enabled WAF rules that apply to a listener."""
     return _rules_for_listener(db, listener_id)
 
@@ -537,9 +524,7 @@ def generate_coraza_spoa_config(db: Session) -> str:
 
     # If no rules exist, still emit a disabled global app so Coraza starts cleanly
     if not applications:
-        applications.append(
-            _app_block("haproxy-waf", "SecRuleEngine Off\n")
-        )
+        applications.append(_app_block("haproxy-waf", "SecRuleEngine Off\n"))
 
     # The default application must be one of the defined apps.
     default_app = "haproxy-waf"
@@ -562,10 +547,10 @@ log_format: json
 default_application: {default_app}
 
 applications:
-{''.join(applications)}"""
+{"".join(applications)}"""
 
 
-def coraza_app_for_listener(listener_id: Optional[int], db: Session) -> str:
+def coraza_app_for_listener(listener_id: int | None, db: Session) -> str:
     """Return the Coraza application name to use for a given listener."""
     if listener_id is not None and rules_for_listener(db, listener_id):
         return f"haproxy-waf-listener-{listener_id}"
@@ -587,7 +572,7 @@ def write_coraza_spoa_config(db: Session, restart: bool = True) -> str:
 
     previous = None
     try:
-        with open(path, "r") as f:
+        with open(path) as f:
             previous = f.read()
     except FileNotFoundError:
         pass

@@ -1,7 +1,10 @@
 from datetime import datetime
-from typing import Optional, List, Dict, Any, Type, TypeVar
-from pydantic import BaseModel, Field, model_validator, field_validator, ConfigDict
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
 from ._base import _optional_update
+
 
 class CacheConfigBase(BaseModel):
     backend_id: int
@@ -12,7 +15,7 @@ class CacheConfigBase(BaseModel):
     haproxy_max_age: int = Field(default=300, ge=1)  # seconds
     haproxy_process_vary: bool = True
     haproxy_max_secondary_entries: int = Field(default=10, ge=0)
-    haproxy_cache_condition: Optional[str] = None
+    haproxy_cache_condition: str | None = None
     # RFC 7234 compliance for the memory cache. Default False (CDN-style):
     # request-side Cache-Control/Pragma headers are stripped before the cache
     # lookup so a single client's "no-cache" reload does not bypass the shared
@@ -46,11 +49,14 @@ class CacheConfigResponse(CacheConfigBase):
 
 class CacheRuleBase(BaseModel):
     """Ordered, first-match-wins cacheability rule.
-    
+
     Request-phase match types (evaluated on request): path, filename, extension, method, query_string
     Response-phase match types (evaluated on response): content_type, status_code
     """
-    match_type: str = Field(description="path | filename | extension | method | query_string | content_type | status_code")
+
+    match_type: str = Field(
+        description="path | filename | extension | method | query_string | content_type | status_code"
+    )
     pattern: str = Field(description="e.g. /downloads/, linux.iso, png, GET, nocache, application/json, 200")
     action: str = Field(default="cache", description="cache | bypass")
     tier: str = Field(description="memory | disk (required - choose which cache tier)")
@@ -61,6 +67,7 @@ class CacheRuleBase(BaseModel):
     @classmethod
     def _check_match_type(cls, v):
         from ..services.cache_rules import MATCH_TYPES
+
         if v is not None and v not in MATCH_TYPES:
             raise ValueError(f"match_type must be one of: {', '.join(MATCH_TYPES)}")
         return v
@@ -69,6 +76,7 @@ class CacheRuleBase(BaseModel):
     @classmethod
     def _check_action(cls, v):
         from ..services.cache_rules import ACTIONS
+
         if v is not None and v not in ACTIONS:
             raise ValueError(f"action must be one of: {', '.join(ACTIONS)}")
         return v
@@ -77,6 +85,7 @@ class CacheRuleBase(BaseModel):
     @classmethod
     def _check_tier(cls, v):
         from ..services.cache_rules import TIERS
+
         if v is not None and v not in TIERS:
             raise ValueError(f"tier must be one of: {', '.join(TIERS)}")
         return v
@@ -91,6 +100,7 @@ class CacheRuleBase(BaseModel):
         stored match_type.
         """
         from ..services.cache_rules import normalize_pattern
+
         if self.match_type is not None and self.pattern is not None:
             self.pattern = normalize_pattern(self.match_type, self.pattern)
         return self
@@ -114,7 +124,8 @@ class CacheRuleResponse(CacheRuleBase):
 
 class CacheRuleReorder(BaseModel):
     """New ordering for a cache config's rules, as a list of rule IDs."""
-    rule_ids: List[int]
+
+    rule_ids: list[int]
 
 
 class CacheClearResponse(BaseModel):
@@ -128,8 +139,21 @@ class CacheStatusResponse(BaseModel):
 
 
 class CacheMetricsResponse(BaseModel):
-    snapshots: List[Dict[str, Any]] = Field(default_factory=list)
-    summary: Dict[str, Any] = Field(default_factory=dict)
+    snapshots: list[dict[str, Any]] = Field(default_factory=list)
+    summary: dict[str, Any] = Field(default_factory=dict)
 
 
-__all__ = ['CacheClearResponse', 'CacheConfigBase', 'CacheConfigCreate', 'CacheConfigResponse', 'CacheConfigUpdate', 'CacheMetricsResponse', 'CacheRuleBase', 'CacheRuleCreate', 'CacheRuleReorder', 'CacheRuleResponse', 'CacheRuleUpdate', 'CacheStatusResponse']
+__all__ = [
+    "CacheClearResponse",
+    "CacheConfigBase",
+    "CacheConfigCreate",
+    "CacheConfigResponse",
+    "CacheConfigUpdate",
+    "CacheMetricsResponse",
+    "CacheRuleBase",
+    "CacheRuleCreate",
+    "CacheRuleReorder",
+    "CacheRuleResponse",
+    "CacheRuleUpdate",
+    "CacheStatusResponse",
+]

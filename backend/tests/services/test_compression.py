@@ -7,8 +7,9 @@ HAProxy-native (no Rust module). brotli/zstd require the haproxy-compression
 Rust Lua module, which is loaded globally when the single `compression_enabled`
 toggle is on.
 """
+
 from app.services import haproxy
-from tests.factories import make_backend, make_listener, make_server
+from tests.factories import make_backend, make_server
 
 
 def test_no_compression_by_default(db):

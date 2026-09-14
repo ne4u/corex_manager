@@ -1,7 +1,9 @@
 """Tests for the API Armor schema-learning sampler."""
+
 import json
 import os
 import tempfile
+from datetime import UTC
 
 from app.models.api_armor import ApiSchema
 from app.services.api_armor_schema_learner import (
@@ -30,16 +32,20 @@ def test_ingest_schema_learning_from_log(db):
 
 def test_ingest_schema_learning_merges(db):
     """Two observations for the same endpoint are merged."""
-    ingest_schema_learning_entry_from_log({
-        "method": "POST",
-        "path": "/api/v1/users",
-        "body_sample": {"name": "alice"},
-    })
-    ingest_schema_learning_entry_from_log({
-        "method": "POST",
-        "path": "/api/v1/users",
-        "body_sample": {"name": "bob", "age": 30},
-    })
+    ingest_schema_learning_entry_from_log(
+        {
+            "method": "POST",
+            "path": "/api/v1/users",
+            "body_sample": {"name": "alice"},
+        }
+    )
+    ingest_schema_learning_entry_from_log(
+        {
+            "method": "POST",
+            "path": "/api/v1/users",
+            "body_sample": {"name": "bob", "age": 30},
+        }
+    )
 
     schema = db.query(ApiSchema).first()
     assert schema.sample_count == 2
@@ -72,7 +78,7 @@ def test_learner_processes_log_file(db):
 
 def test_prune_learned_schemas(db):
     """prune_learned_schemas removes old learned schemas."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     old = ApiSchema(
         name="old",
@@ -81,7 +87,7 @@ def test_prune_learned_schemas(db):
         schema={},
         source="learned",
         enabled=True,
-        created_at=datetime.now(timezone.utc) - timedelta(days=90),
+        created_at=datetime.now(UTC) - timedelta(days=90),
     )
     new = ApiSchema(
         name="new",
@@ -90,7 +96,7 @@ def test_prune_learned_schemas(db):
         schema={},
         source="learned",
         enabled=True,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     db.add_all([old, new])
     db.commit()

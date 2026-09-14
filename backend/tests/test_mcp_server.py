@@ -9,8 +9,8 @@ Exercises:
 - Auth gating when COREX_MCP_TOKEN is set.
 - Self-registration service (ensure_self_registration) against the DB.
 """
+
 import importlib
-import os
 import sys
 from pathlib import Path
 
@@ -27,16 +27,19 @@ if str(_MCP_SERVER_DIR) not in sys.path:
 # Tool discovery (OpenAPI spec → MCP tools)
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def openapi_spec():
     """The backend app's real OpenAPI spec, injected into discover_tools."""
     from app.main import app as backend_app
+
     return backend_app.openapi()
 
 
 @pytest.mark.asyncio
 async def test_discover_tools_returns_non_empty_list(openapi_spec):
     import tools as mcp_tools  # noqa: F401  (the mcp-server module)
+
     discovered = await mcp_tools.discover_tools(spec=openapi_spec)
     assert isinstance(discovered, list)
     assert len(discovered) > 0, "expected backend v1 routes to produce MCP tools"
@@ -45,6 +48,7 @@ async def test_discover_tools_returns_non_empty_list(openapi_spec):
 @pytest.mark.asyncio
 async def test_discover_tools_have_required_fields(openapi_spec):
     import tools as mcp_tools
+
     for t in await mcp_tools.discover_tools(spec=openapi_spec):
         assert "name" in t and isinstance(t["name"], str) and t["name"]
         assert "description" in t
@@ -56,6 +60,7 @@ async def test_discover_tools_have_required_fields(openapi_spec):
 @pytest.mark.asyncio
 async def test_discover_tool_names_unique(openapi_spec):
     import tools as mcp_tools
+
     names = [t["name"] for t in await mcp_tools.discover_tools(spec=openapi_spec)]
     assert len(names) == len(set(names)), f"duplicate tool names: {names}"
 
@@ -64,6 +69,7 @@ async def test_discover_tool_names_unique(openapi_spec):
 async def test_discover_tools_include_core_endpoints(openapi_spec):
     """A few well-known backend endpoints should be present as tools."""
     import tools as mcp_tools
+
     names = {t["name"] for t in await mcp_tools.discover_tools(spec=openapi_spec)}
     # At least one tool should mention backends or listeners
     assert any("backend" in n for n in names), names
@@ -74,22 +80,21 @@ async def test_discover_tools_include_core_endpoints(openapi_spec):
 async def test_tool_names_match_operation_function_names(openapi_spec):
     """operationId suffix stripping should recover clean function names."""
     import tools as mcp_tools
+
     discovered = await mcp_tools.discover_tools(spec=openapi_spec)
     names = {t["name"] for t in discovered}
     # These are endpoint function names; if suffix stripping regressed the
     # names would look like list_backends_api_v1_backends_get.
     assert "list_backends" in names
     assert "list_listener_endpoints" in names
-    assert not any("_api_v1_" in n for n in names), \
-        [n for n in names if "_api_v1_" in n]
+    assert not any("_api_v1_" in n for n in names), [n for n in names if "_api_v1_" in n]
 
 
 @pytest.mark.asyncio
 async def test_tool_name_derivation_unit():
     import tools as mcp_tools
-    assert mcp_tools._tool_name(
-        "list_backends_api_v1_backends_get", "/api/v1/backends", "GET"
-    ) == "list_backends"
+
+    assert mcp_tools._tool_name("list_backends_api_v1_backends_get", "/api/v1/backends", "GET") == "list_backends"
     # Fallback: non-matching operationId passes through
     assert mcp_tools._tool_name("customOp", "/api/v1/x", "GET") == "customOp"
     # Missing operationId derives from method+path
@@ -99,6 +104,7 @@ async def test_tool_name_derivation_unit():
 @pytest.mark.asyncio
 async def test_path_and_query_params_mapped(openapi_spec):
     import tools as mcp_tools
+
     discovered = await mcp_tools.discover_tools(spec=openapi_spec)
     by_key = {(t["_method"], t["_path"]): t for t in discovered}
     tool = by_key.get(("GET", "/api/v1/backends/{bid}"))
@@ -113,20 +119,22 @@ async def test_path_and_query_params_mapped(openapi_spec):
 async def test_json_body_schema_inlines_defs(openapi_spec):
     """Body schemas must be self-contained ($defs inlined, refs rewritten)."""
     import tools as mcp_tools
+
     discovered = await mcp_tools.discover_tools(spec=openapi_spec)
     body_tools = [t for t in discovered if t["_body_kind"] == "json"]
     assert body_tools, "expected at least one JSON-body tool"
     import json as _json
+
     for t in body_tools:
         blob = _json.dumps(t["inputSchema"]["properties"]["body"])
-        assert "#/components/schemas/" not in blob, \
-            f"{t['name']}: unresolved component ref leaked into tool schema"
+        assert "#/components/schemas/" not in blob, f"{t['name']}: unresolved component ref leaked into tool schema"
 
 
 @pytest.mark.asyncio
 async def test_form_body_tool_exists(openapi_spec):
     """Form-encoded endpoints (e.g. /auth/token) are exposed with form bodies."""
     import tools as mcp_tools
+
     discovered = await mcp_tools.discover_tools(spec=openapi_spec)
     by_key = {(t["_method"], t["_path"]): t for t in discovered}
     token_tool = by_key.get(("POST", "/api/v1/auth/token"))
@@ -138,11 +146,13 @@ async def test_form_body_tool_exists(openapi_spec):
 async def test_file_upload_tools_skipped(openapi_spec):
     """Operations whose only body is a file upload are not exposed as tools."""
     import tools as mcp_tools
+
     discovered = await mcp_tools.discover_tools(spec=openapi_spec)
     for t in discovered:
         props = t["inputSchema"]["properties"]
         if "body" in props and t["_body_kind"] == "form":
             import json as _json
+
             assert '"binary"' not in _json.dumps(props["body"]), t["name"]
 
 
@@ -157,19 +167,15 @@ async def test_call_tool_via_asgi_transport(db, monkeypatch, openapi_spec):
     db.add(User(username="admin", hashed_password="x", role="admin", is_admin=True))
     db.commit()
 
-    asgi_client = httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=backend_app), base_url="http://test"
-    )
+    asgi_client = httpx.AsyncClient(transport=httpx.ASGITransport(app=backend_app), base_url="http://test")
     monkeypatch.setattr(mcp_tools, "_client", asgi_client)
 
     discovered = await mcp_tools.discover_tools(spec=openapi_spec)
-    tool = next(
-        t for t in discovered
-        if t["_method"] == "GET" and t["_path"] == "/api/v1/backends"
-    )
+    tool = next(t for t in discovered if t["_method"] == "GET" and t["_path"] == "/api/v1/backends")
     text, is_error = await mcp_tools.call_tool(tool, {})
     assert not is_error, text
     import json as _json
+
     assert isinstance(_json.loads(text), list)
 
 
@@ -177,8 +183,10 @@ async def test_call_tool_via_asgi_transport(db, monkeypatch, openapi_spec):
 # Resources
 # ---------------------------------------------------------------------------
 
+
 def test_list_resources_returns_list():
     import resources as mcp_resources
+
     res = mcp_resources.list_resources()
     assert isinstance(res, list)
     for r in res:
@@ -189,6 +197,7 @@ def test_list_resources_returns_list():
 @pytest.mark.asyncio
 async def test_read_unknown_resource_returns_none():
     import resources as mcp_resources
+
     result = await mcp_resources.read_resource("corex://does-not-exist")
     assert result is None
 
@@ -197,8 +206,10 @@ async def test_read_unknown_resource_returns_none():
 # Prompts
 # ---------------------------------------------------------------------------
 
+
 def test_list_prompts_returns_list():
     import prompts as mcp_prompts
+
     plist = mcp_prompts.list_prompts()
     assert isinstance(plist, list)
     assert len(plist) > 0
@@ -209,6 +220,7 @@ def test_list_prompts_returns_list():
 
 def test_get_prompt_corex_manager_guide():
     import prompts as mcp_prompts
+
     result = mcp_prompts.get_prompt("corex-manager-guide", {})
     assert result is not None
     # MCP prompt result shape: {"description": ..., "messages": [...]}
@@ -222,17 +234,20 @@ def test_get_prompt_corex_manager_guide():
 
 def test_get_unknown_prompt_returns_none():
     import prompts as mcp_prompts
+
     assert mcp_prompts.get_prompt("no-such-prompt", {}) is None
 
 
 def json_blob(messages):
     import json as _json
+
     return _json.dumps(messages)
 
 
 # ---------------------------------------------------------------------------
 # JSON-RPC dispatch via the FastAPI app (TestClient)
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def mcp_app_client(monkeypatch, openapi_spec):
@@ -247,8 +262,10 @@ def mcp_app_client(monkeypatch, openapi_spec):
     monkeypatch.setattr(mcp_tools, "_fetch_openapi", _fake_fetch)
     # Reset the tools cache so a stale cache from another test doesn't leak.
     import server as mcp_server
+
     mcp_server._tools_cache = None
     from fastapi.testclient import TestClient
+
     with TestClient(mcp_server.app) as c:
         yield c
 
@@ -261,11 +278,15 @@ def _rpc(client, method, params=None, msg_id=1):
 
 
 def test_initialize(mcp_app_client):
-    resp = _rpc(mcp_app_client, "initialize", {
-        "protocolVersion": "2025-11-25",
-        "capabilities": {},
-        "clientInfo": {"name": "test", "version": "0.0"},
-    })
+    resp = _rpc(
+        mcp_app_client,
+        "initialize",
+        {
+            "protocolVersion": "2025-11-25",
+            "capabilities": {},
+            "clientInfo": {"name": "test", "version": "0.0"},
+        },
+    )
     assert resp.status_code == 200
     body = resp.json()
     assert body["jsonrpc"] == "2.0"
@@ -317,6 +338,7 @@ def test_healthz(mcp_app_client):
 # Auth gating
 # ---------------------------------------------------------------------------
 
+
 def test_auth_required_when_token_set(monkeypatch, openapi_spec):
     monkeypatch.setenv("COREX_MCP_TOKEN", "secret-token-123")
     import tools as mcp_tools
@@ -326,9 +348,11 @@ def test_auth_required_when_token_set(monkeypatch, openapi_spec):
 
     monkeypatch.setattr(mcp_tools, "_fetch_openapi", _fake_fetch)
     import server as mcp_server
+
     importlib.reload(mcp_server)
     mcp_server._tools_cache = None
     from fastapi.testclient import TestClient
+
     with TestClient(mcp_server.app) as c:
         # No auth header -> 401
         resp = c.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "initialize"})
@@ -350,10 +374,12 @@ def test_auth_required_when_token_set(monkeypatch, openapi_spec):
 # Self-registration service
 # ---------------------------------------------------------------------------
 
+
 def test_self_registration_skipped_when_gateway_disabled(db, monkeypatch):
     """When MCP_GATEWAY_ENABLED is False, ensure_self_registration is a no-op."""
-    from app.services.mcp_self_register import ensure_self_registration
     from app.models.mcp import McpServer
+    from app.services.mcp_self_register import ensure_self_registration
+
     monkeypatch.setattr("app.services.mcp_self_register.settings.MCP_GATEWAY_ENABLED", False)
     ensure_self_registration(db)
     assert db.query(McpServer).filter(McpServer.namespace == "corex-manager").count() == 0
@@ -361,15 +387,23 @@ def test_self_registration_skipped_when_gateway_disabled(db, monkeypatch):
 
 def test_self_registration_creates_server_and_skill(db, monkeypatch):
     """With gateway enabled + secrets key set, registration creates the rows."""
-    from app.services import mcp_self_register as mod
     from app.models.mcp import McpServer, McpSkill, Team
+    from app.services import mcp_self_register as mod
 
-    monkeypatch.setattr(mod, "settings", type("S", (), {
-        "MCP_GATEWAY_ENABLED": True,
-        "MCP_SELF_REGISTER": True,
-        "MCP_SERVER_INTERNAL_HOST": "mcp-server",
-        "MCP_SERVER_INTERNAL_PORT": 8082,
-    })())
+    monkeypatch.setattr(
+        mod,
+        "settings",
+        type(
+            "S",
+            (),
+            {
+                "MCP_GATEWAY_ENABLED": True,
+                "MCP_SELF_REGISTER": True,
+                "MCP_SERVER_INTERNAL_HOST": "mcp-server",
+                "MCP_SERVER_INTERNAL_PORT": 8082,
+            },
+        )(),
+    )
     monkeypatch.setattr(mod, "has_secrets_key", lambda: True)
     monkeypatch.setattr(mod, "encrypt_secret", lambda raw: f"enc:{raw}")
     # decrypt_secret is imported lazily inside ensure_self_registration

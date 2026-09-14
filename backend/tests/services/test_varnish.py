@@ -6,8 +6,9 @@ HAProxy's response filters run before Varnish caches the response. The Varnish
 implementation detail is not exposed in the GUI — all user-facing text refers
 to "Disk Cache".
 """
+
 from app.services import varnish
-from tests.factories import make_backend, make_server, make_cache_config, make_listener
+from tests.factories import make_backend, make_cache_config, make_listener, make_server
 
 
 def test_vcl_no_backends(db):
@@ -307,6 +308,7 @@ def test_vcl_strips_haproxy_managed_response_headers(db):
     """VCL vcl_backend_response strips HAProxy-managed response headers from
     cached objects so they're not baked into cache and duplicated on delivery."""
     from app.models.models import ResponseHeader
+
     backend = make_backend(db, name="web")
     make_server(db, backend.id)
     make_cache_config(db, backend.id, disk_cache_enabled=True)
@@ -328,6 +330,7 @@ def test_vcl_strips_csp_headers_when_page_protect_enabled(db):
     """VCL strips Content-Security-Policy headers from cached objects when
     Page Protect policies are enabled."""
     from tests.factories import make_page_protect_policy
+
     backend = make_backend(db, name="protected")
     make_server(db, backend.id)
     make_cache_config(db, backend.id, disk_cache_enabled=True)

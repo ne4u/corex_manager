@@ -5,12 +5,12 @@ When HA is disabled (``HA_ENABLED=false``), every function here short-circuits
 to the single-instance behavior, preserving byte-for-byte parity with the
 pre-HA codebase.
 """
+
 from __future__ import annotations
 
 import logging
 import os
-import socket
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 from urllib.parse import urlparse
 
 from sqlalchemy.orm import Session
@@ -27,22 +27,23 @@ settings = get_settings()
 # Instance inventory
 # ---------------------------------------------------------------------------
 
+
 class HaproxyInstance:
     """A single HAProxy instance with its Data Plane API endpoint."""
 
     __slots__ = ("name", "url", "user", "password")
 
-    def __init__(self, name: str, url: str, user: Optional[str] = None, password: Optional[str] = None):
+    def __init__(self, name: str, url: str, user: str | None = None, password: str | None = None):
         self.name = name
         self.url = url
         self.user = user
         self.password = password
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {"name": self.name, "url": self.url, "user": self.user, "password": self.password}
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "HaproxyInstance":
+    def from_dict(cls, d: dict[str, Any]) -> HaproxyInstance:
         return cls(
             name=d.get("name", ""),
             url=d.get("url", ""),
@@ -51,7 +52,7 @@ class HaproxyInstance:
         )
 
 
-def _parse_instances(raw: str) -> List[HaproxyInstance]:
+def _parse_instances(raw: str) -> list[HaproxyInstance]:
     """Parse a semicolon-separated ``name=url[,user[,password]]`` string.
 
     Instances are separated by ``;``. Within each instance, the format is
@@ -62,7 +63,7 @@ def _parse_instances(raw: str) -> List[HaproxyInstance]:
     detected when there are no semicolons and every comma-separated chunk
     contains ``=``.
     """
-    instances: List[HaproxyInstance] = []
+    instances: list[HaproxyInstance] = []
     if ";" in raw:
         # Semicolon-separated format (preferred — supports credentials)
         chunks = [c.strip() for c in raw.split(";") if c.strip()]
@@ -92,9 +93,9 @@ def _parse_instances(raw: str) -> List[HaproxyInstance]:
     return instances
 
 
-def _instances_to_str(instances: List[HaproxyInstance]) -> str:
+def _instances_to_str(instances: list[HaproxyInstance]) -> str:
     """Serialize instances back to the semicolon-separated string format."""
-    parts: List[str] = []
+    parts: list[str] = []
     for inst in instances:
         s = f"{inst.name}={inst.url}"
         if inst.user:
@@ -105,14 +106,14 @@ def _instances_to_str(instances: List[HaproxyInstance]) -> str:
     return ";".join(parts)
 
 
-def get_haproxy_instances(db: Optional[Session] = None) -> List[HaproxyInstance]:
+def get_haproxy_instances(db: Session | None = None) -> list[HaproxyInstance]:
     """Return the list of HAProxy instances.
 
     Priority: DB setting ``haproxy_instances`` → env ``HAPROXY_INSTANCES``.
     When HA is disabled or no instances are configured, falls back to a
     single instance derived from ``DATAPLANE_API_URL`` with name "corex".
     """
-    raw: Optional[str] = None
+    raw: str | None = None
     if db is not None:
         raw = get_setting(db, "haproxy_instances", settings.HAPROXY_INSTANCES)
     if raw is None:
@@ -121,16 +122,18 @@ def get_haproxy_instances(db: Optional[Session] = None) -> List[HaproxyInstance]
     instances = _parse_instances(raw or "")
     if not instances:
         # Fallback: single instance from the default Data Plane API URL
-        instances = [HaproxyInstance(
-            name="corex",
-            url=settings.DATAPLANE_API_URL,
-            user=settings.DATAPLANE_API_USER,
-            password=settings.DATAPLANE_API_PASSWORD,
-        )]
+        instances = [
+            HaproxyInstance(
+                name="corex",
+                url=settings.DATAPLANE_API_URL,
+                user=settings.DATAPLANE_API_USER,
+                password=settings.DATAPLANE_API_PASSWORD,
+            )
+        ]
     return instances
 
 
-def is_ha_enabled(db: Optional[Session] = None) -> bool:
+def is_ha_enabled(db: Session | None = None) -> bool:
     """Return True if HA mode is enabled (DB setting or env fallback)."""
     if db is not None:
         val = get_setting(db, "ha_enabled", str(settings.HA_ENABLED))
@@ -142,6 +145,7 @@ def is_ha_enabled(db: Optional[Session] = None) -> bool:
 # Peers section (stick-table sync)
 # ---------------------------------------------------------------------------
 
+
 def _extract_host(url: str) -> str:
     """Extract the hostname from a Data Plane API URL."""
     try:
@@ -151,7 +155,7 @@ def _extract_host(url: str) -> str:
         return url
 
 
-def generate_peers_section(db: Optional[Session] = None) -> str:
+def generate_peers_section(db: Session | None = None) -> str:
     """Emit the ``peers`` section for stick-table replication.
 
     Returns an empty string when HA is disabled or fewer than 2 instances
@@ -174,7 +178,7 @@ def generate_peers_section(db: Optional[Session] = None) -> str:
     return "\n".join(lines) + "\n\n"
 
 
-def maybe_peers(db: Optional[Session] = None) -> str:
+def maybe_peers(db: Session | None = None) -> str:
     """Return `` peers corex-peers`` (with leading space) or empty string.
 
     Appended to every ``stick-table`` directive when HA is on and the peers
@@ -192,14 +196,15 @@ def maybe_peers(db: Optional[Session] = None) -> str:
 # Keepalived config generation
 # ---------------------------------------------------------------------------
 
-def _get_keepalived_setting(db: Optional[Session], key: str, default: str) -> str:
+
+def _get_keepalived_setting(db: Session | None, key: str, default: str) -> str:
     """Read a keepalived setting from DB (with env fallback)."""
     if db is not None:
         return get_setting(db, key, default) or default
     return default
 
 
-def generate_keepalived_config(db: Optional[Session] = None, instance_name: Optional[str] = None) -> str:
+def generate_keepalived_config(db: Session | None = None, instance_name: str | None = None) -> str:
     """Render a keepalived.conf from DB/env settings.
 
     Returns an empty string when HA is disabled or Swarm mode is active
@@ -223,14 +228,18 @@ def generate_keepalived_config(db: Optional[Session] = None, instance_name: Opti
     auth_pass = _get_keepalived_setting(db, "keepalived_auth_password", settings.KEEPALIVED_AUTH_PASSWORD or "")
     peer_addrs_raw = _get_keepalived_setting(db, "keepalived_peer_addresses", settings.KEEPALIVED_PEER_ADDRESSES or "")
     advert_int = int(_get_keepalived_setting(db, "keepalived_advert_int", str(settings.KEEPALIVED_ADVERT_INT)))
-    preempt = _get_keepalived_setting(db, "keepalived_preempt", str(settings.KEEPALIVED_PREEMPT)).lower() in ("true", "1", "yes")
+    preempt = _get_keepalived_setting(db, "keepalived_preempt", str(settings.KEEPALIVED_PREEMPT)).lower() in (
+        "true",
+        "1",
+        "yes",
+    )
     track_script = _get_keepalived_setting(db, "keepalived_track_script", settings.KEEPALIVED_TRACK_SCRIPT or "")
 
     if not vip:
         # No VIP configured — return empty so entrypoint skips keepalived
         return ""
 
-    lines: List[str] = []
+    lines: list[str] = []
     lines.append("# Generated by coreX Manager — do not edit manually")
     lines.append("global_defs {")
     lines.append(f"    enable_script_security")
@@ -293,7 +302,7 @@ def generate_keepalived_config(db: Optional[Session] = None, instance_name: Opti
     return "\n".join(lines) + "\n"
 
 
-def write_keepalived_configs(db: Optional[Session] = None) -> None:
+def write_keepalived_configs(db: Session | None = None) -> None:
     """Write keepalived.conf to the shared data directory.
 
     In single-host mode, all HAProxy containers share the same data volume,
@@ -322,10 +331,11 @@ def write_keepalived_configs(db: Optional[Session] = None) -> None:
 # Multi-instance config push
 # ---------------------------------------------------------------------------
 
+
 def push_config_to_all_instances(
-    db: Optional[Session],
+    db: Session | None,
     config_text: str,
-) -> Dict[str, Dict[str, Any]]:
+) -> dict[str, dict[str, Any]]:
     """Push generated HAProxy config to every instance via its Data Plane API.
 
     Returns a dict mapping instance name → push result dict.
@@ -333,7 +343,7 @@ def push_config_to_all_instances(
     the original ``dataplane.push_config(config)`` behavior).
     """
     instances = get_haproxy_instances(db)
-    results: Dict[str, Dict[str, Any]] = {}
+    results: dict[str, dict[str, Any]] = {}
 
     for inst in instances:
         try:
@@ -354,7 +364,8 @@ def push_config_to_all_instances(
 # Health aggregation
 # ---------------------------------------------------------------------------
 
-def _read_keepalived_state() -> Optional[str]:
+
+def _read_keepalived_state() -> str | None:
     """Read the keepalived VRRP state from /app/data/keepalived.state.
 
     Returns one of "MASTER", "BACKUP", "FAULT", or None if the file doesn't
@@ -365,13 +376,13 @@ def _read_keepalived_state() -> Optional[str]:
         "keepalived.state",
     )
     try:
-        with open(state_path, "r") as f:
+        with open(state_path) as f:
             return f.read().strip().upper() or None
     except Exception:
         return None
 
 
-def get_ha_health(db: Optional[Session] = None) -> Dict[str, Any]:
+def get_ha_health(db: Session | None = None) -> dict[str, Any]:
     """Aggregate health across all HA instances.
 
     Returns a dict matching the ``HaHealthSummary`` schema.
@@ -380,9 +391,9 @@ def get_ha_health(db: Optional[Session] = None) -> Dict[str, Any]:
     instances = get_haproxy_instances(db)
 
     # HAProxy instance health
-    haproxy_health: List[Dict[str, Any]] = []
+    haproxy_health: list[dict[str, Any]] = []
     for inst in instances:
-        entry: Dict[str, Any] = {
+        entry: dict[str, Any] = {
             "name": inst.name,
             "url": inst.url,
             "available": False,
@@ -415,22 +426,25 @@ def get_ha_health(db: Optional[Session] = None) -> Dict[str, Any]:
         haproxy_health.append(entry)
 
     # Valkey node health
-    valkey_nodes: List[Dict[str, Any]] = []
+    valkey_nodes: list[dict[str, Any]] = []
     try:
         from . import valkey_inspect
+
         info = valkey_inspect.server_info()
-        valkey_nodes.append({
-            "role": info.get("role", ""),
-            "host": settings.VALKEY_HOST,
-            "available": info.get("available", False),
-            "error": info.get("error"),
-        })
+        valkey_nodes.append(
+            {
+                "role": info.get("role", ""),
+                "host": settings.VALKEY_HOST,
+                "available": info.get("available", False),
+                "error": info.get("error"),
+            }
+        )
         # In HA mode, also check the replica (best-effort)
         if ha_enabled:
             # The replica host is conventionally "valkey-replica"
             try:
-                from ..core.valkey_client import _get_client as _vc_get
                 from valkey import Valkey
+
                 replica = Valkey(
                     host="valkey-replica",
                     port=settings.VALKEY_PORT,
@@ -440,41 +454,49 @@ def get_ha_health(db: Optional[Session] = None) -> Dict[str, Any]:
                     decode_responses=True,
                 )
                 r_info = replica.info()
-                valkey_nodes.append({
-                    "role": r_info.get("role", "slave"),
-                    "host": "valkey-replica",
-                    "available": True,
-                    "error": None,
-                })
+                valkey_nodes.append(
+                    {
+                        "role": r_info.get("role", "slave"),
+                        "host": "valkey-replica",
+                        "available": True,
+                        "error": None,
+                    }
+                )
                 replica.close()
             except Exception as e:
-                valkey_nodes.append({
-                    "role": "slave",
-                    "host": "valkey-replica",
-                    "available": False,
-                    "error": str(e),
-                })
+                valkey_nodes.append(
+                    {
+                        "role": "slave",
+                        "host": "valkey-replica",
+                        "available": False,
+                        "error": str(e),
+                    }
+                )
     except Exception as e:
-        valkey_nodes.append({
-            "role": "",
-            "host": settings.VALKEY_HOST,
-            "available": False,
-            "error": str(e),
-        })
+        valkey_nodes.append(
+            {
+                "role": "",
+                "host": settings.VALKEY_HOST,
+                "available": False,
+                "error": str(e),
+            }
+        )
 
     # Coraza instance health (from HAProxy stats — the coraza backend servers)
-    coraza_health: List[Dict[str, Any]] = []
+    coraza_health: list[dict[str, Any]] = []
     try:
         stats = dataplane.get_stats()
         for row in stats:
             backend = row.get("backend_name", "") or row.get("backend", "")
             if backend == "coraza-spoa":
-                coraza_health.append({
-                    "name": row.get("server_name", "") or row.get("svname", ""),
-                    "state": row.get("status", "") or row.get("state", ""),
-                    "check_status": row.get("check_status"),
-                    "error": None,
-                })
+                coraza_health.append(
+                    {
+                        "name": row.get("server_name", "") or row.get("svname", ""),
+                        "state": row.get("status", "") or row.get("state", ""),
+                        "check_status": row.get("check_status"),
+                        "error": None,
+                    }
+                )
     except Exception:
         pass
 
@@ -492,7 +514,8 @@ def get_ha_health(db: Optional[Session] = None) -> Dict[str, Any]:
 # Config response / update helpers
 # ---------------------------------------------------------------------------
 
-def get_ha_config(db: Session) -> Dict[str, Any]:
+
+def get_ha_config(db: Session) -> dict[str, Any]:
     """Return the full HA config for the ``GET /ha/config`` endpoint."""
     instances = get_haproxy_instances(db)
     ha_enabled = is_ha_enabled(db)
@@ -500,18 +523,32 @@ def get_ha_config(db: Session) -> Dict[str, Any]:
     # Keepalived settings
     keepalived = {
         "vip": _get_keepalived_setting(db, "keepalived_vip", settings.KEEPALIVED_VIP),
-        "virtual_router_id": int(_get_keepalived_setting(db, "keepalived_virtual_router_id", str(settings.KEEPALIVED_VIRTUAL_ROUTER_ID))),
+        "virtual_router_id": int(
+            _get_keepalived_setting(db, "keepalived_virtual_router_id", str(settings.KEEPALIVED_VIRTUAL_ROUTER_ID))
+        ),
         "priority": int(_get_keepalived_setting(db, "keepalived_priority", str(settings.KEEPALIVED_PRIORITY))),
         "interface": _get_keepalived_setting(db, "keepalived_interface", settings.KEEPALIVED_INTERFACE),
-        "auth_password": _get_keepalived_setting(db, "keepalived_auth_password", settings.KEEPALIVED_AUTH_PASSWORD or ""),
-        "peer_addresses": [p.strip() for p in _get_keepalived_setting(db, "keepalived_peer_addresses", settings.KEEPALIVED_PEER_ADDRESSES or "").split(",") if p.strip()],
+        "auth_password": _get_keepalived_setting(
+            db, "keepalived_auth_password", settings.KEEPALIVED_AUTH_PASSWORD or ""
+        ),
+        "peer_addresses": [
+            p.strip()
+            for p in _get_keepalived_setting(
+                db, "keepalived_peer_addresses", settings.KEEPALIVED_PEER_ADDRESSES or ""
+            ).split(",")
+            if p.strip()
+        ],
         "advert_int": int(_get_keepalived_setting(db, "keepalived_advert_int", str(settings.KEEPALIVED_ADVERT_INT))),
-        "preempt": _get_keepalived_setting(db, "keepalived_preempt", str(settings.KEEPALIVED_PREEMPT)).lower() in ("true", "1", "yes"),
-        "track_script": _get_keepalived_setting(db, "keepalived_track_script", settings.KEEPALIVED_TRACK_SCRIPT or "") or None,
+        "preempt": _get_keepalived_setting(db, "keepalived_preempt", str(settings.KEEPALIVED_PREEMPT)).lower()
+        in ("true", "1", "yes"),
+        "track_script": _get_keepalived_setting(db, "keepalived_track_script", settings.KEEPALIVED_TRACK_SCRIPT or "")
+        or None,
     }
 
     # Valkey sentinel settings
-    sentinel_enabled = _get_keepalived_setting(db, "valkey_sentinel_enabled", str(settings.VALKEY_SENTINEL_ENABLED)).lower() in ("true", "1", "yes")
+    sentinel_enabled = _get_keepalived_setting(
+        db, "valkey_sentinel_enabled", str(settings.VALKEY_SENTINEL_ENABLED)
+    ).lower() in ("true", "1", "yes")
     sentinel_hosts_raw = _get_keepalived_setting(db, "valkey_sentinel_hosts", settings.VALKEY_SENTINEL_HOSTS or "")
     sentinel_hosts = [h.strip() for h in sentinel_hosts_raw.split(",") if h.strip()]
 
@@ -519,7 +556,9 @@ def get_ha_config(db: Session) -> Dict[str, Any]:
         "ha_enabled": ha_enabled,
         "swarm_mode": getattr(settings, "SWARM_MODE", False),
         "ha_topology": _get_keepalived_setting(db, "ha_topology", settings.HA_TOPOLOGY),
-        "haproxy_ha_replicas": int(_get_keepalived_setting(db, "haproxy_ha_replicas", str(settings.HAPROXY_HA_REPLICAS))),
+        "haproxy_ha_replicas": int(
+            _get_keepalived_setting(db, "haproxy_ha_replicas", str(settings.HAPROXY_HA_REPLICAS))
+        ),
         "valkey_ha_replicas": int(_get_keepalived_setting(db, "valkey_ha_replicas", str(settings.VALKEY_HA_REPLICAS))),
         "coraza_ha_replicas": int(_get_keepalived_setting(db, "coraza_ha_replicas", str(settings.CORAZA_HA_REPLICAS))),
         "haproxy_instances": [inst.to_dict() for inst in instances],
@@ -527,11 +566,13 @@ def get_ha_config(db: Session) -> Dict[str, Any]:
         "keepalived": keepalived,
         "valkey_sentinel_enabled": sentinel_enabled,
         "valkey_sentinel_hosts": sentinel_hosts,
-        "valkey_sentinel_service": _get_keepalived_setting(db, "valkey_sentinel_service", settings.VALKEY_SENTINEL_SERVICE),
+        "valkey_sentinel_service": _get_keepalived_setting(
+            db, "valkey_sentinel_service", settings.VALKEY_SENTINEL_SERVICE
+        ),
     }
 
 
-def update_ha_config(db: Session, update: Dict[str, Any]) -> None:
+def update_ha_config(db: Session, update: dict[str, Any]) -> None:
     """Apply a partial HA config update (admin only).
 
     Writes each provided field to the DB ``Setting`` table. Fields not in the

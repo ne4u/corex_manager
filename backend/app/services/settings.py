@@ -1,13 +1,14 @@
 """Dynamic settings stored in the database, with env fallback."""
-from typing import Optional
+
 from sqlalchemy.orm import Session
+
 from ..core.config import get_settings
 from ..models.models import Setting
 
 settings = get_settings()
 
 
-def get_setting(db: Session, key: str, default: Optional[str] = None) -> Optional[str]:
+def get_setting(db: Session, key: str, default: str | None = None) -> str | None:
     """Return a setting value from the database or fall back to env/config.
 
     Values are always returned as strings so they serialize cleanly as SettingResponse.
@@ -21,7 +22,7 @@ def get_setting(db: Session, key: str, default: Optional[str] = None) -> Optiona
     return str(value)
 
 
-def set_setting(db: Session, key: str, value: Optional[str]) -> Setting:
+def set_setting(db: Session, key: str, value: str | None) -> Setting:
     """Create or update a setting value."""
     row = db.query(Setting).filter(Setting.key == key).first()
     if not row:
@@ -38,6 +39,6 @@ def list_settings(db: Session) -> list[Setting]:
     return db.query(Setting).all()
 
 
-def get_maxmind_license_key(db: Session) -> Optional[str]:
+def get_maxmind_license_key(db: Session) -> str | None:
     """Return the MaxMind license key, preferring DB over env."""
     return get_setting(db, "maxmind_license_key", settings.MAXMIND_LICENSE_KEY)

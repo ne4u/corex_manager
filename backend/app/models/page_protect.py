@@ -1,10 +1,12 @@
-from sqlalchemy import Column, Integer, String, Boolean, Text, DateTime, ForeignKey, JSON
-from sqlalchemy.orm import relationship, column_property
+from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import column_property, relationship
+
 from .base import Base, utcnow
 
 
 class PageProtectPolicy(Base):
     """CSP policy scoped to backends. Generates Content-Security-Policy headers."""
+
     __tablename__ = "page_protect_policies"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -21,6 +23,7 @@ class PageProtectPolicy(Base):
 
 class CspReport(Base):
     """Individual CSP violation report collected from HAProxy logs."""
+
     __tablename__ = "csp_reports"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -47,6 +50,7 @@ class CspReport(Base):
 
 class PageProtectScript(Base):
     """Detected script/connection/resource inventory with code-change tracking."""
+
     __tablename__ = "page_protect_scripts"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -71,4 +75,4 @@ class PageProtectScript(Base):
     last_fetch_method = Column(String, nullable=True)  # method used by last successful check (GET | POST)
 
 
-__all__ = ['CspReport', 'PageProtectPolicy', 'PageProtectScript']
+__all__ = ["CspReport", "PageProtectPolicy", "PageProtectScript"]

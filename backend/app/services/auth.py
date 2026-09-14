@@ -1,8 +1,8 @@
 """Authentication and session helpers."""
+
 import base64
 import io
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
 import pyotp
 import qrcode
@@ -10,7 +10,7 @@ from qrcode.image.svg import SvgImage
 from sqlalchemy.orm import Session
 
 from ..core.config import get_settings
-from ..core.security import create_access_token, verify_password, get_password_hash
+from ..core.security import create_access_token, get_password_hash, verify_password
 from ..core.valkey_client import revoke_token
 from ..models.auth import User
 from ..schemas.users import (
@@ -32,7 +32,7 @@ def _session_timeout_minutes(db: Session) -> int:
     raw = get_setting(db, "session_timeout_minutes", str(settings.SESSION_TIMEOUT_MINUTES))
     try:
         return max(5, min(1440, int(raw)))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return max(5, min(1440, settings.SESSION_TIMEOUT_MINUTES))
 
 
@@ -40,11 +40,11 @@ def _session_warning_seconds(db: Session) -> int:
     raw = get_setting(db, "session_warning_seconds", str(settings.SESSION_WARNING_SECONDS))
     try:
         return max(5, min(120, int(raw)))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return max(5, min(120, settings.SESSION_WARNING_SECONDS))
 
 
-def authenticate_user(db: Session, username: str, password: str, totp_code: Optional[str] = None):
+def authenticate_user(db: Session, username: str, password: str, totp_code: str | None = None):
     user = db.query(User).filter(User.username == username).first()
     if not user or not verify_password(password, user.hashed_password):
         raise ValueError("Invalid credentials")
@@ -54,7 +54,7 @@ def authenticate_user(db: Session, username: str, password: str, totp_code: Opti
         if not user.totp_secret or not pyotp.TOTP(user.totp_secret).verify(totp_code.strip()):
             raise ValueError("Invalid TOTP code")
     # Record successful login timestamp.
-    user.last_login_at = datetime.now(timezone.utc)
+    user.last_login_at = datetime.now(UTC)
     db.commit()
     db.refresh(user)
     return user
@@ -75,7 +75,7 @@ def create_token_for_user(user: User, db: Session) -> dict:
     }
 
 
-def setup_totp(user: User, alias: Optional[str] = None):
+def setup_totp(user: User, alias: str | None = None):
     secret = pyotp.random_base32()
     user.totp_secret = secret
     user.totp_enabled = False
@@ -119,7 +119,7 @@ def change_password(db: Session, user: User, current_password: str, new_password
         raise ValueError("Current password is incorrect")
     validate_password_complexity(db, new_password)
     user.hashed_password = get_password_hash(new_password)
-    user.password_changed_at = datetime.now(timezone.utc)
+    user.password_changed_at = datetime.now(UTC)
 
 
 def logout(token: str):
@@ -128,7 +128,7 @@ def logout(token: str):
     payload = decode_access_token(token)
     if payload:
         exp = payload.get("exp")
-        ttl = max(1, int(exp - datetime.now(timezone.utc).timestamp())) if exp else 3600
+        ttl = max(1, int(exp - datetime.now(UTC).timestamp())) if exp else 3600
         revoke_token(token, ttl)
     return {"status": "ok"}
 

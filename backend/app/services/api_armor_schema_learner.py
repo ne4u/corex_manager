@@ -4,13 +4,13 @@ Tails the same profiling log as the profiler and, when schema learning is
 enabled, merges observed request bodies ("body_sample") into per-endpoint
 learned JSON Schemas. It also prunes old learned schemas by retention.
 """
+
 import json
 import logging
 import os
 import threading
-import time
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -30,10 +30,12 @@ _MAX_BODY_SAMPLE_SIZE = 4096
 class ApiArmorSchemaLearner:
     """Background thread that tails the profiling log and learns schemas."""
 
-    def __init__(self, log_path: Optional[str] = None, sample_interval: float = 5.0):
-        self.log_path = log_path or getattr(settings, "API_ARMOR_PROFILING_LOG_PATH", "/app/data/api-armor/profiling.log")
+    def __init__(self, log_path: str | None = None, sample_interval: float = 5.0):
+        self.log_path = log_path or getattr(
+            settings, "API_ARMOR_PROFILING_LOG_PATH", "/app/data/api-armor/profiling.log"
+        )
         self.sample_interval = sample_interval
-        self._thread: Optional[threading.Thread] = None
+        self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
         self._offset = 0
 
@@ -78,7 +80,7 @@ class ApiArmorSchemaLearner:
 
         count = 0
         try:
-            with open(self.log_path, "r") as f:
+            with open(self.log_path) as f:
                 f.seek(self._offset)
                 for line in f:
                     line = line.strip()
@@ -109,7 +111,7 @@ class ApiArmorSchemaLearner:
             db.close()
 
 
-def ingest_schema_learning_entry_from_log(entry: Dict[str, Any]) -> None:
+def ingest_schema_learning_entry_from_log(entry: dict[str, Any]) -> None:
     """Ingest a single profiling log entry for schema learning.
 
     Expects `method` and `path`, and either `body_sample` (raw body JSON) or
@@ -171,18 +173,13 @@ def prune_learned_schemas(db: Session, retention_days: int) -> int:
     """Delete learned schemas older than the configured retention."""
     if retention_days <= 0:
         return 0
-    cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
-    count = (
-        db.query(ApiSchema)
-        .filter(ApiSchema.source == "learned")
-        .filter(ApiSchema.created_at < cutoff)
-        .delete()
-    )
+    cutoff = datetime.now(UTC) - timedelta(days=retention_days)
+    count = db.query(ApiSchema).filter(ApiSchema.source == "learned").filter(ApiSchema.created_at < cutoff).delete()
     return count
 
 
 # Singleton management
-_learner: Optional[ApiArmorSchemaLearner] = None
+_learner: ApiArmorSchemaLearner | None = None
 
 
 def start_schema_learner() -> None:

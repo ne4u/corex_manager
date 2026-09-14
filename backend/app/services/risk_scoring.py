@@ -23,15 +23,16 @@ This module provides:
 - Baseline ruleset seeding (32 rules + 4 seed security lists).
 - Data file writer (``write_risk_rules_data_file``).
 """
+
+import logging
 import os
 import re
-import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from sqlalchemy.orm import Session
 
-from . import security_rules
 from ..core.config import get_settings
+from . import security_rules
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -47,7 +48,7 @@ RISK_RULES_DATA_FILENAME = "risk_rules_data.lua"
 # Maps expression field names to risk rule categories.
 # The FIRST field reference in the expression (by AST traversal order:
 # left-to-right, depth-first) determines the category.
-_FIELD_CATEGORIES: Dict[str, str] = {
+_FIELD_CATEGORIES: dict[str, str] = {
     # Protocol & Transport
     "http.request.version_numeric": "protocol",
     "http.request.version": "protocol",
@@ -100,13 +101,13 @@ _FIELD_CATEGORIES: Dict[str, str] = {
 VALID_CATEGORIES = {"protocol", "headers", "geo", "behavioral", "list", "trust", "custom"}
 
 
-def _collect_fields(node: Dict[str, Any]) -> List[str]:
+def _collect_fields(node: dict[str, Any]) -> list[str]:
     """Collect field references from an AST in left-to-right depth-first order."""
     if not isinstance(node, dict):
         return []
     t = node.get("type")
     if t in ("and", "or"):
-        fields: List[str] = []
+        fields: list[str] = []
         for child in node.get("children", []):
             fields.extend(_collect_fields(child))
         return fields
@@ -119,7 +120,7 @@ def _collect_fields(node: Dict[str, Any]) -> List[str]:
     return []
 
 
-def _has_in_list(node: Dict[str, Any]) -> bool:
+def _has_in_list(node: dict[str, Any]) -> bool:
     """Check whether the AST contains any in_list leaf node."""
     if not isinstance(node, dict):
         return False
@@ -131,7 +132,7 @@ def _has_in_list(node: Dict[str, Any]) -> bool:
     return t == "in_list"
 
 
-def derive_category(ast: Optional[Dict[str, Any]], points: int = 0) -> str:
+def derive_category(ast: dict[str, Any] | None, points: int = 0) -> str:
     """Derive a risk rule category from its expression AST and points.
 
     Rules:
@@ -163,7 +164,7 @@ def derive_category(ast: Optional[Dict[str, Any]], points: int = 0) -> str:
 # Slug generation + validation
 # ---------------------------------------------------------------------------
 
-_SLUG_RE = re.compile(r'^[a-z_][a-z0-9_]*$')
+_SLUG_RE = re.compile(r"^[a-z_][a-z0-9_]*$")
 
 
 def slugify_ruleset_name(name: str) -> str:
@@ -177,7 +178,7 @@ def slugify_ruleset_name(name: str) -> str:
     - If the result would start with a digit, prepend "rs_"
     - If the result is empty, return "ruleset"
     """
-    slug = re.sub(r'[^a-zA-Z0-9]+', '_', name).strip('_').lower()
+    slug = re.sub(r"[^a-zA-Z0-9]+", "_", name).strip("_").lower()
     if not slug:
         return "ruleset"
     if slug[0].isdigit():
@@ -194,10 +195,11 @@ def validate_slug(slug: str) -> bool:
 # Ruleset CRUD helpers
 # ---------------------------------------------------------------------------
 
+
 def create_ruleset(
     db: Session,
     name: str,
-    description: Optional[str] = None,
+    description: str | None = None,
 ) -> Any:
     """Create a new RiskRuleset with an auto-generated unique slug.
 
@@ -231,9 +233,9 @@ def create_ruleset(
 def update_ruleset(
     db: Session,
     ruleset_id: int,
-    name: Optional[str] = None,
-    description: Optional[str] = None,
-    enabled: Optional[bool] = None,
+    name: str | None = None,
+    description: str | None = None,
+    enabled: bool | None = None,
 ) -> Any:
     """Update a RiskRuleset. Regenerates slug if name changes.
 
@@ -252,10 +254,14 @@ def update_ruleset(
         if ruleset.slug != "default":
             new_slug = slugify_ruleset_name(name)
             # Ensure uniqueness (excluding self)
-            existing = db.query(RiskRuleset).filter(
-                RiskRuleset.slug == new_slug,
-                RiskRuleset.id != ruleset_id,
-            ).first()
+            existing = (
+                db.query(RiskRuleset)
+                .filter(
+                    RiskRuleset.slug == new_slug,
+                    RiskRuleset.id != ruleset_id,
+                )
+                .first()
+            )
             if existing:
                 raise ValueError(f"Slug '{new_slug}' already in use by another ruleset")
             ruleset.slug = new_slug
@@ -292,7 +298,8 @@ def delete_ruleset(db: Session, ruleset_id: int, force: bool = False) -> None:
 # Expression validation (reuses security_rules engine)
 # ---------------------------------------------------------------------------
 
-def parse_expression(text: str) -> Dict[str, Any]:
+
+def parse_expression(text: str) -> dict[str, Any]:
     """Parse a Cloudflare-style expression string into an AST dict.
 
     Reuses the security_rules parser so the same field set and boolean fields
@@ -301,7 +308,7 @@ def parse_expression(text: str) -> Dict[str, Any]:
     return security_rules.parse_expression(text)
 
 
-def validate_expression(text: str, db: Optional[Session] = None) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
+def validate_expression(text: str, db: Session | None = None) -> tuple[bool, dict[str, Any] | None, str | None]:
     """Validate a risk rule expression.
 
     Returns (ok, ast, error). Rejects response-phase expressions (all risk
@@ -330,7 +337,8 @@ def validate_expression(text: str, db: Optional[Session] = None) -> Tuple[bool, 
 # Rule helpers
 # ---------------------------------------------------------------------------
 
-def rules_for_listener(db: Session, listener_id: int) -> List[Any]:
+
+def rules_for_listener(db: Session, listener_id: int) -> list[Any]:
     """Return enabled RiskRules matching the given listener, ordered by priority."""
     from ..models.models import RiskRule
 
@@ -344,7 +352,7 @@ def rules_for_listener(db: Session, listener_id: int) -> List[Any]:
     return matched
 
 
-def reorder_rules(db: Session, ordered_ids: List[int]) -> None:
+def reorder_rules(db: Session, ordered_ids: list[int]) -> None:
     """Reassign priorities based on the given ordered list of rule IDs."""
     from ..models.models import RiskRule
 
@@ -370,7 +378,7 @@ def _safe_log_value(value: str) -> str:
     return '"' + _LOG_VALUE_RE.sub("", str(value)) + '"'
 
 
-def emit_risk_scoring(listener: Any, db: Session, lines: List[str], guard: str = "") -> None:
+def emit_risk_scoring(listener: Any, db: Session, lines: list[str], guard: str = "") -> None:
     """Emit http-request lines for risk scoring on a listener.
 
     Three phases:
@@ -414,7 +422,7 @@ def emit_risk_scoring(listener: Any, db: Session, lines: List[str], guard: str =
         try:
             ast = parse_expression(rule.expression)
             condition, phase = security_rules.translate(ast, db)
-        except (ValueError, KeyError):
+        except ValueError, KeyError:
             # Skip rules that fail to parse/translate at emit time.
             logger.warning("Risk rule %s (%s) failed to translate, skipping", rule.id, rule.name)
             continue
@@ -426,9 +434,7 @@ def emit_risk_scoring(listener: Any, db: Session, lines: List[str], guard: str =
         # juxtaposed, OR groups joined by "or"). Do NOT add extra braces —
         # `{ { ... } }` is rejected by HAProxy ("missing fetch method in ACL
         # expression '{'"). Match the convention used by _emit_request_rule.
-        lines.append(
-            f"    http-request set-var(txn.risk.match_{rule.id}) bool(1) if {condition}{guard_suffix}"
-        )
+        lines.append(f"    http-request set-var(txn.risk.match_{rule.id}) bool(1) if {condition}{guard_suffix}")
 
     # Phase 3: compute score
     lines.append("    # Risk Scoring Phase 3: compute score from match flags (Lua)")
@@ -441,6 +447,7 @@ def emit_risk_scoring(listener: Any, db: Session, lines: List[str], guard: str =
 # ---------------------------------------------------------------------------
 # Data file writer
 # ---------------------------------------------------------------------------
+
 
 def _risk_rules_data_path() -> str:
     """Return the filesystem path for the generated risk_rules_data.lua file."""
@@ -462,18 +469,21 @@ def generate_risk_rules_data(db: Session) -> str:
     from ..models.models import RiskRule, RiskRuleset
 
     # Get all enabled rulesets (for the rulesets list)
-    rulesets = db.query(RiskRuleset).filter(
-        RiskRuleset.enabled == True
-    ).order_by(RiskRuleset.priority).all()
+    rulesets = db.query(RiskRuleset).filter(RiskRuleset.enabled == True).order_by(RiskRuleset.priority).all()
     slug_to_id = {rs.slug: rs.id for rs in rulesets}
     id_to_slug = {rs.id: rs.slug for rs in rulesets}
 
     # Get all rules from enabled rulesets (include disabled rules so Lua
     # can count total_enabled per ruleset for hit_density)
     enabled_ruleset_ids = list(id_to_slug.keys())
-    rules = db.query(RiskRule).filter(
-        RiskRule.ruleset_id.in_(enabled_ruleset_ids),
-    ).order_by(RiskRule.priority).all()
+    rules = (
+        db.query(RiskRule)
+        .filter(
+            RiskRule.ruleset_id.in_(enabled_ruleset_ids),
+        )
+        .order_by(RiskRule.priority)
+        .all()
+    )
 
     lines = ["-- Auto-generated by haproxy.py. Do not edit; regenerated on each config write."]
     lines.append("return {")
@@ -553,7 +563,7 @@ _JA4_RISK_FIELDS = {
 }
 
 
-def _ast_references_any_field(node: Dict[str, Any], fields: set) -> bool:
+def _ast_references_any_field(node: dict[str, Any], fields: set) -> bool:
     """Check whether an AST node references any of the given fields."""
     if not isinstance(node, dict):
         return False
@@ -572,7 +582,7 @@ def _ast_references_any_field(node: Dict[str, Any], fields: set) -> bool:
     return False
 
 
-def rules_referencing_req_fp(db: Session) -> List[Any]:
+def rules_referencing_req_fp(db: Session) -> list[Any]:
     """Return enabled RiskRules referencing txn.risk_fp.* / req_fp-derived fields.
 
     Used by the req_fp_enabled toggle to auto-disable rules that would produce
@@ -580,7 +590,7 @@ def rules_referencing_req_fp(db: Session) -> List[Any]:
     """
     from ..models.models import RiskRule
 
-    matches: List[Any] = []
+    matches: list[Any] = []
     for rule in db.query(RiskRule).filter(RiskRule.enabled == True).all():
         ast = rule.expression_ast
         if isinstance(ast, dict) and _ast_references_any_field(ast, _REQ_FP_RISK_FIELDS):
@@ -595,7 +605,7 @@ def rules_referencing_req_fp(db: Session) -> List[Any]:
     return matches
 
 
-def rules_referencing_ja4_fields(db: Session) -> List[Any]:
+def rules_referencing_ja4_fields(db: Session) -> list[Any]:
     """Return enabled RiskRules referencing JA4-derived fields (cipher_count, ext_count, ja4).
 
     Used by the ja4_enabled toggle to auto-disable rules that would produce
@@ -603,7 +613,7 @@ def rules_referencing_ja4_fields(db: Session) -> List[Any]:
     """
     from ..models.models import RiskRule
 
-    matches: List[Any] = []
+    matches: list[Any] = []
     for rule in db.query(RiskRule).filter(RiskRule.enabled == True).all():
         ast = rule.expression_ast
         if isinstance(ast, dict) and _ast_references_any_field(ast, _JA4_RISK_FIELDS):
@@ -622,53 +632,76 @@ def rules_referencing_ja4_fields(db: Session) -> List[Any]:
 # ---------------------------------------------------------------------------
 
 # Baseline rulesets: (name, slug, description)
-_BASELINE_RULESETS: List[Tuple[str, str, str]] = [
+_BASELINE_RULESETS: list[tuple[str, str, str]] = [
     ("Default", "default", "Default risk scoring ruleset — applies to all traffic types"),
 ]
 
 # Baseline rules per ruleset: (ruleset_slug, name, expression, points, category, log)
 # Points are calibrated to actual risk. The total of matched rules is clamped
 # to [0, 99] at runtime by the Lua risk_compute action.
-_BASELINE_RULES_BY_RULESET: List[Tuple[str, str, str, int, str, bool]] = [
+_BASELINE_RULES_BY_RULESET: list[tuple[str, str, str, int, str, bool]] = [
     # === DEFAULT — rules that apply to ALL traffic ===
-    ("default", "HTTP/1.0 protocol", 'http.request.version_numeric < 11', 5, "protocol", True),
+    ("default", "HTTP/1.0 protocol", "http.request.version_numeric < 11", 5, "protocol", True),
     ("default", "TLS 1.0 or 1.1", 'http.request.tls.version ~ "(?i)TLSv1\\.[01]"', 8, "protocol", True),
-    ("default", "High-risk country", 'ip.geoip.country in $geo:high_risk_countries', 15, "list", True),
-    ("default", "IP in blocklist", 'ip.src in $network:ip_blocklist', 85, "list", True),
-    ("default", "Datacenter ASN", 'ip.geoip.asnum in $asn:datacenter_asns', 25, "list", True),
-    ("default", "Known bot JA4", 'http.request.ja4 in $ja4:known_bot_ja4', 30, "list", True),
-    ("default", "Deep path", 'http.request.fingerprint.path_depth > 4', 3, "behavioral", True),
-    ("default", "Very deep path", 'http.request.fingerprint.path_depth > 8', 8, "behavioral", True),
-    ("default", "Long URI", 'http.request.uri_length > 1024', 5, "behavioral", True),
-    ("default", "High param count", 'http.request.param_count > 20', 5, "behavioral", True),
-    ("default", "Deep JSON body", 'http.request.fingerprint.body_depth > 10', 5, "behavioral", True),
-    ("default", "Geo/Lang mismatch", 'http.request.geo_lang_mismatch', 8, "geo", True),
-    ("default", "Timezone mismatch", 'http.request.geoip.timezone_mismatch', 8, "geo", True),
-    ("default", "Off-hours request", 'http.request.hour < 5', 3, "geo", True),
+    ("default", "High-risk country", "ip.geoip.country in $geo:high_risk_countries", 15, "list", True),
+    ("default", "IP in blocklist", "ip.src in $network:ip_blocklist", 85, "list", True),
+    ("default", "Datacenter ASN", "ip.geoip.asnum in $asn:datacenter_asns", 25, "list", True),
+    ("default", "Known bot JA4", "http.request.ja4 in $ja4:known_bot_ja4", 30, "list", True),
+    ("default", "Deep path", "http.request.fingerprint.path_depth > 4", 3, "behavioral", True),
+    ("default", "Very deep path", "http.request.fingerprint.path_depth > 8", 8, "behavioral", True),
+    ("default", "Long URI", "http.request.uri_length > 1024", 5, "behavioral", True),
+    ("default", "High param count", "http.request.param_count > 20", 5, "behavioral", True),
+    ("default", "Deep JSON body", "http.request.fingerprint.body_depth > 10", 5, "behavioral", True),
+    ("default", "Geo/Lang mismatch", "http.request.geo_lang_mismatch", 8, "geo", True),
+    ("default", "Timezone mismatch", "http.request.geoip.timezone_mismatch", 8, "geo", True),
+    ("default", "Off-hours request", "http.request.hour < 5", 3, "geo", True),
     # Trust signals (negative points subtract from score)
-    ("default", "Valid auth", 'auth.valid', -15, "trust", True),
-    ("default", "HTTP/2+", 'http.request.version_numeric >= 20', -5, "trust", True),
-    ("default", "Beacon-trusted IP", 'ip.beacon_trusted > 0', -15, "trust", True),
+    ("default", "Valid auth", "auth.valid", -15, "trust", True),
+    ("default", "HTTP/2+", "http.request.version_numeric >= 20", -5, "trust", True),
+    ("default", "Beacon-trusted IP", "ip.beacon_trusted > 0", -15, "trust", True),
 ]
 
 # Seed security lists: (name, type, description, entries)
-_BASELINE_LISTS: List[Tuple[str, str, str, List[str]]] = [
-    ("high_risk_countries", "geo", "High-risk countries (baseline seed — adjust as needed)", ["RU", "CN", "KP", "IR", "SY", "BY", "VE", "UA"]),
-    ("datacenter_asns", "asn", "Major cloud/hosting provider ASNs (baseline seed)", [
-        "AS14618", "AS15169", "AS8075", "AS16509", "AS13335",
-        "AS24940", "AS14061", "AS16276", "AS49505", "AS63949",
-    ]),
-    ("known_bot_ja4", "ja4", "Known bot/tool JA4 fingerprints (baseline seed — add observed fingerprints)", [
-        # curl default (TLS 1.3, no SNI, no ALPN)
-        "t13d000000_000000000000_000000000000",
-        # Python requests default
-        "t13d1516h2_8daaf6152771_b186095e22b6",
-    ]),
+_BASELINE_LISTS: list[tuple[str, str, str, list[str]]] = [
+    (
+        "high_risk_countries",
+        "geo",
+        "High-risk countries (baseline seed — adjust as needed)",
+        ["RU", "CN", "KP", "IR", "SY", "BY", "VE", "UA"],
+    ),
+    (
+        "datacenter_asns",
+        "asn",
+        "Major cloud/hosting provider ASNs (baseline seed)",
+        [
+            "AS14618",
+            "AS15169",
+            "AS8075",
+            "AS16509",
+            "AS13335",
+            "AS24940",
+            "AS14061",
+            "AS16276",
+            "AS49505",
+            "AS63949",
+        ],
+    ),
+    (
+        "known_bot_ja4",
+        "ja4",
+        "Known bot/tool JA4 fingerprints (baseline seed — add observed fingerprints)",
+        [
+            # curl default (TLS 1.3, no SNI, no ALPN)
+            "t13d000000_000000000000_000000000000",
+            # Python requests default
+            "t13d1516h2_8daaf6152771_b186095e22b6",
+        ],
+    ),
     ("ip_blocklist", "network", "IP blocklist (empty — populate manually or via dynamic feeds)", []),
 ]
 
 
-def seed_baseline_rules(db: Session) -> Tuple[int, int, int, int]:
+def seed_baseline_rules(db: Session) -> tuple[int, int, int, int]:
     """Create the 4 baseline rulesets + rules + 4 seed security lists.
 
     Idempotent: checks ruleset slugs, rule names, and list names before
@@ -677,8 +710,16 @@ def seed_baseline_rules(db: Session) -> Tuple[int, int, int, int]:
     Returns (created_rules, created_lists, created_rulesets, skipped).
     """
     from ..models.models import (
-        RiskRule, RiskRuleset, NetworkList, NetworkListEntry, AsnList, AsnListEntry,
-        GeoList, GeoListEntry, Ja4List, Ja4ListEntry,
+        AsnList,
+        AsnListEntry,
+        GeoList,
+        GeoListEntry,
+        Ja4List,
+        Ja4ListEntry,
+        NetworkList,
+        NetworkListEntry,
+        RiskRule,
+        RiskRuleset,
     )
 
     created_rules = 0
@@ -687,7 +728,7 @@ def seed_baseline_rules(db: Session) -> Tuple[int, int, int, int]:
     skipped = 0
 
     # --- Seed rulesets ---
-    slug_to_id: Dict[str, int] = {}
+    slug_to_id: dict[str, int] = {}
     for name, slug, description in _BASELINE_RULESETS:
         existing = db.query(RiskRuleset).filter(RiskRuleset.slug == slug).first()
         if existing:
@@ -764,11 +805,9 @@ def seed_baseline_rules(db: Session) -> Tuple[int, int, int, int]:
     existing_names = set(r.name for r in db.query(RiskRule).all())
 
     # Track per-ruleset priority counter
-    priority_counters: Dict[int, int] = {}
+    priority_counters: dict[int, int] = {}
     for rs_id in slug_to_id.values():
-        max_pri = db.query(RiskRule).filter(
-            RiskRule.ruleset_id == rs_id
-        ).order_by(RiskRule.priority.desc()).first()
+        max_pri = db.query(RiskRule).filter(RiskRule.ruleset_id == rs_id).order_by(RiskRule.priority.desc()).first()
         priority_counters[rs_id] = (max_pri.priority + 1) if max_pri else 0
 
     for ruleset_slug, name, expression, points, category, log in _BASELINE_RULES_BY_RULESET:

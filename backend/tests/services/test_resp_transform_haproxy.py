@@ -5,12 +5,13 @@ compression. The haproxy-resp-transform Rust Lua module is loaded globally
 via the combined modules.lua loader when the `resp_transform_enabled` toggle
 is on. Per-backend JSON config files are written to RESP_TRANSFORM_DIR.
 """
+
 import json
 import os
 
 from app.services import haproxy
 from app.services import resp_transform as rt_svc
-from tests.factories import make_backend, make_fcgi_app, make_listener, make_response_transform, make_server
+from tests.factories import make_backend, make_fcgi_app, make_response_transform, make_server
 
 
 def test_no_transform_by_default(db):
@@ -169,6 +170,7 @@ def test_disabled_transform_not_emitted(db):
 def test_write_resp_transform_files(db, tmp_path, monkeypatch):
     """write_resp_transform_files writes JSON config files per backend."""
     from app.core.config import get_settings
+
     settings = get_settings()
     monkeypatch.setattr(settings, "RESP_TRANSFORM_DIR", str(tmp_path))
 
@@ -198,6 +200,7 @@ def test_write_resp_transform_files(db, tmp_path, monkeypatch):
 def test_write_resp_transform_files_removes_stale(db, tmp_path, monkeypatch):
     """Stale config files for backends with no rules are removed."""
     from app.core.config import get_settings
+
     settings = get_settings()
     monkeypatch.setattr(settings, "RESP_TRANSFORM_DIR", str(tmp_path))
 
@@ -225,6 +228,7 @@ def test_write_resp_transform_files_removes_stale(db, tmp_path, monkeypatch):
 def test_mask_rule_in_config_file(db, tmp_path, monkeypatch):
     """Mask rules with detector mode are correctly serialized to JSON."""
     from app.core.config import get_settings
+
     settings = get_settings()
     monkeypatch.setattr(settings, "RESP_TRANSFORM_DIR", str(tmp_path))
 
@@ -476,8 +480,8 @@ def test_detokenize_query_not_emitted_for_unmatched_backend(db):
     # The action should appear for be_a's section but not be_b's
     assert "http-request lua.detokenize_query" in cfg
     # Verify it's in be_a's section, not be_b's
-    be_a_section = cfg[cfg.index("backend be_detok_a"):]
-    be_b_section = cfg[cfg.index("backend be_detok_b"):]
+    be_a_section = cfg[cfg.index("backend be_detok_a") :]
+    be_b_section = cfg[cfg.index("backend be_detok_b") :]
     assert "http-request lua.detokenize_query" in be_a_section
     assert "http-request lua.detokenize_query" not in be_b_section
 
@@ -551,8 +555,8 @@ def test_detokenize_query_not_emitted_when_module_disabled(db):
 def test_del_accept_encoding_guarded_when_disk_cache_active(db):
     """When disk cache is active, del-header Accept-Encoding is guarded with
     is_varnish_fetch so it only strips on Varnish→origin fetches."""
-    from tests.factories import make_cache_config, make_cache_rule
     from app.services.settings import set_setting
+    from tests.factories import make_cache_config, make_cache_rule
 
     backend = make_backend(db, name="be_rt_disk")
     make_server(db, backend.id)
@@ -602,8 +606,8 @@ def test_del_accept_encoding_unguarded_when_disk_cache_inactive(db):
 def test_del_accept_encoding_guarded_when_disk_cache_enabled_but_no_rules(db):
     """When disk cache is active but no cache rules match, the guard still
     applies (disk_cache_active is true, is_varnish_fetch ACL is emitted)."""
-    from tests.factories import make_cache_config
     from app.services.settings import set_setting
+    from tests.factories import make_cache_config
 
     backend = make_backend(db, name="be_rt_disk_norule")
     make_server(db, backend.id)

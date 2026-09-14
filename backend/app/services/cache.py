@@ -8,8 +8,9 @@ https://github.com/haproxy/haproxy/issues/452 for the upstream statement.
 Disk cache (Varnish) is cleared via `varnishadm ban`, which invalidates objects
 by matching the X-Cache-Backend header stored on each cached object.
 """
+
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -21,7 +22,7 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
-def clear_backend_cache(db: Session, backend_id: int) -> Dict[str, Any]:
+def clear_backend_cache(db: Session, backend_id: int) -> dict[str, Any]:
     """Clear the cache for a specific backend.
 
     Memory cache (HAProxy native) is cleared by reloading HAProxy — the cache
@@ -47,6 +48,7 @@ def clear_backend_cache(db: Session, backend_id: int) -> Dict[str, Any]:
     # The BAN invalidates objects in the running Varnish without a restart.
     if cc.disk_cache_enabled:
         from .haproxy import _get_section_names
+
         _, backend_names, _, _ = _get_section_names(db)
         x_cache_backend_value = backend_names.get(backend.id, backend.name)
         if varnish.purge_backend(x_cache_backend_value):
@@ -62,6 +64,7 @@ def clear_backend_cache(db: Session, backend_id: int) -> Dict[str, Any]:
     # existing config on disk (no rewrite needed).
     if cc.haproxy_enabled:
         from .haproxy import reload_haproxy
+
         result = reload_haproxy()
         if result.get("status") == "ok":
             memory_cleared = True
@@ -79,7 +82,7 @@ def clear_backend_cache(db: Session, backend_id: int) -> Dict[str, Any]:
     }
 
 
-def clear_all_caches(db: Session) -> Dict[str, Any]:
+def clear_all_caches(db: Session) -> dict[str, Any]:
     """Clear all caches (memory + disk) for all backends.
 
     Disk cache (Varnish) is cleared via a single `varnishadm ban` that matches
@@ -108,6 +111,7 @@ def clear_all_caches(db: Session) -> Dict[str, Any]:
     memory_configs = db.query(CacheConfig).filter(CacheConfig.haproxy_enabled == True).all()  # noqa: E712
     if memory_configs:
         from .haproxy import reload_haproxy
+
         result = reload_haproxy()
         if result.get("status") == "ok":
             memory_cleared = True

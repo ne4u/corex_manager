@@ -1,22 +1,24 @@
 from datetime import datetime
-from typing import Optional, List, Dict, Any, Type, TypeVar
-from pydantic import BaseModel, Field, model_validator, field_validator, ConfigDict
+
+from pydantic import BaseModel, ConfigDict, Field
+
 from ._base import _optional_update
 
 # ─── Network Lists ──────────────────────────────────────────────────────────
 
+
 class NetworkListEntryInline(BaseModel):
     value: str
-    note: Optional[str] = None
+    note: str | None = None
 
 
 class NetworkListBase(BaseModel):
     name: str
-    description: Optional[str] = None
+    description: str | None = None
 
 
 class NetworkListCreate(NetworkListBase):
-    entries: Optional[List[NetworkListEntryInline]] = None
+    entries: list[NetworkListEntryInline] | None = None
 
 
 NetworkListUpdate = _optional_update(NetworkListCreate)
@@ -24,7 +26,7 @@ NetworkListUpdate = _optional_update(NetworkListCreate)
 
 class NetworkListEntryBase(BaseModel):
     value: str
-    note: Optional[str] = None
+    note: str | None = None
 
 
 class NetworkListEntryCreate(NetworkListEntryBase):
@@ -45,7 +47,7 @@ class NetworkListEntryResponse(NetworkListEntryBase):
 class NetworkListResponse(NetworkListBase):
     id: int
     entry_count: int = 0
-    entries: List[NetworkListEntryResponse] = []
+    entries: list[NetworkListEntryResponse] = []
     created_at: datetime
     updated_at: datetime
 
@@ -54,18 +56,19 @@ class NetworkListResponse(NetworkListBase):
 
 # ─── ASN Lists ──────────────────────────────────────────────────────────────
 
+
 class AsnListEntryInline(BaseModel):
     value: str
-    note: Optional[str] = None
+    note: str | None = None
 
 
 class AsnListBase(BaseModel):
     name: str
-    description: Optional[str] = None
+    description: str | None = None
 
 
 class AsnListCreate(AsnListBase):
-    entries: Optional[List[AsnListEntryInline]] = None
+    entries: list[AsnListEntryInline] | None = None
 
 
 AsnListUpdate = _optional_update(AsnListCreate)
@@ -73,7 +76,7 @@ AsnListUpdate = _optional_update(AsnListCreate)
 
 class AsnListEntryBase(BaseModel):
     value: str
-    note: Optional[str] = None
+    note: str | None = None
 
 
 class AsnListEntryCreate(AsnListEntryBase):
@@ -94,7 +97,7 @@ class AsnListEntryResponse(AsnListEntryBase):
 class AsnListResponse(AsnListBase):
     id: int
     entry_count: int = 0
-    entries: List[AsnListEntryResponse] = []
+    entries: list[AsnListEntryResponse] = []
     created_at: datetime
     updated_at: datetime
 
@@ -103,18 +106,19 @@ class AsnListResponse(AsnListBase):
 
 # ─── Geo Lists ─────────────────────────────────────────────────────────────
 
+
 class GeoListEntryInline(BaseModel):
     value: str
-    note: Optional[str] = None
+    note: str | None = None
 
 
 class GeoListBase(BaseModel):
     name: str
-    description: Optional[str] = None
+    description: str | None = None
 
 
 class GeoListCreate(GeoListBase):
-    entries: Optional[List[GeoListEntryInline]] = None
+    entries: list[GeoListEntryInline] | None = None
 
 
 GeoListUpdate = _optional_update(GeoListCreate)
@@ -122,7 +126,7 @@ GeoListUpdate = _optional_update(GeoListCreate)
 
 class GeoListEntryBase(BaseModel):
     value: str
-    note: Optional[str] = None
+    note: str | None = None
 
 
 class GeoListEntryCreate(GeoListEntryBase):
@@ -143,7 +147,7 @@ class GeoListEntryResponse(GeoListEntryBase):
 class GeoListResponse(GeoListBase):
     id: int
     entry_count: int = 0
-    entries: List[GeoListEntryResponse] = []
+    entries: list[GeoListEntryResponse] = []
     created_at: datetime
     updated_at: datetime
 
@@ -152,18 +156,19 @@ class GeoListResponse(GeoListBase):
 
 # ─── JA4 Lists ──────────────────────────────────────────────────────────────
 
+
 class Ja4ListEntryInline(BaseModel):
     value: str
-    note: Optional[str] = None
+    note: str | None = None
 
 
 class Ja4ListBase(BaseModel):
     name: str
-    description: Optional[str] = None
+    description: str | None = None
 
 
 class Ja4ListCreate(Ja4ListBase):
-    entries: Optional[List[Ja4ListEntryInline]] = None
+    entries: list[Ja4ListEntryInline] | None = None
 
 
 Ja4ListUpdate = _optional_update(Ja4ListCreate)
@@ -171,7 +176,7 @@ Ja4ListUpdate = _optional_update(Ja4ListCreate)
 
 class Ja4ListEntryBase(BaseModel):
     value: str
-    note: Optional[str] = None
+    note: str | None = None
 
 
 class Ja4ListEntryCreate(Ja4ListEntryBase):
@@ -192,7 +197,7 @@ class Ja4ListEntryResponse(Ja4ListEntryBase):
 class Ja4ListResponse(Ja4ListBase):
     id: int
     entry_count: int = 0
-    entries: List[Ja4ListEntryResponse] = []
+    entries: list[Ja4ListEntryResponse] = []
     created_at: datetime
     updated_at: datetime
 
@@ -201,18 +206,19 @@ class Ja4ListResponse(Ja4ListBase):
 
 # ─── Pattern Lists ─────────────────────────────────────────────────────────
 
+
 class PatternListEntryInline(BaseModel):
     value: str
-    note: Optional[str] = None
+    note: str | None = None
 
 
 class PatternListBase(BaseModel):
     name: str
-    description: Optional[str] = None
+    description: str | None = None
 
 
 class PatternListCreate(PatternListBase):
-    entries: Optional[List[PatternListEntryInline]] = None
+    entries: list[PatternListEntryInline] | None = None
 
 
 PatternListUpdate = _optional_update(PatternListCreate)
@@ -220,7 +226,7 @@ PatternListUpdate = _optional_update(PatternListCreate)
 
 class PatternListEntryBase(BaseModel):
     value: str
-    note: Optional[str] = None
+    note: str | None = None
 
 
 class PatternListEntryCreate(PatternListEntryBase):
@@ -241,7 +247,7 @@ class PatternListEntryResponse(PatternListEntryBase):
 class PatternListResponse(PatternListBase):
     id: int
     entry_count: int = 0
-    entries: List[PatternListEntryResponse] = []
+    entries: list[PatternListEntryResponse] = []
     created_at: datetime
     updated_at: datetime
 
@@ -249,6 +255,7 @@ class PatternListResponse(PatternListBase):
 
 
 # ─── Shared ────────────────────────────────────────────────────────────────
+
 
 class GeoCountryOption(BaseModel):
     code: str
@@ -260,10 +267,10 @@ class DynamicFeedBase(BaseModel):
     list_type: str = Field(..., pattern="^(network|asn|ja4)$")
     url: str
     update_interval_hours: int = 24
-    description: Optional[str] = None
+    description: str | None = None
     enabled: bool = True
     auto_apply: bool = True
-    target_list_id: Optional[int] = None
+    target_list_id: int | None = None
 
 
 class DynamicFeedCreate(DynamicFeedBase):
@@ -276,13 +283,64 @@ DynamicFeedUpdate = _optional_update(DynamicFeedBase)
 class DynamicFeedResponse(DynamicFeedBase):
     id: int
     target_list_id: int
-    last_updated_at: Optional[datetime] = None
-    last_error: Optional[str] = None
-    last_entry_count: Optional[int] = None
+    last_updated_at: datetime | None = None
+    last_error: str | None = None
+    last_entry_count: int | None = None
     created_at: datetime
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
 
-__all__ = ['AsnListBase', 'AsnListCreate', 'AsnListEntryBase', 'AsnListEntryCreate', 'AsnListEntryInline', 'AsnListEntryResponse', 'AsnListEntryUpdate', 'AsnListResponse', 'AsnListUpdate', 'DynamicFeedBase', 'DynamicFeedCreate', 'DynamicFeedResponse', 'DynamicFeedUpdate', 'GeoCountryOption', 'GeoListBase', 'GeoListCreate', 'GeoListEntryBase', 'GeoListEntryCreate', 'GeoListEntryInline', 'GeoListEntryResponse', 'GeoListEntryUpdate', 'GeoListResponse', 'GeoListUpdate', 'Ja4ListBase', 'Ja4ListCreate', 'Ja4ListEntryBase', 'Ja4ListEntryCreate', 'Ja4ListEntryInline', 'Ja4ListEntryResponse', 'Ja4ListEntryUpdate', 'Ja4ListResponse', 'Ja4ListUpdate', 'NetworkListBase', 'NetworkListCreate', 'NetworkListEntryBase', 'NetworkListEntryCreate', 'NetworkListEntryInline', 'NetworkListEntryResponse', 'NetworkListEntryUpdate', 'NetworkListResponse', 'NetworkListUpdate', 'PatternListBase', 'PatternListCreate', 'PatternListEntryBase', 'PatternListEntryCreate', 'PatternListEntryInline', 'PatternListEntryResponse', 'PatternListEntryUpdate', 'PatternListResponse', 'PatternListUpdate']
+__all__ = [
+    "AsnListBase",
+    "AsnListCreate",
+    "AsnListEntryBase",
+    "AsnListEntryCreate",
+    "AsnListEntryInline",
+    "AsnListEntryResponse",
+    "AsnListEntryUpdate",
+    "AsnListResponse",
+    "AsnListUpdate",
+    "DynamicFeedBase",
+    "DynamicFeedCreate",
+    "DynamicFeedResponse",
+    "DynamicFeedUpdate",
+    "GeoCountryOption",
+    "GeoListBase",
+    "GeoListCreate",
+    "GeoListEntryBase",
+    "GeoListEntryCreate",
+    "GeoListEntryInline",
+    "GeoListEntryResponse",
+    "GeoListEntryUpdate",
+    "GeoListResponse",
+    "GeoListUpdate",
+    "Ja4ListBase",
+    "Ja4ListCreate",
+    "Ja4ListEntryBase",
+    "Ja4ListEntryCreate",
+    "Ja4ListEntryInline",
+    "Ja4ListEntryResponse",
+    "Ja4ListEntryUpdate",
+    "Ja4ListResponse",
+    "Ja4ListUpdate",
+    "NetworkListBase",
+    "NetworkListCreate",
+    "NetworkListEntryBase",
+    "NetworkListEntryCreate",
+    "NetworkListEntryInline",
+    "NetworkListEntryResponse",
+    "NetworkListEntryUpdate",
+    "NetworkListResponse",
+    "NetworkListUpdate",
+    "PatternListBase",
+    "PatternListCreate",
+    "PatternListEntryBase",
+    "PatternListEntryCreate",
+    "PatternListEntryInline",
+    "PatternListEntryResponse",
+    "PatternListEntryUpdate",
+    "PatternListResponse",
+    "PatternListUpdate",
+]

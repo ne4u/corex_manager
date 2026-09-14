@@ -4,9 +4,10 @@ Submits hosts to the SSL Labs analyze endpoint (publish=off), polls for
 results, and persists full reports. Auto-registers the user's email with
 SSL Labs on the "not registered" error, then retries.
 """
-import httpx
-from typing import Any, Dict, List, Optional
 
+from typing import Any
+
+import httpx
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
@@ -47,9 +48,7 @@ def _require_contact_fields(user: User) -> None:
         raise HTTPException(
             status_code=400,
             detail=(
-                "Complete your profile ("
-                + ", ".join(missing)
-                + ") before running SSL Labs scans. "
+                "Complete your profile (" + ", ".join(missing) + ") before running SSL Labs scans. "
                 "Update your profile via the user menu."
             ),
         )
@@ -70,9 +69,7 @@ def register_email(user: User) -> None:
             try:
                 body = r.json()
                 if isinstance(body, dict) and body.get("errors"):
-                    detail = "; ".join(
-                        e.get("message", "") for e in body["errors"]
-                    )
+                    detail = "; ".join(e.get("message", "") for e in body["errors"])
             except Exception:
                 detail = r.text
             raise HTTPException(
@@ -91,19 +88,17 @@ def _is_not_registered_error(response: httpx.Response) -> bool:
         return False
     if isinstance(body, dict) and isinstance(body.get("errors"), list):
         for err in body["errors"]:
-            if err.get("field") == "email" and "register" in (
-                err.get("message", "") or ""
-            ).lower():
+            if err.get("field") == "email" and "register" in (err.get("message", "") or "").lower():
                 return True
     return False
 
 
-def _analyze(host: str, user: User, start_new: bool = False) -> Dict[str, Any]:
+def _analyze(host: str, user: User, start_new: bool = False) -> dict[str, Any]:
     """Call the SSL Labs /analyze endpoint.
 
     On the "email not registered" error, auto-registers and retries once.
     """
-    params: Dict[str, str] = {
+    params: dict[str, str] = {
         "host": host,
         "publish": "off",
         "all": "on",
@@ -132,9 +127,7 @@ def _analyze(host: str, user: User, start_new: bool = False) -> Dict[str, Any]:
             try:
                 body = r.json()
                 if isinstance(body, dict) and body.get("errors"):
-                    detail = "; ".join(
-                        e.get("message", "") for e in body["errors"]
-                    )
+                    detail = "; ".join(e.get("message", "") for e in body["errors"])
             except Exception:
                 detail = r.text
             raise HTTPException(
@@ -144,28 +137,28 @@ def _analyze(host: str, user: User, start_new: bool = False) -> Dict[str, Any]:
         return r.json()
 
 
-def start_scan(host: str, user: User) -> Dict[str, Any]:
+def start_scan(host: str, user: User) -> dict[str, Any]:
     """Start a new SSL Labs assessment for the given host."""
     _require_contact_fields(user)
     return _analyze(host, user, start_new=True)
 
 
-def poll_scan(host: str, user: User) -> Dict[str, Any]:
+def poll_scan(host: str, user: User) -> dict[str, Any]:
     """Poll an in-progress SSL Labs assessment (no startNew)."""
     _require_contact_fields(user)
     return _analyze(host, user, start_new=False)
 
 
-def derive_hosts_from_cert(cert: Certificate) -> List[str]:
+def derive_hosts_from_cert(cert: Certificate) -> list[str]:
     """Derive scannable hostnames from a certificate's CN and SANs.
 
     Strips leading ``*.`` wildcard prefixes (SSL Labs cannot scan a literal
     wildcard), drops empty entries, and dedupes preserving order.
     """
-    hosts: List[str] = []
+    hosts: list[str] = []
     seen = set()
 
-    raw_names: List[str] = []
+    raw_names: list[str] = []
     if cert.subject_cn:
         raw_names.append(cert.subject_cn)
     if cert.sans:
@@ -187,7 +180,7 @@ def derive_hosts_from_cert(cert: Certificate) -> List[str]:
     return hosts
 
 
-def _extract_grade(report: Dict[str, Any]) -> Optional[str]:
+def _extract_grade(report: dict[str, Any]) -> str | None:
     """Extract the best (highest) grade from the report's endpoints."""
     endpoints = report.get("endpoints") or []
     grades = []
@@ -199,13 +192,12 @@ def _extract_grade(report: Dict[str, Any]) -> Optional[str]:
         return None
     # Sort by grade quality: A+ > A > A- > B > C > D > E > F > T
     # Simple approach: pick the "best" by a rough ordering.
-    grade_order = {"A+": 100, "A": 95, "A-": 90, "B": 80, "C": 70, "D": 60,
-                   "E": 50, "F": 40, "T": 30}
+    grade_order = {"A+": 100, "A": 95, "A-": 90, "B": 80, "C": 70, "D": 60, "E": 50, "F": 40, "T": 30}
     best = max(grades, key=lambda g: grade_order.get(g, 0))
     return best
 
 
-def _host_from_report(report: Dict[str, Any]) -> Dict[str, Any]:
+def _host_from_report(report: dict[str, Any]) -> dict[str, Any]:
     """Extract the fields we store from a SSL Labs Host object."""
     return {
         "status": report.get("status", _STATUS_IN_PROGRESS),
@@ -220,9 +212,7 @@ def _host_from_report(report: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def create_scan_record(
-    db: Session, cert_id: int, host: str, report: Dict[str, Any]
-) -> SslLabsScan:
+def create_scan_record(db: Session, cert_id: int, host: str, report: dict[str, Any]) -> SslLabsScan:
     """Create a new scan record from a SSL Labs Host object."""
     fields = _host_from_report(report)
     scan = SslLabsScan(
@@ -239,9 +229,7 @@ def create_scan_record(
     return scan
 
 
-def update_scan_record(
-    db: Session, scan_id: int, report: Dict[str, Any]
-) -> Optional[SslLabsScan]:
+def update_scan_record(db: Session, scan_id: int, report: dict[str, Any]) -> SslLabsScan | None:
     """Update an existing scan record from a polled SSL Labs Host object."""
     scan = db.get(SslLabsScan, scan_id)
     if not scan:
@@ -262,7 +250,7 @@ def get_max_scans_per_host(db: Session) -> int:
     val = get_setting(db, "ssllabs_max_scans_per_host", str(_DEFAULT_MAX_SCANS_PER_HOST))
     try:
         n = int(val) if val else _DEFAULT_MAX_SCANS_PER_HOST
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         n = _DEFAULT_MAX_SCANS_PER_HOST
     return max(1, n)
 

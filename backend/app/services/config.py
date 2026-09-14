@@ -1,9 +1,10 @@
 """Config lifecycle and preview helpers."""
+
 import difflib
 import os
 import threading
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -15,7 +16,6 @@ from ..schemas.config import (
     ConfigRevertResponse,
     ConfigSnapshotRollbackResponse,
 )
-from ..schemas.settings import SettingResponse
 from ..services.coraza_config import generate_coraza_spoa_config
 from ..services.haproxy import generate_config, generate_coraza_spoe_config
 from ..services.settings import get_setting, set_setting
@@ -38,17 +38,17 @@ def _ensure_applied_snapshot(path: str, generated: str) -> None:
 def _read_current_config(path: str) -> str:
     applied_path = _applied_snapshot_path(path)
     if os.path.exists(applied_path):
-        with open(applied_path, "r", encoding="utf-8", errors="replace") as f:
+        with open(applied_path, encoding="utf-8", errors="replace") as f:
             return f.read()
     if os.path.exists(path):
-        with open(path, "r", encoding="utf-8", errors="replace") as f:
+        with open(path, encoding="utf-8", errors="replace") as f:
             return f.read()
     return ""
 
 
-def _config_status_data(db: Session) -> Tuple[bool, Dict[str, str], Dict[str, str]]:
+def _config_status_data(db: Session) -> tuple[bool, dict[str, str], dict[str, str]]:
     cfg = get_settings()
-    files: List[tuple[str, str, Any]] = [
+    files: list[tuple[str, str, Any]] = [
         ("haproxy.cfg", cfg.HAPROXY_CONFIG_PATH, generate_config),
     ]
     if cfg.CORAZA_SPOA_ENABLED:
@@ -58,7 +58,8 @@ def _config_status_data(db: Session) -> Tuple[bool, Dict[str, str], Dict[str, st
     # Risk rules data file (Lua) — compared so that risk ruleset changes
     # (e.g. density amplification) show as unapplied and trigger the banner.
     try:
-        from ..services.risk_scoring import generate_risk_rules_data, _risk_rules_data_path
+        from ..services.risk_scoring import _risk_rules_data_path, generate_risk_rules_data
+
         files.append(("risk_rules_data.lua", _risk_rules_data_path(), generate_risk_rules_data))
     except Exception:
         pass  # risk scoring not configured — skip
@@ -68,9 +69,11 @@ def _config_status_data(db: Session) -> Tuple[bool, Dict[str, str], Dict[str, st
     disk_cache_on = get_setting(db, "disk_cache_enabled", str(cfg.DISK_CACHE_ENABLED)).lower() in ("true", "1", "yes")
     if disk_cache_on:
         from ..models.models import CacheConfig
+
         any_disk = db.query(CacheConfig).filter(CacheConfig.disk_cache_enabled == True).first()  # noqa: E712
         if any_disk:
             from ..services.varnish import generate_vcl as generate_varnish_vcl
+
             files.append(("varnish.vcl", cfg.VARNISH_VCL_PATH, generate_varnish_vcl))
 
     # MCP Gateway config bundle — compared as decrypted plaintext because
@@ -84,6 +87,7 @@ def _config_status_data(db: Session) -> Tuple[bool, Dict[str, str], Dict[str, st
     if mcp_on:
         try:
             from ..services.mcp_config import generate_mcp_bundle_text, read_applied_mcp_bundle
+
             mcp_generated = generate_mcp_bundle_text(db)
             mcp_current = read_applied_mcp_bundle()
         except Exception:
@@ -99,8 +103,8 @@ def _config_status_data(db: Session) -> Tuple[bool, Dict[str, str], Dict[str, st
     vector_failed = False
     vector_active = False
     try:
-        from ..services.vector_pipeline import (
-            generate_vector_toml, redact_vector_text, vector_pipeline_active)
+        from ..services.vector_pipeline import generate_vector_toml, redact_vector_text, vector_pipeline_active
+
         vector_active = vector_pipeline_active(db)
         if vector_active:
             v_generated_raw, _v_secrets = generate_vector_toml(db)
@@ -108,8 +112,8 @@ def _config_status_data(db: Session) -> Tuple[bool, Dict[str, str], Dict[str, st
     except Exception:
         vector_failed = True
 
-    current: Dict[str, str] = {}
-    generated: Dict[str, str] = {}
+    current: dict[str, str] = {}
+    generated: dict[str, str] = {}
     unapplied = False
     for label, path, generator in files:
         gen = generator(db)
@@ -144,6 +148,7 @@ def _config_status_data(db: Session) -> Tuple[bool, Dict[str, str], Dict[str, st
     # but no generated content) are also detected as unapplied.
     try:
         from ..services.security_lists import generate_security_list_file_contents
+
         sec_base = cfg.SECURITY_LISTS_DIR
         sec_gen = generate_security_list_file_contents(db)
         # Discover applied files on disk (including orphans from deleted lists).
@@ -154,7 +159,7 @@ def _config_status_data(db: Session) -> Tuple[bool, Dict[str, str], Dict[str, st
                 continue
             for fn in os.listdir(sub_dir):
                 if fn.endswith(".lst.applied"):
-                    applied_rels.add(f"{sub}/{fn[:-len('.applied')]}")
+                    applied_rels.add(f"{sub}/{fn[: -len('.applied')]}")
         for rel in set(sec_gen) | applied_rels:
             label = f"lists/{rel}"
             gen = sec_gen.get(rel, "")
@@ -174,6 +179,7 @@ def _config_status_data(db: Session) -> Tuple[bool, Dict[str, str], Dict[str, st
     # files which are also detected as unapplied.
     try:
         from ..services.resp_transform import generate_resp_transform_file_contents
+
         rt_base = cfg.RESP_TRANSFORM_DIR
         rt_gen = generate_resp_transform_file_contents(db)
         # Discover on-disk files (including orphans from deleted backends/transforms).
@@ -196,7 +202,7 @@ def _config_status_data(db: Session) -> Tuple[bool, Dict[str, str], Dict[str, st
     return unapplied, current, generated
 
 
-def security_list_files_unapplied(db: Session) -> Tuple[bool, bool]:
+def security_list_files_unapplied(db: Session) -> tuple[bool, bool]:
     """Return ``(security_list_unapplied, other_unapplied)``.
 
     Used by the dynamic feed updater to decide whether to auto-apply after a
@@ -259,7 +265,7 @@ def get_max_snapshots_row(db: Session):
 def set_max_snapshots(db: Session, value: str) -> Setting:
     try:
         val = max(1, int(value))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         raise RuntimeError("max_snapshots must be a positive integer")
     return set_setting(db, "max_snapshots", str(val))
 
@@ -281,14 +287,14 @@ def preview_config(db: Session) -> str:
     return generate_config(db)
 
 
-def preview_all_configs(db: Session) -> Dict[str, str]:
+def preview_all_configs(db: Session) -> dict[str, str]:
     """Return all generated config files as {label: content}.
 
     Only includes configs that are actually generated (e.g. Varnish VCL
     only if disk cache is enabled, MCP bundle only if MCP gateway is enabled).
     """
     cfg = get_settings()
-    configs: Dict[str, str] = {}
+    configs: dict[str, str] = {}
     configs["haproxy.cfg"] = generate_config(db)
     if cfg.CORAZA_SPOA_ENABLED:
         configs["coraza.cfg"] = generate_coraza_spoe_config(db)
@@ -296,19 +302,23 @@ def preview_all_configs(db: Session) -> Dict[str, str]:
     disk_cache_on = get_setting(db, "disk_cache_enabled", str(cfg.DISK_CACHE_ENABLED)).lower() in ("true", "1", "yes")
     if disk_cache_on:
         from ..models.models import CacheConfig
+
         any_disk = db.query(CacheConfig).filter(CacheConfig.disk_cache_enabled == True).first()  # noqa: E712
         if any_disk:
             from ..services.varnish import generate_vcl as generate_varnish_vcl
+
             configs["varnish.vcl"] = generate_varnish_vcl(db)
     mcp_on = get_setting(db, "mcp_gateway_enabled", str(cfg.MCP_GATEWAY_ENABLED)).lower() in ("true", "1", "yes")
     if mcp_on:
         try:
             from ..services.mcp_config import generate_mcp_bundle_text
+
             configs["mcp-bundle.json"] = generate_mcp_bundle_text(db)
         except Exception:
             pass  # MCP bundle generation failed — skip it
     try:
         from ..services.vector_pipeline import generate_vector_toml, redact_vector_text
+
         configs["vector.toml"] = redact_vector_text(generate_vector_toml(db)[0])
     except Exception:
         pass
@@ -333,7 +343,7 @@ def preview_all_configs(db: Session) -> Dict[str, str]:
 # ---------------------------------------------------------------------------
 _CONFIG_STATUS_TTL = 5.0  # seconds
 _config_status_lock = threading.Lock()
-_config_status_cache: Optional[Tuple[float, bool]] = None
+_config_status_cache: tuple[float, bool] | None = None
 # Set by invalidate_config_status() while a regeneration is in flight: the
 # in-flight result may reflect pre-mutation state, so it must not be cached.
 _config_status_dirty = False
@@ -386,7 +396,7 @@ def get_config_status(db: Session) -> bool:
 
 def get_config_diff(db: Session) -> dict:
     unapplied, current, generated = _config_status_data(db)
-    parts: List[str] = []
+    parts: list[str] = []
     for label in current:
         if current[label] == generated[label]:
             continue

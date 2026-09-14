@@ -4,6 +4,7 @@ Downloads the official OWASP CRS minimal ZIP from GitHub releases, extracts it
 to a per-version directory on the shared volume, and manages CRS snapshots for
 rollback. Snapshots are stored in the settings table as JSON values.
 """
+
 import hashlib
 import io
 import json
@@ -11,8 +12,8 @@ import logging
 import os
 import shutil
 import zipfile
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 import requests
 from sqlalchemy.orm import Session
@@ -26,7 +27,7 @@ settings = get_settings()
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _crs_dir(version: str) -> str:
@@ -39,19 +40,19 @@ def _coraza_crs_path(version: str) -> str:
     return f"/app/data/crs/{version}"
 
 
-def get_active_crs_version(db: Session) -> Optional[str]:
+def get_active_crs_version(db: Session) -> str | None:
     """Return the currently active CRS version, or None if using embedded."""
     val = get_setting(db, "crs_active_version")
     return val if val else None
 
 
-def get_pinned_crs_version(db: Session) -> Optional[str]:
+def get_pinned_crs_version(db: Session) -> str | None:
     """Return the user-pinned CRS version, or None for 'latest'."""
     val = get_setting(db, "crs_pinned_version")
     return val if val else None
 
 
-def _find_minimal_zip_url(release_data: dict) -> Optional[str]:
+def _find_minimal_zip_url(release_data: dict) -> str | None:
     """Find the minimal ZIP download URL from a GitHub release's assets."""
     for asset in release_data.get("assets", []):
         name = asset.get("name", "")
@@ -115,7 +116,7 @@ def _extract_zip(zip_bytes: bytes, dest_dir: str) -> str:
     return dest_dir
 
 
-def download_crs(db: Session, created_by: Optional[str] = None) -> Dict[str, Any]:
+def download_crs(db: Session, created_by: str | None = None) -> dict[str, Any]:
     """Download and extract the CRS rules. Returns a result dict.
 
     Steps:
@@ -172,12 +173,13 @@ def download_crs(db: Session, created_by: Optional[str] = None) -> Dict[str, Any
     _prune_crs_snapshots(db)
 
     from . import coraza_config
+
     coraza_config.write_coraza_spoa_config(db)
 
     return {"ok": True, "version": version, "file_hash": file_hash, "error": None}
 
 
-def list_crs_snapshots(db: Session) -> List[Dict[str, Any]]:
+def list_crs_snapshots(db: Session) -> list[dict[str, Any]]:
     """List all CRS snapshots from the settings table, newest first."""
     rows = db.query(Setting).filter(Setting.key.like("crs_snapshot_%")).all()
     snapshots = []
@@ -185,13 +187,13 @@ def list_crs_snapshots(db: Session) -> List[Dict[str, Any]]:
         try:
             data = json.loads(row.value)
             snapshots.append(data)
-        except (json.JSONDecodeError, TypeError):
+        except json.JSONDecodeError, TypeError:
             continue
     snapshots.sort(key=lambda s: s.get("created_at", ""), reverse=True)
     return snapshots
 
 
-def rollback_crs(db: Session, snapshot_id: int, created_by: Optional[str] = None) -> Dict[str, Any]:
+def rollback_crs(db: Session, snapshot_id: int, created_by: str | None = None) -> dict[str, Any]:
     """Rollback to a previous CRS version by switching the active version.
 
     Returns: {ok, version, error?}
@@ -202,7 +204,7 @@ def rollback_crs(db: Session, snapshot_id: int, created_by: Optional[str] = None
 
     try:
         data = json.loads(row.value)
-    except (json.JSONDecodeError, TypeError):
+    except json.JSONDecodeError, TypeError:
         return {"ok": False, "version": None, "error": "Invalid snapshot data"}
 
     dir_version = data.get("dir_version")
@@ -216,12 +218,13 @@ def rollback_crs(db: Session, snapshot_id: int, created_by: Optional[str] = None
     set_setting(db, "crs_active_version", dir_version)
 
     from . import coraza_config
+
     coraza_config.write_coraza_spoa_config(db)
 
     return {"ok": True, "version": dir_version, "error": None}
 
 
-def delete_crs_snapshot(db: Session, snapshot_id: int) -> Dict[str, Any]:
+def delete_crs_snapshot(db: Session, snapshot_id: int) -> dict[str, Any]:
     """Delete a CRS snapshot record and its files if not active and not referenced."""
     row = db.query(Setting).filter(Setting.key == f"crs_snapshot_{snapshot_id}").first()
     if not row:
@@ -229,7 +232,7 @@ def delete_crs_snapshot(db: Session, snapshot_id: int) -> Dict[str, Any]:
 
     try:
         data = json.loads(row.value)
-    except (json.JSONDecodeError, TypeError):
+    except json.JSONDecodeError, TypeError:
         data = {}
 
     dir_version = data.get("dir_version")
@@ -240,8 +243,7 @@ def delete_crs_snapshot(db: Session, snapshot_id: int) -> Dict[str, Any]:
 
     if dir_version:
         other_refs = [
-            s for s in list_crs_snapshots(db)
-            if s.get("dir_version") == dir_version and s.get("id") != snapshot_id
+            s for s in list_crs_snapshots(db) if s.get("dir_version") == dir_version and s.get("id") != snapshot_id
         ]
         if not other_refs:
             dest = _crs_dir(dir_version)
@@ -263,7 +265,7 @@ def _next_snapshot_id(db: Session) -> int:
             sid = int(data.get("id", 0))
             if sid > max_id:
                 max_id = sid
-        except (json.JSONDecodeError, TypeError, ValueError):
+        except json.JSONDecodeError, TypeError, ValueError:
             continue
     return max_id + 1
 
@@ -289,7 +291,7 @@ def _prune_crs_snapshots(db: Session) -> int:
     return count
 
 
-def get_crs_status(db: Session) -> Dict[str, Any]:
+def get_crs_status(db: Session) -> dict[str, Any]:
     """Return current CRS status for the UI."""
     active = get_active_crs_version(db)
     pinned = get_pinned_crs_version(db)

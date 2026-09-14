@@ -11,17 +11,17 @@ non-config-affecting actions (validate_risk_rule, login, theme changes, etc.)
 that should have config_change=false so they don't appear in the audit log
 "Pending Changes" section.
 """
-from typing import Sequence, Union
 
-from alembic import op
+from collections.abc import Sequence
+
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = 'v3w4x5y6z7a8'
-down_revision: Union[str, Sequence[str], None] = 'u2v3w4x5y6z7'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision: str = "v3w4x5y6z7a8"
+down_revision: str | Sequence[str] | None = "u2v3w4x5y6z7"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -37,9 +37,7 @@ def upgrade() -> None:
     conn = op.get_bind()
     # Fetch all events that still have the default config_change=true.
     # We only need id, method, and path to determine the correct value.
-    rows = conn.execute(
-        sa.text("SELECT id, method, path FROM audit_events WHERE config_change = true")
-    ).fetchall()
+    rows = conn.execute(sa.text("SELECT id, method, path FROM audit_events WHERE config_change = true")).fetchall()
 
     updated = 0
     for row in rows:

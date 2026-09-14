@@ -1,7 +1,7 @@
-from datetime import datetime
-from typing import Optional, List, Dict, Any, Type, TypeVar
-from pydantic import BaseModel, Field, model_validator, field_validator, ConfigDict
-from ._base import _optional_update
+from typing import Any
+
+from pydantic import BaseModel
+
 
 class StatsResponse(BaseModel):
     process_id: int
@@ -12,24 +12,25 @@ class StatsResponse(BaseModel):
     total_requests: int
     bytes_in: int
     bytes_out: int
-    listeners: List[Dict[str, Any]] = []
-    backends: List[Dict[str, Any]] = []
+    listeners: list[dict[str, Any]] = []
+    backends: list[dict[str, Any]] = []
 
 
 class MetricsResponse(BaseModel):
-    data: List[Dict[str, Any]]
+    data: list[dict[str, Any]]
 
 
 class WafMetricsResponse(BaseModel):
-    time: List[str]
-    series: List[Dict[str, Any]]
+    time: list[str]
+    series: list[dict[str, Any]]
     breakdown: str
-    totals: Dict[str, int]
+    totals: dict[str, int]
 
 
 # ---------------------------------------------------------------------------
 # HAProxy stick-table viewer (System → Tables tab)
 # ---------------------------------------------------------------------------
+
 
 class StickTableSummary(BaseModel):
     name: str
@@ -42,7 +43,7 @@ class StickTableEntry(BaseModel):
     key: str = ""
     use: Any = 0
     exp: Any = 0
-    stores: Dict[str, str] = {}
+    stores: dict[str, str] = {}
 
 
 class StickTableDetail(BaseModel):
@@ -53,7 +54,7 @@ class StickTableDetail(BaseModel):
     total: int = 0
     offset: int = 0
     limit: int = 100
-    entries: List[StickTableEntry] = []
+    entries: list[StickTableEntry] = []
 
 
 class StickTableClearResponse(BaseModel):
@@ -65,9 +66,10 @@ class StickTableClearResponse(BaseModel):
 # Valkey inspector (System → Valkey tab)
 # ---------------------------------------------------------------------------
 
+
 class ValkeyServerInfo(BaseModel):
     available: bool
-    version: Optional[str] = None
+    version: str | None = None
     uptime_seconds: int = 0
     connected_clients: int = 0
     used_memory_human: str = ""
@@ -75,20 +77,20 @@ class ValkeyServerInfo(BaseModel):
     total_keys: int = 0
     db_count: int = 0
     role: str = ""
-    error: Optional[str] = None
+    error: str | None = None
 
 
 class ValkeyNamespaceSummary(BaseModel):
     prefix: str
     count: int
-    sample_keys: List[str] = []
+    sample_keys: list[str] = []
 
 
 class ValkeyKeyEntry(BaseModel):
     key: str
     type: str
     ttl: int  # -1 = no expiry, -2 = missing
-    size: Optional[int] = None  # bytes from MEMORY USAGE
+    size: int | None = None  # bytes from MEMORY USAGE
     preview: str = ""
 
 
@@ -97,7 +99,7 @@ class ValkeyNamespaceDetail(BaseModel):
     total: int = 0
     offset: int = 0
     limit: int = 100
-    keys: List[ValkeyKeyEntry] = []
+    keys: list[ValkeyKeyEntry] = []
 
 
 class ValkeyDeleteResponse(BaseModel):
@@ -106,16 +108,16 @@ class ValkeyDeleteResponse(BaseModel):
 
 
 __all__ = [
-    'MetricsResponse',
-    'StatsResponse',
-    'WafMetricsResponse',
-    'StickTableSummary',
-    'StickTableEntry',
-    'StickTableDetail',
-    'StickTableClearResponse',
-    'ValkeyServerInfo',
-    'ValkeyNamespaceSummary',
-    'ValkeyKeyEntry',
-    'ValkeyNamespaceDetail',
-    'ValkeyDeleteResponse',
+    "MetricsResponse",
+    "StatsResponse",
+    "WafMetricsResponse",
+    "StickTableSummary",
+    "StickTableEntry",
+    "StickTableDetail",
+    "StickTableClearResponse",
+    "ValkeyServerInfo",
+    "ValkeyNamespaceSummary",
+    "ValkeyKeyEntry",
+    "ValkeyNamespaceDetail",
+    "ValkeyDeleteResponse",
 ]

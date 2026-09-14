@@ -1,9 +1,7 @@
-from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from ..deps import get_current_user, get_db, require_admin, require_write, rate_limit
-from ...models.models import Certificate, SslLabsScan, User
+from ...models.models import Certificate, SslLabsScan
 from ...schemas.ssllabs import (
     SslLabsHostsResponse,
     SslLabsScanCreate,
@@ -20,6 +18,7 @@ from ...services.ssllabs import (
     start_scan,
     update_scan_record,
 )
+from ..deps import get_current_user, get_db, rate_limit, require_admin, require_write
 
 router = APIRouter()
 
@@ -48,7 +47,7 @@ def get_ssllabs_hosts(
 
 @router.get(
     "/certificates/{cert_id}/ssllabs/scans",
-    response_model=List[SslLabsScanResponse],
+    response_model=list[SslLabsScanResponse],
 )
 def list_ssllabs_scans(
     cert_id: int,

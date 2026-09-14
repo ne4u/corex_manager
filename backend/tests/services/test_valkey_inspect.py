@@ -1,14 +1,14 @@
 """Tests for the valkey_inspect service (server info, namespaces, pagination, previews, delete)."""
-from unittest.mock import patch, MagicMock
+
+from unittest.mock import MagicMock
 
 import pytest
-
 from app.services import valkey_inspect
-
 
 # ---------------------------------------------------------------------------
 # Fakes
 # ---------------------------------------------------------------------------
+
 
 class FakeValkey:
     """Minimal in-memory Valkey/Redis fake supporting the calls the service makes."""
@@ -44,6 +44,7 @@ class FakeValkey:
     # --- scan ---
     def scan_iter(self, match="*", count=100):
         import fnmatch
+
         for k in self._store:
             if fnmatch.fnmatch(k, match):
                 yield k
@@ -86,7 +87,7 @@ class FakeValkey:
         lst = entry[1]
         if end == -1:
             end = len(lst) - 1
-        return lst[start:end + 1]
+        return lst[start : end + 1]
 
     def hlen(self, key):
         entry = self._store.get(key)
@@ -133,7 +134,7 @@ class FakeValkey:
         items = entry[1]
         if end == -1:
             end = len(items) - 1
-        sliced = items[start:end + 1]
+        sliced = items[start : end + 1]
         if withscores:
             return [(m, s) for m, s in sliced]
         return [m for m, _ in sliced]
@@ -191,6 +192,7 @@ def fake_client(monkeypatch):
 # server_info
 # ---------------------------------------------------------------------------
 
+
 class TestServerInfo:
     def test_parses_info_sections(self, fake_client):
         fake = fake_client()
@@ -206,10 +208,12 @@ class TestServerInfo:
         assert info["error"] is None
 
     def test_total_keys_excludes_own_cache(self, fake_client):
-        fake = fake_client(keys={
-            "cache:foo": ("string", "v", -1),
-            "valkey_inspect:ns:cache": ("string", "[]", -1),  # our own cache key
-        })
+        fake = fake_client(
+            keys={
+                "cache:foo": ("string", "v", -1),
+                "valkey_inspect:ns:cache": ("string", "[]", -1),  # our own cache key
+            }
+        )
         info = valkey_inspect.server_info()
         assert info["total_keys"] == 1  # only cache:foo counted
 
@@ -249,14 +253,17 @@ class TestServerInfo:
 # list_namespaces
 # ---------------------------------------------------------------------------
 
+
 class TestListNamespaces:
     def test_groups_by_prefix(self, fake_client):
-        fake_client(keys={
-            "cache:foo": ("string", "v", -1),
-            "cache:bar": ("string", "v", -1),
-            "stick_table:t1": ("string", "[]", -1),
-            "lonely": ("string", "v", -1),  # no namespace
-        })
+        fake_client(
+            keys={
+                "cache:foo": ("string", "v", -1),
+                "cache:bar": ("string", "v", -1),
+                "stick_table:t1": ("string", "[]", -1),
+                "lonely": ("string", "v", -1),  # no namespace
+            }
+        )
         ns = valkey_inspect.list_namespaces()
         prefixes = [n["prefix"] for n in ns]
         # NO_NAMESPACE sorts last (the sort key puts it last).
@@ -285,6 +292,7 @@ class TestListNamespaces:
 # ---------------------------------------------------------------------------
 # get_namespace (pagination + previews)
 # ---------------------------------------------------------------------------
+
 
 class TestGetNamespace:
     def test_pagination(self, fake_client):
@@ -322,6 +330,7 @@ class TestGetNamespace:
     def test_limit_clamped_to_max(self, fake_client, monkeypatch):
         fake_client()
         from app.core.config import get_settings
+
         s = get_settings()
         monkeypatch.setattr(s, "VALKEY_INSPECT_MAX_PAGE_SIZE", 10)
         result = valkey_inspect.get_namespace("cache", limit=999)
@@ -341,10 +350,12 @@ class TestGetNamespace:
         # The NO_NAMESPACE group should only include keys WITHOUT a `:`. The
         # scan uses pattern `*` which matches everything, so the service must
         # post-filter.
-        fake_client(keys={
-            "lonely": ("string", "v", -1),
-            "cache:has_colon": ("string", "v", -1),
-        })
+        fake_client(
+            keys={
+                "lonely": ("string", "v", -1),
+                "cache:has_colon": ("string", "v", -1),
+            }
+        )
         result = valkey_inspect.get_namespace(valkey_inspect.NO_NAMESPACE, limit=100)
         assert result["total"] == 1
         assert result["keys"][0]["key"] == "lonely"
@@ -400,10 +411,12 @@ class TestGetNamespace:
         assert "stream[2]" in preview
 
     def test_ttl_persisted_and_missing(self, fake_client):
-        fake_client(keys={
-            "cache:persist": ("string", "v", -1),  # no expiry
-            # "cache:gone" intentionally absent → ttl -2, type none
-        })
+        fake_client(
+            keys={
+                "cache:persist": ("string", "v", -1),  # no expiry
+                # "cache:gone" intentionally absent → ttl -2, type none
+            }
+        )
         result = valkey_inspect.get_namespace("cache", limit=10)
         by_key = {k["key"]: k for k in result["keys"]}
         assert by_key["cache:persist"]["ttl"] == -1
@@ -438,6 +451,7 @@ class TestGetNamespace:
 # ---------------------------------------------------------------------------
 # delete_key
 # ---------------------------------------------------------------------------
+
 
 class TestDeleteKey:
     def test_deletes_existing_key(self, fake_client):
@@ -475,6 +489,7 @@ class TestDeleteKey:
 # ---------------------------------------------------------------------------
 # _namespace_of helper
 # ---------------------------------------------------------------------------
+
 
 class TestNamespaceOf:
     def test_extracts_prefix(self):

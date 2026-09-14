@@ -5,8 +5,9 @@ directives. Disk cache redirects server lines to the Varnish container and sets
 the X-Cache-Backend routing header (only when the global disk_cache_enabled
 toggle is on).
 """
+
 from app.services import haproxy
-from tests.factories import make_backend, make_server, make_cache_config, make_cache_rule
+from tests.factories import make_backend, make_cache_config, make_cache_rule, make_server
 
 
 def test_no_cache_by_default(db):
@@ -24,7 +25,14 @@ def test_memory_cache_section_emitted(db):
     """A backend with haproxy_enabled emits a cache section with correct directives."""
     backend = make_backend(db, name="web")
     make_server(db, backend.id)
-    make_cache_config(db, backend.id, haproxy_enabled=True, haproxy_total_max_size=200, haproxy_max_object_size=500000, haproxy_max_age=600)
+    make_cache_config(
+        db,
+        backend.id,
+        haproxy_enabled=True,
+        haproxy_total_max_size=200,
+        haproxy_max_object_size=500000,
+        haproxy_max_age=600,
+    )
     cfg = haproxy.generate_config(db)
     assert "cache cache_web" in cfg
     assert "total-max-size 200" in cfg
@@ -140,15 +148,19 @@ def test_disk_cache_redirects_servers(db):
     cc = make_cache_config(db, backend.id, disk_cache_enabled=True)
     # Add a cache rule so use-server directives are emitted
     from app.models.models import CacheRule
-    rule = CacheRule(cache_config_id=cc.id, match_type="path", pattern="/static/", action="cache", tier="disk", priority=0)
+
+    rule = CacheRule(
+        cache_config_id=cc.id, match_type="path", pattern="/static/", action="cache", tier="disk", priority=0
+    )
     db.add(rule)
     db.commit()
-    
+
     # Enable the global disk cache toggle
     from app.services.settings import set_setting
+
     set_setting(db, "disk_cache_enabled", "true")
     cfg = haproxy.generate_config(db)
-    
+
     # Varnish server is emitted as a backup (not a round-robin peer) to avoid
     # routing Varnish's own fetches back into Varnish.
     assert "server disk_cache varnish:6081" in cfg
@@ -166,12 +178,13 @@ def test_disk_cache_redirects_servers(db):
     # Backup would be added as a flag, so if the line doesn't end with "backup" we're good
     # But let's be more precise: the line should not contain " backup" as a standalone word
     import re
-    assert not re.search(r'\sbackup(\s|$)', origin_line[0]), f"Origin server should not be backup: {origin_line[0]}"
-    
+
+    assert not re.search(r"\sbackup(\s|$)", origin_line[0]), f"Origin server should not be backup: {origin_line[0]}"
+
     # Redispatch + retry-on ensure fallback on Varnish errors (503/502/504)
     assert "option redispatch" in cfg
     assert "retry-on 503 502 504" in cfg
-    
+
     # Check for use-server directive
     assert "use-server disk_cache" in cfg
 
@@ -183,14 +196,18 @@ def test_disk_cache_header_set(db):
     cc = make_cache_config(db, backend.id, disk_cache_enabled=True)
     # Add a cache rule so the header is set
     from app.models.models import CacheRule
-    rule = CacheRule(cache_config_id=cc.id, match_type="extension", pattern="jpg", action="cache", tier="disk", priority=0)
+
+    rule = CacheRule(
+        cache_config_id=cc.id, match_type="extension", pattern="jpg", action="cache", tier="disk", priority=0
+    )
     db.add(rule)
     db.commit()
-    
+
     from app.services.settings import set_setting
+
     set_setting(db, "disk_cache_enabled", "true")
     cfg = haproxy.generate_config(db)
-    
+
     # Header is set conditionally (with "if" clause for cache rules or PURGE)
     assert "http-request set-header X-Cache-Backend mybackend if" in cfg
 
@@ -202,6 +219,7 @@ def test_disk_cache_globally_disabled(db):
     make_cache_config(db, backend.id, disk_cache_enabled=True)
     # Global toggle is off by default
     from app.services.settings import set_setting
+
     set_setting(db, "disk_cache_enabled", "false")
     cfg = haproxy.generate_config(db)
     # Should fall back to origin servers
@@ -222,6 +240,7 @@ def test_both_tiers_simultaneous(db):
     cc = make_cache_config(db, backend.id, haproxy_enabled=True, disk_cache_enabled=True)
     make_cache_rule(db, cc.id, match_type="extension", pattern="png")
     from app.services.settings import set_setting
+
     set_setting(db, "disk_cache_enabled", "true")
     cfg = haproxy.generate_config(db)
     # Memory cache section is declared
@@ -252,6 +271,7 @@ def test_tcp_backend_no_cache(db):
     make_server(db, backend.id, address="10.0.0.2", port=3306)
     make_cache_config(db, backend.id, haproxy_enabled=True, disk_cache_enabled=True)
     from app.services.settings import set_setting
+
     set_setting(db, "disk_cache_enabled", "true")
     cfg = haproxy.generate_config(db)
     # No cache section for TCP backends
@@ -272,14 +292,20 @@ def test_disk_cache_header_condition_uses_named_acls(db):
     make_server(db, backend.id)
     cc = make_cache_config(db, backend.id, disk_cache_enabled=True)
     from app.models.models import CacheRule
+
     # Bypass rule then cache rule so the condition includes a negation.
-    bypass = CacheRule(cache_config_id=cc.id, match_type="path", pattern="/api/", action="bypass", tier="disk", priority=0)
-    rule = CacheRule(cache_config_id=cc.id, match_type="path", pattern="/static/", action="cache", tier="disk", priority=1)
+    bypass = CacheRule(
+        cache_config_id=cc.id, match_type="path", pattern="/api/", action="bypass", tier="disk", priority=0
+    )
+    rule = CacheRule(
+        cache_config_id=cc.id, match_type="path", pattern="/static/", action="cache", tier="disk", priority=1
+    )
     db.add(bypass)
     db.add(rule)
     db.commit()
 
     from app.services.settings import set_setting
+
     set_setting(db, "disk_cache_enabled", "true")
     cfg = haproxy.generate_config(db)
 

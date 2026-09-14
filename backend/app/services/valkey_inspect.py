@@ -13,9 +13,10 @@ keyspaces; on bigger stores the namespace list will be approximate.
 All access degrades gracefully when Valkey is unreachable (returns empty/``available=False``
 shapes), matching the pattern in ``valkey_client.py`` and ``stick_tables.py``.
 """
+
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from ..core import valkey_client
 from ..core.config import get_settings
@@ -36,12 +37,13 @@ _OWN_CACHE_PREFIX = "valkey_inspect:"
 # Low-level helpers
 # ---------------------------------------------------------------------------
 
+
 def _client():
     """Return the shared Valkey client, or None if unreachable."""
     return valkey_client._get_client()
 
 
-def _scan_keys(pattern: str) -> List[str]:
+def _scan_keys(pattern: str) -> list[str]:
     """Bounded SCAN over the keyspace matching ``pattern``.
 
     Returns a list of key strings. SCAN iterates in batches of 200; we cap the
@@ -53,7 +55,7 @@ def _scan_keys(pattern: str) -> List[str]:
     if not client:
         return []
     max_batches = getattr(settings, "VALKEY_INSPECT_MAX_SCAN_BATCHES", 1000)
-    keys: List[str] = []
+    keys: list[str] = []
     try:
         # valkey-py's scan_iter wraps SCAN into a generator. We break early once
         # we've issued enough batches to stay within the bound.
@@ -66,7 +68,9 @@ def _scan_keys(pattern: str) -> List[str]:
                 if batch >= max_batches:
                     logger.info(
                         "valkey_inspect: SCAN cap reached (%d batches, %d keys) for %r",
-                        batch, len(keys), pattern,
+                        batch,
+                        len(keys),
+                        pattern,
                     )
                     break
     except Exception as e:
@@ -91,15 +95,16 @@ def _namespace_of(key: str) -> str:
 # Caching (cached scanned key list per namespace)
 # ---------------------------------------------------------------------------
 
+
 def _ns_cache_key(prefix: str) -> str:
     return f"valkey_inspect:ns:{prefix}"
 
 
-def _ns_cache_get(prefix: str) -> Optional[List[str]]:
+def _ns_cache_get(prefix: str) -> list[str] | None:
     return valkey_client.cache_get(_ns_cache_key(prefix))
 
 
-def _ns_cache_set(prefix: str, keys: List[str]) -> None:
+def _ns_cache_set(prefix: str, keys: list[str]) -> None:
     valkey_client.cache_set(
         _ns_cache_key(prefix),
         keys,
@@ -121,7 +126,8 @@ def _ns_cache_invalidate(prefix: str) -> None:
 # Server info
 # ---------------------------------------------------------------------------
 
-def server_info() -> Dict[str, Any]:
+
+def server_info() -> dict[str, Any]:
     """Return a summary of the Valkey server state.
 
     Degrades to ``{available: False, error: ...}`` when Valkey is unreachable.
@@ -165,7 +171,8 @@ def server_info() -> Dict[str, Any]:
 # Namespace listing
 # ---------------------------------------------------------------------------
 
-def list_namespaces() -> List[Dict[str, Any]]:
+
+def list_namespaces() -> list[dict[str, Any]]:
     """Group all keys by namespace prefix and return a sorted summary list.
 
     Each entry: ``{prefix, count, sample_keys}`` (up to 5 sample keys).
@@ -177,19 +184,21 @@ def list_namespaces() -> List[Dict[str, Any]]:
         return cached
 
     keys = _scan_keys("*")
-    groups: Dict[str, List[str]] = {}
+    groups: dict[str, list[str]] = {}
     for k in keys:
         ns = _namespace_of(k)
         groups.setdefault(ns, []).append(k)
 
-    out: List[Dict[str, Any]] = []
+    out: list[dict[str, Any]] = []
     for prefix in sorted(groups.keys(), key=lambda p: (p == NO_NAMESPACE, p)):
         members = groups[prefix]
-        out.append({
-            "prefix": prefix,
-            "count": len(members),
-            "sample_keys": sorted(members)[:5],
-        })
+        out.append(
+            {
+                "prefix": prefix,
+                "count": len(members),
+                "sample_keys": sorted(members)[:5],
+            }
+        )
 
     valkey_client.cache_set(
         cache_key,
@@ -202,6 +211,7 @@ def list_namespaces() -> List[Dict[str, Any]]:
 # ---------------------------------------------------------------------------
 # Namespace detail (paginated keys with type/ttl/size/preview)
 # ---------------------------------------------------------------------------
+
 
 def _preview_value(client, key: str, ktype: str) -> str:
     """Build a short human-readable preview of a key's value.
@@ -220,7 +230,7 @@ def _preview_value(client, key: str, ktype: str) -> str:
             try:
                 parsed = json.loads(s)
                 s = json.dumps(parsed, default=str, ensure_ascii=False)
-            except (json.JSONDecodeError, TypeError, ValueError):
+            except json.JSONDecodeError, TypeError, ValueError:
                 pass
             return _truncate(s, 200)
         if ktype == "list":
@@ -265,8 +275,8 @@ def get_namespace(
     prefix: str,
     limit: int = 100,
     offset: int = 0,
-    search: Optional[str] = None,
-) -> Dict[str, Any]:
+    search: str | None = None,
+) -> dict[str, Any]:
     """Fetch a paginated, optionally key-substring-filtered slice of a namespace.
 
     Returns ``{prefix, total, offset, limit, keys}`` where each key is
@@ -299,13 +309,13 @@ def get_namespace(
         filtered = keys
 
     total = len(filtered)
-    page = filtered[offset:offset + limit]
+    page = filtered[offset : offset + limit]
 
     client = _client()
-    entries: List[Dict[str, Any]] = []
+    entries: list[dict[str, Any]] = []
     if client:
         for key in page:
-            entry: Dict[str, Any] = {
+            entry: dict[str, Any] = {
                 "key": key,
                 "type": "none",
                 "ttl": -2,
@@ -342,7 +352,8 @@ def get_namespace(
 # Delete
 # ---------------------------------------------------------------------------
 
-def delete_key(key: str) -> Dict[str, Any]:
+
+def delete_key(key: str) -> dict[str, Any]:
     """Delete a single key. Refuses to delete our own cache keys.
 
     Returns ``{ok, deleted}`` where ``deleted`` is the number of keys removed

@@ -3,15 +3,14 @@ import re
 import shutil
 import subprocess
 import tempfile
-from datetime import datetime, timezone, timedelta
-from typing import List, Optional
+from datetime import UTC, datetime, timedelta
+
 from sqlalchemy.orm import Session
+
 from ..core.config import get_settings
 from ..models.models import Certificate
 from .acme_cas import resolve_ca_server
 from .dns_providers import (
-    get_active_acme_client,
-    get_provider_code,
     get_provider_credentials_config,
     validate_dns_credentials,
 )
@@ -24,7 +23,9 @@ settings = get_settings()
 # out the real error message. It also appends a generic "Please add '--debug'"
 # and "See: https://..." footer to every error. Filter both out.
 _ACME_NOISE_RE = re.compile(r"\[: (INFO|DEBUG|ERROR): integer expression expected")
-_ACME_FOOTER_RE = re.compile(r"Please add '--debug' or '--log' to see more information\.|See: https://github\.com/acmesh-official/acme\.sh/wiki/How-to-debug-acme\.sh")
+_ACME_FOOTER_RE = re.compile(
+    r"Please add '--debug' or '--log' to see more information\.|See: https://github\.com/acmesh-official/acme\.sh/wiki/How-to-debug-acme\.sh"
+)
 
 
 def _clean_acme_output(output: str) -> str:
@@ -40,7 +41,7 @@ def _acme_sh_bin() -> str:
     return shutil.which("acme.sh") or settings.ACME_SH_BIN
 
 
-def _acme_keylength(key_type: Optional[str]) -> str:
+def _acme_keylength(key_type: str | None) -> str:
     mapping = {
         "rsa-2048": "2048",
         "rsa-3072": "3072",
@@ -53,14 +54,18 @@ def _acme_keylength(key_type: Optional[str]) -> str:
     return mapping.get(key_type or "ecdsa-p384", "ec-384")
 
 
-def _acme_sh_base(ca: Optional[str] = None, accountemail: Optional[str] = None) -> List[str]:
+def _acme_sh_base(ca: str | None = None, accountemail: str | None = None) -> list[str]:
     server = resolve_ca_server(ca, "acme.sh") or settings.ACME_SH_CA
     return [
         _acme_sh_bin(),
-        "--home", settings.ACME_SH_HOME,
-        "--cert-home", settings.ACME_SH_HOME,
-        "--accountemail", accountemail or "admin@example.com",
-        "--server", server,
+        "--home",
+        settings.ACME_SH_HOME,
+        "--cert-home",
+        settings.ACME_SH_HOME,
+        "--accountemail",
+        accountemail or "admin@example.com",
+        "--server",
+        server,
     ]
 
 
@@ -117,6 +122,7 @@ def migrate_cert_bundles(db: Session) -> None:
     haproxy.pem bundle logic was introduced.
     """
     from sqlalchemy import select
+
     try:
         certs = db.execute(select(Certificate)).scalars().all()
     except Exception:
@@ -151,10 +157,7 @@ def _sync_cert_metadata(cert: Certificate):
     fullchain = os.path.join(_cert_dir(cert), "fullchain.pem")
     if os.path.exists(fullchain) and shutil.which("openssl"):
         try:
-            out = subprocess.check_output(
-                ["openssl", "x509", "-in", fullchain, "-noout", "-dates"],
-                text=True
-            )
+            out = subprocess.check_output(["openssl", "x509", "-in", fullchain, "-noout", "-dates"], text=True)
             for line in out.splitlines():
                 if line.startswith("notBefore="):
                     cert.not_before = _parse_openssl_date(line.split("=", 1)[1])
@@ -165,8 +168,7 @@ def _sync_cert_metadata(cert: Certificate):
 
         try:
             subject = subprocess.check_output(
-                ["openssl", "x509", "-in", fullchain, "-noout", "-subject", "-nameopt", "RFC2253"],
-                text=True
+                ["openssl", "x509", "-in", fullchain, "-noout", "-subject", "-nameopt", "RFC2253"], text=True
             )
             subject_value = subject.strip().split("=", 1)[1]
             for part in subject_value.split(","):
@@ -179,8 +181,7 @@ def _sync_cert_metadata(cert: Certificate):
 
         try:
             san_out = subprocess.check_output(
-                ["openssl", "x509", "-in", fullchain, "-noout", "-ext", "subjectAltName"],
-                text=True
+                ["openssl", "x509", "-in", fullchain, "-noout", "-ext", "subjectAltName"], text=True
             )
             sans = []
             for line in san_out.splitlines():
@@ -190,7 +191,7 @@ def _sync_cert_metadata(cert: Certificate):
             cert.sans = None
 
 
-def _parse_openssl_date(s: str) -> Optional[datetime]:
+def _parse_openssl_date(s: str) -> datetime | None:
     try:
         # OpenSSL always prints GMT; strip the timezone and return a naive UTC datetime
         return datetime.strptime(s.strip(), "%b %d %H:%M:%S %Y %Z").replace(tzinfo=None)
@@ -226,12 +227,19 @@ def generate_certificate(cert: Certificate, db: Session, issue: bool = True) -> 
 def _install_acme_sh_cert(cert: Certificate, cert_dir: str) -> dict:
     """Copy an acme.sh issued cert into the project cert directory."""
     install_cmd = _acme_sh_base(cert.acme_ca, cert.email) + [
-        "--install-cert", "-d", cert.domain,
-        "--cert-file", os.path.join(cert_dir, "cert.pem"),
-        "--key-file", os.path.join(cert_dir, "privkey.pem"),
-        "--fullchain-file", os.path.join(cert_dir, "fullchain.pem"),
-        "--ca-file", os.path.join(cert_dir, "chain.pem"),
-        "--reloadcmd", "echo 'certificate installed'",
+        "--install-cert",
+        "-d",
+        cert.domain,
+        "--cert-file",
+        os.path.join(cert_dir, "cert.pem"),
+        "--key-file",
+        os.path.join(cert_dir, "privkey.pem"),
+        "--fullchain-file",
+        os.path.join(cert_dir, "fullchain.pem"),
+        "--ca-file",
+        os.path.join(cert_dir, "chain.pem"),
+        "--reloadcmd",
+        "echo 'certificate installed'",
     ]
     install = subprocess.run(install_cmd, capture_output=True, text=True)
     if install.returncode != 0:
@@ -316,11 +324,18 @@ def _run_certbot(cert: Certificate, db: Session) -> dict:
         domains.append(f"*.{cert.domain}")
 
     cmd = [
-        "certbot", "certonly", "--non-interactive", "--agree-tos",
-        "--email", cert.email or "admin@example.com",
-        "--work-dir", work_dir,
-        "--logs-dir", logs_dir,
-        "--config-dir", config_dir,
+        "certbot",
+        "certonly",
+        "--non-interactive",
+        "--agree-tos",
+        "--email",
+        cert.email or "admin@example.com",
+        "--work-dir",
+        work_dir,
+        "--logs-dir",
+        logs_dir,
+        "--config-dir",
+        config_dir,
     ]
     ca_server = resolve_ca_server(cert.acme_ca, acme_client)
     if ca_server:
@@ -419,13 +434,15 @@ def _renew_acme_sh(cert: Certificate, db: Session) -> dict:
 
 def renew_certificates(db: Session) -> dict:
     results = []
-    now = datetime.now(timezone.utc)
-    for cert in db.query(Certificate).filter(Certificate.auto_renew == True, Certificate.provider == "letsencrypt").all():
+    now = datetime.now(UTC)
+    for cert in (
+        db.query(Certificate).filter(Certificate.auto_renew == True, Certificate.provider == "letsencrypt").all()
+    ):
         if cert.not_after:
             # not_after may be naive (SQLite strips tzinfo); treat it as UTC
             not_after = cert.not_after
             if not_after.tzinfo is None:
-                not_after = not_after.replace(tzinfo=timezone.utc)
+                not_after = not_after.replace(tzinfo=UTC)
             if not_after - now > timedelta(days=30):
                 continue
         if settings.ACME_SH_ENABLED:
@@ -455,7 +472,9 @@ def upload_custom_certificate(cert: Certificate, key: str, chain: str, fullchain
                 temp_files.append(fullchain_tmp.name)
                 subprocess.run(
                     ["openssl", "x509", "-noout", "-in", fullchain_tmp.name],
-                    check=True, capture_output=True, text=True,
+                    check=True,
+                    capture_output=True,
+                    text=True,
                 )
             if chain.strip():
                 chain_tmp = tempfile.NamedTemporaryFile("w", delete=False, suffix=".pem")
@@ -464,7 +483,9 @@ def upload_custom_certificate(cert: Certificate, key: str, chain: str, fullchain
                 temp_files.append(chain_tmp.name)
                 subprocess.run(
                     ["openssl", "x509", "-noout", "-in", chain_tmp.name],
-                    check=True, capture_output=True, text=True,
+                    check=True,
+                    capture_output=True,
+                    text=True,
                 )
         except subprocess.CalledProcessError as e:
             return {"status": "error", "message": f"Invalid CA certificate: {e.stderr or e.stdout}"}
@@ -520,26 +541,22 @@ def upload_custom_certificate(cert: Certificate, key: str, chain: str, fullchain
             chain_tmp.close()
             temp_files.append(chain_tmp.name)
             subprocess.run(
-                ["openssl", "x509", "-noout", "-in", chain_tmp.name],
-                check=True, capture_output=True, text=True
+                ["openssl", "x509", "-noout", "-in", chain_tmp.name], check=True, capture_output=True, text=True
             )
 
         subprocess.run(
-            ["openssl", "x509", "-noout", "-in", fullchain_tmp.name],
-            check=True, capture_output=True, text=True
+            ["openssl", "x509", "-noout", "-in", fullchain_tmp.name], check=True, capture_output=True, text=True
         )
-        subprocess.run(
-            ["openssl", "pkey", "-noout", "-in", key_tmp.name],
-            check=True, capture_output=True, text=True
-        )
+        subprocess.run(["openssl", "pkey", "-noout", "-in", key_tmp.name], check=True, capture_output=True, text=True)
 
         pubkey_cert = subprocess.run(
             ["openssl", "x509", "-noout", "-pubkey", "-in", fullchain_tmp.name],
-            check=True, capture_output=True, text=True
+            check=True,
+            capture_output=True,
+            text=True,
         ).stdout.strip()
         pubkey_key = subprocess.run(
-            ["openssl", "pkey", "-pubout", "-in", key_tmp.name],
-            check=True, capture_output=True, text=True
+            ["openssl", "pkey", "-pubout", "-in", key_tmp.name], check=True, capture_output=True, text=True
         ).stdout.strip()
         if pubkey_cert != pubkey_key:
             return {"status": "error", "message": "Private key does not match certificate"}

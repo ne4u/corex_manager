@@ -1,17 +1,17 @@
 """Endpoint router."""
+
 import csv
 import io
-import os
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
-from ..deps import get_current_user, get_db, require_admin, require_write, rate_limit
+
 from ...core.config import get_settings
 from ...models.models import *
 from ...schemas.page_protect import *
 from ...services.page_protect import *
-from ...services.tasks import queue_task
+from ..deps import get_current_user, get_db, rate_limit, require_write
 
 settings = get_settings()
 router = APIRouter()
@@ -20,9 +20,13 @@ router = APIRouter()
 # Page Protect (Cloudflare Page Shield-style client-side security)
 # ---------------------------------------------------------------------------
 
+
 @router.get("/page-protect/settings", response_model=PageProtectSettings)
-def get_page_protect_settings_route(db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
+def get_page_protect_settings_route(
+    db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)
+):
     from ...services.page_protect import get_page_protect_settings
+
     return PageProtectSettings(**get_page_protect_settings(db))
 
 
@@ -35,6 +39,7 @@ def update_page_protect_settings_route(
 ):
     from ...services.page_protect import update_page_protect_settings
     from ...services.settings import get_setting
+
     # Gate beacon injection and beacon trust behind Response Transformations —
     # the beacon JS is injected via the resp_transform filter, so neither
     # feature can work without it.
@@ -49,13 +54,15 @@ def update_page_protect_settings_route(
     return PageProtectSettings(**result)
 
 
-@router.get("/page-protect/policies", response_model=List[PageProtectPolicyResponse])
+@router.get("/page-protect/policies", response_model=list[PageProtectPolicyResponse])
 def list_page_protect_policies(db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
     return db.query(PageProtectPolicy).order_by(PageProtectPolicy.id).all()
 
 
 @router.post("/page-protect/policies", response_model=PageProtectPolicyResponse)
-def create_page_protect_policy(p: PageProtectPolicyCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def create_page_protect_policy(
+    p: PageProtectPolicyCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     existing = db.query(PageProtectPolicy).filter(PageProtectPolicy.name == p.name).first()
     if existing:
         raise HTTPException(status_code=409, detail="A policy with this name already exists")
@@ -67,7 +74,13 @@ def create_page_protect_policy(p: PageProtectPolicyCreate, db: Session = Depends
 
 
 @router.put("/page-protect/policies/{pid}", response_model=PageProtectPolicyResponse)
-def update_page_protect_policy(pid: int, p_in: PageProtectPolicyUpdate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def update_page_protect_policy(
+    pid: int,
+    p_in: PageProtectPolicyUpdate,
+    db: Session = Depends(get_db),
+    user=Depends(require_write),
+    _=Depends(rate_limit),
+):
     obj = db.get(PageProtectPolicy, pid)
     if not obj:
         raise HTTPException(status_code=404, detail="Policy not found")
@@ -79,7 +92,9 @@ def update_page_protect_policy(pid: int, p_in: PageProtectPolicyUpdate, db: Sess
 
 
 @router.delete("/page-protect/policies/{pid}")
-def delete_page_protect_policy(pid: int, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def delete_page_protect_policy(
+    pid: int, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     obj = db.get(PageProtectPolicy, pid)
     if not obj:
         raise HTTPException(status_code=404, detail="Policy not found")
@@ -88,13 +103,13 @@ def delete_page_protect_policy(pid: int, db: Session = Depends(get_db), user=Dep
     return {"status": "ok"}
 
 
-@router.get("/page-protect/reports", response_model=List[CspReportResponse])
+@router.get("/page-protect/reports", response_model=list[CspReportResponse])
 def list_csp_reports(
-    policy_id: Optional[int] = Query(None),
-    from_: Optional[datetime] = Query(None, alias="from"),
-    to: Optional[datetime] = Query(None),
-    backend: Optional[str] = Query(None),
-    violated_directive: Optional[str] = Query(None),
+    policy_id: int | None = Query(None),
+    from_: datetime | None = Query(None, alias="from"),
+    to: datetime | None = Query(None),
+    backend: str | None = Query(None),
+    violated_directive: str | None = Query(None),
     limit: int = Query(100, le=1000),
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
@@ -123,16 +138,44 @@ def export_csp_reports(
     reports = db.query(CspReport).order_by(CspReport.captured_at.desc()).limit(10000).all()
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["id", "captured_at", "client_ip", "document_uri", "violated_directive", "blocked_uri", "backend_name", "listener_name", "report_type"])
+    writer.writerow(
+        [
+            "id",
+            "captured_at",
+            "client_ip",
+            "document_uri",
+            "violated_directive",
+            "blocked_uri",
+            "backend_name",
+            "listener_name",
+            "report_type",
+        ]
+    )
     for r in reports:
-        writer.writerow([r.id, r.captured_at, r.client_ip, r.document_uri, r.violated_directive, r.blocked_uri, r.backend_name, r.listener_name, r.report_type])
+        writer.writerow(
+            [
+                r.id,
+                r.captured_at,
+                r.client_ip,
+                r.document_uri,
+                r.violated_directive,
+                r.blocked_uri,
+                r.backend_name,
+                r.listener_name,
+                r.report_type,
+            ]
+        )
     output.seek(0)
-    return Response(content=output.getvalue(), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=csp_reports.csv"})
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=csp_reports.csv"},
+    )
 
 
 @router.delete("/page-protect/reports")
 def clear_csp_reports(
-    policy_id: Optional[int] = Query(None),
+    policy_id: int | None = Query(None),
     db: Session = Depends(get_db),
     user=Depends(require_write),
     _=Depends(rate_limit),
@@ -145,11 +188,11 @@ def clear_csp_reports(
     return {"status": "ok", "deleted": count}
 
 
-@router.get("/page-protect/scripts", response_model=List[PageProtectScriptResponse])
+@router.get("/page-protect/scripts", response_model=list[PageProtectScriptResponse])
 def list_page_protect_scripts(
-    resource_type: Optional[str] = Query(None),
-    hash_changed: Optional[bool] = Query(None),
-    ignored: Optional[bool] = Query(None),
+    resource_type: str | None = Query(None),
+    hash_changed: bool | None = Query(None),
+    ignored: bool | None = Query(None),
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
     _=Depends(rate_limit),
@@ -186,6 +229,7 @@ def create_page_protect_script(
     domain = None
     try:
         from urllib.parse import urlparse
+
         parsed = urlparse(url)
         domain = parsed.hostname
     except Exception:
@@ -206,7 +250,13 @@ def create_page_protect_script(
 
 
 @router.put("/page-protect/scripts/{sid}", response_model=PageProtectScriptResponse)
-def update_page_protect_script(sid: int, s_in: PageProtectScriptUpdate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def update_page_protect_script(
+    sid: int,
+    s_in: PageProtectScriptUpdate,
+    db: Session = Depends(get_db),
+    user=Depends(require_write),
+    _=Depends(rate_limit),
+):
     obj = db.get(PageProtectScript, sid)
     if not obj:
         raise HTTPException(status_code=404, detail="Script not found")
@@ -224,7 +274,9 @@ def update_page_protect_script(sid: int, s_in: PageProtectScriptUpdate, db: Sess
 
 
 @router.delete("/page-protect/scripts/{sid}")
-def delete_page_protect_script(sid: int, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def delete_page_protect_script(
+    sid: int, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     obj = db.get(PageProtectScript, sid)
     if not obj:
         raise HTTPException(status_code=404, detail="Script not found")
@@ -234,8 +286,11 @@ def delete_page_protect_script(sid: int, db: Session = Depends(get_db), user=Dep
 
 
 @router.post("/page-protect/scripts/{sid}/check", response_model=PageProtectScriptResponse)
-def check_page_protect_script(sid: int, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def check_page_protect_script(
+    sid: int, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     from ...services.page_protect_hasher import check_script
+
     obj = db.get(PageProtectScript, sid)
     if not obj:
         raise HTTPException(status_code=404, detail="Script not found")
@@ -250,7 +305,9 @@ def check_page_protect_script(sid: int, db: Session = Depends(get_db), user=Depe
 
 
 @router.get("/page-protect/scripts/{sid}/content")
-def get_page_protect_script_content(sid: int, db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
+def get_page_protect_script_content(
+    sid: int, db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)
+):
     """Return the stored fetched content for a script asset.
 
     The content is persisted by the hasher when the asset is first checked or
@@ -280,6 +337,7 @@ def reset_page_protect_script_hash(
     performed to establish the new baseline right away.
     """
     from ...services.page_protect_hasher import check_script, reset_script_hash
+
     obj = db.get(PageProtectScript, sid)
     if not obj:
         raise HTTPException(status_code=404, detail="Script not found")
@@ -294,6 +352,7 @@ def reset_page_protect_script_hash(
 @router.post("/page-protect/scripts/check-all")
 def check_all_page_protect_scripts(db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
     from ...services.page_protect_hasher import check_all_scripts
+
     checked = check_all_scripts(db, force=True)
     return {"status": "ok", "checked": checked}
 
@@ -301,6 +360,7 @@ def check_all_page_protect_scripts(db: Session = Depends(get_db), user=Depends(r
 @router.get("/page-protect/stats", response_model=PageProtectStats)
 def get_page_protect_stats(db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
     from ...services.page_protect import get_stats
+
     return PageProtectStats(**get_stats(db))
 
 
@@ -308,16 +368,19 @@ def get_page_protect_stats(db: Session = Depends(get_db), user=Depends(get_curre
 def sample_page_protect_reports(user=Depends(require_write), _=Depends(rate_limit)):
     """Manually trigger one cycle of CSP report collection from HAProxy logs."""
     from ...services.page_protect_sampler import sample_csp_reports
+
     stored = sample_csp_reports(force_recent=True)
     return PageProtectSampleResponse(stored=stored)
 
 
 # ----- Baseline collection window -----
 
+
 @router.get("/page-protect/baseline", response_model=PageProtectBaselineStatus)
 def get_page_protect_baseline(db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
     """Return the current baseline collection window state."""
     from ...services.page_protect import get_baseline
+
     return PageProtectBaselineStatus(**get_baseline(db))
 
 
@@ -330,6 +393,7 @@ def start_page_protect_baseline(
 ):
     """Start a new baseline collection window."""
     from ...services.page_protect import start_baseline
+
     return PageProtectBaselineStatus(**start_baseline(db, note=req.note))
 
 
@@ -337,6 +401,7 @@ def start_page_protect_baseline(
 def stop_page_protect_baseline(db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
     """Stop the current baseline collection window."""
     from ...services.page_protect import stop_baseline
+
     result = stop_baseline(db)
     if result.get("status") == "idle" and result.get("error"):
         raise HTTPException(status_code=400, detail=result["error"])
@@ -347,21 +412,24 @@ def stop_page_protect_baseline(db: Session = Depends(get_db), user=Depends(requi
 def clear_page_protect_baseline(db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
     """Clear the baseline collection window."""
     from ...services.page_protect import clear_baseline
+
     return PageProtectBaselineStatus(**clear_baseline(db))
 
 
 # ----- Policy recommender -----
 
+
 @router.get("/page-protect/recommend", response_model=PageProtectRecommendResponse)
 def get_page_protect_recommendation(
-    backend_ids: Optional[str] = Query(None, description="Comma-separated backend IDs to filter"),
+    backend_ids: str | None = Query(None, description="Comma-separated backend IDs to filter"),
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
     _=Depends(rate_limit),
 ):
     """Recommend a CSP policy based on observed scripts and violation reports."""
     from ...services.page_protect import recommend_policy
-    ids: Optional[List[int]] = None
+
+    ids: list[int] | None = None
     if backend_ids:
         try:
             ids = [int(x.strip()) for x in backend_ids.split(",") if x.strip()]

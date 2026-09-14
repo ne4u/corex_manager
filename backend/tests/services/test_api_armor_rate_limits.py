@@ -1,6 +1,7 @@
 """Tests for per-endpoint rate limiting (API Armor path/method scoping)."""
-from app.services import haproxy
+
 from app.models.models import RateLimit
+from app.services import haproxy
 from tests.factories import make_backend, make_listener, make_server
 
 

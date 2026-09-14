@@ -10,9 +10,9 @@ from sqlalchemy.pool import NullPool
 _BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, _BACKEND_DIR)
 
+import app.models.models  # noqa: E402, F401
 from app.core.config import get_settings  # noqa: E402
 from app.core.database import Base  # noqa: E402
-import app.models.models  # noqa: E402, F401
 
 _settings = get_settings()
 # Use a dedicated NullPool engine for migrations so there is zero chance of

@@ -1,11 +1,11 @@
 """Vector log pipeline API — admin-only management of log sources and sinks."""
+
 import os
-from typing import Any, Dict, List
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from ..deps import get_db, require_admin, rate_limit
 from ...core.config import get_settings
 from ...models.logging import VectorSink
 from ...schemas.vector import (
@@ -21,6 +21,7 @@ from ...schemas.vector import (
     VectorValidateResponse,
 )
 from ...services import vector_pipeline as vp
+from ..deps import get_db, rate_limit, require_admin
 
 router = APIRouter()
 settings = get_settings()
@@ -37,8 +38,7 @@ def _to_response(sink: VectorSink) -> VectorSinkResponse:
     )
 
 
-def _resolve_masked_options(sink_type: str, incoming: Dict[str, Any],
-                            stored: Dict[str, Any]) -> Dict[str, Any]:
+def _resolve_masked_options(sink_type: str, incoming: dict[str, Any], stored: dict[str, Any]) -> dict[str, Any]:
     """Merge client options with stored encrypted values.
 
     A secret field submitted as the mask sentinel keeps the stored value;
@@ -62,6 +62,7 @@ def get_pipeline(
     _=Depends(rate_limit),
 ):
     from ...services.runtime import get_runtime
+
     sinks = db.query(VectorSink).order_by(VectorSink.name).all()
     applied = False
     try:
@@ -77,7 +78,7 @@ def get_pipeline(
     )
 
 
-@router.get("/vector/sinks", response_model=List[VectorSinkResponse])
+@router.get("/vector/sinks", response_model=list[VectorSinkResponse])
 def list_sinks(
     db: Session = Depends(get_db),
     user=Depends(require_admin),
@@ -183,8 +184,10 @@ def test_sink(
     includes a ``demo_logs`` source, but both modes use ``validate`` because
     the vector image's ``ENTRYPOINT ["vector"]`` prevents running shell
     pipelines (``sh`` is not a vector subcommand)."""
-    from ...services.runtime import get_runtime
     import logging
+
+    from ...services.runtime import get_runtime
+
     logger = logging.getLogger(__name__)
 
     # Resolve masked secrets against the stored sink when testing an edit.
@@ -200,12 +203,10 @@ def test_sink(
         raise HTTPException(status_code=400, detail=f"Secret decryption failed: {exc}")
 
     try:
-        toml_text, secrets = vp.generate_staging_sink_toml(
-            db, body.type, body.source, options, body.send_test_event)
+        toml_text, secrets = vp.generate_staging_sink_toml(db, body.type, body.source, options, body.send_test_event)
         secrets.extend(plaintexts)
 
-        staging_local = os.path.join(
-            os.path.dirname(settings.VECTOR_CONFIG_PATH), "vector.sink-test.toml")
+        staging_local = os.path.join(os.path.dirname(settings.VECTOR_CONFIG_PATH), "vector.sink-test.toml")
         staging_container = _container_path(staging_local)
         vp._write_file(staging_local, toml_text)
     except Exception as exc:
@@ -218,8 +219,7 @@ def test_sink(
     # --config). Both modes use `validate` (which runs sink healthchecks —
     # real connectivity/auth tests). The send_test_event flag controls
     # whether the staging config includes a demo_logs source.
-    ok, output = runtime.vector_exec(
-        ["vector", "validate", staging_container], timeout=45)
+    ok, output = runtime.vector_exec(["vector", "validate", staging_container], timeout=45)
     if not ok and ("not available" in output.lower() or "not found" in output.lower()):
         raise HTTPException(status_code=503, detail=output)
     return VectorSinkTestResponse(ok=ok, output=vp.redact_text(output, secrets))
@@ -232,10 +232,9 @@ def validate_config(
 ):
     """Run ``vector validate`` against the live vector.toml in the container."""
     from ...services.runtime import get_runtime
+
     # Vector 0.58+ uses positional paths (not --config).
-    ok, output = get_runtime().vector_exec(
-        ["vector", "validate", settings.VECTOR_CONTAINER_CONFIG_PATH],
-        timeout=45)
+    ok, output = get_runtime().vector_exec(["vector", "validate", settings.VECTOR_CONTAINER_CONFIG_PATH], timeout=45)
     return VectorValidateResponse(valid=ok, output=output)
 
 
@@ -245,6 +244,7 @@ def restart_vector(
     _=Depends(rate_limit),
 ):
     from ...services.runtime import get_runtime
+
     ok = get_runtime().restart_vector()
     if not ok:
         raise HTTPException(status_code=503, detail="Vector container not available")

@@ -9,17 +9,17 @@ Backfills the ``last_applied_at`` setting from the most recent
 the audit log's pending-vs-applied determination (replacing the old
 ``snapshot_id`` stamping approach).
 """
-from typing import Sequence, Union
 
-from alembic import op
+from collections.abc import Sequence
+
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = 'w4x5y6z7a8b9'
-down_revision: Union[str, Sequence[str], None] = 'v3w4x5y6z7a8'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision: str = "w4x5y6z7a8b9"
+down_revision: str | Sequence[str] | None = "v3w4x5y6z7a8"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -33,9 +33,7 @@ def upgrade() -> None:
         return
 
     # Get the most recent snapshot's created_at
-    row = conn.execute(sa.text(
-        "SELECT created_at FROM config_snapshots ORDER BY created_at DESC LIMIT 1"
-    )).fetchone()
+    row = conn.execute(sa.text("SELECT created_at FROM config_snapshots ORDER BY created_at DESC LIMIT 1")).fetchone()
 
     if not row or not row[0]:
         # No snapshots exist — nothing to backfill.
@@ -43,15 +41,13 @@ def upgrade() -> None:
 
     created_at = row[0]
     # Format as ISO string (the setting stores string values)
-    if hasattr(created_at, 'isoformat'):
+    if hasattr(created_at, "isoformat"):
         val = created_at.isoformat()
     else:
         val = str(created_at)
 
     # Insert or update the setting. Use a portable upsert pattern.
-    existing = conn.execute(
-        sa.text("SELECT id FROM settings WHERE key = 'last_applied_at'")
-    ).fetchone()
+    existing = conn.execute(sa.text("SELECT id FROM settings WHERE key = 'last_applied_at'")).fetchone()
     if existing:
         conn.execute(
             sa.text("UPDATE settings SET value = :val WHERE key = 'last_applied_at'"),

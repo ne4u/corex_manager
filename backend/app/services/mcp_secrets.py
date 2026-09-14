@@ -10,24 +10,24 @@ with the AES key derived via HKDF-SHA256 (salt=b"mcp-gateway-secrets",
 info=b"mcp-gateway-bundle"). HMAC signing uses a separate HKDF-derived key
 (info=b"mcp-gateway-sig") and is emitted as the `_sig` JSON field.
 """
+
 import base64
 import hashlib
 import hmac as _hmac
 import json
 import logging
 import os
-from typing import Optional
 
 from cryptography.fernet import Fernet, InvalidToken
+from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
-from cryptography.hazmat.primitives import hashes
 
 from ..core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-_fernet: Optional[Fernet] = None
+_fernet: Fernet | None = None
 
 # AES-GCM bundle envelope constants (must match the Rust gateway's `core/crypto.rs`).
 _BUNDLE_VERSION = 0x01
@@ -80,6 +80,7 @@ def has_secrets_key() -> bool:
 # ---------------------------------------------------------------------------
 # AES-256-GCM bundle envelope (Rust gateway format)
 # ---------------------------------------------------------------------------
+
 
 def _get_bundle_secret() -> str:
     settings = get_settings()

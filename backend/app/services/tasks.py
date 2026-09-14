@@ -1,11 +1,9 @@
 import logging
-import os
-import signal
 import threading
 import time
 import traceback
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional, Set
+from datetime import UTC, datetime
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -21,12 +19,12 @@ QUEUE_NAME = "haproxy_tasks"
 
 # Track task IDs that should be cancelled. The worker checks this set
 # before and after long-running operations (e.g. acme.sh subprocess).
-_cancelled_tasks: Set[int] = set()
+_cancelled_tasks: set[int] = set()
 _cancelled_lock = threading.Lock()
 
 
 def _utcnow() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def cancel_task(task_id: int) -> bool:
@@ -57,7 +55,7 @@ def _clear_cancelled(task_id: int) -> None:
         _cancelled_tasks.discard(task_id)
 
 
-def queue_task(task_type: str, payload: Optional[Dict[str, Any]] = None) -> int:
+def queue_task(task_type: str, payload: dict[str, Any] | None = None) -> int:
     """Create a task record and optionally enqueue it for the background worker.
 
     Returns the task id. If the task queue is available, the task is queued for
@@ -105,6 +103,7 @@ def _dispatch_task(task: Task, db) -> None:
     """
     if task.task_type == "issue_certificate":
         task_id = task.id
+
         def _run_in_thread():
             tdb = SessionLocal()
             try:
@@ -113,6 +112,7 @@ def _dispatch_task(task: Task, db) -> None:
                     _run_task(t, tdb)
             finally:
                 tdb.close()
+
         thread = threading.Thread(target=_run_in_thread, daemon=True)
         thread.start()
     else:
@@ -133,7 +133,7 @@ def _run_task(task: Task, db) -> None:
     db.commit()
 
     try:
-        result: Dict[str, Any] = {}
+        result: dict[str, Any] = {}
         if task.task_type == "apply_config":
             print(f"[TASK] Task {task.id}: starting write_config", flush=True)
             logger.info("Task %s: starting write_config", task.id)
@@ -197,6 +197,7 @@ def _run_task(task: Task, db) -> None:
                     _clear_cancelled(task.id)
                     # Cert was deleted during issue — clean up orphaned files
                     from ..services.certificates import delete_cert_files
+
                     delete_cert_files(cert.domain or cert.name)
                     logger.info("Cert %s was deleted during issue; cleaned up orphaned files", cert_id)
                     return
@@ -231,7 +232,7 @@ def _run_task(task: Task, db) -> None:
         logger.info("Task %s record no longer exists; skipping status update", task.id if task else "?")
 
 
-def process_task(item: Dict[str, Any]) -> None:
+def process_task(item: dict[str, Any]) -> None:
     """Worker entry point: load the Task row and run it.
 
     issue_certificate tasks are run in a separate thread so they don't block
@@ -362,5 +363,5 @@ def get_queue_length() -> int:
     return queue_length(QUEUE_NAME)
 
 
-def get_task(db, task_id: int) -> Optional[Task]:
+def get_task(db, task_id: int) -> Task | None:
     return db.query(Task).filter(Task.id == task_id).first()

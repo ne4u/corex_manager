@@ -1,4 +1,5 @@
 """API tests for the /valkey/* endpoints (System → Valkey tab)."""
+
 from unittest.mock import patch
 
 
@@ -132,8 +133,8 @@ def test_valkey_delete_refuses_own_cache_key(client):
 def test_valkey_delete_requires_admin(client):
     """A non-admin user should be forbidden from deleting keys."""
     from app.api.deps import get_current_user
-    from app.models.models import User
     from app.main import app
+    from app.models.models import User
 
     viewer = User(username="viewer", role="viewer", is_admin=False, hashed_password="x")
     app.dependency_overrides[get_current_user] = lambda: viewer

@@ -1,9 +1,9 @@
-from typing import List, Optional
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
-from ..deps import get_db, require_admin, rate_limit
-from ...schemas.audit import AuditEventResponse, AuditEventFilterOptions
-from ...services.audit_events import export_audit_events_csv, list_audit_events, get_audit_event_filter_options
+
+from ...schemas.audit import AuditEventFilterOptions, AuditEventResponse
+from ...services.audit_events import export_audit_events_csv, get_audit_event_filter_options, list_audit_events
+from ..deps import get_db, rate_limit, require_admin
 
 router = APIRouter()
 
@@ -17,16 +17,16 @@ def get_audit_event_filters_endpoint(
     return get_audit_event_filter_options(db)
 
 
-@router.get("/audit-events", response_model=List[AuditEventResponse])
+@router.get("/audit-events", response_model=list[AuditEventResponse])
 def list_audit_events_endpoint(
     limit: int = 100,
-    username: Optional[str] = Query(None),
-    action: Optional[str] = Query(None),
-    resource: Optional[str] = Query(None),
-    ip_address: Optional[str] = Query(None),
-    from_date: Optional[str] = Query(None, alias="from"),
-    to_date: Optional[str] = Query(None, alias="to"),
-    has_snapshot: Optional[bool] = Query(None),
+    username: str | None = Query(None),
+    action: str | None = Query(None),
+    resource: str | None = Query(None),
+    ip_address: str | None = Query(None),
+    from_date: str | None = Query(None, alias="from"),
+    to_date: str | None = Query(None, alias="to"),
+    has_snapshot: bool | None = Query(None),
     db: Session = Depends(get_db),
     user=Depends(require_admin),
     _=Depends(rate_limit),
@@ -46,13 +46,13 @@ def list_audit_events_endpoint(
 
 @router.get("/audit-events/export")
 def export_audit_events_endpoint(
-    from_date: Optional[str] = Query(None, alias="from"),
-    to_date: Optional[str] = Query(None, alias="to"),
-    username: Optional[str] = Query(None),
-    action: Optional[str] = Query(None),
-    resource: Optional[str] = Query(None),
-    ip_address: Optional[str] = Query(None),
-    has_snapshot: Optional[bool] = Query(None),
+    from_date: str | None = Query(None, alias="from"),
+    to_date: str | None = Query(None, alias="to"),
+    username: str | None = Query(None),
+    action: str | None = Query(None),
+    resource: str | None = Query(None),
+    ip_address: str | None = Query(None),
+    has_snapshot: bool | None = Query(None),
     db: Session = Depends(get_db),
     user=Depends(require_admin),
     _=Depends(rate_limit),

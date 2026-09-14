@@ -3,11 +3,10 @@
 Provides CRUD for risk rulesets. Each ruleset has its own independent
 score variable (risk.<slug>.score), clamped to [0, 99] at runtime.
 """
-from typing import List
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from ..deps import get_current_user, get_db, require_write, rate_limit
 from ...models.models import RiskRule, RiskRuleset
 from ...schemas.security_rules import (
     RiskRulesetCreate,
@@ -21,6 +20,7 @@ from ...services.risk_scoring import (
     update_ruleset,
     validate_slug,
 )
+from ..deps import get_current_user, get_db, rate_limit, require_write
 
 router = APIRouter()
 
@@ -41,7 +41,7 @@ def _ruleset_to_response(rs: RiskRuleset, db: Session) -> RiskRulesetResponse:
     )
 
 
-@router.get("/risk-rulesets", response_model=List[RiskRulesetResponse])
+@router.get("/risk-rulesets", response_model=list[RiskRulesetResponse])
 def list_rulesets(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),

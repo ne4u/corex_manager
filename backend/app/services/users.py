@@ -1,7 +1,8 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
+
 from ..core.security import get_password_hash
 from ..models.auth import User
 from ..schemas.users import UserCreate, UserUpdate
@@ -29,7 +30,7 @@ def create_user(db: Session, u_in: UserCreate):
         first_name=u_in.first_name,
         last_name=u_in.last_name,
         organization=u_in.organization,
-        password_changed_at=datetime.now(timezone.utc),
+        password_changed_at=datetime.now(UTC),
     )
     db.add(obj)
     db.commit()
@@ -49,7 +50,7 @@ def update_user(db: Session, uid: int, u_in: UserUpdate, current_user: User):
         if plain:
             validate_password_complexity(db, plain)
             data["hashed_password"] = get_password_hash(plain)
-            data["password_changed_at"] = datetime.now(timezone.utc)
+            data["password_changed_at"] = datetime.now(UTC)
     if "role" in data and current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Only admins can change roles")
     if "role" in data:

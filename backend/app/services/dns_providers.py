@@ -1,20 +1,20 @@
 import json
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from ..core.config import get_settings
 
 settings = get_settings()
 
-_dns_providers: Optional[Dict[str, Any]] = None
+_dns_providers: dict[str, Any] | None = None
 
 
-def _load_dns_providers() -> Dict[str, Any]:
+def _load_dns_providers() -> dict[str, Any]:
     global _dns_providers
     if _dns_providers is not None:
         return _dns_providers
     path = os.path.join(os.path.dirname(__file__), "dns_providers.json")
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         _dns_providers = json.load(f)
     return _dns_providers
 
@@ -34,20 +34,20 @@ def _client_key(client: str) -> str:
     return "acme_sh" if client == "acme.sh" else client
 
 
-def list_dns_providers() -> List[Dict[str, Any]]:
+def list_dns_providers() -> list[dict[str, Any]]:
     """Return the configured DNS provider metadata list."""
     data = _load_dns_providers()
     return data.get("providers", [])
 
 
-def get_dns_provider(provider_id: str) -> Optional[Dict[str, Any]]:
+def get_dns_provider(provider_id: str) -> dict[str, Any] | None:
     for provider in list_dns_providers():
         if provider.get("id") == provider_id:
             return provider
     return None
 
 
-def get_provider_code(provider_id: str, client: Optional[str] = None) -> Optional[str]:
+def get_provider_code(provider_id: str, client: str | None = None) -> str | None:
     client = client or get_active_acme_client()
     provider = get_dns_provider(provider_id)
     if not provider:
@@ -56,7 +56,7 @@ def get_provider_code(provider_id: str, client: Optional[str] = None) -> Optiona
     return client_meta.get("code") or client_meta.get("plugin")
 
 
-def get_provider_credentials_config(provider_id: str, client: Optional[str] = None) -> Optional[Dict[str, Any]]:
+def get_provider_credentials_config(provider_id: str, client: str | None = None) -> dict[str, Any] | None:
     client = client or get_active_acme_client()
     provider = get_dns_provider(provider_id)
     if not provider:
@@ -64,7 +64,7 @@ def get_provider_credentials_config(provider_id: str, client: Optional[str] = No
     return provider.get(_client_key(client))
 
 
-def get_provider_credential_keys(provider_id: str, client: Optional[str] = None) -> List[Dict[str, Any]]:
+def get_provider_credential_keys(provider_id: str, client: str | None = None) -> list[dict[str, Any]]:
     client = client or get_active_acme_client()
     config = get_provider_credentials_config(provider_id, client)
     if not config:
@@ -74,7 +74,7 @@ def get_provider_credential_keys(provider_id: str, client: Optional[str] = None)
     return config.get("credentials_keys", [])
 
 
-def validate_dns_credentials(provider_id: str, credentials: Dict[str, Any], client: Optional[str] = None) -> Optional[str]:
+def validate_dns_credentials(provider_id: str, credentials: dict[str, Any], client: str | None = None) -> str | None:
     client = client or get_active_acme_client()
     config = get_provider_credentials_config(provider_id, client)
     if not config:

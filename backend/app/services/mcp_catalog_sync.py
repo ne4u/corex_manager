@@ -5,12 +5,12 @@ watches those keys and mirrors the server's health/last_catalog_at state into
 the backend database so the UI (Servers tab, builder metadata) reflects what
 the worker found without requiring a manual backend refresh.
 """
+
 import datetime
 import logging
 import os
 import threading
 import time
-from typing import Dict, Optional
 
 from sqlalchemy.orm import Session
 
@@ -25,7 +25,7 @@ CATALOG_KEY_PREFIX = "mcp:catalog:"
 SYNC_INTERVAL_SECONDS = int(os.environ.get("MCP_CATALOG_SYNC_INTERVAL_SECONDS", "10"))
 # Minimum seconds between backend-catalog-refresh fallbacks for a missing server.
 _FALLBACK_REFRESH_INTERVAL = 30
-_last_fallback_refresh: Dict[int, float] = {}
+_last_fallback_refresh: dict[int, float] = {}
 
 
 def _get_valkey():
@@ -47,6 +47,7 @@ def _update_server_state(db: Session, server: McpServer) -> None:
             catalog = raw if isinstance(raw, (dict, list)) else None
             if isinstance(raw, (str, bytes)):
                 import json
+
                 catalog = json.loads(raw)
         except Exception:
             catalog = None
@@ -59,18 +60,18 @@ def _update_server_state(db: Session, server: McpServer) -> None:
                 logger.info("Catalog sync: server %s has a catalog, marking healthy", server.name)
                 server.health_status = "healthy"
                 server.last_error = None
-            server.last_catalog_at = datetime.datetime.now(datetime.timezone.utc)
+            server.last_catalog_at = datetime.datetime.now(datetime.UTC)
             db.commit()
             return
 
     # Worker has not produced a usable catalog for this server.  Only mark it
     # unhealthy if we have never successfully cataloged it (startup race) or it
     # has been stale for more than two intervals.
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.datetime.now(datetime.UTC)
     stale_threshold = datetime.timedelta(seconds=SYNC_INTERVAL_SECONDS * 2 + 5)
     last_cat = server.last_catalog_at
     if last_cat and last_cat.tzinfo is None:
-        last_cat = last_cat.replace(tzinfo=datetime.timezone.utc)
+        last_cat = last_cat.replace(tzinfo=datetime.UTC)
     if not last_cat or (now - last_cat) > stale_threshold:
         if server.health_status != "unhealthy" or not server.last_error:
             server.health_status = "unhealthy"
@@ -119,7 +120,7 @@ def _catalog_sync_loop() -> None:
             logger.exception("MCP catalog sync loop error: %s", exc)
 
 
-def start_mcp_catalog_sync() -> Optional[threading.Thread]:
+def start_mcp_catalog_sync() -> threading.Thread | None:
     """Start the background catalog sync thread (unless running under pytest)."""
     if os.environ.get("PYTEST_VERSION"):
         return None

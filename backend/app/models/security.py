@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String, Boolean, Text, DateTime, Float, ForeignKey, JSON
 import sqlalchemy as sa
+from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
+
 from .base import Base, utcnow
 
 
@@ -135,7 +136,9 @@ class DynamicFeed(Base):
     description = Column(String, nullable=True)
     enabled = Column(Boolean, default=True)
     auto_apply = Column(Boolean, default=True, nullable=False, server_default=sa.text("true"))
-    target_list_id = Column(Integer, nullable=False)  # FK to network_lists.id, asn_lists.id, or ja4_lists.id (polymorphic by list_type)
+    target_list_id = Column(
+        Integer, nullable=False
+    )  # FK to network_lists.id, asn_lists.id, or ja4_lists.id (polymorphic by list_type)
     last_updated_at = Column(DateTime, nullable=True)
     last_error = Column(Text, nullable=True)
     last_entry_count = Column(Integer, nullable=True)
@@ -153,7 +156,9 @@ class SecurityRule(Base):
     listener_ids = Column(JSON, default=list, nullable=True)  # [] = all listeners
     expression = Column(Text, nullable=False)  # source of truth (Cloudflare-style text)
     expression_ast = Column(JSON, nullable=True)  # parsed AST, re-derived on save
-    action = Column(String, default="block")  # block|allow|redirect|custom_response|challenge|skip_rules|skip_rules_ratelimit|skip_rules_waf|skip_all
+    action = Column(
+        String, default="block"
+    )  # block|allow|redirect|custom_response|challenge|skip_rules|skip_rules_ratelimit|skip_rules_waf|skip_all
     log = Column(Boolean, default=True)  # record action in request log line
     no_log = Column(Boolean, default=False)  # suppress entire request log line for matching requests
     status_code = Column(Integer, nullable=True)  # block/custom_response status (default 403 at emit time)
@@ -181,9 +186,7 @@ class RiskRuleset(Base):
 
 class RiskRule(Base):
     __tablename__ = "risk_rules"
-    __table_args__ = (
-        sa.UniqueConstraint('name', 'ruleset_id', name='uq_risk_rules_name_ruleset'),
-    )
+    __table_args__ = (sa.UniqueConstraint("name", "ruleset_id", name="uq_risk_rules_name_ruleset"),)
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True, nullable=False)  # unique per (name, ruleset_id)
@@ -202,4 +205,19 @@ class RiskRule(Base):
     ruleset = relationship("RiskRuleset", back_populates="rules")
 
 
-__all__ = ['AsnList', 'AsnListEntry', 'DynamicFeed', 'GeoList', 'GeoListEntry', 'Ja4List', 'Ja4ListEntry', 'NetworkList', 'NetworkListEntry', 'PatternList', 'PatternListEntry', 'RiskRule', 'RiskRuleset', 'SecurityRule']
+__all__ = [
+    "AsnList",
+    "AsnListEntry",
+    "DynamicFeed",
+    "GeoList",
+    "GeoListEntry",
+    "Ja4List",
+    "Ja4ListEntry",
+    "NetworkList",
+    "NetworkListEntry",
+    "PatternList",
+    "PatternListEntry",
+    "RiskRule",
+    "RiskRuleset",
+    "SecurityRule",
+]

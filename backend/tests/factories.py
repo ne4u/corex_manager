@@ -1,12 +1,14 @@
 """Test helpers for creating WAF-related database rows."""
-from typing import Optional
-
-from sqlalchemy.orm import Session
 
 from app.models.models import (
     Backend,
+    CacheConfig,
+    CacheRule,
+    CspReport,
     FcgiApp,
     Listener,
+    PageProtectPolicy,
+    PageProtectScript,
     RateLimit,
     RequestHeader,
     ResponseTransform,
@@ -17,13 +19,9 @@ from app.models.models import (
     WafMetric,
     WafRule,
     WafRuleVersion,
-    PageProtectPolicy,
-    CspReport,
-    PageProtectScript,
-    CacheConfig,
-    CacheRule,
 )
 from app.models.observability import CacheMetricSnapshot
+from sqlalchemy.orm import Session
 
 
 def make_backend(
@@ -32,7 +30,7 @@ def make_backend(
     algorithm: str = "roundrobin",
     protocol: str = "http",
     mode: str = "http",
-    fcgi_app_id: Optional[int] = None,
+    fcgi_app_id: int | None = None,
 ) -> Backend:
     backend = Backend(
         name=name,
@@ -52,7 +50,7 @@ def make_fcgi_app(
     docroot: str = "/var/www/html",
     index: str = "index.php",
     keep_conn: bool = True,
-    params: Optional[list] = None,
+    params: list | None = None,
 ) -> FcgiApp:
     app = FcgiApp(
         name=name,
@@ -75,7 +73,7 @@ def make_server(db: Session, backend_id: int, name: str = "srv1", address: str =
 
 def make_listener(
     db: Session,
-    backend: Optional[Backend] = None,
+    backend: Backend | None = None,
     name: str = "http_in",
     bind_address: str = "0.0.0.0",
     bind_port: int = 80,
@@ -83,7 +81,7 @@ def make_listener(
     mode: str = "http",
     enabled: bool = True,
     ssl_enabled: bool = False,
-    options: Optional[dict] = None,
+    options: dict | None = None,
 ) -> Listener:
     listener = Listener(
         name=name,
@@ -104,31 +102,31 @@ def make_listener(
 def make_waf_rule(
     db: Session,
     name: str = "test-waf",
-    listener_id: Optional[int] = None,
-    backend_id: Optional[int] = None,
+    listener_id: int | None = None,
+    backend_id: int | None = None,
     enabled: bool = True,
     action: str = "block",
-    redirect_url: Optional[str] = None,
-    status_code: Optional[int] = 403,
+    redirect_url: str | None = None,
+    status_code: int | None = 403,
     engine: str = "On",
     paranoia_level: int = 1,
     rule_set: str = "coraza",
-    rule_set_url: Optional[str] = None,
-    rule_set_sha256: Optional[str] = None,
+    rule_set_url: str | None = None,
+    rule_set_sha256: str | None = None,
     rule_set_auto_update: bool = False,
     rule_set_update_interval_hours: int = 24,
-    path_pattern: Optional[str] = None,
-    http_methods: Optional[str] = None,
-    content_types: Optional[str] = None,
+    path_pattern: str | None = None,
+    http_methods: str | None = None,
+    content_types: str | None = None,
     rate_enabled: bool = False,
     rate_events: int = 100,
     rate_window_seconds: int = 60,
     rate_action: str = "block",
     rate_key: str = "src",
-    rate_header: Optional[str] = None,
+    rate_header: str | None = None,
     rate_duration_seconds: int = 0,
     fail_open: bool = False,
-    sec_rules: Optional[str] = None,
+    sec_rules: str | None = None,
     export_rule_ids: bool = False,
 ) -> WafRule:
     rule = WafRule(
@@ -167,21 +165,21 @@ def make_waf_rule(
 
 def make_waf_exception(
     db: Session,
-    waf_rule_id: Optional[int] = None,
+    waf_rule_id: int | None = None,
     name: str = "ex",
-    rule_id: Optional[str] = None,
-    rule_tag: Optional[str] = None,
-    rule_msg: Optional[str] = None,
-    zone: Optional[str] = None,
-    variable: Optional[str] = None,
+    rule_id: str | None = None,
+    rule_tag: str | None = None,
+    rule_msg: str | None = None,
+    zone: str | None = None,
+    variable: str | None = None,
     action: str = "remove",
-    update_action: Optional[str] = None,
-    update_target: Optional[str] = None,
-    matcher: Optional[str] = None,
-    value: Optional[str] = None,
-    condition_variable: Optional[str] = None,
-    condition_operator: Optional[str] = None,
-    condition_value: Optional[str] = None,
+    update_action: str | None = None,
+    update_target: str | None = None,
+    matcher: str | None = None,
+    value: str | None = None,
+    condition_variable: str | None = None,
+    condition_operator: str | None = None,
+    condition_value: str | None = None,
 ) -> WafException:
     ex = WafException(
         waf_rule_id=waf_rule_id,
@@ -205,7 +203,9 @@ def make_waf_exception(
     return ex
 
 
-def make_rule_version(db: Session, waf_rule_id: int, version: str = "v1", snapshot: Optional[dict] = None) -> WafRuleVersion:
+def make_rule_version(
+    db: Session, waf_rule_id: int, version: str = "v1", snapshot: dict | None = None
+) -> WafRuleVersion:
     v = WafRuleVersion(waf_rule_id=waf_rule_id, version=version, snapshot=snapshot or {})
     db.add(v)
     db.flush()
@@ -215,12 +215,12 @@ def make_rule_version(db: Session, waf_rule_id: int, version: str = "v1", snapsh
 def make_waf_metric(
     db: Session,
     action: str = "deny",
-    rule_id: Optional[str] = None,
-    severity: Optional[str] = None,
-    msg: Optional[str] = None,
-    client: Optional[str] = None,
-    country: Optional[str] = None,
-    uri: Optional[str] = None,
+    rule_id: str | None = None,
+    severity: str | None = None,
+    msg: str | None = None,
+    client: str | None = None,
+    country: str | None = None,
+    uri: str | None = None,
 ) -> WafMetric:
     m = WafMetric(
         action=action,
@@ -238,7 +238,7 @@ def make_waf_metric(
 
 def make_rate_limit(
     db: Session,
-    listener_id: Optional[int] = None,
+    listener_id: int | None = None,
     name: str = "rl",
     limit_type: str = "waf",
     waf_event_threshold: int = 1,
@@ -246,16 +246,16 @@ def make_rate_limit(
     events: int = 100,
     window_seconds: int = 60,
     duration_seconds: int = 0,
-    response_code: Optional[int] = None,
+    response_code: int | None = None,
     action: str = "block",
-    waf_block_duration: Optional[int] = None,
-    waf_window_seconds: Optional[int] = None,
+    waf_block_duration: int | None = None,
+    waf_window_seconds: int | None = None,
     log: bool = True,
     no_log: bool = False,
-    match_status_code: Optional[int] = None,
+    match_status_code: int | None = None,
     rate_key: str = "src",
-    rate_header: Optional[str] = None,
-    expression: Optional[str] = None,
+    rate_header: str | None = None,
+    expression: str | None = None,
 ) -> RateLimit:
     rl = RateLimit(
         listener_id=listener_id,
@@ -289,13 +289,13 @@ def make_security_rule(
     action: str = "block",
     enabled: bool = True,
     priority: int = 0,
-    listener_ids: Optional[list] = None,
+    listener_ids: list | None = None,
     log: bool = True,
     no_log: bool = False,
-    status_code: Optional[int] = None,
-    redirect_url: Optional[str] = None,
-    redirect_code: Optional[int] = None,
-    error_page_id: Optional[int] = None,
+    status_code: int | None = None,
+    redirect_url: str | None = None,
+    redirect_code: int | None = None,
+    error_page_id: int | None = None,
 ) -> SecurityRule:
     rule = SecurityRule(
         name=name,
@@ -319,9 +319,9 @@ def make_security_rule(
 def make_rewrite(
     db: Session,
     name: str = "rw",
-    listener_id: Optional[int] = None,
-    listener_ids: Optional[list] = None,
-    host_match: Optional[str] = None,
+    listener_id: int | None = None,
+    listener_ids: list | None = None,
+    host_match: str | None = None,
     source_regex: str = "^/",
     target: str = "/prefix%[path]",
     type: str = "path",
@@ -345,12 +345,12 @@ def make_rewrite(
 def make_request_header(
     db: Session,
     name: str = "rh",
-    backend_id: Optional[int] = None,
-    backend_ids: Optional[list] = None,
+    backend_id: int | None = None,
+    backend_ids: list | None = None,
     header: str = "X-Forwarded-For",
     value: str = "%[src]",
     action: str = "override",
-    condition: Optional[str] = None,
+    condition: str | None = None,
 ) -> RequestHeader:
     rh = RequestHeader(
         name=name,
@@ -370,11 +370,11 @@ def make_page_protect_policy(
     db: Session,
     name: str = "pp-policy",
     enabled: bool = True,
-    backend_ids: Optional[list] = None,
+    backend_ids: list | None = None,
     mode: str = "monitor",
     sample_rate_percent: int = 100,
     report_path: str = "/_csp-report",
-    directives: Optional[dict] = None,
+    directives: dict | None = None,
 ) -> PageProtectPolicy:
     p = PageProtectPolicy(
         name=name,
@@ -392,13 +392,13 @@ def make_page_protect_policy(
 
 def make_csp_report(
     db: Session,
-    policy_id: Optional[int] = None,
-    client_ip: Optional[str] = "1.2.3.4",
-    document_uri: Optional[str] = "https://example.com/page",
-    violated_directive: Optional[str] = "script-src",
-    blocked_uri: Optional[str] = "https://evil.example.com/script.js",
-    backend_name: Optional[str] = "be",
-    listener_name: Optional[str] = "http_in",
+    policy_id: int | None = None,
+    client_ip: str | None = "1.2.3.4",
+    document_uri: str | None = "https://example.com/page",
+    violated_directive: str | None = "script-src",
+    blocked_uri: str | None = "https://evil.example.com/script.js",
+    backend_name: str | None = "be",
+    listener_name: str | None = "http_in",
     report_type: str = "csp",
 ) -> CspReport:
     r = CspReport(
@@ -420,18 +420,18 @@ def make_page_protect_script(
     db: Session,
     url: str = "https://cdn.example.com/script.js",
     resource_type: str = "script",
-    domain: Optional[str] = "cdn.example.com",
+    domain: str | None = "cdn.example.com",
     hash_changed: bool = False,
     ignored: bool = False,
-    content: Optional[str] = None,
-    last_hash: Optional[str] = None,
+    content: str | None = None,
+    last_hash: str | None = None,
     last_hash_at=None,
-    notes: Optional[str] = None,
+    notes: str | None = None,
     last_seen=None,
     hash_checked_at=None,
     source: str = "csp",
     fetch_method: str = "auto",
-    last_fetch_method: Optional[str] = None,
+    last_fetch_method: str | None = None,
 ) -> PageProtectScript:
     s = PageProtectScript(
         url=url,
@@ -463,7 +463,7 @@ def make_cache_config(
     haproxy_max_age: int = 300,
     haproxy_process_vary: bool = True,
     haproxy_max_secondary_entries: int = 10,
-    haproxy_cache_condition: Optional[str] = None,
+    haproxy_cache_condition: str | None = None,
     haproxy_rfc7234_compliance: bool = False,
     disk_cache_enabled: bool = False,
     disk_cache_ttl: int = 120,
@@ -499,7 +499,7 @@ def make_cache_rule(
     tier: str = "memory",  # Default to memory for test convenience
     enabled: bool = True,
     priority: int = 0,
-) -> "CacheRule":
+) -> CacheRule:
     rule = CacheRule(
         cache_config_id=cache_config_id,
         match_type=match_type,
@@ -517,23 +517,23 @@ def make_cache_rule(
 def make_response_transform(
     db: Session,
     name: str = "rt",
-    backend_id: Optional[int] = None,
-    backend_ids: Optional[list] = None,
+    backend_id: int | None = None,
+    backend_ids: list | None = None,
     transform_type: str = "replace",
     enabled: bool = True,
     priority: int = 0,
-    content_types: Optional[str] = None,
+    content_types: str | None = None,
     max_body_size: int = 1048576,
-    find_regex: Optional[str] = None,
-    replace_string: Optional[str] = None,
-    inject_string: Optional[str] = None,
-    inject_position: Optional[str] = None,
-    mask_mode: Optional[str] = None,
-    detector: Optional[str] = None,
-    token_mode: Optional[str] = None,
-    token_prefix: Optional[str] = None,
-    token_ttl: Optional[int] = None,
-    encrypt_key_env: Optional[str] = None,
+    find_regex: str | None = None,
+    replace_string: str | None = None,
+    inject_string: str | None = None,
+    inject_position: str | None = None,
+    mask_mode: str | None = None,
+    detector: str | None = None,
+    token_mode: str | None = None,
+    token_prefix: str | None = None,
+    token_ttl: int | None = None,
+    encrypt_key_env: str | None = None,
     detokenize_query: bool = False,
 ) -> ResponseTransform:
     rt = ResponseTransform(
@@ -566,8 +566,8 @@ def make_cache_metric_snapshot(
     db: Session,
     backend_id: int,
     created_at,
-    haproxy_stats: Optional[dict] = None,
-    disk_cache_stats: Optional[dict] = None,
+    haproxy_stats: dict | None = None,
+    disk_cache_stats: dict | None = None,
 ) -> CacheMetricSnapshot:
     """Insert a CacheMetricSnapshot row with an explicit timestamp.
 

@@ -6,16 +6,17 @@ JSON config files written by ``write_resp_transform_files``; Valkey connection
 params for tokenize mode are injected into the global ``modules.lua`` loader by
 ``haproxy.py`` (not stored in the per-backend JSON).
 """
+
 import json
 import os
 import re
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 from sqlalchemy.orm import Session
 
 from ..core.config import get_settings
-from ..models.routing import ResponseTransform
 from ..models.proxy import Backend
+from ..models.routing import ResponseTransform
 from ..schemas.resp_transform import (
     ResponseTransformCreate,
     ResponseTransformUpdate,
@@ -25,7 +26,7 @@ from ..schemas.resp_transform import (
 settings = get_settings()
 
 # Built-in PII detector regex patterns (must match the Rust module's constants).
-DETECTORS: Dict[str, str] = {
+DETECTORS: dict[str, str] = {
     "email": r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}",
     "phone": r"\+?\d[\d\s().-]{7,}\d",
     "ssn": r"\b\d{3}-\d{2}-\d{4}\b",
@@ -34,7 +35,7 @@ DETECTORS: Dict[str, str] = {
 }
 
 
-def validate_regex(pattern: Optional[str]) -> bool:
+def validate_regex(pattern: str | None) -> bool:
     """Compile-check a regex pattern. Returns True if valid (or empty)."""
     if not pattern:
         return True
@@ -45,12 +46,12 @@ def validate_regex(pattern: Optional[str]) -> bool:
         return False
 
 
-def _rule_to_dict(rule: ResponseTransform) -> Dict[str, Any]:
+def _rule_to_dict(rule: ResponseTransform) -> dict[str, Any]:
     """Convert a ResponseTransform row to the JSON config format the Rust filter expects."""
-    content_types: List[str] = []
+    content_types: list[str] = []
     if rule.content_types:
         content_types = [c.strip() for c in rule.content_types.split(",") if c.strip()]
-    d: Dict[str, Any] = {
+    d: dict[str, Any] = {
         "id": rule.id,
         "enabled": bool(rule.enabled),
         "priority": rule.priority,
@@ -87,11 +88,12 @@ def _rule_to_dict(rule: ResponseTransform) -> Dict[str, Any]:
 # CRUD
 # ---------------------------------------------------------------------------
 
-def list_response_transforms(db: Session) -> List[ResponseTransform]:
+
+def list_response_transforms(db: Session) -> list[ResponseTransform]:
     return db.query(ResponseTransform).order_by(ResponseTransform.priority).all()
 
 
-def get_response_transform(db: Session, rid: int) -> Optional[ResponseTransform]:
+def get_response_transform(db: Session, rid: int) -> ResponseTransform | None:
     return db.query(ResponseTransform).filter(ResponseTransform.id == rid).first()
 
 
@@ -103,7 +105,7 @@ def create_response_transform(db: Session, t_in: ResponseTransformCreate) -> Res
     return obj
 
 
-def update_response_transform(db: Session, rid: int, t_in: ResponseTransformUpdate) -> Optional[ResponseTransform]:
+def update_response_transform(db: Session, rid: int, t_in: ResponseTransformUpdate) -> ResponseTransform | None:
     obj = get_response_transform(db, rid)
     if not obj:
         return None
@@ -123,7 +125,7 @@ def delete_response_transform(db: Session, rid: int) -> bool:
     return True
 
 
-def reorder_response_transforms(db: Session, ordered_ids: List[int]) -> None:
+def reorder_response_transforms(db: Session, ordered_ids: list[int]) -> None:
     for i, rid in enumerate(ordered_ids):
         obj = get_response_transform(db, rid)
         if obj:
@@ -134,6 +136,7 @@ def reorder_response_transforms(db: Session, ordered_ids: List[int]) -> None:
 def validate_response_transform(req: ResponseTransformValidateRequest) -> tuple:
     """Validate a transform spec without saving. Returns (valid, error)."""
     from ..schemas.resp_transform import ResponseTransformBase
+
     try:
         ResponseTransformBase(
             name="__validation__",
@@ -159,9 +162,10 @@ def validate_response_transform(req: ResponseTransformValidateRequest) -> tuple:
 # Config file writer (consumed by HAProxy config generation)
 # ---------------------------------------------------------------------------
 
-def backends_with_transforms(db: Session) -> Set[int]:
+
+def backends_with_transforms(db: Session) -> set[int]:
     """Return the set of backend IDs that have at least one enabled ResponseTransform."""
-    ids: Set[int] = set()
+    ids: set[int] = set()
     for t in db.query(ResponseTransform).filter(ResponseTransform.enabled == True).all():  # noqa: E712
         if t.backend_id:
             ids.add(t.backend_id)
@@ -190,7 +194,7 @@ def _matches_backend(transform: ResponseTransform, backend: Backend) -> bool:
     return False
 
 
-def _build_resp_transform_configs(db: Session) -> Dict[str, dict]:
+def _build_resp_transform_configs(db: Session) -> dict[str, dict]:
     """Build the per-backend config dicts the Rust filter expects, without writing.
 
     Returns ``{filename: config_dict}`` where ``filename`` is
@@ -200,7 +204,7 @@ def _build_resp_transform_configs(db: Session) -> Dict[str, dict]:
     ``generate_resp_transform_file_contents`` (config-status comparison) so the
     two never drift.
     """
-    from .page_protect import get_beacon_settings, build_beacon_rule
+    from .page_protect import build_beacon_rule, get_beacon_settings
 
     backends = db.query(Backend).all()
     transforms = db.query(ResponseTransform).order_by(ResponseTransform.priority).all()
@@ -216,14 +220,12 @@ def _build_resp_transform_configs(db: Session) -> Dict[str, dict]:
     if beacon_enabled:
         beacon_rule = build_beacon_rule(beacon, beacon["beacon_script_path"])
 
-    configs: Dict[str, dict] = {}
+    configs: dict[str, dict] = {}
     for backend in backends:
         applicable = [t for t in transforms if _matches_backend(t, backend)]
         # Check if beacon injection applies to this backend
         has_beacon = (
-            beacon_enabled
-            and beacon_rule is not None
-            and (not beacon_backend_ids or backend.id in beacon_backend_ids)
+            beacon_enabled and beacon_rule is not None and (not beacon_backend_ids or backend.id in beacon_backend_ids)
         )
         if not applicable and not has_beacon:
             continue
@@ -243,7 +245,7 @@ def _build_resp_transform_configs(db: Session) -> Dict[str, dict]:
 QUERY_DETOKENIZE_FILENAME = "query_detokenize.json"
 
 
-def _build_query_detok_config(db: Session) -> Dict[str, Any]:
+def _build_query_detok_config(db: Session) -> dict[str, Any]:
     """Build the global query-detokenize config dict from enabled mask rules
     with ``detokenize_query=True``.
 
@@ -251,24 +253,30 @@ def _build_query_detok_config(db: Session) -> Dict[str, Any]:
     ``token_mode``, and ``encrypt_key_env``. The Rust action reads this file
     with mtime-based hot-reload.
     """
-    transforms = db.query(ResponseTransform).filter(
-        ResponseTransform.enabled == True,  # noqa: E712
-        ResponseTransform.transform_type == "mask",
-        ResponseTransform.detokenize_query == True,  # noqa: E712
-    ).all()
-    rules: List[Dict[str, Any]] = []
+    transforms = (
+        db.query(ResponseTransform)
+        .filter(
+            ResponseTransform.enabled == True,  # noqa: E712
+            ResponseTransform.transform_type == "mask",
+            ResponseTransform.detokenize_query == True,  # noqa: E712
+        )
+        .all()
+    )
+    rules: list[dict[str, Any]] = []
     for t in transforms:
         if not t.token_prefix:
             continue
-        rules.append({
-            "token_prefix": t.token_prefix,
-            "token_mode": t.token_mode or "tokenize",
-            "encrypt_key_env": t.encrypt_key_env,
-        })
+        rules.append(
+            {
+                "token_prefix": t.token_prefix,
+                "token_mode": t.token_mode or "tokenize",
+                "encrypt_key_env": t.encrypt_key_env,
+            }
+        )
     return {"rules": rules}
 
 
-def write_query_detokenize_config(db: Session) -> Dict[str, Any]:
+def write_query_detokenize_config(db: Session) -> dict[str, Any]:
     """Write the global query-detokenize config file for the Rust action.
 
     Contains all enabled mask rules with ``detokenize_query=True`` across all
@@ -283,26 +291,30 @@ def write_query_detokenize_config(db: Session) -> Dict[str, Any]:
     return {"written": path, "rule_count": len(config["rules"])}
 
 
-def _mask_detokenize_prefixes_for_backend(db: Session, backend: Backend) -> List[str]:
+def _mask_detokenize_prefixes_for_backend(db: Session, backend: Backend) -> list[str]:
     """Return ``token_prefix`` values from enabled mask rules with
     ``detokenize_query=True`` that apply to the given backend.
 
     Used by haproxy.py to emit the per-backend ACL guard so the Lua action
     only runs on requests whose query string contains one of these prefixes.
     """
-    transforms = db.query(ResponseTransform).filter(
-        ResponseTransform.enabled == True,  # noqa: E712
-        ResponseTransform.transform_type == "mask",
-        ResponseTransform.detokenize_query == True,  # noqa: E712
-    ).all()
-    prefixes: List[str] = []
+    transforms = (
+        db.query(ResponseTransform)
+        .filter(
+            ResponseTransform.enabled == True,  # noqa: E712
+            ResponseTransform.transform_type == "mask",
+            ResponseTransform.detokenize_query == True,  # noqa: E712
+        )
+        .all()
+    )
+    prefixes: list[str] = []
     for t in transforms:
         if t.token_prefix and _matches_backend(t, backend):
             prefixes.append(t.token_prefix)
     return prefixes
 
 
-def generate_resp_transform_file_contents(db: Session) -> Dict[str, str]:
+def generate_resp_transform_file_contents(db: Session) -> dict[str, str]:
     """Return ``{filename: json_text}`` for every backend resp-transform config.
 
     ``filename`` is relative to ``RESP_TRANSFORM_DIR`` (e.g.
@@ -318,7 +330,7 @@ def generate_resp_transform_file_contents(db: Session) -> Dict[str, str]:
     return contents
 
 
-def write_resp_transform_files(db: Session) -> Dict[str, Any]:
+def write_resp_transform_files(db: Session) -> dict[str, Any]:
     """Write per-backend JSON config files for the Rust filter.
 
     For each backend that has >=1 enabled ResponseTransform (or a Page Protect
@@ -327,16 +339,17 @@ def write_resp_transform_files(db: Session) -> Dict[str, Any]:
     Returns a summary dict.
     """
     import logging
+
     logger = logging.getLogger(__name__)
 
     out_dir = settings.RESP_TRANSFORM_DIR
     os.makedirs(out_dir, exist_ok=True)
 
     configs = _build_resp_transform_configs(db)
-    written: List[str] = []
-    removed: List[str] = []
+    written: list[str] = []
+    removed: list[str] = []
 
-    expected_files: Set[str] = set()
+    expected_files: set[str] = set()
     for filename, config in configs.items():
         filepath = os.path.join(out_dir, filename)
         expected_files.add(filepath)
@@ -345,8 +358,7 @@ def write_resp_transform_files(db: Session) -> Dict[str, Any]:
             with open(filepath, "w") as f:
                 json.dump(config, f, indent=2)
             written.append(filename)
-            logger.info("write_resp_transform_files: wrote %s (%d rules)",
-                        filepath, len(rules))
+            logger.info("write_resp_transform_files: wrote %s (%d rules)", filepath, len(rules))
         except OSError as e:
             logger.error("write_resp_transform_files: FAILED to write %s: %s", filepath, e)
 
@@ -355,8 +367,7 @@ def write_resp_transform_files(db: Session) -> Dict[str, Any]:
     detok_result = write_query_detokenize_config(db)
     detok_path = os.path.join(out_dir, QUERY_DETOKENIZE_FILENAME)
     expected_files.add(detok_path)
-    logger.info("write_resp_transform_files: wrote %s (%d query-detok rules)",
-                detok_path, detok_result["rule_count"])
+    logger.info("write_resp_transform_files: wrote %s (%d query-detok rules)", detok_path, detok_result["rule_count"])
 
     # Remove stale files
     if os.path.isdir(out_dir):

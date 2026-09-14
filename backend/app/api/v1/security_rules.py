@@ -1,7 +1,6 @@
-from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from ..deps import get_current_user, get_db, require_write, rate_limit
+
 from ...models.models import SecurityRule
 from ...schemas.security_rules import (
     SecurityRuleCreate,
@@ -12,11 +11,12 @@ from ...schemas.security_rules import (
     SecurityRuleValidateResponse,
 )
 from ...services.security_rules import parse_expression, reorder_rules, translate, validate_expression
+from ..deps import get_current_user, get_db, rate_limit, require_write
 
 router = APIRouter()
 
 
-@router.get("/security-rules", response_model=List[SecurityRuleResponse])
+@router.get("/security-rules", response_model=list[SecurityRuleResponse])
 def list_security_rules(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),

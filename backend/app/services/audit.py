@@ -1,10 +1,11 @@
 """Audit event helpers: action derivation, payload truncation, config-change classification."""
+
 import json
 import logging
 import re
 import threading
 import time
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 from ..core.config import get_settings
 
@@ -17,7 +18,7 @@ AUDIT_QUEUE_NAME = "audit_events"
 # lifespan is suppressed), the middleware writes synchronously instead of
 # enqueuing — this preserves the synchronous behaviour tests rely on.
 _audit_worker_running = False
-_audit_worker_thread: Optional[threading.Thread] = None
+_audit_worker_thread: threading.Thread | None = None
 
 # Paths whose request bodies contain secrets and must NOT be captured.
 _PAYLOAD_SKIP_PATHS = {
@@ -38,9 +39,7 @@ _PAYLOAD_SKIP_PATHS = {
 
 # Payload path prefixes that are always skipped (regex-free startswith match
 # after the /api/v1 strip) — covers parameterized paths like PUT /vector/sinks/7.
-_PAYLOAD_SKIP_PREFIXES = (
-    "/vector/sinks",
-)
+_PAYLOAD_SKIP_PREFIXES = ("/vector/sinks",)
 
 # Special-case action mapping for non-REST or ambiguous paths.
 # Maps (method, path_pattern) -> (action, resource_type, resource_id_group_index)
@@ -79,7 +78,6 @@ _SPECIAL_CASES = [
     (r"^/risk-rules/validate$", "POST", "validate_risk_rule", None, None),
     (r"^/risk-rules/seed-baseline$", "POST", "seed_baseline_risk_rules", "risk_rule", None),
     # Risk rulesets
-
     # Response transforms
     (r"^/resp-transforms/reorder$", "PUT", "reorder_response_transforms", "response_transform", None),
     (r"^/resp-transforms/validate$", "POST", "validate_response_transform", None, None),
@@ -223,7 +221,7 @@ def is_config_change(method: str, path: str) -> bool:
     """
     clean = path
     if clean.startswith("/api/v1"):
-        clean = clean[len("/api/v1"):]
+        clean = clean[len("/api/v1") :]
     if not clean.startswith("/"):
         clean = "/" + clean
     for sc_method, pattern in _NON_CONFIG_PATHS:
@@ -232,6 +230,7 @@ def is_config_change(method: str, path: str) -> bool:
         if re.match(pattern, clean):
             return False
     return True
+
 
 # Simple pluralization rules for singularizing resource names.
 _SINGULAR_OVERRIDES = {
@@ -298,7 +297,7 @@ def _singularize(segment: str) -> str:
     return segment
 
 
-def derive_action(method: str, path: str) -> Tuple[str, Optional[str], Optional[str]]:
+def derive_action(method: str, path: str) -> tuple[str, str | None, str | None]:
     """Derive a semantic action label, resource_type, and resource_id from method + path.
 
     Returns (action, resource_type, resource_id).
@@ -307,7 +306,7 @@ def derive_action(method: str, path: str) -> Tuple[str, Optional[str], Optional[
     # Strip /api/v1/ prefix if present
     clean = path
     if clean.startswith("/api/v1"):
-        clean = clean[len("/api/v1"):]
+        clean = clean[len("/api/v1") :]
     if not clean.startswith("/"):
         clean = "/" + clean
 
@@ -348,7 +347,7 @@ def derive_action(method: str, path: str) -> Tuple[str, Optional[str], Optional[
     return action, resource_type, resource_id
 
 
-def should_capture_payload(path: str, content_type: Optional[str]) -> bool:
+def should_capture_payload(path: str, content_type: str | None) -> bool:
     """Return True if the request payload should be captured for this path."""
     if not content_type:
         return False
@@ -358,7 +357,7 @@ def should_capture_payload(path: str, content_type: Optional[str]) -> bool:
     # Strip /api/v1 prefix
     clean = path
     if clean.startswith("/api/v1"):
-        clean = clean[len("/api/v1"):]
+        clean = clean[len("/api/v1") :]
     if not clean.startswith("/"):
         clean = "/" + clean
     # Check exact skip paths
@@ -374,7 +373,7 @@ def should_capture_payload(path: str, content_type: Optional[str]) -> bool:
     return True
 
 
-def truncate_payload(body_bytes: bytes, max_bytes: int) -> Optional[Dict[str, Any]]:
+def truncate_payload(body_bytes: bytes, max_bytes: int) -> dict[str, Any] | None:
     """Parse and optionally truncate a request body for audit storage.
 
     Returns a dict (parsed JSON or raw preview), or None if the body is empty.
@@ -409,7 +408,7 @@ def truncate_payload(body_bytes: bytes, max_bytes: int) -> Optional[Dict[str, An
             "_size": len(body_bytes),
             "_preview": text[:max_bytes],
         }
-    except (json.JSONDecodeError, UnicodeDecodeError):
+    except json.JSONDecodeError, UnicodeDecodeError:
         pass
     # Not JSON — store raw preview
     preview = body_bytes[:max_bytes].decode("utf-8", errors="replace")
@@ -423,6 +422,7 @@ def truncate_payload(body_bytes: bytes, max_bytes: int) -> Optional[Dict[str, An
 # ---------------------------------------------------------------------------
 # Async audit event persistence (fire-and-forget via Valkey task queue)
 # ---------------------------------------------------------------------------
+
 
 def write_audit_event(data: dict) -> None:
     """Synchronously persist an audit event to the database.
@@ -457,8 +457,7 @@ def write_audit_event(data: dict) -> None:
         db.add(event)
         db.commit()
     except Exception:
-        logger.exception("Failed to write audit event for %s %s",
-                         data.get("method"), data.get("path"))
+        logger.exception("Failed to write audit event for %s %s", data.get("method"), data.get("path"))
         db.rollback()
     finally:
         db.close()
@@ -473,6 +472,7 @@ def enqueue_audit_event(data: dict) -> bool:
     if not _audit_worker_running:
         return False
     from ..core.valkey_client import enqueue, is_available
+
     if not is_available():
         return False
     return enqueue(AUDIT_QUEUE_NAME, data)
@@ -480,6 +480,7 @@ def enqueue_audit_event(data: dict) -> bool:
 
 def _audit_worker_loop() -> None:
     from ..core.valkey_client import dequeue, is_available
+
     while True:
         if not is_available():
             time.sleep(5)

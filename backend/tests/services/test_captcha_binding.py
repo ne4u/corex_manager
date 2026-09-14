@@ -5,6 +5,7 @@ The binding hash ties a solved captcha cookie to the client (IP + User-Agent
 client. The hash is computed identically in Python (compute_cv_binding_hash)
 and in HAProxy Lua (captcha_ctx.lua:compute_cv_binding_hash).
 """
+
 import hashlib
 
 from app.services.captcha_providers import compute_cv_binding_hash

@@ -1,6 +1,8 @@
 from datetime import datetime
-from typing import Optional, List, Dict, Any, Type, TypeVar
-from pydantic import BaseModel, Field, model_validator, field_validator, ConfigDict
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
 from ._base import _optional_update
 
 # WAF response actions. "challenge" presents a CAPTCHA interstitial; the
@@ -10,38 +12,39 @@ WAF_ACTIONS = ("block", "allow", "log", "redirect", "challenge")
 # "challenge" is accepted for compat but behaves as a 403 deny in generation.
 WAF_RATE_ACTIONS = ("block", "challenge")
 
+
 class WafRuleBase(BaseModel):
-    listener_id: Optional[int] = None
-    backend_id: Optional[int] = None
+    listener_id: int | None = None
+    backend_id: int | None = None
     name: str
     enabled: bool = True
     rule_set: str = "coraza"
-    rule_set_version: Optional[str] = None
-    rule_set_url: Optional[str] = None
-    rule_set_sha256: Optional[str] = None
+    rule_set_version: str | None = None
+    rule_set_url: str | None = None
+    rule_set_sha256: str | None = None
     rule_set_auto_update: bool = False
     rule_set_update_interval_hours: int = 24
-    rule_set_last_updated_at: Optional[datetime] = None
-    rule_set_last_error: Optional[str] = None
-    rule_set_plugins: Optional[List[str]] = []
+    rule_set_last_updated_at: datetime | None = None
+    rule_set_last_error: str | None = None
+    rule_set_plugins: list[str] | None = []
     engine: str = Field(default="On", pattern="^(On|DetectionOnly|Off)$")
     paranoia_level: int = Field(default=1, ge=1, le=4)
     inbound_anomaly_threshold: int = Field(default=5, ge=0)
     outbound_anomaly_threshold: int = Field(default=4, ge=0)
-    sec_rules: Optional[str] = None
+    sec_rules: str | None = None
     action: str = "block"
-    redirect_url: Optional[str] = None
-    status_code: Optional[int] = Field(default=None, ge=100, le=599)
+    redirect_url: str | None = None
+    status_code: int | None = Field(default=None, ge=100, le=599)
     captcha_valid_seconds: int = Field(default=3600, ge=0)
-    path_pattern: Optional[str] = None
-    http_methods: Optional[str] = None
-    content_types: Optional[str] = None
+    path_pattern: str | None = None
+    http_methods: str | None = None
+    content_types: str | None = None
     export_rule_ids: bool = False
     rate_enabled: bool = False
     rate_events: int = 100
     rate_window_seconds: int = 60
     rate_key: str = "src"
-    rate_header: Optional[str] = None
+    rate_header: str | None = None
     rate_action: str = "block"
     rate_duration_seconds: int = 0
     fail_open: bool = False
@@ -93,28 +96,28 @@ WafRuleUpdate = _optional_update(WafRuleBase)
 class WafRuleResponse(WafRuleBase):
     id: int
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class WafExceptionBase(BaseModel):
-    waf_rule_id: Optional[int] = None
+    waf_rule_id: int | None = None
     name: str
-    rule_id: Optional[str] = None
-    rule_tag: Optional[str] = None
-    rule_msg: Optional[str] = None
-    zone: Optional[str] = None
-    variable: Optional[str] = None
+    rule_id: str | None = None
+    rule_tag: str | None = None
+    rule_msg: str | None = None
+    zone: str | None = None
+    variable: str | None = None
     matcher: str = "equals"
-    value: Optional[str] = None
-    description: Optional[str] = None
+    value: str | None = None
+    description: str | None = None
     action: str = Field(default="remove", pattern="^(remove|allow|comment|update)$")
-    update_action: Optional[str] = None
-    update_target: Optional[str] = None
-    condition_variable: Optional[str] = None
+    update_action: str | None = None
+    update_target: str | None = None
+    condition_variable: str | None = None
     condition_operator: str = "equals"
-    condition_value: Optional[str] = None
+    condition_value: str | None = None
 
 
 class WafExceptionCreate(WafExceptionBase):
@@ -126,7 +129,7 @@ WafExceptionUpdate = _optional_update(WafExceptionBase)
 
 class WafExceptionResponse(WafExceptionBase):
     id: int
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -136,20 +139,20 @@ class WafExceptionPreviewRequest(WafExceptionBase):
 
 
 class WafExceptionPreviewResponse(BaseModel):
-    conditional: List[str]
-    unconditional: List[str]
+    conditional: list[str]
+    unconditional: list[str]
 
 
 class WafExceptionRuleOption(BaseModel):
     id: str
-    msg: Optional[str] = None
-    tags: List[str] = []
+    msg: str | None = None
+    tags: list[str] = []
     hits: int = 0
 
 
 class WafExceptionMsgOption(BaseModel):
     msg: str
-    rule_id: Optional[str] = None
+    rule_id: str | None = None
     hits: int = 0
 
 
@@ -159,19 +162,19 @@ class WafExceptionVariableOption(BaseModel):
 
 
 class WafExceptionOptionsResponse(BaseModel):
-    rules: List[WafExceptionRuleOption]
-    tags: List[str]
-    msgs: List[WafExceptionMsgOption]
-    zones: List[str]
-    variables: List[WafExceptionVariableOption]
-    condition_variables: List[str]
+    rules: list[WafExceptionRuleOption]
+    tags: list[str]
+    msgs: list[WafExceptionMsgOption]
+    zones: list[str]
+    variables: list[WafExceptionVariableOption]
+    condition_variables: list[str]
 
 
 class WafRuleVersionBase(BaseModel):
     waf_rule_id: int
     version: str
-    snapshot: Dict[str, Any]
-    created_by: Optional[str] = None
+    snapshot: dict[str, Any]
+    created_by: str | None = None
 
 
 class WafRuleVersionCreate(WafRuleVersionBase):
@@ -188,4 +191,23 @@ class WafRuleVersionResponse(WafRuleVersionBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-__all__ = ['WafExceptionBase', 'WafExceptionCreate', 'WafExceptionMsgOption', 'WafExceptionOptionsResponse', 'WafExceptionPreviewRequest', 'WafExceptionPreviewResponse', 'WafExceptionResponse', 'WafExceptionRuleOption', 'WafExceptionUpdate', 'WafExceptionVariableOption', 'WafRuleBase', 'WafRuleCreate', 'WafRuleResponse', 'WafRuleUpdate', 'WafRuleVersionBase', 'WafRuleVersionCreate', 'WafRuleVersionResponse', 'WafRuleVersionUpdate']
+__all__ = [
+    "WafExceptionBase",
+    "WafExceptionCreate",
+    "WafExceptionMsgOption",
+    "WafExceptionOptionsResponse",
+    "WafExceptionPreviewRequest",
+    "WafExceptionPreviewResponse",
+    "WafExceptionResponse",
+    "WafExceptionRuleOption",
+    "WafExceptionUpdate",
+    "WafExceptionVariableOption",
+    "WafRuleBase",
+    "WafRuleCreate",
+    "WafRuleResponse",
+    "WafRuleUpdate",
+    "WafRuleVersionBase",
+    "WafRuleVersionCreate",
+    "WafRuleVersionResponse",
+    "WafRuleVersionUpdate",
+]

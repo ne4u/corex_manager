@@ -5,17 +5,17 @@ Revises: l3m4n5o6p7q8
 Create Date: 2026-08-22 00:00:00.000000
 
 """
-from typing import Sequence, Union
 
-from alembic import op
+from collections.abc import Sequence
+
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = 'm4n5o6p7q8r9'
-down_revision: Union[str, Sequence[str], None] = 'l3m4n5o6p7q8'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision: str = "m4n5o6p7q8r9"
+down_revision: str | Sequence[str] | None = "l3m4n5o6p7q8"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -29,14 +29,14 @@ def upgrade() -> None:
 
     bind = op.get_bind()
     inspector = sa_inspect(bind)
-    existing_cols = [c['name'] for c in inspector.get_columns('cache_metric_snapshots')]
+    existing_cols = [c["name"] for c in inspector.get_columns("cache_metric_snapshots")]
 
-    if 'lua_module_stats' not in existing_cols:
-        with op.batch_alter_table('cache_metric_snapshots', schema=None) as batch_op:
-            batch_op.add_column(sa.Column('lua_module_stats', sa.JSON(), nullable=True))
+    if "lua_module_stats" not in existing_cols:
+        with op.batch_alter_table("cache_metric_snapshots", schema=None) as batch_op:
+            batch_op.add_column(sa.Column("lua_module_stats", sa.JSON(), nullable=True))
 
 
 def downgrade() -> None:
     """Remove lua_module_stats column from cache_metric_snapshots."""
-    with op.batch_alter_table('cache_metric_snapshots', schema=None) as batch_op:
-        batch_op.drop_column('lua_module_stats')
+    with op.batch_alter_table("cache_metric_snapshots", schema=None) as batch_op:
+        batch_op.drop_column("lua_module_stats")

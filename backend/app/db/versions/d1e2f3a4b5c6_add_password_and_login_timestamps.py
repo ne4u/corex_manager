@@ -11,35 +11,34 @@ the Users admin tab. Existing users are backfilled so that
 password immediately on upgrade; they expire only after the configured
 rotation period elapses).
 """
-from typing import Sequence, Union
 
-from alembic import op
+from collections.abc import Sequence
+
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = 'd1e2f3a4b5c6'
-down_revision: Union[str, Sequence[str], None] = 'c0d1e2f3a4b5'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision: str = "d1e2f3a4b5c6"
+down_revision: str | Sequence[str] | None = "c0d1e2f3a4b5"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
     """Add last_login_at and password_changed_at columns to users."""
-    with op.batch_alter_table('users') as batch_op:
-        batch_op.add_column(sa.Column('last_login_at', sa.DateTime(), nullable=True))
-        batch_op.add_column(sa.Column('password_changed_at', sa.DateTime(), nullable=True))
+    with op.batch_alter_table("users") as batch_op:
+        batch_op.add_column(sa.Column("last_login_at", sa.DateTime(), nullable=True))
+        batch_op.add_column(sa.Column("password_changed_at", sa.DateTime(), nullable=True))
 
     # Backfill: existing users are treated as if they set their password at
     # account creation time, so they are not immediately prompted to change it.
     op.execute(
-        "UPDATE users SET password_changed_at = created_at "
-        "WHERE password_changed_at IS NULL AND created_at IS NOT NULL"
+        "UPDATE users SET password_changed_at = created_at WHERE password_changed_at IS NULL AND created_at IS NOT NULL"
     )
 
 
 def downgrade() -> None:
     """Remove last_login_at and password_changed_at columns from users."""
-    with op.batch_alter_table('users') as batch_op:
-        batch_op.drop_column('password_changed_at')
-        batch_op.drop_column('last_login_at')
+    with op.batch_alter_table("users") as batch_op:
+        batch_op.drop_column("password_changed_at")
+        batch_op.drop_column("last_login_at")

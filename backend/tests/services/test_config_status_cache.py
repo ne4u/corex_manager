@@ -1,9 +1,9 @@
 """Tests for the in-process /config/status cache and its invalidation hooks."""
+
 import threading
 import time
 
 import pytest
-
 from app.services import config as config_service
 
 
@@ -72,10 +72,7 @@ def test_get_config_status_single_flight(db, monkeypatch):
     monkeypatch.setattr(config_service, "_config_status_data", _slow)
 
     results = []
-    threads = [
-        threading.Thread(target=lambda: results.append(config_service.get_config_status(db)))
-        for _ in range(4)
-    ]
+    threads = [threading.Thread(target=lambda: results.append(config_service.get_config_status(db))) for _ in range(4)]
     for t in threads:
         t.start()
     for t in threads:
@@ -113,6 +110,7 @@ def test_invalidate_does_not_block_during_regen(db, monkeypatch):
 def test_invalidation_during_regen_is_not_cached(db, monkeypatch):
     """A mutation landing mid-regeneration must not let the (possibly stale)
     result get cached — the next call regenerates."""
+
     def _impl(_db):
         config_service.invalidate_config_status()
         return True, {}, {}

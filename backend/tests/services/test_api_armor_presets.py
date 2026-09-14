@@ -1,6 +1,7 @@
 """Tests for API Armor preset security rules."""
-from app.services.api_armor_presets import get_preset_rules, apply_preset_rules
+
 from app.models.models import SecurityRule
+from app.services.api_armor_presets import apply_preset_rules, get_preset_rules
 
 
 def test_get_preset_rules():

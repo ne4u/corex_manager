@@ -1,20 +1,19 @@
 """Tests for the stick_tables service (parsers, pagination, cache, clear)."""
-from unittest.mock import patch, MagicMock
+
+from unittest.mock import patch
 
 from app.services import stick_tables
-
 
 # ---------------------------------------------------------------------------
 # parse_show_tables
 # ---------------------------------------------------------------------------
 
+
 class TestParseShowTables:
     def test_parse_single_table(self):
         raw = "# table: beacon_trust_table, type: ip, size:1048576, used:12\n"
         result = stick_tables.parse_show_tables(raw)
-        assert result == [
-            {"name": "beacon_trust_table", "type": "ip", "size": 1048576, "used": 12}
-        ]
+        assert result == [{"name": "beacon_trust_table", "type": "ip", "size": 1048576, "used": 12}]
 
     def test_parse_multiple_tables_sorted_by_name(self):
         raw = (
@@ -33,11 +32,7 @@ class TestParseShowTables:
         assert stick_tables.parse_show_tables("error: no tables") == []
 
     def test_ignores_non_header_lines(self):
-        raw = (
-            "some random line\n"
-            "# table: t1, type: ip, size:100, used:1\n"
-            "another line\n"
-        )
+        raw = "some random line\n# table: t1, type: ip, size:100, used:1\nanother line\n"
         result = stick_tables.parse_show_tables(raw)
         assert len(result) == 1
         assert result[0]["name"] == "t1"
@@ -72,12 +67,10 @@ class TestParseShowTables:
 # parse_show_table (entries)
 # ---------------------------------------------------------------------------
 
+
 class TestParseShowTable:
     def test_parse_single_entry(self):
-        raw = (
-            "# table: t1, type: ip, size:100, used:1\n"
-            "0x7f1234: key=192.168.1.5 use=0 exp=45000 shard=0 gpt0=0\n"
-        )
+        raw = "# table: t1, type: ip, size:100, used:1\n0x7f1234: key=192.168.1.5 use=0 exp=45000 shard=0 gpt0=0\n"
         entries = stick_tables.parse_show_table(raw)
         assert len(entries) == 1
         e = entries[0]
@@ -100,18 +93,12 @@ class TestParseShowTable:
 
     def test_parse_rate_store_with_window(self):
         """Store names like `gpc0_rate(60s)` should be preserved verbatim."""
-        raw = (
-            "# table: t1, type: ip, size:100, used:1\n"
-            "0x7f1: key=1.2.3.4 use=0 exp=45000 gpc0_rate(60s)=42\n"
-        )
+        raw = "# table: t1, type: ip, size:100, used:1\n0x7f1: key=1.2.3.4 use=0 exp=45000 gpc0_rate(60s)=42\n"
         entries = stick_tables.parse_show_table(raw)
         assert entries[0]["stores"]["gpc0_rate(60s)"] == "42"
 
     def test_parse_ipv6_key(self):
-        raw = (
-            "# table: t1, type: ip, size:100, used:1\n"
-            "0x7f1: key=::ffff:192.168.1.5 use=0 exp=45000 gpt0=1\n"
-        )
+        raw = "# table: t1, type: ip, size:100, used:1\n0x7f1: key=::ffff:192.168.1.5 use=0 exp=45000 gpt0=1\n"
         entries = stick_tables.parse_show_table(raw)
         assert entries[0]["key"] == "::ffff:192.168.1.5"
 
@@ -145,11 +132,7 @@ class TestParseShowTable:
         assert stick_tables.parse_show_table("error: table not found") == []
 
     def test_parse_skips_non_entry_lines(self):
-        raw = (
-            "# table: t1, type: ip, size:100, used:1\n"
-            "table: t1\n"
-            "0x7f1: key=1.2.3.4 use=0 exp=45000 gpc0=1\n"
-        )
+        raw = "# table: t1, type: ip, size:100, used:1\ntable: t1\n0x7f1: key=1.2.3.4 use=0 exp=45000 gpc0=1\n"
         entries = stick_tables.parse_show_table(raw)
         assert len(entries) == 1
         assert entries[0]["key"] == "1.2.3.4"
@@ -158,6 +141,7 @@ class TestParseShowTable:
 # ---------------------------------------------------------------------------
 # get_table (pagination + search + cache)
 # ---------------------------------------------------------------------------
+
 
 class TestGetTable:
     @patch("app.services.stick_tables._send_table_command")
@@ -260,6 +244,7 @@ class TestGetTable:
 # clear_entry / clear_table
 # ---------------------------------------------------------------------------
 
+
 class TestClear:
     @patch("app.services.stick_tables._send_table_command", return_value="")
     @patch("app.services.stick_tables._invalidate_cache")
@@ -298,12 +283,12 @@ class TestClear:
 # list_tables
 # ---------------------------------------------------------------------------
 
+
 class TestListTables:
     @patch("app.services.stick_tables._send_table_command")
     def test_list_tables(self, mock_send):
         mock_send.return_value = (
-            "# table: b_table, type: ip, size:1000, used:5\n"
-            "# table: a_table, type: string, size:10000, used:50\n"
+            "# table: b_table, type: ip, size:1000, used:5\n# table: a_table, type: string, size:10000, used:50\n"
         )
         result = stick_tables.list_tables()
         assert [t["name"] for t in result] == ["a_table", "b_table"]

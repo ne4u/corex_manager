@@ -10,10 +10,11 @@ Tests cover:
 - skip_dlp policy action bypasses DLP
 - Config bundle includes DLP rules
 """
+
 import json
 import os
 import sys
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -25,14 +26,26 @@ if _GATEWAY_DIR not in sys.path:
 
 # ---- Detector pattern tests ----
 
+
 def test_email_detector():
     """Email detector matches standard email addresses."""
     import importlib
-    dlp = importlib.import_module('dlp')
-    dlp.load_dlp_rules({"dlp_rules": [
-        {"name": "emails", "enabled": True, "priority": 0,
-         "direction": "both", "detector": "email", "action": "redact"},
-    ]})
+
+    dlp = importlib.import_module("dlp")
+    dlp.load_dlp_rules(
+        {
+            "dlp_rules": [
+                {
+                    "name": "emails",
+                    "enabled": True,
+                    "priority": 0,
+                    "direction": "both",
+                    "detector": "email",
+                    "action": "redact",
+                },
+            ]
+        }
+    )
     rules = dlp.get_dlp_rules()
     result = dlp.scan_request("tools/call", {"text": "Contact alice@example.com"}, rules)
     assert not result.blocked
@@ -44,11 +57,22 @@ def test_email_detector():
 def test_ssn_detector():
     """SSN detector matches XXX-XX-XXXX format."""
     import importlib
-    dlp = importlib.import_module('dlp')
-    dlp.load_dlp_rules({"dlp_rules": [
-        {"name": "ssn", "enabled": True, "priority": 0,
-         "direction": "both", "detector": "ssn", "action": "redact"},
-    ]})
+
+    dlp = importlib.import_module("dlp")
+    dlp.load_dlp_rules(
+        {
+            "dlp_rules": [
+                {
+                    "name": "ssn",
+                    "enabled": True,
+                    "priority": 0,
+                    "direction": "both",
+                    "detector": "ssn",
+                    "action": "redact",
+                },
+            ]
+        }
+    )
     rules = dlp.get_dlp_rules()
     result = dlp.scan_request("tools/call", {"ssn": "123-45-6789"}, rules)
     assert result.modified
@@ -58,11 +82,22 @@ def test_ssn_detector():
 def test_aws_key_detector():
     """AWS key detector matches AKIA-prefixed keys."""
     import importlib
-    dlp = importlib.import_module('dlp')
-    dlp.load_dlp_rules({"dlp_rules": [
-        {"name": "aws", "enabled": True, "priority": 0,
-         "direction": "both", "detector": "aws_key", "action": "block"},
-    ]})
+
+    dlp = importlib.import_module("dlp")
+    dlp.load_dlp_rules(
+        {
+            "dlp_rules": [
+                {
+                    "name": "aws",
+                    "enabled": True,
+                    "priority": 0,
+                    "direction": "both",
+                    "detector": "aws_key",
+                    "action": "block",
+                },
+            ]
+        }
+    )
     rules = dlp.get_dlp_rules()
     result = dlp.scan_request("tools/call", {"key": "AKIAIOSFODNN7EXAMPLE"}, rules)
     assert result.blocked
@@ -73,11 +108,22 @@ def test_aws_key_detector():
 def test_github_token_detector():
     """GitHub token detector matches ghp_/ghs_/gho_ prefixed tokens."""
     import importlib
-    dlp = importlib.import_module('dlp')
-    dlp.load_dlp_rules({"dlp_rules": [
-        {"name": "gh", "enabled": True, "priority": 0,
-         "direction": "both", "detector": "github_token", "action": "redact"},
-    ]})
+
+    dlp = importlib.import_module("dlp")
+    dlp.load_dlp_rules(
+        {
+            "dlp_rules": [
+                {
+                    "name": "gh",
+                    "enabled": True,
+                    "priority": 0,
+                    "direction": "both",
+                    "detector": "github_token",
+                    "action": "redact",
+                },
+            ]
+        }
+    )
     rules = dlp.get_dlp_rules()
     result = dlp.scan_request("tools/call", {"token": "ghp_" + "A" * 36}, rules)
     assert result.modified
@@ -87,12 +133,23 @@ def test_github_token_detector():
 def test_custom_detector():
     """Custom detector uses user-provided regex."""
     import importlib
-    dlp = importlib.import_module('dlp')
-    dlp.load_dlp_rules({"dlp_rules": [
-        {"name": "custom", "enabled": True, "priority": 0,
-         "direction": "both", "detector": "custom",
-         "find_regex": r"\bSECRET-\d+\b", "action": "redact"},
-    ]})
+
+    dlp = importlib.import_module("dlp")
+    dlp.load_dlp_rules(
+        {
+            "dlp_rules": [
+                {
+                    "name": "custom",
+                    "enabled": True,
+                    "priority": 0,
+                    "direction": "both",
+                    "detector": "custom",
+                    "find_regex": r"\bSECRET-\d+\b",
+                    "action": "redact",
+                },
+            ]
+        }
+    )
     rules = dlp.get_dlp_rules()
     result = dlp.scan_request("tools/call", {"code": "SECRET-12345"}, rules)
     assert result.modified
@@ -103,11 +160,22 @@ def test_custom_detector():
 def test_no_match_returns_original():
     """When no detector matches, data is unchanged."""
     import importlib
-    dlp = importlib.import_module('dlp')
-    dlp.load_dlp_rules({"dlp_rules": [
-        {"name": "emails", "enabled": True, "priority": 0,
-         "direction": "both", "detector": "email", "action": "redact"},
-    ]})
+
+    dlp = importlib.import_module("dlp")
+    dlp.load_dlp_rules(
+        {
+            "dlp_rules": [
+                {
+                    "name": "emails",
+                    "enabled": True,
+                    "priority": 0,
+                    "direction": "both",
+                    "detector": "email",
+                    "action": "redact",
+                },
+            ]
+        }
+    )
     rules = dlp.get_dlp_rules()
     params = {"text": "no sensitive data here"}
     result = dlp.scan_request("tools/call", params, rules)
@@ -118,14 +186,26 @@ def test_no_match_returns_original():
 
 # ---- Action tests ----
 
+
 def test_block_action():
     """Block action sets blocked=True and returns original data."""
     import importlib
-    dlp = importlib.import_module('dlp')
-    dlp.load_dlp_rules({"dlp_rules": [
-        {"name": "block-email", "enabled": True, "priority": 0,
-         "direction": "both", "detector": "email", "action": "block"},
-    ]})
+
+    dlp = importlib.import_module("dlp")
+    dlp.load_dlp_rules(
+        {
+            "dlp_rules": [
+                {
+                    "name": "block-email",
+                    "enabled": True,
+                    "priority": 0,
+                    "direction": "both",
+                    "detector": "email",
+                    "action": "block",
+                },
+            ]
+        }
+    )
     rules = dlp.get_dlp_rules()
     params = {"text": "alice@example.com"}
     result = dlp.scan_request("tools/call", params, rules)
@@ -138,11 +218,22 @@ def test_block_action():
 def test_redact_action():
     """Redact action replaces matches with [REDACTED]."""
     import importlib
-    dlp = importlib.import_module('dlp')
-    dlp.load_dlp_rules({"dlp_rules": [
-        {"name": "redact-email", "enabled": True, "priority": 0,
-         "direction": "both", "detector": "email", "action": "redact"},
-    ]})
+
+    dlp = importlib.import_module("dlp")
+    dlp.load_dlp_rules(
+        {
+            "dlp_rules": [
+                {
+                    "name": "redact-email",
+                    "enabled": True,
+                    "priority": 0,
+                    "direction": "both",
+                    "detector": "email",
+                    "action": "redact",
+                },
+            ]
+        }
+    )
     rules = dlp.get_dlp_rules()
     result = dlp.scan_request("tools/call", {"a": "x@y.com", "b": "z@w.com"}, rules)
     assert not result.blocked
@@ -154,14 +245,26 @@ def test_redact_action():
 def test_tokenize_action_no_valkey():
     """Tokenize action falls back to [REDACTED] when Valkey unavailable."""
     import importlib
-    dlp = importlib.import_module('dlp')
+
+    dlp = importlib.import_module("dlp")
     dlp._client = None
     dlp._get_client = lambda: None
-    dlp.load_dlp_rules({"dlp_rules": [
-        {"name": "tok-email", "enabled": True, "priority": 0,
-         "direction": "both", "detector": "email", "action": "tokenize",
-         "token_prefix": "tok_", "token_ttl": 3600},
-    ]})
+    dlp.load_dlp_rules(
+        {
+            "dlp_rules": [
+                {
+                    "name": "tok-email",
+                    "enabled": True,
+                    "priority": 0,
+                    "direction": "both",
+                    "detector": "email",
+                    "action": "tokenize",
+                    "token_prefix": "tok_",
+                    "token_ttl": 3600,
+                },
+            ]
+        }
+    )
     rules = dlp.get_dlp_rules()
     result = dlp.scan_request("tools/call", {"email": "test@example.com"}, rules)
     assert not result.blocked
@@ -172,16 +275,28 @@ def test_tokenize_action_no_valkey():
 def test_tokenize_action_with_valkey():
     """Tokenize action stores mapping in Valkey when available."""
     import importlib
-    dlp = importlib.import_module('dlp')
+
+    dlp = importlib.import_module("dlp")
     mock_client = MagicMock()
     mock_client.setex = MagicMock()
     dlp._client = mock_client
     dlp._get_client = lambda: mock_client
-    dlp.load_dlp_rules({"dlp_rules": [
-        {"name": "tok-email", "enabled": True, "priority": 0,
-         "direction": "both", "detector": "email", "action": "tokenize",
-         "token_prefix": "tok_", "token_ttl": 3600},
-    ]})
+    dlp.load_dlp_rules(
+        {
+            "dlp_rules": [
+                {
+                    "name": "tok-email",
+                    "enabled": True,
+                    "priority": 0,
+                    "direction": "both",
+                    "detector": "email",
+                    "action": "tokenize",
+                    "token_prefix": "tok_",
+                    "token_ttl": 3600,
+                },
+            ]
+        }
+    )
     rules = dlp.get_dlp_rules()
     result = dlp.scan_request("tools/call", {"email": "test@example.com"}, rules)
     assert not result.blocked
@@ -193,14 +308,26 @@ def test_tokenize_action_with_valkey():
 
 # ---- Direction filtering tests ----
 
+
 def test_direction_request_only():
     """Rules with direction=request only scan requests, not responses."""
     import importlib
-    dlp = importlib.import_module('dlp')
-    dlp.load_dlp_rules({"dlp_rules": [
-        {"name": "req-only", "enabled": True, "priority": 0,
-         "direction": "request", "detector": "email", "action": "redact"},
-    ]})
+
+    dlp = importlib.import_module("dlp")
+    dlp.load_dlp_rules(
+        {
+            "dlp_rules": [
+                {
+                    "name": "req-only",
+                    "enabled": True,
+                    "priority": 0,
+                    "direction": "request",
+                    "detector": "email",
+                    "action": "redact",
+                },
+            ]
+        }
+    )
     rules = dlp.get_dlp_rules()
 
     # Request scan should match
@@ -215,11 +342,22 @@ def test_direction_request_only():
 def test_direction_response_only():
     """Rules with direction=response only scan responses, not requests."""
     import importlib
-    dlp = importlib.import_module('dlp')
-    dlp.load_dlp_rules({"dlp_rules": [
-        {"name": "resp-only", "enabled": True, "priority": 0,
-         "direction": "response", "detector": "email", "action": "redact"},
-    ]})
+
+    dlp = importlib.import_module("dlp")
+    dlp.load_dlp_rules(
+        {
+            "dlp_rules": [
+                {
+                    "name": "resp-only",
+                    "enabled": True,
+                    "priority": 0,
+                    "direction": "response",
+                    "detector": "email",
+                    "action": "redact",
+                },
+            ]
+        }
+    )
     rules = dlp.get_dlp_rules()
 
     # Request scan should not match
@@ -234,11 +372,22 @@ def test_direction_response_only():
 def test_direction_both():
     """Rules with direction=both scan both requests and responses."""
     import importlib
-    dlp = importlib.import_module('dlp')
-    dlp.load_dlp_rules({"dlp_rules": [
-        {"name": "both", "enabled": True, "priority": 0,
-         "direction": "both", "detector": "email", "action": "redact"},
-    ]})
+
+    dlp = importlib.import_module("dlp")
+    dlp.load_dlp_rules(
+        {
+            "dlp_rules": [
+                {
+                    "name": "both",
+                    "enabled": True,
+                    "priority": 0,
+                    "direction": "both",
+                    "detector": "email",
+                    "action": "redact",
+                },
+            ]
+        }
+    )
     rules = dlp.get_dlp_rules()
 
     req_result = dlp.scan_request("tools/call", {"text": "alice@example.com"}, rules)
@@ -250,10 +399,12 @@ def test_direction_both():
 
 # ---- DLP rule loading tests ----
 
+
 def test_load_dlp_rules_empty():
     """Loading with no dlp_rules key sets has_dlp_configured=False."""
     import importlib
-    dlp = importlib.import_module('dlp')
+
+    dlp = importlib.import_module("dlp")
     dlp.load_dlp_rules({})
     assert not dlp.has_dlp_rules()
     assert len(dlp.get_dlp_rules()) == 0
@@ -262,54 +413,100 @@ def test_load_dlp_rules_empty():
 def test_load_dlp_rules_disabled():
     """Disabled rules are not compiled."""
     import importlib
-    dlp = importlib.import_module('dlp')
-    dlp.load_dlp_rules({"dlp_rules": [
-        {"name": "disabled", "enabled": False, "priority": 0,
-         "direction": "both", "detector": "email", "action": "redact"},
-    ]})
+
+    dlp = importlib.import_module("dlp")
+    dlp.load_dlp_rules(
+        {
+            "dlp_rules": [
+                {
+                    "name": "disabled",
+                    "enabled": False,
+                    "priority": 0,
+                    "direction": "both",
+                    "detector": "email",
+                    "action": "redact",
+                },
+            ]
+        }
+    )
     assert not dlp.has_dlp_rules()
 
 
 def test_load_dlp_rules_invalid_detector():
     """Unknown detector is skipped without error."""
     import importlib
-    dlp = importlib.import_module('dlp')
-    dlp.load_dlp_rules({"dlp_rules": [
-        {"name": "bad", "enabled": True, "priority": 0,
-         "direction": "both", "detector": "nonexistent", "action": "redact"},
-    ]})
+
+    dlp = importlib.import_module("dlp")
+    dlp.load_dlp_rules(
+        {
+            "dlp_rules": [
+                {
+                    "name": "bad",
+                    "enabled": True,
+                    "priority": 0,
+                    "direction": "both",
+                    "detector": "nonexistent",
+                    "action": "redact",
+                },
+            ]
+        }
+    )
     assert len(dlp.get_dlp_rules()) == 0
 
 
 def test_load_dlp_rules_invalid_regex():
     """Invalid custom regex is skipped without error."""
     import importlib
-    dlp = importlib.import_module('dlp')
-    dlp.load_dlp_rules({"dlp_rules": [
-        {"name": "bad-regex", "enabled": True, "priority": 0,
-         "direction": "both", "detector": "custom",
-         "find_regex": "[invalid", "action": "redact"},
-    ]})
+
+    dlp = importlib.import_module("dlp")
+    dlp.load_dlp_rules(
+        {
+            "dlp_rules": [
+                {
+                    "name": "bad-regex",
+                    "enabled": True,
+                    "priority": 0,
+                    "direction": "both",
+                    "detector": "custom",
+                    "find_regex": "[invalid",
+                    "action": "redact",
+                },
+            ]
+        }
+    )
     assert len(dlp.get_dlp_rules()) == 0
 
 
 def test_dlp_error_code():
     """MCP_DLP_BLOCKED is -32050."""
     import importlib
-    dlp = importlib.import_module('dlp')
+
+    dlp = importlib.import_module("dlp")
     assert dlp.MCP_DLP_BLOCKED == -32050
 
 
 # ---- Recursive scanning tests ----
 
+
 def test_scan_nested_json():
     """DLP scans recursively through nested JSON structures."""
     import importlib
-    dlp = importlib.import_module('dlp')
-    dlp.load_dlp_rules({"dlp_rules": [
-        {"name": "email", "enabled": True, "priority": 0,
-         "direction": "both", "detector": "email", "action": "redact"},
-    ]})
+
+    dlp = importlib.import_module("dlp")
+    dlp.load_dlp_rules(
+        {
+            "dlp_rules": [
+                {
+                    "name": "email",
+                    "enabled": True,
+                    "priority": 0,
+                    "direction": "both",
+                    "detector": "email",
+                    "action": "redact",
+                },
+            ]
+        }
+    )
     rules = dlp.get_dlp_rules()
     params = {
         "user": {"email": "alice@example.com"},
@@ -324,50 +521,93 @@ def test_scan_nested_json():
 
 # ---- Protocol integration tests ----
 
+
 @pytest.mark.asyncio
 async def test_protocol_dlp_request_blocked():
     """DLP block on request returns -32050."""
     import importlib
-    protocol = importlib.import_module('protocol')
-    policy = importlib.import_module('policy')
-    dlp = importlib.import_module('dlp')
-    events = importlib.import_module('events')
+
+    protocol = importlib.import_module("protocol")
+    policy = importlib.import_module("policy")
+    dlp = importlib.import_module("dlp")
+    events = importlib.import_module("events")
 
     # Allow-all policy
-    policy.load_policies({"policies": [
-        {"name": "allow-all", "enabled": True, "priority": 0,
-         "expression": "true", "expression_ast": None, "action": "allow"},
-    ]})
+    policy.load_policies(
+        {
+            "policies": [
+                {
+                    "name": "allow-all",
+                    "enabled": True,
+                    "priority": 0,
+                    "expression": "true",
+                    "expression_ast": None,
+                    "action": "allow",
+                },
+            ]
+        }
+    )
 
     # DLP rule: block emails
-    dlp.load_dlp_rules({"dlp_rules": [
-        {"name": "block-email", "enabled": True, "priority": 0,
-         "direction": "request", "detector": "email", "action": "block"},
-    ]})
+    dlp.load_dlp_rules(
+        {
+            "dlp_rules": [
+                {
+                    "name": "block-email",
+                    "enabled": True,
+                    "priority": 0,
+                    "direction": "request",
+                    "detector": "email",
+                    "action": "block",
+                },
+            ]
+        }
+    )
 
     server = {"id": 1, "team_id": 10, "name": "jira", "namespace": "jira", "url": "https://up/mcp"}
     protocol.get_enabled_servers = lambda: [server]
     protocol.get_server_by_namespace = lambda ns: server if ns == "jira" else None
     protocol.get_upstream_session = lambda sid, server_id: "upstream-sess"
     protocol.send_request_tracked = AsyncMock(return_value=(200, {"jsonrpc": "2.0", "result": {}}, {}))
-    protocol.get_config = lambda: {"policies": [
-        {"name": "allow-all", "enabled": True, "priority": 0,
-         "expression": "true", "expression_ast": None, "action": "allow"},
-    ], "dlp_rules": [
-        {"name": "block-email", "enabled": True, "priority": 0,
-         "direction": "request", "detector": "email", "action": "block"},
-    ], "default_rpm": 60}
+    protocol.get_config = lambda: {
+        "policies": [
+            {
+                "name": "allow-all",
+                "enabled": True,
+                "priority": 0,
+                "expression": "true",
+                "expression_ast": None,
+                "action": "allow",
+            },
+        ],
+        "dlp_rules": [
+            {
+                "name": "block-email",
+                "enabled": True,
+                "priority": 0,
+                "direction": "request",
+                "detector": "email",
+                "action": "block",
+            },
+        ],
+        "default_rpm": 60,
+    }
 
     # Rate limiter allows
     protocol.check_rate_limit = lambda identity_id, tool, max_rpm: (True, max_rpm)
 
     from types import SimpleNamespace
+
     auth_ctx = SimpleNamespace(name="alice", kind="pat", team_id=10, identity_id=1, claims={})
 
     response = await protocol._route_call(
-        "sess1", auth_ctx, "tools/call",
+        "sess1",
+        auth_ctx,
+        "tools/call",
         {"name": "jira__search", "arguments": {"email": "test@example.com"}},
-        1, {}, "tool",
+        1,
+        {},
+        "tool",
     )
     body = json.loads(response.body)
     assert body["error"]["code"] == -32050
@@ -378,19 +618,40 @@ async def test_protocol_dlp_request_blocked():
 async def test_protocol_dlp_request_redacted():
     """DLP redact on request modifies params before upstream call."""
     import importlib
-    protocol = importlib.import_module('protocol')
-    policy = importlib.import_module('policy')
-    dlp = importlib.import_module('dlp')
 
-    policy.load_policies({"policies": [
-        {"name": "allow-all", "enabled": True, "priority": 0,
-         "expression": "true", "expression_ast": None, "action": "allow"},
-    ]})
+    protocol = importlib.import_module("protocol")
+    policy = importlib.import_module("policy")
+    dlp = importlib.import_module("dlp")
 
-    dlp.load_dlp_rules({"dlp_rules": [
-        {"name": "redact-email", "enabled": True, "priority": 0,
-         "direction": "request", "detector": "email", "action": "redact"},
-    ]})
+    policy.load_policies(
+        {
+            "policies": [
+                {
+                    "name": "allow-all",
+                    "enabled": True,
+                    "priority": 0,
+                    "expression": "true",
+                    "expression_ast": None,
+                    "action": "allow",
+                },
+            ]
+        }
+    )
+
+    dlp.load_dlp_rules(
+        {
+            "dlp_rules": [
+                {
+                    "name": "redact-email",
+                    "enabled": True,
+                    "priority": 0,
+                    "direction": "request",
+                    "detector": "email",
+                    "action": "redact",
+                },
+            ]
+        }
+    )
 
     server = {"id": 1, "team_id": 10, "name": "jira", "namespace": "jira", "url": "https://up/mcp"}
     protocol.get_enabled_servers = lambda: [server]
@@ -399,28 +660,50 @@ async def test_protocol_dlp_request_redacted():
 
     # Capture the forwarded params
     captured_params = {}
+
     async def _capture_request(sid, mid, srv, body, usid):
         captured_params.update(body.get("params", {}))
         return (200, {"jsonrpc": "2.0", "result": {}}, {})
 
     protocol.send_request_tracked = _capture_request
-    protocol.get_config = lambda: {"policies": [
-        {"name": "allow-all", "enabled": True, "priority": 0,
-         "expression": "true", "expression_ast": None, "action": "allow"},
-    ], "dlp_rules": [
-        {"name": "redact-email", "enabled": True, "priority": 0,
-         "direction": "request", "detector": "email", "action": "redact"},
-    ], "default_rpm": 60}
+    protocol.get_config = lambda: {
+        "policies": [
+            {
+                "name": "allow-all",
+                "enabled": True,
+                "priority": 0,
+                "expression": "true",
+                "expression_ast": None,
+                "action": "allow",
+            },
+        ],
+        "dlp_rules": [
+            {
+                "name": "redact-email",
+                "enabled": True,
+                "priority": 0,
+                "direction": "request",
+                "detector": "email",
+                "action": "redact",
+            },
+        ],
+        "default_rpm": 60,
+    }
 
     protocol.check_rate_limit = lambda identity_id, tool, max_rpm: (True, max_rpm)
 
     from types import SimpleNamespace
+
     auth_ctx = SimpleNamespace(name="alice", kind="pat", team_id=10, identity_id=1, claims={})
 
     await protocol._route_call(
-        "sess1", auth_ctx, "tools/call",
+        "sess1",
+        auth_ctx,
+        "tools/call",
         {"name": "jira__search", "arguments": {"email": "test@example.com"}},
-        1, {}, "tool",
+        1,
+        {},
+        "tool",
     )
 
     # The upstream should have received redacted params
@@ -431,45 +714,91 @@ async def test_protocol_dlp_request_redacted():
 async def test_protocol_dlp_response_blocked():
     """DLP block on response returns -32050."""
     import importlib
-    protocol = importlib.import_module('protocol')
-    policy = importlib.import_module('policy')
-    dlp = importlib.import_module('dlp')
 
-    policy.load_policies({"policies": [
-        {"name": "allow-all", "enabled": True, "priority": 0,
-         "expression": "true", "expression_ast": None, "action": "allow"},
-    ]})
+    protocol = importlib.import_module("protocol")
+    policy = importlib.import_module("policy")
+    dlp = importlib.import_module("dlp")
 
-    dlp.load_dlp_rules({"dlp_rules": [
-        {"name": "block-ssn", "enabled": True, "priority": 0,
-         "direction": "response", "detector": "ssn", "action": "block"},
-    ]})
+    policy.load_policies(
+        {
+            "policies": [
+                {
+                    "name": "allow-all",
+                    "enabled": True,
+                    "priority": 0,
+                    "expression": "true",
+                    "expression_ast": None,
+                    "action": "allow",
+                },
+            ]
+        }
+    )
+
+    dlp.load_dlp_rules(
+        {
+            "dlp_rules": [
+                {
+                    "name": "block-ssn",
+                    "enabled": True,
+                    "priority": 0,
+                    "direction": "response",
+                    "detector": "ssn",
+                    "action": "block",
+                },
+            ]
+        }
+    )
 
     server = {"id": 1, "team_id": 10, "name": "jira", "namespace": "jira", "url": "https://up/mcp"}
     protocol.get_enabled_servers = lambda: [server]
     protocol.get_server_by_namespace = lambda ns: server if ns == "jira" else None
     protocol.get_upstream_session = lambda sid, server_id: "upstream-sess"
     # Upstream returns a response containing an SSN
-    protocol.send_request_tracked = AsyncMock(return_value=(
-        200, {"jsonrpc": "2.0", "result": {"text": "123-45-6789"}}, {},
-    ))
-    protocol.get_config = lambda: {"policies": [
-        {"name": "allow-all", "enabled": True, "priority": 0,
-         "expression": "true", "expression_ast": None, "action": "allow"},
-    ], "dlp_rules": [
-        {"name": "block-ssn", "enabled": True, "priority": 0,
-         "direction": "response", "detector": "ssn", "action": "block"},
-    ], "default_rpm": 60}
+    protocol.send_request_tracked = AsyncMock(
+        return_value=(
+            200,
+            {"jsonrpc": "2.0", "result": {"text": "123-45-6789"}},
+            {},
+        )
+    )
+    protocol.get_config = lambda: {
+        "policies": [
+            {
+                "name": "allow-all",
+                "enabled": True,
+                "priority": 0,
+                "expression": "true",
+                "expression_ast": None,
+                "action": "allow",
+            },
+        ],
+        "dlp_rules": [
+            {
+                "name": "block-ssn",
+                "enabled": True,
+                "priority": 0,
+                "direction": "response",
+                "detector": "ssn",
+                "action": "block",
+            },
+        ],
+        "default_rpm": 60,
+    }
 
     protocol.check_rate_limit = lambda identity_id, tool, max_rpm: (True, max_rpm)
 
     from types import SimpleNamespace
+
     auth_ctx = SimpleNamespace(name="alice", kind="pat", team_id=10, identity_id=1, claims={})
 
     response = await protocol._route_call(
-        "sess1", auth_ctx, "tools/call",
+        "sess1",
+        auth_ctx,
+        "tools/call",
         {"name": "jira__search", "arguments": {}},
-        1, {}, "tool",
+        1,
+        {},
+        "tool",
     )
     body = json.loads(response.body)
     assert body["error"]["code"] == -32050
@@ -480,45 +809,87 @@ async def test_protocol_dlp_response_blocked():
 async def test_protocol_dlp_skip_dlp_policy():
     """Policy with skip_dlp action bypasses DLP scanning."""
     import importlib
-    protocol = importlib.import_module('protocol')
-    policy = importlib.import_module('policy')
-    dlp = importlib.import_module('dlp')
+
+    protocol = importlib.import_module("protocol")
+    policy = importlib.import_module("policy")
+    dlp = importlib.import_module("dlp")
 
     # skip_dlp policy
-    policy.load_policies({"policies": [
-        {"name": "skip-dlp", "enabled": True, "priority": 0,
-         "expression": "true", "expression_ast": None, "action": "skip_dlp"},
-    ]})
+    policy.load_policies(
+        {
+            "policies": [
+                {
+                    "name": "skip-dlp",
+                    "enabled": True,
+                    "priority": 0,
+                    "expression": "true",
+                    "expression_ast": None,
+                    "action": "skip_dlp",
+                },
+            ]
+        }
+    )
 
     # DLP rule that would block
-    dlp.load_dlp_rules({"dlp_rules": [
-        {"name": "block-email", "enabled": True, "priority": 0,
-         "direction": "both", "detector": "email", "action": "block"},
-    ]})
+    dlp.load_dlp_rules(
+        {
+            "dlp_rules": [
+                {
+                    "name": "block-email",
+                    "enabled": True,
+                    "priority": 0,
+                    "direction": "both",
+                    "detector": "email",
+                    "action": "block",
+                },
+            ]
+        }
+    )
 
     server = {"id": 1, "team_id": 10, "name": "jira", "namespace": "jira", "url": "https://up/mcp"}
     protocol.get_enabled_servers = lambda: [server]
     protocol.get_server_by_namespace = lambda ns: server if ns == "jira" else None
     protocol.get_upstream_session = lambda sid, server_id: "upstream-sess"
     protocol.send_request_tracked = AsyncMock(return_value=(200, {"jsonrpc": "2.0", "result": {}}, {}))
-    protocol.get_config = lambda: {"policies": [
-        {"name": "skip-dlp", "enabled": True, "priority": 0,
-         "expression": "true", "expression_ast": None, "action": "skip_dlp"},
-    ], "dlp_rules": [
-        {"name": "block-email", "enabled": True, "priority": 0,
-         "direction": "both", "detector": "email", "action": "block"},
-    ], "default_rpm": 60}
+    protocol.get_config = lambda: {
+        "policies": [
+            {
+                "name": "skip-dlp",
+                "enabled": True,
+                "priority": 0,
+                "expression": "true",
+                "expression_ast": None,
+                "action": "skip_dlp",
+            },
+        ],
+        "dlp_rules": [
+            {
+                "name": "block-email",
+                "enabled": True,
+                "priority": 0,
+                "direction": "both",
+                "detector": "email",
+                "action": "block",
+            },
+        ],
+        "default_rpm": 60,
+    }
 
     protocol.check_rate_limit = lambda identity_id, tool, max_rpm: (True, max_rpm)
 
     from types import SimpleNamespace
+
     auth_ctx = SimpleNamespace(name="alice", kind="pat", team_id=10, identity_id=1, claims={})
 
     # Should not be blocked despite DLP rule
     response = await protocol._route_call(
-        "sess1", auth_ctx, "tools/call",
+        "sess1",
+        auth_ctx,
+        "tools/call",
         {"name": "jira__search", "arguments": {"email": "test@example.com"}},
-        1, {}, "tool",
+        1,
+        {},
+        "tool",
     )
     body = json.loads(response.body)
     assert "error" not in body
@@ -527,10 +898,11 @@ async def test_protocol_dlp_skip_dlp_policy():
 
 # ---- Config bundle tests ----
 
+
 def test_config_bundle_includes_dlp_rules(db):
     """Config bundle includes dlp_rules from the database."""
-    from app.services.mcp_config import build_config_bundle
     from app.models.mcp import McpDlpRule, Team
+    from app.services.mcp_config import build_config_bundle
 
     # Create a team
     team = Team(name="Test", slug="test")
@@ -539,9 +911,13 @@ def test_config_bundle_includes_dlp_rules(db):
 
     # Create a DLP rule
     rule = McpDlpRule(
-        team_id=team.id, name="test-email",
-        enabled=True, priority=0, direction="both",
-        detector="email", action="redact",
+        team_id=team.id,
+        name="test-email",
+        enabled=True,
+        priority=0,
+        direction="both",
+        detector="email",
+        action="redact",
         apply_to="json_strings",
     )
     db.add(rule)
@@ -566,51 +942,94 @@ def test_config_bundle_dlp_rules_empty(db):
 
 # ---- Event logging with DLP hits ----
 
+
 @pytest.mark.asyncio
 async def test_protocol_dlp_event_logged(tmp_path):
     """DLP hits are logged in the event."""
     import importlib
-    protocol = importlib.import_module('protocol')
-    policy = importlib.import_module('policy')
-    dlp = importlib.import_module('dlp')
-    events = importlib.import_module('events')
+
+    protocol = importlib.import_module("protocol")
+    policy = importlib.import_module("policy")
+    dlp = importlib.import_module("dlp")
+    events = importlib.import_module("events")
 
     log_file = str(tmp_path / "events.ndjson")
     events._log_path = log_file
     events._log_payloads = False
 
-    policy.load_policies({"policies": [
-        {"name": "allow-all", "enabled": True, "priority": 0,
-         "expression": "true", "expression_ast": None, "action": "allow"},
-    ]})
+    policy.load_policies(
+        {
+            "policies": [
+                {
+                    "name": "allow-all",
+                    "enabled": True,
+                    "priority": 0,
+                    "expression": "true",
+                    "expression_ast": None,
+                    "action": "allow",
+                },
+            ]
+        }
+    )
 
-    dlp.load_dlp_rules({"dlp_rules": [
-        {"name": "redact-email", "enabled": True, "priority": 0,
-         "direction": "both", "detector": "email", "action": "redact"},
-    ]})
+    dlp.load_dlp_rules(
+        {
+            "dlp_rules": [
+                {
+                    "name": "redact-email",
+                    "enabled": True,
+                    "priority": 0,
+                    "direction": "both",
+                    "detector": "email",
+                    "action": "redact",
+                },
+            ]
+        }
+    )
 
     server = {"id": 1, "team_id": 10, "name": "jira", "namespace": "jira", "url": "https://up/mcp"}
     protocol.get_enabled_servers = lambda: [server]
     protocol.get_server_by_namespace = lambda ns: server if ns == "jira" else None
     protocol.get_upstream_session = lambda sid, server_id: "upstream-sess"
     protocol.send_request_tracked = AsyncMock(return_value=(200, {"jsonrpc": "2.0", "result": {}}, {}))
-    protocol.get_config = lambda: {"policies": [
-        {"name": "allow-all", "enabled": True, "priority": 0,
-         "expression": "true", "expression_ast": None, "action": "allow"},
-    ], "dlp_rules": [
-        {"name": "redact-email", "enabled": True, "priority": 0,
-         "direction": "both", "detector": "email", "action": "redact"},
-    ], "default_rpm": 60}
+    protocol.get_config = lambda: {
+        "policies": [
+            {
+                "name": "allow-all",
+                "enabled": True,
+                "priority": 0,
+                "expression": "true",
+                "expression_ast": None,
+                "action": "allow",
+            },
+        ],
+        "dlp_rules": [
+            {
+                "name": "redact-email",
+                "enabled": True,
+                "priority": 0,
+                "direction": "both",
+                "detector": "email",
+                "action": "redact",
+            },
+        ],
+        "default_rpm": 60,
+    }
 
     protocol.check_rate_limit = lambda identity_id, tool, max_rpm: (True, max_rpm)
 
     from types import SimpleNamespace
+
     auth_ctx = SimpleNamespace(name="alice", kind="pat", team_id=10, identity_id=1, claims={})
 
     await protocol._route_call(
-        "sess1", auth_ctx, "tools/call",
+        "sess1",
+        auth_ctx,
+        "tools/call",
         {"name": "jira__search", "arguments": {"email": "test@example.com"}},
-        1, {}, "tool",
+        1,
+        {},
+        "tool",
     )
 
     with open(log_file) as f:

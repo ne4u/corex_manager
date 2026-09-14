@@ -1,22 +1,22 @@
 """Tests for the CSP policy recommender and baseline window."""
-from datetime import datetime, timedelta, timezone
+
+from datetime import UTC, datetime, timedelta
 
 from app.services.page_protect import (
-    recommend_policy,
+    clear_baseline,
     get_baseline,
+    recommend_policy,
     start_baseline,
     stop_baseline,
-    clear_baseline,
 )
-from app.services.settings import set_setting
 from tests.factories import (
     make_backend,
     make_csp_report,
     make_page_protect_script,
 )
 
-
 # --- Baseline window ---
+
 
 def test_baseline_idle_by_default(db):
     result = get_baseline(db)
@@ -63,6 +63,7 @@ def test_stop_baseline_without_start_returns_error(db):
 
 # --- Recommender: cold start ---
 
+
 def test_recommend_cold_start_minimal_policy(db):
     """With no scripts and no reports, return a minimal safe policy."""
     result = recommend_policy(db)
@@ -78,11 +79,12 @@ def test_recommend_cold_start_minimal_policy(db):
 
 # --- Recommender: script inventory ---
 
+
 def test_recommend_includes_script_origins(db):
-    make_page_protect_script(db, url="https://cdn.example.com/app.js",
-                             resource_type="script", domain="cdn.example.com")
-    make_page_protect_script(db, url="https://www.googletagmanager.com/gtm.js",
-                             resource_type="script", domain="www.googletagmanager.com")
+    make_page_protect_script(db, url="https://cdn.example.com/app.js", resource_type="script", domain="cdn.example.com")
+    make_page_protect_script(
+        db, url="https://www.googletagmanager.com/gtm.js", resource_type="script", domain="www.googletagmanager.com"
+    )
     db.commit()
     result = recommend_policy(db)
     d = result["directives"]
@@ -94,10 +96,10 @@ def test_recommend_includes_script_origins(db):
 
 def test_recommend_groups_by_origin_not_full_url(db):
     """Multiple URLs from the same domain should produce one origin entry."""
-    make_page_protect_script(db, url="https://cdn.example.com/app.js",
-                             resource_type="script", domain="cdn.example.com")
-    make_page_protect_script(db, url="https://cdn.example.com/vendor.js",
-                             resource_type="script", domain="cdn.example.com")
+    make_page_protect_script(db, url="https://cdn.example.com/app.js", resource_type="script", domain="cdn.example.com")
+    make_page_protect_script(
+        db, url="https://cdn.example.com/vendor.js", resource_type="script", domain="cdn.example.com"
+    )
     db.commit()
     result = recommend_policy(db)
     d = result["directives"]
@@ -105,8 +107,7 @@ def test_recommend_groups_by_origin_not_full_url(db):
 
 
 def test_recommend_includes_connect_origins(db):
-    make_page_protect_script(db, url="https://api.stripe.com/charges",
-                             resource_type="connect", domain="api.stripe.com")
+    make_page_protect_script(db, url="https://api.stripe.com/charges", resource_type="connect", domain="api.stripe.com")
     db.commit()
     result = recommend_policy(db)
     d = result["directives"]
@@ -115,8 +116,9 @@ def test_recommend_includes_connect_origins(db):
 
 
 def test_recommend_includes_img_origins(db):
-    make_page_protect_script(db, url="https://images.example.com/logo.png",
-                             resource_type="img", domain="images.example.com")
+    make_page_protect_script(
+        db, url="https://images.example.com/logo.png", resource_type="img", domain="images.example.com"
+    )
     db.commit()
     result = recommend_policy(db)
     d = result["directives"]
@@ -126,8 +128,7 @@ def test_recommend_includes_img_origins(db):
 
 def test_recommend_skips_other_resource_type(db):
     """resource_type 'other' should not get its own directive — default-src covers it."""
-    make_page_protect_script(db, url="https://misc.example.com/thing",
-                             resource_type="other", domain="misc.example.com")
+    make_page_protect_script(db, url="https://misc.example.com/thing", resource_type="other", domain="misc.example.com")
     db.commit()
     result = recommend_policy(db)
     d = result["directives"]
@@ -138,11 +139,10 @@ def test_recommend_skips_other_resource_type(db):
 
 # --- Recommender: inline/eval ---
 
+
 def test_recommend_adds_unsafe_inline_for_scripts(db):
-    make_csp_report(db, violated_directive="script-src", blocked_uri="inline",
-                    client_ip="1.2.3.4")
-    make_csp_report(db, violated_directive="script-src", blocked_uri="inline",
-                    client_ip="5.6.7.8")
+    make_csp_report(db, violated_directive="script-src", blocked_uri="inline", client_ip="1.2.3.4")
+    make_csp_report(db, violated_directive="script-src", blocked_uri="inline", client_ip="5.6.7.8")
     db.commit()
     result = recommend_policy(db)
     d = result["directives"]
@@ -152,8 +152,7 @@ def test_recommend_adds_unsafe_inline_for_scripts(db):
 
 
 def test_recommend_adds_unsafe_inline_for_styles(db):
-    make_csp_report(db, violated_directive="style-src", blocked_uri="inline",
-                    client_ip="1.2.3.4")
+    make_csp_report(db, violated_directive="style-src", blocked_uri="inline", client_ip="1.2.3.4")
     db.commit()
     result = recommend_policy(db)
     d = result["directives"]
@@ -162,8 +161,7 @@ def test_recommend_adds_unsafe_inline_for_styles(db):
 
 
 def test_recommend_adds_unsafe_eval(db):
-    make_csp_report(db, violated_directive="script-src", blocked_uri="eval",
-                    client_ip="1.2.3.4")
+    make_csp_report(db, violated_directive="script-src", blocked_uri="eval", client_ip="1.2.3.4")
     db.commit()
     result = recommend_policy(db)
     d = result["directives"]
@@ -172,9 +170,9 @@ def test_recommend_adds_unsafe_eval(db):
 
 # --- Recommender: data: and blob: ---
 
+
 def test_recommend_adds_data_uri(db):
-    make_csp_report(db, violated_directive="img-src", blocked_uri="data",
-                    client_ip="1.2.3.4")
+    make_csp_report(db, violated_directive="img-src", blocked_uri="data", client_ip="1.2.3.4")
     db.commit()
     result = recommend_policy(db)
     d = result["directives"]
@@ -183,8 +181,7 @@ def test_recommend_adds_data_uri(db):
 
 
 def test_recommend_adds_blob_uri(db):
-    make_csp_report(db, violated_directive="worker-src", blocked_uri="blob",
-                    client_ip="1.2.3.4")
+    make_csp_report(db, violated_directive="worker-src", blocked_uri="blob", client_ip="1.2.3.4")
     db.commit()
     result = recommend_policy(db)
     d = result["directives"]
@@ -196,14 +193,16 @@ def test_recommend_adds_blob_uri(db):
 
 # --- Recommender: object-src ---
 
+
 def test_recommend_object_src_none_when_no_violations(db):
     result = recommend_policy(db)
     assert result["directives"]["object-src"] == ["'none'"]
 
 
 def test_recommend_object_src_with_origins_when_violations(db):
-    make_csp_report(db, violated_directive="object-src",
-                    blocked_uri="https://flash.example.com/swf", client_ip="1.2.3.4")
+    make_csp_report(
+        db, violated_directive="object-src", blocked_uri="https://flash.example.com/swf", client_ip="1.2.3.4"
+    )
     db.commit()
     result = recommend_policy(db)
     # object-src should not be 'none' if there are object violations
@@ -214,27 +213,29 @@ def test_recommend_object_src_with_origins_when_violations(db):
 
 # --- Recommender: baseline window filtering ---
 
+
 def test_recommend_filters_by_baseline_window(db):
     """Reports outside the baseline window should be excluded."""
     from app.services.page_protect import start_baseline, stop_baseline
+
     # Create an old report (before baseline)
-    old_report = make_csp_report(db, violated_directive="script-src",
-                                 blocked_uri="https://old.example.com/old.js",
-                                 client_ip="1.2.3.4")
-    old_report.captured_at = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=2)
+    old_report = make_csp_report(
+        db, violated_directive="script-src", blocked_uri="https://old.example.com/old.js", client_ip="1.2.3.4"
+    )
+    old_report.captured_at = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=2)
     db.commit()
 
     # Start and stop baseline (window = now)
     start_baseline(db)
     import time
+
     time.sleep(0.1)
     stop_baseline(db)
     db.commit()
 
     # Create a new report (after baseline end)
-    new_report = make_csp_report(db, violated_directive="script-src",
-                                 blocked_uri="inline", client_ip="5.6.7.8")
-    new_report.captured_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(seconds=5)
+    new_report = make_csp_report(db, violated_directive="script-src", blocked_uri="inline", client_ip="5.6.7.8")
+    new_report.captured_at = datetime.now(UTC).replace(tzinfo=None) + timedelta(seconds=5)
     db.commit()
 
     result = recommend_policy(db)
@@ -247,16 +248,15 @@ def test_recommend_filters_by_baseline_window(db):
 
 # --- Recommender: backend filtering ---
 
+
 def test_recommend_filters_by_backend_ids(db):
     backend1 = make_backend(db, name="be1")
     backend2 = make_backend(db, name="be2")
     db.commit()
     # Report from be1
-    make_csp_report(db, violated_directive="script-src", blocked_uri="inline",
-                    client_ip="1.2.3.4", backend_name="be1")
+    make_csp_report(db, violated_directive="script-src", blocked_uri="inline", client_ip="1.2.3.4", backend_name="be1")
     # Report from be2
-    make_csp_report(db, violated_directive="script-src", blocked_uri="eval",
-                    client_ip="5.6.7.8", backend_name="be2")
+    make_csp_report(db, violated_directive="script-src", blocked_uri="eval", client_ip="5.6.7.8", backend_name="be2")
     db.commit()
     result = recommend_policy(db, backend_ids=[backend1.id])
     d = result["directives"]
@@ -267,9 +267,9 @@ def test_recommend_filters_by_backend_ids(db):
 
 # --- Recommender: sources detail ---
 
+
 def test_recommend_includes_sources_detail(db):
-    make_page_protect_script(db, url="https://cdn.example.com/app.js",
-                             resource_type="script", domain="cdn.example.com")
+    make_page_protect_script(db, url="https://cdn.example.com/app.js", resource_type="script", domain="cdn.example.com")
     db.commit()
     result = recommend_policy(db)
     sources = result["sources"]
@@ -280,6 +280,7 @@ def test_recommend_includes_sources_detail(db):
 
 
 # --- Recommender: report-uri ---
+
 
 def test_recommend_includes_report_uri(db):
     result = recommend_policy(db)
@@ -294,11 +295,14 @@ def test_recommend_uses_custom_report_path(db):
 
 def test_recommend_skips_ignored_scripts(db):
     """Ignored inventory entries should not be recommended as CSP sources."""
-    make_page_protect_script(db, url="https://cdn.example.com/app.js",
-                             resource_type="script", domain="cdn.example.com")
-    make_page_protect_script(db, url="https://ignored.example.com/track.js",
-                             resource_type="script", domain="ignored.example.com",
-                             ignored=True)
+    make_page_protect_script(db, url="https://cdn.example.com/app.js", resource_type="script", domain="cdn.example.com")
+    make_page_protect_script(
+        db,
+        url="https://ignored.example.com/track.js",
+        resource_type="script",
+        domain="ignored.example.com",
+        ignored=True,
+    )
     db.commit()
     result = recommend_policy(db)
     d = result["directives"]

@@ -1,8 +1,6 @@
-from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from ..deps import get_db, get_current_user, require_write, rate_limit
-from ...models.proxy import FcgiApp
+
 from ...schemas.fcgi import FcgiAppCreate, FcgiAppResponse, FcgiAppUpdate
 from ...services.fcgi import (
     create_fcgi_app,
@@ -11,11 +9,12 @@ from ...services.fcgi import (
     list_fcgi_apps,
     update_fcgi_app,
 )
+from ..deps import get_current_user, get_db, rate_limit, require_write
 
 router = APIRouter()
 
 
-@router.get("/fcgi-apps", response_model=List[FcgiAppResponse])
+@router.get("/fcgi-apps", response_model=list[FcgiAppResponse])
 def list_fcgi_apps_endpoint(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),

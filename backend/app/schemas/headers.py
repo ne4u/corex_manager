@@ -1,15 +1,15 @@
-from datetime import datetime
-from typing import Optional, List, Dict, Any, Type, TypeVar
-from pydantic import BaseModel, Field, model_validator, field_validator, ConfigDict
+from pydantic import BaseModel, ConfigDict
+
 from ._base import _optional_update
 
+
 class ResponseHeaderBase(BaseModel):
-    listener_id: Optional[int] = None
-    listener_ids: Optional[List[int]] = None
+    listener_id: int | None = None
+    listener_ids: list[int] | None = None
     header: str
     value: str
     action: str = "override"
-    condition: Optional[str] = None
+    condition: str | None = None
 
 
 class ResponseHeaderCreate(ResponseHeaderBase):
@@ -26,12 +26,12 @@ class ResponseHeaderResponse(ResponseHeaderBase):
 
 
 class RequestHeaderBase(BaseModel):
-    backend_id: Optional[int] = None
-    backend_ids: Optional[List[int]] = None
+    backend_id: int | None = None
+    backend_ids: list[int] | None = None
     header: str
     value: str
     action: str = "override"
-    condition: Optional[str] = None
+    condition: str | None = None
 
 
 class RequestHeaderCreate(RequestHeaderBase):
@@ -47,4 +47,13 @@ class RequestHeaderResponse(RequestHeaderBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-__all__ = ['RequestHeaderBase', 'RequestHeaderCreate', 'RequestHeaderResponse', 'RequestHeaderUpdate', 'ResponseHeaderBase', 'ResponseHeaderCreate', 'ResponseHeaderResponse', 'ResponseHeaderUpdate']
+__all__ = [
+    "RequestHeaderBase",
+    "RequestHeaderCreate",
+    "RequestHeaderResponse",
+    "RequestHeaderUpdate",
+    "ResponseHeaderBase",
+    "ResponseHeaderCreate",
+    "ResponseHeaderResponse",
+    "ResponseHeaderUpdate",
+]

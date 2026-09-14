@@ -1,8 +1,6 @@
-from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from ..deps import get_db, get_current_user, require_write, rate_limit
-from ...models.proxy import CipherSuite
+
 from ...schemas.ciphers import CipherSuiteCreate, CipherSuiteResponse, CipherSuiteUpdate
 from ...services.ciphers import (
     create_cipher,
@@ -10,11 +8,12 @@ from ...services.ciphers import (
     list_ciphers,
     update_cipher,
 )
+from ..deps import get_current_user, get_db, rate_limit, require_write
 
 router = APIRouter()
 
 
-@router.get("/ciphers", response_model=List[CipherSuiteResponse])
+@router.get("/ciphers", response_model=list[CipherSuiteResponse])
 def list_cipher_suites(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),

@@ -1,9 +1,8 @@
-import secrets
-from typing import Any, Optional
+from functools import lru_cache
+from typing import Any
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from functools import lru_cache
 
 
 class Settings(BaseSettings):
@@ -17,11 +16,11 @@ class Settings(BaseSettings):
     # HAProxy Data Plane API
     DATAPLANE_API_URL: str = "https://haproxy:5555/v3"
     DATAPLANE_API_USER: str = "admin"
-    DATAPLANE_API_PASSWORD: Optional[str] = None
+    DATAPLANE_API_PASSWORD: str | None = None
     DATAPLANE_API_ENABLED: bool = True
     # Optional CA bundle path for verifying the Data Plane API TLS cert.
     # If unset, TLS verification is skipped (self-signed internal cert).
-    DATAPLANE_API_CA_BUNDLE: Optional[str] = None
+    DATAPLANE_API_CA_BUNDLE: str | None = None
 
     # acme.sh
     ACME_SH_ENABLED: bool = True
@@ -40,7 +39,7 @@ class Settings(BaseSettings):
     CORAZA_SPOA_ENABLED: bool = True
     CORAZA_SPOA_HOST: str = "coraza-spoa"
     CORAZA_SPOA_PORT: int = 9000
-    CORAZA_SPOA_TARGETS: Optional[str] = None  # comma-separated host:port pairs for HA
+    CORAZA_SPOA_TARGETS: str | None = None  # comma-separated host:port pairs for HA
     CORAZA_SPOA_APP: str = "haproxy-waf"
     CORAZA_SPOE_CONFIG_PATH: str = "data/coraza.cfg"
     # Coraza SPOA's maximum SPOE frame size. The emitted max-frame-size is
@@ -63,8 +62,8 @@ class Settings(BaseSettings):
     CAPTCHA_SERVICE_URL: str = "http://cap:3000"
     CAPTCHA_SERVICE_PUBLIC_URL: str = "http://localhost:3000"
     CAPTCHA_CHALLENGE_URL: str = "/_cap/challenge"
-    CAPTCHA_SITE_KEY: Optional[str] = None
-    CAPTCHA_SECRET: Optional[str] = None
+    CAPTCHA_SITE_KEY: str | None = None
+    CAPTCHA_SECRET: str | None = None
     # Path prefix for proxying captcha traffic through the HAProxy listener
     CAPTCHA_PROXY_PATH: str = "/_cap"
     # CDN URL for the @cap.js/widget script (pinned version; change to @latest or self-host as needed)
@@ -79,13 +78,13 @@ class Settings(BaseSettings):
     # consumed (deleted) on a successful solve.
     CAPTCHA_CHALLENGE_TTL_SECONDS: int = 900
     # reCAPTCHA (Google) — env-var fallbacks; UI can override via settings table
-    RECAPTCHA_SITE_KEY: Optional[str] = None
-    RECAPTCHA_SECRET: Optional[str] = None
+    RECAPTCHA_SITE_KEY: str | None = None
+    RECAPTCHA_SECRET: str | None = None
     RECAPTCHA_VERSION: str = "v2"  # "v2" or "v3"
     RECAPTCHA_MIN_SCORE: float = 0.5  # v3 only: minimum score (0.0-1.0) to accept
     # Cloudflare Turnstile — env-var fallbacks; UI can override via settings table
-    TURNSTILE_SITE_KEY: Optional[str] = None
-    TURNSTILE_SECRET: Optional[str] = None
+    TURNSTILE_SITE_KEY: str | None = None
+    TURNSTILE_SECRET: str | None = None
     # CAPTCHA challenge event retention (challenge_events table pruned on startup)
     CAPTCHA_CHALLENGE_RETENTION_DAYS: int = 7
     WAF_METRICS_SAMPLE_INTERVAL_SECONDS: int = 10
@@ -122,7 +121,7 @@ class Settings(BaseSettings):
     VALKEY_HOST: str = "localhost"
     VALKEY_PORT: int = 6379
     VALKEY_DB: int = 0
-    VALKEY_PASSWORD: Optional[str] = None
+    VALKEY_PASSWORD: str | None = None
     # Valkey inspector (System → Valkey tab). The scanned key list per namespace
     # is cached for VALKEY_INSPECT_CACHE_TTL_SECONDS so repeated pagination clicks
     # don't rescan. SCAN is bounded by VALKEY_INSPECT_MAX_SCAN_BATCHES batches of
@@ -134,7 +133,7 @@ class Settings(BaseSettings):
     GEOIP_DB_PATH: str = "data/GeoLite2-Country.mmdb"
     ASN_DB_PATH: str = "data/GeoLite2-ASN.mmdb"
     GEOIP_CITY_DB_PATH: str = "data/GeoLite2-City.mmdb"
-    MAXMIND_LICENSE_KEY: Optional[str] = None
+    MAXMIND_LICENSE_KEY: str | None = None
     GEOIP_DOWNLOAD_INTERVAL_HOURS: int = 24
     # haproxy-geoip2 Rust Lua module — the primary GeoIP engine. Reads MMDB files
     # directly via the maxminddb Rust crate, registers lua.geoip2-lookup-city/asn
@@ -309,7 +308,7 @@ class Settings(BaseSettings):
     PAGE_PROTECT_BEACON_JS_PATH: str = "/app/data/page-protect-beacon.js"
     # Beacon Trust — IP trust via Page Protect beacon + Server-Timing cxid
     BEACON_TRUST_TTL_SECONDS: int = 900  # 15 min sliding window, refreshed on every request
-    BEACON_CXID_TTL_SECONDS: int = 120   # 2 min cxid validity window (page load → beacon POST)
+    BEACON_CXID_TTL_SECONDS: int = 120  # 2 min cxid validity window (page load → beacon POST)
     BEACON_TRUST_PERSIST_INTERVAL_SECONDS: int = 60  # export trust table to Valkey
 
     # Stick-table viewer (System → Tables tab). The full parsed entry list for a
@@ -359,9 +358,11 @@ class Settings(BaseSettings):
     # Vector log pipeline (managed vector.dev sidecar/service)
     VECTOR_CONFIG_PATH: str = "data/vector/vector.toml"  # generated config on the shared haproxy data volume
     VECTOR_SYSLOG_TARGET: str = "vector:601"  # HAProxy `log` target (used in `server vector <target>` line of the `ring vector_tcp` section). Helm overrides to 127.0.0.1:601 (same-pod sidecar). The ring uses TCP (HAProxy default for server lines); the Vector syslog source listens on TCP to match.
-    VECTOR_SECRETS_KEY: Optional[str] = None  # Fernet key material for vector sink secrets; falls back to SECRET_KEY
+    VECTOR_SECRETS_KEY: str | None = None  # Fernet key material for vector sink secrets; falls back to SECRET_KEY
     VECTOR_CONTAINER_NAME: str = "vector"  # container name/compose service for the vector sidecar
-    VECTOR_CONTAINER_CONFIG_PATH: str = "/app/data/vector/vector.toml"  # config path as seen inside the vector container (shared volume mount)
+    VECTOR_CONTAINER_CONFIG_PATH: str = (
+        "/app/data/vector/vector.toml"  # config path as seen inside the vector container (shared volume mount)
+    )
 
     # Runtime backend selection — controls how the backend interacts with
     # sibling containers (HAProxy, Coraza, Varnish) for config validation,
@@ -422,28 +423,28 @@ class Settings(BaseSettings):
     MCP_UPSTREAM_PORT: int = 8090
     MCP_METRICS_SAMPLE_INTERVAL_SECONDS: int = 30
     MCP_METRICS_RETENTION_DAYS: int = 7
-    MCP_SECRETS_KEY: Optional[str] = None  # 32+ byte key for Fernet; separate from SECRET_KEY
-    MCP_JWT_ISSUER: Optional[str] = None
-    MCP_JWT_AUDIENCE: Optional[str] = None
-    MCP_JWT_JWKS_URL: Optional[str] = None
+    MCP_SECRETS_KEY: str | None = None  # 32+ byte key for Fernet; separate from SECRET_KEY
+    MCP_JWT_ISSUER: str | None = None
+    MCP_JWT_AUDIENCE: str | None = None
+    MCP_JWT_JWKS_URL: str | None = None
 
     # Auth0 IdP integration for MCP identities
     # The onboarding tool writes AUTH0_DOMAIN, CLIENT_ID, CLIENT_SECRET and SECRET.
     # AUTH0_MCP_AUDIENCE is the Auth0 API identifier that MCP clients request tokens for.
-    AUTH0_DOMAIN: Optional[str] = None
-    AUTH0_CLIENT_ID: Optional[str] = None
-    AUTH0_CLIENT_SECRET: Optional[str] = None
-    AUTH0_SECRET: Optional[str] = None
-    AUTH0_MCP_AUDIENCE: Optional[str] = None
+    AUTH0_DOMAIN: str | None = None
+    AUTH0_CLIENT_ID: str | None = None
+    AUTH0_CLIENT_SECRET: str | None = None
+    AUTH0_SECRET: str | None = None
+    AUTH0_MCP_AUDIENCE: str | None = None
     AUTH0_SYNC_ENABLED: bool = False
-    AUTH0_SYNC_TEAM_ID: Optional[int] = None
+    AUTH0_SYNC_TEAM_ID: int | None = None
 
-    MCP_ALLOWED_ORIGINS: Optional[str] = None  # comma-separated list
+    MCP_ALLOWED_ORIGINS: str | None = None  # comma-separated list
     MCP_LOG_PAYLOADS: bool = False
     MCP_DEFAULT_RPM: int = 600
     # MCP Server (coreX Manager's own MCP server exposing the control plane)
     MCP_SELF_REGISTER: bool = True  # auto-register the coreX Manager MCP server into the gateway
-    MCP_SERVICE_TOKEN: Optional[str] = None  # shared secret for rate-limit bypass on in-process MCP calls
+    MCP_SERVICE_TOKEN: str | None = None  # shared secret for rate-limit bypass on in-process MCP calls
     MCP_SERVER_INTERNAL_HOST: str = "mcp-server"
     MCP_SERVER_INTERNAL_PORT: int = 8082
 
@@ -472,7 +473,7 @@ class Settings(BaseSettings):
     # peer discovery. When unset or HA disabled, falls back to the single
     # DATAPLANE_API_URL with name "corex".
     #   Example: corex1=https://corex1:5555/v3,corex2=https://corex2:5555/v3
-    HAPROXY_INSTANCES: Optional[str] = None
+    HAPROXY_INSTANCES: str | None = None
     # Stick-table peer sync port (HAProxy peers section). Each HAProxy
     # instance binds this port for stick-table replication.
     HAPROXY_PEER_PORT: int = 10000
@@ -486,26 +487,26 @@ class Settings(BaseSettings):
     KEEPALIVED_VIRTUAL_ROUTER_ID: int = 51
     KEEPALIVED_PRIORITY: int = 100
     KEEPALIVED_INTERFACE: str = "eth0"
-    KEEPALIVED_AUTH_PASSWORD: Optional[str] = None
+    KEEPALIVED_AUTH_PASSWORD: str | None = None
     # Comma-separated list of peer VRRP interface addresses (other keepalived
     # instances). Used for unicast peers; if empty, keepalived uses multicast.
-    KEEPALIVED_PEER_ADDRESSES: Optional[str] = None
+    KEEPALIVED_PEER_ADDRESSES: str | None = None
     KEEPALIVED_ADVERT_INT: int = 1
     KEEPALIVED_PREEMPT: bool = True
     # Optional track script path (HAProxy health check). When set, keepalived
     # runs the script and enters FAULT state if it fails.
-    KEEPALIVED_TRACK_SCRIPT: Optional[str] = None
+    KEEPALIVED_TRACK_SCRIPT: str | None = None
 
     # Valkey Sentinel — when VALKEY_SENTINEL_ENABLED=true, the Valkey client
     # connects via Sentinel (valkey.Sentinel + master_for) instead of direct
     # host:port. Enables automatic failover to the replica on primary failure.
     VALKEY_SENTINEL_ENABLED: bool = False
     # Comma-separated list of "host:port" sentinel addresses.
-    VALKEY_SENTINEL_HOSTS: Optional[str] = None
+    VALKEY_SENTINEL_HOSTS: str | None = None
     # Sentinel monitor service name (default "mymaster").
     VALKEY_SENTINEL_SERVICE: str = "mymaster"
     # Optional Sentinel auth password (AUTH command).
-    VALKEY_SENTINEL_PASSWORD: Optional[str] = None
+    VALKEY_SENTINEL_PASSWORD: str | None = None
 
     # Docker Swarm mode — when true, the backend knows it's running in a
     # Swarm stack. Affects HA behavior: keepalived is skipped (Swarm's
@@ -533,7 +534,7 @@ class Settings(BaseSettings):
 
     @field_validator("AUTH0_SYNC_TEAM_ID", mode="before")
     @classmethod
-    def _validate_auth0_sync_team_id(cls, v: Any) -> Optional[int]:
+    def _validate_auth0_sync_team_id(cls, v: Any) -> int | None:
         if v is None or v == "":
             return None
         if isinstance(v, int):
@@ -555,6 +556,6 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
-@lru_cache()
+@lru_cache
 def get_settings() -> Settings:
     return Settings()

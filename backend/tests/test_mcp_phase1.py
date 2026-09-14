@@ -1,10 +1,10 @@
 """Tests for MCP Gateway Phase 1 — config bundle, HAProxy generation, protocol."""
+
 import json
 import os
 import sys
 import tempfile
-from unittest.mock import AsyncMock, MagicMock, patch
-from urllib.parse import urlparse
+from datetime import UTC
 
 import pytest
 
@@ -16,8 +16,10 @@ if _GATEWAY_DIR not in sys.path:
 
 # ---- Config bundle tests ----
 
+
 def test_build_config_bundle_empty(client, db):
     from app.services.mcp_config import build_config_bundle
+
     bundle = build_config_bundle(db)
     assert bundle["servers"] == []
     assert bundle["identities"] == []
@@ -28,19 +30,26 @@ def test_build_config_bundle_empty(client, db):
 
 def test_build_config_bundle_with_server(client, db):
     from app.services.mcp_config import build_config_bundle
-    from app.services.mcp_secrets import encrypt_secret
+
     os.environ["MCP_SECRETS_KEY"] = "test-mcp-secrets-key-for-fernet-encryption"
     import app.services.mcp_secrets as ms
+
     ms._fernet = None
 
     # Create team + server via API
     client.post("/api/v1/mcp/teams", json={"name": "Eng", "slug": "eng"})
     tid = client.get("/api/v1/mcp/teams").json()[0]["id"]
 
-    client.post("/api/v1/mcp/servers", json={
-        "team_id": tid, "name": "srv", "url": "https://up.example.com/mcp",
-        "auth_type": "bearer", "auth_secret": "secret123",
-    })
+    client.post(
+        "/api/v1/mcp/servers",
+        json={
+            "team_id": tid,
+            "name": "srv",
+            "url": "https://up.example.com/mcp",
+            "auth_type": "bearer",
+            "auth_secret": "secret123",
+        },
+    )
 
     bundle = build_config_bundle(db)
     assert len(bundle["servers"]) == 1
@@ -54,21 +63,31 @@ def test_build_config_bundle_with_server(client, db):
 
 def test_build_config_bundle_multi_replica_url_rewrite(client, db):
     from app.services.mcp_config import build_config_bundle
+
     os.environ["MCP_SECRETS_KEY"] = "test-mcp-secrets-key-for-fernet-encryption"
     import app.services.mcp_secrets as ms
+
     ms._fernet = None
 
     client.post("/api/v1/mcp/teams", json={"name": "T", "slug": "t"})
     tid = client.get("/api/v1/mcp/teams").json()[0]["id"]
 
-    resp = client.post("/api/v1/mcp/servers", json={
-        "team_id": tid, "name": "multi", "url": "https://up.example.com/mcp",
-    })
+    resp = client.post(
+        "/api/v1/mcp/servers",
+        json={
+            "team_id": tid,
+            "name": "multi",
+            "url": "https://up.example.com/mcp",
+        },
+    )
     sid = resp.json()["id"]
 
-    client.post(f"/api/v1/mcp/servers/{sid}/replicas", json={
-        "url": "https://replica.example.com/mcp",
-    })
+    client.post(
+        f"/api/v1/mcp/servers/{sid}/replicas",
+        json={
+            "url": "https://replica.example.com/mcp",
+        },
+    )
 
     bundle = build_config_bundle(db)
     server = bundle["servers"][0]
@@ -79,10 +98,9 @@ def test_build_config_bundle_multi_replica_url_rewrite(client, db):
 
 
 def test_write_config_bundle_writes_file(client, db):
-    from app.services.mcp_config import write_config_bundle
-    import app.services.mcp_config as mc
     import app.services.mcp_secrets as ms
     from app.core.config import get_settings
+    from app.services.mcp_config import write_config_bundle
 
     settings = get_settings()
     with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
@@ -115,8 +133,10 @@ def test_write_config_bundle_writes_file(client, db):
 
 # ---- HAProxy generation tests ----
 
+
 def test_mcp_gateway_backend_emitted_when_enabled(db):
     from app.services.haproxy import generate_mcp_gateway_backend
+
     config = generate_mcp_gateway_backend(db)
     assert "backend mcp_gateway" in config
     assert "stick on req.hdr(Mcp-Session-Id)" in config
@@ -133,6 +153,7 @@ def test_mcp_gateway_backend_rust_when_setting_is_rust(db):
     """When mcp_gateway_backend setting is 'rust', HAProxy routes to the Rust gateway."""
     from app.services.haproxy import generate_mcp_gateway_backend
     from app.services.settings import set_setting
+
     set_setting(db, "mcp_gateway_backend", "rust")
     config = generate_mcp_gateway_backend(db)
     assert "server mcp-gateway-rs mcp-gateway-rs:8089 check inter 5s fall 3 rise 2" in config
@@ -143,6 +164,7 @@ def test_mcp_gateway_backend_python_when_setting_is_python(db):
     """When mcp_gateway_backend setting is 'python', HAProxy routes to the Python gateway."""
     from app.services.haproxy import generate_mcp_gateway_backend
     from app.services.settings import set_setting
+
     set_setting(db, "mcp_gateway_backend", "python")
     config = generate_mcp_gateway_backend(db)
     assert "server mcp-gateway mcp-gateway:8081 check inter 5s fall 3 rise 2" in config
@@ -151,6 +173,7 @@ def test_mcp_gateway_backend_python_when_setting_is_python(db):
 
 def test_mcp_upstreams_empty_when_no_replicas(db):
     from app.services.haproxy import generate_mcp_upstreams
+
     config = generate_mcp_upstreams(db)
     assert config == ""
 
@@ -158,21 +181,31 @@ def test_mcp_upstreams_empty_when_no_replicas(db):
 def test_mcp_upstreams_emitted_with_replicas(client, db):
     os.environ["MCP_SECRETS_KEY"] = "test-mcp-secrets-key-for-fernet-encryption"
     import app.services.mcp_secrets as ms
+
     ms._fernet = None
 
     client.post("/api/v1/mcp/teams", json={"name": "UpT", "slug": "upt"})
     tid = client.get("/api/v1/mcp/teams").json()[0]["id"]
 
-    resp = client.post("/api/v1/mcp/servers", json={
-        "team_id": tid, "name": "multi-srv", "url": "https://up.example.com/mcp",
-    })
+    resp = client.post(
+        "/api/v1/mcp/servers",
+        json={
+            "team_id": tid,
+            "name": "multi-srv",
+            "url": "https://up.example.com/mcp",
+        },
+    )
     sid = resp.json()["id"]
 
-    client.post(f"/api/v1/mcp/servers/{sid}/replicas", json={
-        "url": "https://replica.example.com/mcp",
-    })
+    client.post(
+        f"/api/v1/mcp/servers/{sid}/replicas",
+        json={
+            "url": "https://replica.example.com/mcp",
+        },
+    )
 
     from app.services.haproxy import generate_mcp_upstreams
+
     config = generate_mcp_upstreams(db)
     assert "frontend mcp_upstreams" in config
     assert "backend mcp_up_multi-srv" in config
@@ -187,16 +220,23 @@ def test_mcp_upstreams_emitted_with_replicas(client, db):
 def test_mcp_upstreams_not_emitted_for_single_replica(client, db):
     os.environ["MCP_SECRETS_KEY"] = "test-mcp-secrets-key-for-fernet-encryption"
     import app.services.mcp_secrets as ms
+
     ms._fernet = None
 
     client.post("/api/v1/mcp/teams", json={"name": "SingleT", "slug": "singlet"})
     tid = client.get("/api/v1/mcp/teams").json()[0]["id"]
 
-    client.post("/api/v1/mcp/servers", json={
-        "team_id": tid, "name": "single-srv", "url": "https://up.example.com/mcp",
-    })
+    client.post(
+        "/api/v1/mcp/servers",
+        json={
+            "team_id": tid,
+            "name": "single-srv",
+            "url": "https://up.example.com/mcp",
+        },
+    )
 
     from app.services.haproxy import generate_mcp_upstreams
+
     config = generate_mcp_upstreams(db)
     assert config == ""
     ms._fernet = None
@@ -204,8 +244,10 @@ def test_mcp_upstreams_not_emitted_for_single_replica(client, db):
 
 # ---- Listener protocol validation ----
 
+
 def test_mcp_protocol_accepted_in_listener_schema():
     from app.schemas.listeners import ListenerCreate
+
     listener = ListenerCreate(name="mcp-listener", bind_port=8080, protocol="mcp")
     assert listener.protocol == "mcp"
 
@@ -213,16 +255,19 @@ def test_mcp_protocol_accepted_in_listener_schema():
 def test_invalid_protocol_rejected():
     from app.schemas.listeners import ListenerCreate
     from pydantic import ValidationError
+
     with pytest.raises(ValidationError):
         ListenerCreate(name="bad", bind_port=8080, protocol="invalid")
 
 
 # ---- Frontend routing injection tests ----
 
+
 def test_mcp_frontend_routing_dedicated_listener(db):
     """A listener with protocol=mcp gets default_backend mcp_gateway when flag is on."""
     from app.services import haproxy
     from app.services.settings import set_setting
+
     from tests.factories import make_listener
 
     set_setting(db, "mcp_gateway_enabled", "true")
@@ -238,13 +283,18 @@ def test_mcp_frontend_routing_shared_listener(db):
     """An HTTP listener with options.mcp_route_enabled gets use_backend mcp_gateway for /mcp paths."""
     from app.services import haproxy
     from app.services.settings import set_setting
-    from tests.factories import make_listener, make_backend, make_server
+
+    from tests.factories import make_backend, make_listener, make_server
 
     set_setting(db, "mcp_gateway_enabled", "true")
     backend = make_backend(db, name="web")
     make_server(db, backend.id)
     make_listener(
-        db, backend=backend, name="shared-in", bind_port=80, protocol="http",
+        db,
+        backend=backend,
+        name="shared-in",
+        bind_port=80,
+        protocol="http",
         options={"mcp_route_enabled": True},
     )
     db.commit()
@@ -259,7 +309,8 @@ def test_mcp_frontend_routing_shared_listener_opt_out(db):
     """An HTTP listener WITHOUT mcp_route_enabled gets no /mcp route (per-listener opt-in)."""
     from app.services import haproxy
     from app.services.settings import set_setting
-    from tests.factories import make_listener, make_backend, make_server
+
+    from tests.factories import make_backend, make_listener, make_server
 
     set_setting(db, "mcp_gateway_enabled", "true")
     backend = make_backend(db, name="web")
@@ -278,13 +329,18 @@ def test_mcp_frontend_routing_shared_listener_explicit_false(db):
     """mcp_route_enabled=False explicitly disables /mcp routing on the listener."""
     from app.services import haproxy
     from app.services.settings import set_setting
-    from tests.factories import make_listener, make_backend, make_server
+
+    from tests.factories import make_backend, make_listener, make_server
 
     set_setting(db, "mcp_gateway_enabled", "true")
     backend = make_backend(db, name="web")
     make_server(db, backend.id)
     make_listener(
-        db, backend=backend, name="off-in", bind_port=80, protocol="http",
+        db,
+        backend=backend,
+        name="off-in",
+        bind_port=80,
+        protocol="http",
         options={"mcp_route_enabled": False},
     )
     db.commit()
@@ -297,14 +353,19 @@ def test_mcp_frontend_routing_opt_in_is_per_listener(db):
     """With two HTTP listeners, only the opted-in one routes /mcp."""
     from app.services import haproxy
     from app.services.settings import set_setting
-    from tests.factories import make_listener, make_backend, make_server
+
+    from tests.factories import make_backend, make_listener, make_server
 
     set_setting(db, "mcp_gateway_enabled", "true")
     backend = make_backend(db, name="web")
     make_server(db, backend.id)
     make_listener(db, backend=backend, name="in-no", bind_port=80, protocol="http")
     make_listener(
-        db, backend=backend, name="in-yes", bind_port=443, protocol="http",
+        db,
+        backend=backend,
+        name="in-yes",
+        bind_port=443,
+        protocol="http",
         options={"mcp_route_enabled": True},
     )
     db.commit()
@@ -323,6 +384,7 @@ def test_mcp_frontend_routing_not_emitted_when_disabled(db):
     """No MCP routing rule when the feature flag is off."""
     from app.services import haproxy
     from app.services.settings import set_setting
+
     from tests.factories import make_listener
 
     set_setting(db, "mcp_gateway_enabled", "false")
@@ -335,13 +397,15 @@ def test_mcp_frontend_routing_not_emitted_when_disabled(db):
 
 # ---- Config status / unapplied detection tests ----
 
+
 def test_mcp_config_status_detects_unapplied_changes(client, db):
     """MCP changes show as unapplied when the .applied bundle differs from generated."""
     import os
-    from app.services.settings import set_setting
+
+    import app.services.mcp_secrets as ms
     from app.services.config import get_config_status
     from app.services.mcp_config import generate_mcp_bundle_text, write_applied_mcp_bundle
-    import app.services.mcp_secrets as ms
+    from app.services.settings import set_setting
 
     os.environ["MCP_SECRETS_KEY"] = "test-mcp-secrets-key-for-fernet-encryption"
     ms._fernet = None
@@ -350,9 +414,14 @@ def test_mcp_config_status_detects_unapplied_changes(client, db):
     # Create a team + server
     client.post("/api/v1/mcp/teams", json={"name": "StatusT", "slug": "statust"})
     tid = client.get("/api/v1/mcp/teams").json()[0]["id"]
-    client.post("/api/v1/mcp/servers", json={
-        "team_id": tid, "name": "status-srv", "url": "https://up.example.com/mcp",
-    })
+    client.post(
+        "/api/v1/mcp/servers",
+        json={
+            "team_id": tid,
+            "name": "status-srv",
+            "url": "https://up.example.com/mcp",
+        },
+    )
     db.commit()
 
     # Write the .applied bundle (simulates a prior apply)
@@ -362,9 +431,14 @@ def test_mcp_config_status_detects_unapplied_changes(client, db):
     applied_text = generate_mcp_bundle_text(db)
 
     # Make a change — add another server
-    client.post("/api/v1/mcp/servers", json={
-        "team_id": tid, "name": "status-srv-2", "url": "https://up2.example.com/mcp",
-    })
+    client.post(
+        "/api/v1/mcp/servers",
+        json={
+            "team_id": tid,
+            "name": "status-srv-2",
+            "url": "https://up2.example.com/mcp",
+        },
+    )
     db.commit()
 
     # Now the generated bundle should differ from .applied
@@ -382,9 +456,10 @@ def test_mcp_config_status_detects_unapplied_changes(client, db):
 def test_mcp_config_status_clean_after_apply(client, db):
     """After writing the .applied bundle, MCP changes are not unapplied."""
     import os
-    from app.services.settings import set_setting
-    from app.services.mcp_config import generate_mcp_bundle_text, read_applied_mcp_bundle, write_applied_mcp_bundle
+
     import app.services.mcp_secrets as ms
+    from app.services.mcp_config import generate_mcp_bundle_text, read_applied_mcp_bundle, write_applied_mcp_bundle
+    from app.services.settings import set_setting
 
     os.environ["MCP_SECRETS_KEY"] = "test-mcp-secrets-key-for-fernet-encryption"
     ms._fernet = None
@@ -392,9 +467,14 @@ def test_mcp_config_status_clean_after_apply(client, db):
 
     client.post("/api/v1/mcp/teams", json={"name": "CleanT", "slug": "cleant"})
     tid = client.get("/api/v1/mcp/teams").json()[0]["id"]
-    client.post("/api/v1/mcp/servers", json={
-        "team_id": tid, "name": "clean-srv", "url": "https://up.example.com/mcp",
-    })
+    client.post(
+        "/api/v1/mcp/servers",
+        json={
+            "team_id": tid,
+            "name": "clean-srv",
+            "url": "https://up.example.com/mcp",
+        },
+    )
     db.commit()
 
     # Write .applied (simulates apply)
@@ -409,10 +489,11 @@ def test_mcp_config_status_clean_after_apply(client, db):
 def test_mcp_config_diff_includes_mcp_bundle(client, db):
     """The config diff includes mcp-bundle.json when MCP changes are unapplied."""
     import os
-    from app.services.settings import set_setting
+
+    import app.services.mcp_secrets as ms
     from app.services.config import get_config_diff
     from app.services.mcp_config import write_applied_mcp_bundle
-    import app.services.mcp_secrets as ms
+    from app.services.settings import set_setting
 
     os.environ["MCP_SECRETS_KEY"] = "test-mcp-secrets-key-for-fernet-encryption"
     ms._fernet = None
@@ -420,18 +501,28 @@ def test_mcp_config_diff_includes_mcp_bundle(client, db):
 
     client.post("/api/v1/mcp/teams", json={"name": "DiffT", "slug": "difft"})
     tid = client.get("/api/v1/mcp/teams").json()[0]["id"]
-    client.post("/api/v1/mcp/servers", json={
-        "team_id": tid, "name": "diff-srv", "url": "https://up.example.com/mcp",
-    })
+    client.post(
+        "/api/v1/mcp/servers",
+        json={
+            "team_id": tid,
+            "name": "diff-srv",
+            "url": "https://up.example.com/mcp",
+        },
+    )
     db.commit()
 
     # Write .applied (simulates prior apply with one server)
     write_applied_mcp_bundle(db)
 
     # Add a second server
-    client.post("/api/v1/mcp/servers", json={
-        "team_id": tid, "name": "diff-srv-2", "url": "https://up2.example.com/mcp",
-    })
+    client.post(
+        "/api/v1/mcp/servers",
+        json={
+            "team_id": tid,
+            "name": "diff-srv-2",
+            "url": "https://up2.example.com/mcp",
+        },
+    )
     db.commit()
 
     result = get_config_diff(db)
@@ -450,10 +541,12 @@ def test_mcp_config_status_resilient_to_bundle_failures(client, db):
     and the diff should work for non-MCP configs without a broken mcp-bundle entry.
     """
     import os
-    from app.services.settings import set_setting
-    from app.services.config import get_config_status, get_config_diff
-    from tests.factories import make_listener, make_backend, make_server
+
     import app.services.mcp_secrets as ms
+    from app.services.config import get_config_diff, get_config_status
+    from app.services.settings import set_setting
+
+    from tests.factories import make_backend, make_listener, make_server
 
     # Ensure no Fernet key is set
     os.environ.pop("MCP_SECRETS_KEY", None)
@@ -467,9 +560,14 @@ def test_mcp_config_status_resilient_to_bundle_failures(client, db):
     # We can't create a server with a secret without MCP_SECRETS_KEY, so just
     # create one without secrets — the bundle should still build fine.
     # The real test is that config_status doesn't crash.
-    client.post("/api/v1/mcp/servers", json={
-        "team_id": tid, "name": "resilient-srv", "url": "https://up.example.com/mcp",
-    })
+    client.post(
+        "/api/v1/mcp/servers",
+        json={
+            "team_id": tid,
+            "name": "resilient-srv",
+            "url": "https://up.example.com/mcp",
+        },
+    )
     db.commit()
 
     # Also create a regular HAProxy listener+backend so there's non-MCP config
@@ -498,10 +596,12 @@ def test_mcp_config_status_resilient_to_fernet_runtime_error(client, db):
     configured (e.g. key was removed after servers were created).
     """
     import os
-    from app.services.settings import set_setting
-    from app.services.config import get_config_status, get_config_diff
-    from tests.factories import make_listener, make_backend, make_server
+
     import app.services.mcp_secrets as ms
+    from app.services.config import get_config_diff, get_config_status
+    from app.services.settings import set_setting
+
+    from tests.factories import make_backend, make_listener, make_server
 
     # Set up a valid Fernet key, create a server with a secret, then remove the key
     os.environ["MCP_SECRETS_KEY"] = "test-mcp-secrets-key-for-fernet-encryption"
@@ -510,10 +610,16 @@ def test_mcp_config_status_resilient_to_fernet_runtime_error(client, db):
 
     client.post("/api/v1/mcp/teams", json={"name": "FernetT", "slug": "fernett"})
     tid = client.get("/api/v1/mcp/teams").json()[0]["id"]
-    client.post("/api/v1/mcp/servers", json={
-        "team_id": tid, "name": "fernet-srv", "url": "https://up.example.com/mcp",
-        "auth_type": "bearer", "auth_secret": "secret123",
-    })
+    client.post(
+        "/api/v1/mcp/servers",
+        json={
+            "team_id": tid,
+            "name": "fernet-srv",
+            "url": "https://up.example.com/mcp",
+            "auth_type": "bearer",
+            "auth_secret": "secret123",
+        },
+    )
     db.commit()
 
     # Now remove the key — decrypt_secret will raise RuntimeError
@@ -545,9 +651,11 @@ def test_mcp_config_status_resilient_to_fernet_runtime_error(client, db):
 
 # ---- Gateway auth module tests ----
 
+
 def test_pat_format_detection():
     import importlib
-    auth = importlib.import_module('auth')
+
+    auth = importlib.import_module("auth")
     _is_pat, _parse_pat = auth._is_pat, auth._parse_pat
     assert _is_pat("mcp_abcd1234.secrettoken") is True
     assert _is_pat("eyJhbGciOi...") is False
@@ -558,17 +666,25 @@ def test_pat_format_detection():
 
 def test_pat_verification():
     import importlib
-    auth = importlib.import_module('auth')
+
+    auth = importlib.import_module("auth")
     _verify_pat = auth._verify_pat
     import bcrypt
 
     pat_token = "mcp_abcd1234.mysecret"
     pat_hash = bcrypt.hashpw(pat_token.encode(), bcrypt.gensalt()).decode()
-    identities = [{
-        "id": 1, "team_id": 1, "name": "bot",
-        "kind": "pat", "pat_prefix": "mcp_abcd1234",
-        "pat_hash": pat_hash, "enabled": True, "expires_at": None,
-    }]
+    identities = [
+        {
+            "id": 1,
+            "team_id": 1,
+            "name": "bot",
+            "kind": "pat",
+            "pat_prefix": "mcp_abcd1234",
+            "pat_hash": pat_hash,
+            "enabled": True,
+            "expires_at": None,
+        }
+    ]
     result = _verify_pat("mcp_abcd1234", pat_token, identities)
     assert result is not None
     assert result["name"] == "bot"
@@ -576,61 +692,87 @@ def test_pat_verification():
 
 def test_pat_wrong_secret_rejected():
     import importlib
-    auth = importlib.import_module('auth')
+
+    auth = importlib.import_module("auth")
     _verify_pat = auth._verify_pat
     import bcrypt
 
     pat_hash = bcrypt.hashpw(b"mcp_abcd1234.correct", bcrypt.gensalt()).decode()
-    identities = [{
-        "id": 1, "team_id": 1, "name": "bot",
-        "kind": "pat", "pat_prefix": "mcp_abcd1234",
-        "pat_hash": pat_hash, "enabled": True, "expires_at": None,
-    }]
+    identities = [
+        {
+            "id": 1,
+            "team_id": 1,
+            "name": "bot",
+            "kind": "pat",
+            "pat_prefix": "mcp_abcd1234",
+            "pat_hash": pat_hash,
+            "enabled": True,
+            "expires_at": None,
+        }
+    ]
     result = _verify_pat("mcp_abcd1234", "wrong-secret", identities)
     assert result is None
 
 
 def test_pat_expired_rejected():
     import importlib
-    auth = importlib.import_module('auth')
+
+    auth = importlib.import_module("auth")
     _verify_pat = auth._verify_pat
+    from datetime import datetime, timedelta
+
     import bcrypt
-    from datetime import datetime, timedelta, timezone
 
     pat_token = "mcp_abcd1234.mysecret"
     pat_hash = bcrypt.hashpw(pat_token.encode(), bcrypt.gensalt()).decode()
-    identities = [{
-        "id": 1, "team_id": 1, "name": "bot",
-        "kind": "pat", "pat_prefix": "mcp_abcd1234",
-        "pat_hash": pat_hash, "enabled": True,
-        "expires_at": (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat(),
-    }]
+    identities = [
+        {
+            "id": 1,
+            "team_id": 1,
+            "name": "bot",
+            "kind": "pat",
+            "pat_prefix": "mcp_abcd1234",
+            "pat_hash": pat_hash,
+            "enabled": True,
+            "expires_at": (datetime.now(UTC) - timedelta(hours=1)).isoformat(),
+        }
+    ]
     result = _verify_pat("mcp_abcd1234", pat_token, identities)
     assert result is None
 
 
 def test_pat_disabled_rejected():
     import importlib
-    auth = importlib.import_module('auth')
+
+    auth = importlib.import_module("auth")
     _verify_pat = auth._verify_pat
     import bcrypt
 
     pat_token = "mcp_abcd1234.mysecret"
     pat_hash = bcrypt.hashpw(pat_token.encode(), bcrypt.gensalt()).decode()
-    identities = [{
-        "id": 1, "team_id": 1, "name": "bot",
-        "kind": "pat", "pat_prefix": "mcp_abcd1234",
-        "pat_hash": pat_hash, "enabled": False, "expires_at": None,
-    }]
+    identities = [
+        {
+            "id": 1,
+            "team_id": 1,
+            "name": "bot",
+            "kind": "pat",
+            "pat_prefix": "mcp_abcd1234",
+            "pat_hash": pat_hash,
+            "enabled": False,
+            "expires_at": None,
+        }
+    ]
     result = _verify_pat("mcp_abcd1234", pat_token, identities)
     assert result is None
 
 
 # ---- Gateway config loader tests ----
 
+
 def test_config_loader_empty_when_no_file(tmp_path):
     import importlib
-    cl = importlib.import_module('config_loader')
+
+    cl = importlib.import_module("config_loader")
     cl._config = {}
     cl._config_path = str(tmp_path / "nonexistent.json")
     config = cl.get_config()
@@ -640,7 +782,8 @@ def test_config_loader_empty_when_no_file(tmp_path):
 
 def test_config_loader_reads_file(tmp_path):
     import importlib
-    cl = importlib.import_module('config_loader')
+
+    cl = importlib.import_module("config_loader")
 
     config_file = tmp_path / "config.json"
     config_data = {"servers": [{"id": 1, "name": "srv", "enabled": True}], "identities": []}
@@ -655,7 +798,8 @@ def test_config_loader_reads_file(tmp_path):
 
 def test_config_loader_check_origin():
     import importlib
-    cl = importlib.import_module('config_loader')
+
+    cl = importlib.import_module("config_loader")
     cl._config = {"allowed_origins": ["https://example.com", "https://app.example.com"]}
     assert cl.check_origin("https://example.com") is True
     assert cl.check_origin("https://evil.com") is False
@@ -664,7 +808,8 @@ def test_config_loader_check_origin():
 
 def test_config_loader_empty_origins_rejects_non_empty():
     import importlib
-    cl = importlib.import_module('config_loader')
+
+    cl = importlib.import_module("config_loader")
     cl._config = {"allowed_origins": []}
     assert cl.check_origin("https://example.com") is False
     assert cl.check_origin("") is True
@@ -672,16 +817,19 @@ def test_config_loader_empty_origins_rejects_non_empty():
 
 # ---- Gateway protocol tests ----
 
+
 def test_protocol_prefix_tool_name():
     import importlib
-    protocol = importlib.import_module('protocol')
+
+    protocol = importlib.import_module("protocol")
     _prefix_tool_name = protocol._prefix_tool_name
     assert _prefix_tool_name("jira", "search") == "jira__search"
 
 
 def test_protocol_prefix_list_items():
     import importlib
-    protocol = importlib.import_module('protocol')
+
+    protocol = importlib.import_module("protocol")
     _prefix_list_items = protocol._prefix_list_items
     items = [{"name": "search", "description": "Search issues"}]
     result = _prefix_list_items(items, "jira", "name")
@@ -692,7 +840,8 @@ def test_protocol_prefix_list_items():
 
 def test_protocol_is_notification():
     import importlib
-    protocol = importlib.import_module('protocol')
+
+    protocol = importlib.import_module("protocol")
     _is_notification = protocol._is_notification
     assert _is_notification({"jsonrpc": "2.0", "method": "ping"}) is True
     assert _is_notification({"jsonrpc": "2.0", "id": 1, "method": "ping"}) is False
@@ -700,7 +849,8 @@ def test_protocol_is_notification():
 
 def test_protocol_is_response():
     import importlib
-    protocol = importlib.import_module('protocol')
+
+    protocol = importlib.import_module("protocol")
     _is_response = protocol._is_response
     assert _is_response({"jsonrpc": "2.0", "id": 1, "result": {}}) is True
     assert _is_response({"jsonrpc": "2.0", "id": 1, "error": {}}) is True

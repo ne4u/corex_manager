@@ -1,8 +1,8 @@
 import logging
 import threading
 import time
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -18,21 +18,21 @@ settings = get_settings()
 def _int(value: Any, default: int = 0) -> int:
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 
 def _float(value: Any, default: float = 0.0) -> float:
     try:
         return float(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return default
 
 
 def _bucket(ts: datetime, step: int) -> datetime:
     """Floor a timestamp to the start of a step bucket."""
-    epoch = ts.replace(tzinfo=timezone.utc).timestamp()
-    return datetime.fromtimestamp((epoch // step) * step, tz=timezone.utc)
+    epoch = ts.replace(tzinfo=UTC).timestamp()
+    return datetime.fromtimestamp((epoch // step) * step, tz=UTC)
 
 
 def sample_metrics() -> None:
@@ -42,20 +42,22 @@ def sample_metrics() -> None:
         db = SessionLocal()
         info = stats.get_process_info()
         rows = stats.get_backend_stats()
-        logger.debug("HAProxy socket returned info keys=%s, stat rows=%d",
-                     list(info.keys()) if info else [], len(rows or []))
+        logger.debug(
+            "HAProxy socket returned info keys=%s, stat rows=%d", list(info.keys()) if info else [], len(rows or [])
+        )
         # Capture stick-table entry counts for the Metrics dashboard chart.
         # Stored inside process_info (a freeform JSON dict) under "stick_tables"
         # as {table_name: used_count} to avoid a schema migration.
         try:
             from . import stick_tables
+
             tables = stick_tables.list_tables()
             if tables:
                 info["stick_tables"] = {t["name"]: t["used"] for t in tables}
         except Exception as exc:
             logger.debug("Could not sample stick-table counts: %s", exc)
         snapshot = MetricSnapshot(
-            captured_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            captured_at=datetime.now(UTC).replace(tzinfo=None),
             process_info=info,
             stats=rows,
         )
@@ -74,7 +76,7 @@ def sample_metrics() -> None:
 
 def prune_metrics(db: Session) -> int:
     """Delete metric snapshots older than the retention window."""
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=settings.METRICS_RETENTION_DAYS)).replace(tzinfo=None)
+    cutoff = (datetime.now(UTC) - timedelta(days=settings.METRICS_RETENTION_DAYS)).replace(tzinfo=None)
     result = db.query(MetricSnapshot).filter(MetricSnapshot.captured_at < cutoff).delete()
     db.commit()
     return result
@@ -94,7 +96,7 @@ def _auto_step(start: datetime, end: datetime) -> int:
     return 86400
 
 
-def _row_kind(row: Dict[str, Any]) -> Optional[str]:
+def _row_kind(row: dict[str, Any]) -> str | None:
     if not isinstance(row, dict):
         return None
     stype = row.get("type")
@@ -109,23 +111,25 @@ def _row_kind(row: Dict[str, Any]) -> Optional[str]:
     return None
 
 
-def _proxy_name(row: Dict[str, Any]) -> str:
+def _proxy_name(row: dict[str, Any]) -> str:
     return row.get("pxname") or "unknown"
 
 
-def _server_name(row: Dict[str, Any]) -> str:
+def _server_name(row: dict[str, Any]) -> str:
     return row.get("svname") or "unknown"
 
 
-def _sum_field(rows: List[Dict[str, Any]], field: str) -> int:
+def _sum_field(rows: list[dict[str, Any]], field: str) -> int:
     return sum(_int(r.get(field)) for r in rows)
 
 
-def _sum_float_field(rows: List[Dict[str, Any]], field: str) -> float:
+def _sum_float_field(rows: list[dict[str, Any]], field: str) -> float:
     return sum(_float(r.get(field)) for r in rows)
 
 
-def _derive_proxy_metrics(rows: List[Dict[str, Any]], first_rows: Optional[List[Dict[str, Any]]], duration: float) -> Dict[str, Any]:
+def _derive_proxy_metrics(
+    rows: list[dict[str, Any]], first_rows: list[dict[str, Any]] | None, duration: float
+) -> dict[str, Any]:
     """Derive per-proxy metrics from a snapshot and an optional earlier snapshot for deltas."""
     result = {
         "sessions": _sum_field(rows, "scur"),
@@ -164,9 +168,8 @@ def _derive_proxy_metrics(rows: List[Dict[str, Any]], first_rows: Optional[List[
 
         # Denials rate from cumulative dreq/dresp deltas (counters only go up
         # until HAProxy restarts, so the raw value is useless on a chart).
-        denials_delta = (
-            max(0, _sum_field(rows, "dreq") - _sum_field(first_rows, "dreq"))
-            + max(0, _sum_field(rows, "dresp") - _sum_field(first_rows, "dresp"))
+        denials_delta = max(0, _sum_field(rows, "dreq") - _sum_field(first_rows, "dreq")) + max(
+            0, _sum_field(rows, "dresp") - _sum_field(first_rows, "dresp")
         )
         result["denials_rate"] = denials_delta / duration
 
@@ -187,30 +190,34 @@ def _derive_proxy_metrics(rows: List[Dict[str, Any]], first_rows: Optional[List[
     return result
 
 
-def _derive_backend_metrics(rows: List[Dict[str, Any]], first_rows: Optional[List[Dict[str, Any]]], duration: float) -> Dict[str, Any]:
+def _derive_backend_metrics(
+    rows: list[dict[str, Any]], first_rows: list[dict[str, Any]] | None, duration: float
+) -> dict[str, Any]:
     result = _derive_proxy_metrics(rows, first_rows, duration)
-    result.update({
-        "queue": _sum_field(rows, "qcur"),
-        "connection_errors": _sum_field(rows, "econ"),
-        "retries_and_redispatches": _sum_field(rows, "wretr") + _sum_field(rows, "wredis"),
-        "avg_response_time_ms": _sum_float_field(rows, "rtime"),
-        "avg_connect_time_ms": _sum_float_field(rows, "ctime"),
-        "avg_queue_time_ms": _sum_float_field(rows, "qtime"),
-    })
+    result.update(
+        {
+            "queue": _sum_field(rows, "qcur"),
+            "connection_errors": _sum_field(rows, "econ"),
+            "retries_and_redispatches": _sum_field(rows, "wretr") + _sum_field(rows, "wredis"),
+            "avg_response_time_ms": _sum_float_field(rows, "rtime"),
+            "avg_connect_time_ms": _sum_float_field(rows, "ctime"),
+            "avg_queue_time_ms": _sum_float_field(rows, "qtime"),
+        }
+    )
     if first_rows and duration > 0:
         result["connection_errors_rate"] = max(0, _sum_field(rows, "econ") - _sum_field(first_rows, "econ")) / duration
         result["retries_and_redispatches_rate"] = (
             max(0, _sum_field(rows, "wretr") - _sum_field(first_rows, "wretr")) / duration
-        ) + (
-            max(0, _sum_field(rows, "wredis") - _sum_field(first_rows, "wredis")) / duration
-        )
+        ) + (max(0, _sum_field(rows, "wredis") - _sum_field(first_rows, "wredis")) / duration)
     else:
         result["connection_errors_rate"] = 0.0
         result["retries_and_redispatches_rate"] = 0.0
     return result
 
 
-def _derive_server_status(row: Dict[str, Any], first_row: Optional[Dict[str, Any]] = None, duration: float = 0.0) -> Dict[str, Any]:
+def _derive_server_status(
+    row: dict[str, Any], first_row: dict[str, Any] | None = None, duration: float = 0.0
+) -> dict[str, Any]:
     result = {
         "status": row.get("status", "unknown"),
         "scur": _int(row.get("scur")),
@@ -235,11 +242,11 @@ def _derive_server_status(row: Dict[str, Any], first_row: Optional[Dict[str, Any
     return result
 
 
-def _filter_rows(rows: List[Dict[str, Any]], kind: str) -> List[Dict[str, Any]]:
+def _filter_rows(rows: list[dict[str, Any]], kind: str) -> list[dict[str, Any]]:
     return [r for r in rows if _row_kind(r) == kind]
 
 
-def _aggregate(rows: List[Dict[str, Any]], first_rows: Optional[List[Dict[str, Any]]], duration: float) -> Dict[str, Any]:
+def _aggregate(rows: list[dict[str, Any]], first_rows: list[dict[str, Any]] | None, duration: float) -> dict[str, Any]:
     frontends = _filter_rows(rows, "frontend")
     backends = _filter_rows(rows, "backend")
     servers = [r for r in rows if _row_kind(r) == "server"]
@@ -250,8 +257,8 @@ def _aggregate(rows: List[Dict[str, Any]], first_rows: Optional[List[Dict[str, A
     frontend_metrics = _derive_proxy_metrics(frontends, first_frontends, duration)
     backend_metrics = _derive_backend_metrics(backends, first_backends, duration)
 
-    by_frontend: Dict[str, Any] = {}
-    first_by_proxy: Dict[str, List[Dict[str, Any]]] = {}
+    by_frontend: dict[str, Any] = {}
+    first_by_proxy: dict[str, list[dict[str, Any]]] = {}
     if first_rows:
         for r in first_rows:
             first_by_proxy.setdefault(_proxy_name(r), []).append(r)
@@ -260,14 +267,14 @@ def _aggregate(rows: List[Dict[str, Any]], first_rows: Optional[List[Dict[str, A
         if name not in by_frontend:
             by_frontend[name] = _derive_proxy_metrics([row], first_by_proxy.get(name), duration)
 
-    by_backend: Dict[str, Any] = {}
+    by_backend: dict[str, Any] = {}
     for row in backends:
         name = _proxy_name(row)
         if name not in by_backend:
             by_backend[name] = _derive_backend_metrics([row], first_by_proxy.get(name), duration)
 
-    by_server: Dict[str, Dict[str, Any]] = {}
-    first_server: Dict[str, Dict[str, Any]] = {}
+    by_server: dict[str, dict[str, Any]] = {}
+    first_server: dict[str, dict[str, Any]] = {}
     if first_rows:
         for r in first_rows:
             if _row_kind(r) == "server":
@@ -287,9 +294,11 @@ def _aggregate(rows: List[Dict[str, Any]], first_rows: Optional[List[Dict[str, A
     }
 
 
-def get_metrics(db: Session, start: datetime, end: Optional[datetime] = None, step: Optional[int] = None) -> List[Dict[str, Any]]:
+def get_metrics(
+    db: Session, start: datetime, end: datetime | None = None, step: int | None = None
+) -> list[dict[str, Any]]:
     """Return aggregated metrics time-series for the requested range."""
-    end = (end or datetime.now(timezone.utc)).replace(tzinfo=None)
+    end = (end or datetime.now(UTC)).replace(tzinfo=None)
     start = start.replace(tzinfo=None) if start else (end - timedelta(minutes=5))
     step = step or _auto_step(start, end)
 
@@ -304,13 +313,13 @@ def get_metrics(db: Session, start: datetime, end: Optional[datetime] = None, st
         logger.info("No metric snapshots found between %s and %s", start, end)
         return []
 
-    buckets: Dict[datetime, List[MetricSnapshot]] = {}
+    buckets: dict[datetime, list[MetricSnapshot]] = {}
     for snap in snapshots:
         ts = _bucket(snap.captured_at, step)
         buckets.setdefault(ts, []).append(snap)
 
-    points: List[Dict[str, Any]] = []
-    prev_snapshot: Optional[MetricSnapshot] = None
+    points: list[dict[str, Any]] = []
+    prev_snapshot: MetricSnapshot | None = None
     for ts in sorted(buckets):
         bucket_snaps = buckets[ts]
         last = bucket_snaps[-1]

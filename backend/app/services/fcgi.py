@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+
 from ..models.proxy import FcgiApp
 from ..schemas.fcgi import FcgiAppCreate, FcgiAppUpdate
 

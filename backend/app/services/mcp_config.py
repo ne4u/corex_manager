@@ -10,37 +10,42 @@ The bundle contains everything the gateway needs to operate:
 - teams
 - global settings (JWT, origins, etc.)
 """
+
+import hashlib
+import hmac
 import json
 import logging
 import os
-import hmac
-import hashlib
-from typing import Optional
-
-from cryptography.fernet import Fernet, InvalidToken
 
 from sqlalchemy.orm import Session
 
 from ..core.config import get_settings
 from ..models.models import (
-    Team, McpServer, McpServerReplica, McpIdentity,
-    McpPolicy, McpDlpRule, McpGuardrail, McpSkill, McpSkillVersion,
+    McpDlpRule,
+    McpGuardrail,
+    McpIdentity,
+    McpPolicy,
+    McpServer,
+    McpServerReplica,
+    McpSkill,
+    McpSkillVersion,
+    Team,
 )
-from ..services.mcp_secrets import decrypt_secret, has_secrets_key, _get_fernet
+from ..services.mcp_secrets import _get_fernet, decrypt_secret
 from ..services.settings import get_setting
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
-def _serialize_datetime(dt) -> Optional[str]:
+def _serialize_datetime(dt) -> str | None:
     """Serialize a datetime to ISO format string, or None."""
     if dt is None:
         return None
     return dt.isoformat()
 
 
-def _mask_secret(value: Optional[str]) -> Optional[str]:
+def _mask_secret(value: str | None) -> str | None:
     """Mask a sensitive string with an opaque, stable token for diffing.
 
     Returns the original value if it is None or empty. If the value is already
@@ -88,7 +93,7 @@ def _build_server_dict(server: McpServer, replicas: list[McpServerReplica]) -> d
     if server.auth_secret_enc and server.auth_type != "none":
         try:
             auth_secret = decrypt_secret(server.auth_secret_enc)
-        except (ValueError, RuntimeError):
+        except ValueError, RuntimeError:
             logger.error("Failed to decrypt secret for server %s", server.name)
 
     # Decrypt OAuth client secret if present
@@ -96,7 +101,7 @@ def _build_server_dict(server: McpServer, replicas: list[McpServerReplica]) -> d
     if server.oauth_client_secret_enc:
         try:
             oauth_client_secret = decrypt_secret(server.oauth_client_secret_enc)
-        except (ValueError, RuntimeError):
+        except ValueError, RuntimeError:
             logger.error("Failed to decrypt OAuth client secret for server %s", server.name)
 
     # Decrypt OAuth access/refresh tokens if present
@@ -104,14 +109,14 @@ def _build_server_dict(server: McpServer, replicas: list[McpServerReplica]) -> d
     if server.oauth_token_enc:
         try:
             oauth_access_token = decrypt_secret(server.oauth_token_enc)
-        except (ValueError, RuntimeError):
+        except ValueError, RuntimeError:
             logger.error("Failed to decrypt OAuth access token for server %s", server.name)
 
     oauth_refresh_token = None
     if server.oauth_refresh_token_enc:
         try:
             oauth_refresh_token = decrypt_secret(server.oauth_refresh_token_enc)
-        except (ValueError, RuntimeError):
+        except ValueError, RuntimeError:
             logger.error("Failed to decrypt OAuth refresh token for server %s", server.name)
 
     # Decrypt env vars (stored as JSON: {"key": "encrypted_value", ...})
@@ -123,11 +128,11 @@ def _build_server_dict(server: McpServer, replicas: list[McpServerReplica]) -> d
                 if v and isinstance(v, str):
                     try:
                         env_vars[k] = decrypt_secret(v)
-                    except (ValueError, RuntimeError):
+                    except ValueError, RuntimeError:
                         env_vars[k] = v  # might be plaintext
                 else:
                     env_vars[k] = v
-        except (json.JSONDecodeError, TypeError):
+        except json.JSONDecodeError, TypeError:
             logger.error("Failed to parse env_vars_json for server %s", server.name)
 
     # Parse args_json
@@ -135,7 +140,7 @@ def _build_server_dict(server: McpServer, replicas: list[McpServerReplica]) -> d
     if server.args_json:
         try:
             args = json.loads(server.args_json)
-        except (json.JSONDecodeError, TypeError):
+        except json.JSONDecodeError, TypeError:
             logger.error("Failed to parse args_json for server %s", server.name)
 
     # If replicas exist, rewrite URL to the internal HAProxy upstream frontend
@@ -144,6 +149,7 @@ def _build_server_dict(server: McpServer, replicas: list[McpServerReplica]) -> d
     if has_replicas and url:
         # Rewrite to internal HAProxy upstream path
         from urllib.parse import urlparse
+
         parsed = urlparse(server.url)
         path = parsed.path or "/"
         url = f"http://haproxy:{settings.MCP_UPSTREAM_PORT}/mcp-up/{server.namespace}{path}"
@@ -260,7 +266,7 @@ def _build_guardrail_dict(gr: McpGuardrail) -> dict:
     }
 
 
-def _build_skill_dict(skill: McpSkill, published_version: Optional[McpSkillVersion]) -> dict:
+def _build_skill_dict(skill: McpSkill, published_version: McpSkillVersion | None) -> dict:
     """Build a skill dict for the config bundle, including published version content."""
     d = {
         "id": skill.id,
@@ -298,10 +304,15 @@ def build_config_bundle(db: Session) -> dict:
     # Build servers with replicas
     server_list = []
     for server in servers:
-        replicas = db.query(McpServerReplica).filter(
-            McpServerReplica.server_id == server.id,
-            McpServerReplica.enabled == True,  # noqa: E712
-        ).order_by(McpServerReplica.id).all()
+        replicas = (
+            db.query(McpServerReplica)
+            .filter(
+                McpServerReplica.server_id == server.id,
+                McpServerReplica.enabled == True,  # noqa: E712
+            )
+            .order_by(McpServerReplica.id)
+            .all()
+        )
         server_list.append(_build_server_dict(server, replicas))
 
     # Build identities
@@ -326,7 +337,9 @@ def build_config_bundle(db: Session) -> dict:
 
     # Global settings
     allowed_origins_str = get_setting(db, "mcp_allowed_origins", settings.MCP_ALLOWED_ORIGINS or "")
-    allowed_origins = sorted([o.strip() for o in allowed_origins_str.split(",") if o.strip()]) if allowed_origins_str else []
+    allowed_origins = (
+        sorted([o.strip() for o in allowed_origins_str.split(",") if o.strip()]) if allowed_origins_str else []
+    )
 
     # Per-IP and concurrent limits are exposed in the UI and can be set via the
     # settings table; fall back to env vars for backward compatibility.
@@ -345,7 +358,8 @@ def build_config_bundle(db: Session) -> dict:
         "jwt_audience": get_setting(db, "mcp_jwt_audience", settings.MCP_JWT_AUDIENCE or _auth0_audience()),
         "jwt_jwks_url": get_setting(db, "mcp_jwt_jwks_url", settings.MCP_JWT_JWKS_URL or _auth0_jwks_url()),
         "allowed_origins": allowed_origins,
-        "log_payloads": get_setting(db, "mcp_log_payloads", str(settings.MCP_LOG_PAYLOADS)).lower() in ("true", "1", "yes"),
+        "log_payloads": get_setting(db, "mcp_log_payloads", str(settings.MCP_LOG_PAYLOADS)).lower()
+        in ("true", "1", "yes"),
         "default_rpm": int(get_setting(db, "mcp_default_rpm", str(settings.MCP_DEFAULT_RPM))),
         "per_ip_limit": per_ip_limit,
         "concurrent_limit": concurrent_limit,
@@ -444,14 +458,19 @@ def write_config_bundle(db: Session) -> str:
         f.write(encrypted)
     os.replace(tmp_path, config_path)
 
-    logger.info("Wrote MCP config bundle to %s (%d servers, %d identities)",
-                config_path, len(bundle["servers"]), len(bundle["identities"]))
+    logger.info(
+        "Wrote MCP config bundle to %s (%d servers, %d identities)",
+        config_path,
+        len(bundle["servers"]),
+        len(bundle["identities"]),
+    )
 
     # Also write the AES-256-GCM envelope for the Rust gateway.
     # The Rust gateway reads config.bundle.json alongside the Python config.json.
     rust_path = os.path.join(os.path.dirname(config_path), "config.bundle.json")
     try:
         from .mcp_secrets import encrypt_bundle_aesgcm, has_secrets_key
+
         if has_secrets_key():
             rust_encrypted = encrypt_bundle_aesgcm(plaintext)
             tmp_rust = rust_path + ".tmp"
@@ -537,10 +556,14 @@ def get_multi_replica_servers(db: Session) -> list[McpServer]:
     """Return enabled servers that have at least one enabled replica."""
     result = []
     for server in db.query(McpServer).filter(McpServer.enabled == True).all():  # noqa: E712
-        replica_count = db.query(McpServerReplica).filter(
-            McpServerReplica.server_id == server.id,
-            McpServerReplica.enabled == True,  # noqa: E712
-        ).count()
+        replica_count = (
+            db.query(McpServerReplica)
+            .filter(
+                McpServerReplica.server_id == server.id,
+                McpServerReplica.enabled == True,  # noqa: E712
+            )
+            .count()
+        )
         if replica_count > 0:
             result.append(server)
     return result

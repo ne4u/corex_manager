@@ -1,11 +1,10 @@
 """Integration tests for the /system/export and /system/restore endpoints."""
+
 import io
 import json
 import zipfile
 
-import pytest
-
-from app.models.models import Backend, Setting
+from app.models.models import Backend
 
 
 def test_export_endpoint_returns_zip(client, db):
@@ -37,6 +36,7 @@ def test_export_endpoint_with_password_returns_encrypted(client, db):
 
 def test_export_endpoint_excludes_secrets(client, db):
     from app.models.models import User
+
     db.add(User(username="admin", hashed_password="x", role="admin", is_admin=True))
     db.commit()
     res = client.get("/api/v1/system/export?include_secrets=false")
@@ -48,6 +48,7 @@ def test_export_endpoint_excludes_secrets(client, db):
 
 def test_export_endpoint_includes_metrics(client, db):
     from app.models.models import MetricSnapshot
+
     db.add(MetricSnapshot(process_info={}, stats=[]))
     db.commit()
     res = client.get("/api/v1/system/export?include_metrics=true")
@@ -73,6 +74,7 @@ def test_restore_endpoint_restores_config(client, db):
     # Restore via the API (multipart upload). Use apply_config=False by
     # patching restore_export to skip HAProxy reload (not available in test env).
     import app.services.backup as backup_mod
+
     original_restore = backup_mod.restore_export
 
     def _test_restore(db, archive_bytes, password=None, apply_config=True):
@@ -137,6 +139,7 @@ def test_restore_endpoint_correct_password_succeeds(client, db):
 
     # Patch to skip HAProxy reload.
     import app.services.backup as backup_mod
+
     original_restore = backup_mod.restore_export
 
     def _test_restore(db, archive_bytes, password=None, apply_config=True):

@@ -1,8 +1,8 @@
 """Unit tests for security_lists validation, feed parsing, and list-file writing."""
+
 import os
 
 import pytest
-
 from app.services import security_lists
 from app.services.security_lists import (
     COUNTRY_NAMES,
@@ -17,8 +17,8 @@ from app.services.security_lists import (
     write_security_list_files,
 )
 
-
 # --- Network value validation ----------------------------------------------
+
 
 def test_validate_network_value_single_ip():
     assert validate_network_value("10.0.0.1") == "10.0.0.1"
@@ -48,6 +48,7 @@ def test_validate_network_value_invalid():
 
 # --- ASN value validation ---------------------------------------------------
 
+
 def test_validate_asn_value_plain():
     assert validate_asn_value("12345") == "AS12345"
 
@@ -76,6 +77,7 @@ def test_validate_asn_value_invalid():
 
 
 # --- Country code validation ------------------------------------------------
+
 
 def test_validate_country_code_uppercases():
     assert validate_country_code("us") == "US"
@@ -121,6 +123,7 @@ def test_get_country_options_fallback(monkeypatch):
 
 def test_get_country_options_from_maxmind(monkeypatch, tmp_path):
     from unittest.mock import patch
+
     from app.core.config import get_settings
 
     db = tmp_path / "GeoLite2-Country.mmdb"
@@ -152,6 +155,7 @@ def test_get_country_options_from_maxmind(monkeypatch, tmp_path):
 
 
 # --- JA4 fingerprint validation ---------------------------------------------
+
 
 def test_validate_ja4_value_valid_tcp():
     fp = "t13d1516h2_8daaf6152771_b186095e22b6"
@@ -220,6 +224,7 @@ def test_validate_ja4_value_wrong_delimiter():
 
 # --- Pattern (regex) validation ---------------------------------------------
 
+
 def test_validate_pattern_value_valid():
     assert validate_pattern_value("Ahref/1.*") == "Ahref/1.*"
     assert validate_pattern_value("Googlebot/version.9.*6") == "Googlebot/version.9.*6"
@@ -252,6 +257,7 @@ def test_validate_pattern_value_rejects_newlines():
 
 
 # --- Feed parser ------------------------------------------------------------
+
 
 def test_parse_feed_text_plain_lines():
     text = "10.0.0.1\n10.0.0.2\n10.0.0.0/24\n"
@@ -364,6 +370,7 @@ def test_parse_feed_text_csv_ja4_with_notes():
 
 # --- Filename safety --------------------------------------------------------
 
+
 def test_safe_filename_basic():
     assert safe_filename("my-list") == "my-list"
 
@@ -378,9 +385,21 @@ def test_safe_filename_empty():
 
 # --- List file writer -------------------------------------------------------
 
+
 def test_write_security_list_files(db, tmp_path, monkeypatch):
     from app.core.config import get_settings
-    from app.models.models import NetworkList, NetworkListEntry, AsnList, AsnListEntry, GeoList, GeoListEntry, Ja4List, Ja4ListEntry, PatternList, PatternListEntry
+    from app.models.models import (
+        AsnList,
+        AsnListEntry,
+        GeoList,
+        GeoListEntry,
+        Ja4List,
+        Ja4ListEntry,
+        NetworkList,
+        NetworkListEntry,
+        PatternList,
+        PatternListEntry,
+    )
 
     settings = get_settings()
     monkeypatch.setattr(settings, "SECURITY_LISTS_DIR", str(tmp_path))
@@ -494,6 +513,7 @@ def _baseline_all_configs(db, tmp_path, monkeypatch):
     is a security-list edit."""
     from app.core.config import get_settings
     from app.services import haproxy
+
     s = get_settings()
     lists_dir = tmp_path / "lists"
     lists_dir.mkdir()
@@ -516,7 +536,8 @@ def _baseline_all_configs(db, tmp_path, monkeypatch):
 
     # Risk rules data file baseline (if risk scoring is importable).
     try:
-        from app.services.risk_scoring import generate_risk_rules_data, _risk_rules_data_path
+        from app.services.risk_scoring import _risk_rules_data_path, generate_risk_rules_data
+
         rrd_path = _risk_rules_data_path()
         rrd = generate_risk_rules_data(db)
         os.makedirs(os.path.dirname(rrd_path), exist_ok=True)
@@ -530,6 +551,7 @@ def _baseline_all_configs(db, tmp_path, monkeypatch):
     # Response transform file baselines (if resp transform is importable).
     try:
         from app.services.resp_transform import generate_resp_transform_file_contents
+
         rt_gen = generate_resp_transform_file_contents(db)
         for fname, content in rt_gen.items():
             fpath = str(rt_dir / fname)

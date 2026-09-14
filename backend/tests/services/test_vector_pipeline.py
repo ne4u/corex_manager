@@ -1,8 +1,8 @@
 """Tests for the Vector log-pipeline service (vector_pipeline.py)."""
+
 import os
 
 import pytest
-
 from app.core.config import get_settings
 from app.models.logging import VectorSink
 from app.services import vector_pipeline as vp
@@ -18,8 +18,8 @@ def _vector_tmp(tmp_path, monkeypatch):
 
 def _make_sink(db, name="s3", type="aws_s3", source="corex", options=None, enabled=True):
     sink = VectorSink(
-        name=name, type=type, source=source,
-        options=vp.encrypt_sink_options(type, options or {}), enabled=enabled)
+        name=name, type=type, source=source, options=vp.encrypt_sink_options(type, options or {}), enabled=enabled
+    )
     db.add(sink)
     db.commit()
     return sink
@@ -27,21 +27,19 @@ def _make_sink(db, name="s3", type="aws_s3", source="corex", options=None, enabl
 
 # ── Sources (derived from enabled sinks) ────────────────────────────────────
 
+
 def test_sources_default_off(db):
     assert vp.get_vector_sources(db) == {"corex": False, "waf": False, "mcp": False}
 
 
 def test_sources_derived_from_enabled_sinks(db):
-    _make_sink(db, name="s3corex", source="corex",
-               options={"bucket": "b", "region": "r"})
-    _make_sink(db, name="s3waf", source="waf",
-               options={"bucket": "b", "region": "r"})
+    _make_sink(db, name="s3corex", source="corex", options={"bucket": "b", "region": "r"})
+    _make_sink(db, name="s3waf", source="waf", options={"bucket": "b", "region": "r"})
     assert vp.get_vector_sources(db) == {"corex": True, "waf": True, "mcp": False}
 
 
 def test_sources_disabled_sink_does_not_activate(db):
-    _make_sink(db, name="off", source="corex", enabled=False,
-               options={"bucket": "b", "region": "r"})
+    _make_sink(db, name="off", source="corex", enabled=False, options={"bucket": "b", "region": "r"})
     assert vp.get_vector_sources(db) == {"corex": False, "waf": False, "mcp": False}
 
 
@@ -56,12 +54,12 @@ def test_vector_pipeline_active(db):
     _make_sink(db, options={"bucket": "b", "region": "r"})
     assert vp.vector_pipeline_active(db) is True
     # A disabled sink row also marks the pipeline active
-    _make_sink(db, name="off", enabled=False,
-               options={"bucket": "b", "region": "r"})
+    _make_sink(db, name="off", enabled=False, options={"bucket": "b", "region": "r"})
     assert vp.vector_pipeline_active(db) is True
 
 
 # ── Secret encryption / masking ──────────────────────────────────────────────
+
 
 def test_encrypt_decrypt_round_trip(db):
     opts = {"bucket": "b", "secret_access_key": "supersecret"}
@@ -104,6 +102,7 @@ def test_redact_vector_text_masks_known_secret_keys():
 
 # ── TOML generation ─────────────────────────────────────────────────────────
 
+
 def test_empty_pipeline_emits_noop(db):
     toml_text, secrets = vp.generate_vector_toml(db)
     assert "[sinks.blackhole]" in toml_text
@@ -113,13 +112,13 @@ def test_empty_pipeline_emits_noop(db):
 def test_corex_source_and_transforms(db):
     _make_sink(db, options={"bucket": "logs", "region": "us-east-1"})
     toml_text, _ = vp.generate_vector_toml(db)
-    assert '[sources.corex_syslog]' in toml_text
+    assert "[sources.corex_syslog]" in toml_text
     assert 'mode = "tcp"' in toml_text
     assert 'address = "0.0.0.0:601"' in toml_text
-    assert '[transforms.haproxy_parse_json]' in toml_text
-    assert '[transforms.decode_ja4]' in toml_text
-    assert '[transforms.decode_req_fp]' in toml_text
-    assert '[transforms.haproxy_finalize]' in toml_text
+    assert "[transforms.haproxy_parse_json]" in toml_text
+    assert "[transforms.decode_ja4]" in toml_text
+    assert "[transforms.decode_req_fp]" in toml_text
+    assert "[transforms.haproxy_finalize]" in toml_text
     # VRL content is preserved
     assert "parse_json(.message)" in toml_text
     assert '.corex_source = "corex"' in toml_text
@@ -129,27 +128,23 @@ def test_corex_source_and_transforms(db):
 
 
 def test_waf_and_mcp_sources(db):
-    _make_sink(db, name="s3waf", source="waf",
-               options={"bucket": "logs", "region": "us-east-1"})
-    _make_sink(db, name="s3mcp", source="mcp",
-               options={"bucket": "logs", "region": "us-east-1"})
+    _make_sink(db, name="s3waf", source="waf", options={"bucket": "logs", "region": "us-east-1"})
+    _make_sink(db, name="s3mcp", source="mcp", options={"bucket": "logs", "region": "us-east-1"})
     toml_text, _ = vp.generate_vector_toml(db)
-    assert '[sources.waf_file]' in toml_text
-    assert 'coraza-spoa.log' in toml_text
-    assert '[sources.mcp_file]' in toml_text
-    assert 'events.ndjson' in toml_text
-    assert '[transforms.waf_parse_json]' in toml_text
-    assert '[transforms.mcp_parse_json]' in toml_text
+    assert "[sources.waf_file]" in toml_text
+    assert "coraza-spoa.log" in toml_text
+    assert "[sources.mcp_file]" in toml_text
+    assert "events.ndjson" in toml_text
+    assert "[transforms.waf_parse_json]" in toml_text
+    assert "[transforms.mcp_parse_json]" in toml_text
     assert '.corex_source = "waf"' in toml_text
     assert '.corex_source = "mcp"' in toml_text
 
 
 def test_multiple_sinks_same_source(db):
     """Two sinks with the same source each get their own sink block."""
-    _make_sink(db, name="s3", source="corex",
-               options={"bucket": "logs", "region": "us-east-1"})
-    _make_sink(db, name="dd", type="datadog_logs", source="corex",
-               options={"api_key": "ddkey"})
+    _make_sink(db, name="s3", source="corex", options={"bucket": "logs", "region": "us-east-1"})
+    _make_sink(db, name="dd", type="datadog_logs", source="corex", options={"api_key": "ddkey"})
     toml_text, _ = vp.generate_vector_toml(db)
     assert "[sinks.s3_corex]" in toml_text
     assert "[sinks.dd_corex]" in toml_text
@@ -157,18 +152,21 @@ def test_multiple_sinks_same_source(db):
 
 
 def test_disabled_sink_excluded(db):
-    _make_sink(db, name="off", enabled=False,
-               options={"bucket": "logs", "region": "us-east-1"})
+    _make_sink(db, name="off", enabled=False, options={"bucket": "logs", "region": "us-east-1"})
     toml_text, _ = vp.generate_vector_toml(db)
     assert "off" not in toml_text
 
 
 def test_secrets_inlined_and_reported(db):
-    _make_sink(db, options={
-        "bucket": "logs", "region": "us-east-1",
-        "access_key_id": "AKIAIOSFODNN7EXAMPLE",
-        "secret_access_key": "wJalrXUtnFEMI",
-    })
+    _make_sink(
+        db,
+        options={
+            "bucket": "logs",
+            "region": "us-east-1",
+            "access_key_id": "AKIAIOSFODNN7EXAMPLE",
+            "secret_access_key": "wJalrXUtnFEMI",
+        },
+    )
     toml_text, secrets = vp.generate_vector_toml(db)
     assert 'access_key_id = "AKIAIOSFODNN7EXAMPLE"' in toml_text
     assert 'secret_access_key = "wJalrXUtnFEMI"' in toml_text
@@ -183,14 +181,20 @@ def test_all_sink_types_render(db):
     fixtures = {
         "azure_logs_ingestion": {
             "endpoint": "https://dce.ingest.monitor.azure.com",
-            "dcr_immutable_id": "dcr-123", "stream_name": "Custom-x",
-            "tenant_id": "t", "client_id": "c", "client_secret": "cs",
+            "dcr_immutable_id": "dcr-123",
+            "stream_name": "Custom-x",
+            "tenant_id": "t",
+            "client_id": "c",
+            "client_secret": "cs",
         },
         "datadog_logs": {"api_key": "ddkey"},
-        "elasticsearch": {"endpoints": ["https://es:9200"],
-                          "auth_strategy": "basic", "user": "u", "password": "p"},
-        "http": {"uri": "https://logs.example.com/in", "auth_strategy": "bearer",
-                 "token": "tok", "headers": {"X-A": "b"}},
+        "elasticsearch": {"endpoints": ["https://es:9200"], "auth_strategy": "basic", "user": "u", "password": "p"},
+        "http": {
+            "uri": "https://logs.example.com/in",
+            "auth_strategy": "bearer",
+            "token": "tok",
+            "headers": {"X-A": "b"},
+        },
         "new_relic": {"account_id": "12345", "license_key": "nrlic"},
         "splunk_hec_logs": {"endpoint": "https://splunk:8088", "token": "hec"},
     }
@@ -202,18 +206,21 @@ def test_all_sink_types_render(db):
         assert f'type = "{stype}"' in toml_text
     assert 'strategy = "basic"' in toml_text
     assert 'strategy = "bearer"' in toml_text
-    assert 'api = "logs"' in toml_text          # new_relic
+    assert 'api = "logs"' in toml_text  # new_relic
     assert 'bulk.index = "corex-log-%Y.%m.%d"' in toml_text  # es default index
     assert 'endpoint_target = "event"' in toml_text
-    assert '"X-A" = "b"' in toml_text           # http headers table
+    assert '"X-A" = "b"' in toml_text  # http headers table
 
 
 def test_elasticsearch_per_source_index(db):
-    _make_sink(db, name="es_corex", type="elasticsearch", source="corex",
-               options={"endpoints": "https://es:9200",
-                        "index_corex": "custom-corex-%F"})
-    _make_sink(db, name="es_waf", type="elasticsearch", source="waf",
-               options={"endpoints": "https://es:9200"})
+    _make_sink(
+        db,
+        name="es_corex",
+        type="elasticsearch",
+        source="corex",
+        options={"endpoints": "https://es:9200", "index_corex": "custom-corex-%F"},
+    )
+    _make_sink(db, name="es_waf", type="elasticsearch", source="waf", options={"endpoints": "https://es:9200"})
     toml_text, _ = vp.generate_vector_toml(db)
     assert 'bulk.index = "custom-corex-%F"' in toml_text
     assert 'bulk.index = "waf-logs-%Y.%m.%d"' in toml_text
@@ -221,11 +228,12 @@ def test_elasticsearch_per_source_index(db):
 
 # ── Staging config (check sink) ─────────────────────────────────────────────
 
+
 def test_staging_uses_demo_source_when_no_sinks(db):
     toml_text, secrets = vp.generate_staging_sink_toml(
-        db, "splunk_hec_logs", "corex",
-        {"endpoint": "https://splunk:8088", "token": "hec-tok"}, False)
-    assert '[sources.test_events]' in toml_text
+        db, "splunk_hec_logs", "corex", {"endpoint": "https://splunk:8088", "token": "hec-tok"}, False
+    )
+    assert "[sources.test_events]" in toml_text
     assert 'type = "demo_logs"' in toml_text
     assert 'inputs = ["test_events"]' in toml_text
     assert "[sinks.check_corex]" in toml_text
@@ -235,22 +243,21 @@ def test_staging_uses_demo_source_when_no_sinks(db):
 
 def test_staging_uses_enabled_transform(db):
     _make_sink(db, options={"bucket": "b", "region": "r"})
-    toml_text, _ = vp.generate_staging_sink_toml(
-        db, "aws_s3", "corex", {"bucket": "b", "region": "r"}, False)
-    assert '[sources.corex_syslog]' in toml_text
+    toml_text, _ = vp.generate_staging_sink_toml(db, "aws_s3", "corex", {"bucket": "b", "region": "r"}, False)
+    assert "[sources.corex_syslog]" in toml_text
     assert 'inputs = ["haproxy_finalize"]' in toml_text
     assert "demo_logs" not in toml_text
 
 
 def test_staging_send_test_event_uses_demo_even_with_sinks(db):
     _make_sink(db, options={"bucket": "b", "region": "r"})
-    toml_text, _ = vp.generate_staging_sink_toml(
-        db, "http", "corex", {"uri": "https://x"}, True)
+    toml_text, _ = vp.generate_staging_sink_toml(db, "http", "corex", {"uri": "https://x"}, True)
     assert "demo_logs" in toml_text
     assert 'inputs = ["test_events"]' in toml_text
 
 
 # ── File lifecycle ──────────────────────────────────────────────────────────
+
 
 def test_write_vector_config(db):
     s = get_settings()

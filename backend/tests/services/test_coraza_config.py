@@ -1,5 +1,4 @@
 import os
-import pytest
 
 from app.services import coraza_config
 from tests.factories import (
@@ -134,9 +133,9 @@ def test_generate_coraza_spoa_config_scope_checks(db):
         content_types="application/json",
     )
     cfg = coraza_config.generate_coraza_spoa_config(db)
-    assert '!@beginsWith /api' in cfg
-    assert '!@within GET,POST' in cfg
-    assert '!@beginsWith application/json' in cfg
+    assert "!@beginsWith /api" in cfg
+    assert "!@within GET,POST" in cfg
+    assert "!@beginsWith application/json" in cfg
     assert "SecMarker HAPROXY-WAF-SCOPE-END" in cfg
 
 
@@ -177,7 +176,7 @@ def test_exception_conditional_remove_by_id(db):
         condition_value="10.0.0.1",
     )
     cfg = coraza_config.generate_coraza_spoa_config(db)
-    assert 'ctl:ruleRemoveById=942100' in cfg
+    assert "ctl:ruleRemoveById=942100" in cfg
     assert 'REMOTE_ADDR "@streq 10.0.0.1"' in cfg
     # Should NOT emit the unconditional SecRuleRemoveById
     assert "SecRuleRemoveById 942100" not in cfg
@@ -200,7 +199,7 @@ def test_exception_conditional_allow_by_id(db):
         condition_value="^192.168.",
     )
     cfg = coraza_config.generate_coraza_spoa_config(db)
-    assert 'ctl:ruleRemoveTargetById=942100;ARGS:foo' in cfg
+    assert "ctl:ruleRemoveTargetById=942100;ARGS:foo" in cfg
     assert 'REMOTE_ADDR "@rx ^192.168."' in cfg
 
 
@@ -219,7 +218,7 @@ def test_exception_conditional_remove_by_tag(db):
         condition_value="GET",
     )
     cfg = coraza_config.generate_coraza_spoa_config(db)
-    assert 'ctl:ruleRemoveByTag=sqli' in cfg
+    assert "ctl:ruleRemoveByTag=sqli" in cfg
     assert 'REQUEST_METHOD "@streq GET"' in cfg
 
 
@@ -239,7 +238,7 @@ def test_exception_matcher_only(db):
         value="bar",
     )
     cfg = coraza_config.generate_coraza_spoa_config(db)
-    assert 'ctl:ruleRemoveTargetById=942100;ARGS:foo' in cfg
+    assert "ctl:ruleRemoveTargetById=942100;ARGS:foo" in cfg
     assert 'ARGS:foo "@contains bar"' in cfg
 
 
@@ -265,7 +264,7 @@ def test_exception_conditional_with_matcher(db):
     assert "chain" in cfg
     assert 'REMOTE_ADDR "@streq 10.0.0.1"' in cfg
     assert 'ARGS:foo "@contains bar"' in cfg
-    assert 'ctl:ruleRemoveTargetById=942100;ARGS:foo' in cfg
+    assert "ctl:ruleRemoveTargetById=942100;ARGS:foo" in cfg
 
 
 def test_exception_global_appears_in_config(db):
@@ -315,7 +314,7 @@ def test_exception_conditional_remove_all_rules(db):
         condition_value="/upload?n=",
     )
     cfg = coraza_config.generate_coraza_spoa_config(db)
-    assert 'ctl:ruleEngine=Off' in cfg
+    assert "ctl:ruleEngine=Off" in cfg
     assert 'REQUEST_URI "@contains /upload?n="' in cfg
     # Must precede CRS includes so it takes effect before any CRS rule fires.
     ctl_pos = cfg.find("ctl:ruleEngine=Off")
@@ -373,8 +372,7 @@ def test_conditional_exception_precedes_crs_includes(db):
     assert ctl_pos != -1, "conditional ctl: directive not found in config"
     assert include_pos != -1, "CRS Include directive not found in config"
     assert ctl_pos < include_pos, (
-        "conditional exception must precede CRS includes — "
-        f"ctl at {ctl_pos}, Include at {include_pos}"
+        f"conditional exception must precede CRS includes — ctl at {ctl_pos}, Include at {include_pos}"
     )
 
 
@@ -529,12 +527,16 @@ def test_generate_coraza_spoa_config_crs_no_active_version_uses_embedded(db):
 def test_generate_coraza_spoa_config_remote_rule_set_not_downloaded(db, tmp_path, monkeypatch):
     """Remote rule set that hasn't been downloaded emits a comment."""
     from app.services import rule_set_downloader
+
     monkeypatch.setattr(rule_set_downloader.settings, "CUSTOM_RULES_DIR", str(tmp_path))
     backend = make_backend(db)
     listener = make_listener(db, backend=backend)
     make_waf_rule(
-        db, name="remote-waf", listener_id=listener.id,
-        rule_set="remote", rule_set_url="https://example.com/rules.conf",
+        db,
+        name="remote-waf",
+        listener_id=listener.id,
+        rule_set="remote",
+        rule_set_url="https://example.com/rules.conf",
     )
     cfg = coraza_config.generate_coraza_spoa_config(db)
     assert "not yet downloaded" in cfg
@@ -544,12 +546,16 @@ def test_generate_coraza_spoa_config_remote_rule_set_not_downloaded(db, tmp_path
 def test_generate_coraza_spoa_config_remote_rule_set_downloaded(db, tmp_path, monkeypatch):
     """Remote rule set that has been downloaded emits an Include."""
     from app.services import rule_set_downloader
+
     monkeypatch.setattr(rule_set_downloader.settings, "CUSTOM_RULES_DIR", str(tmp_path))
     backend = make_backend(db)
     listener = make_listener(db, backend=backend)
     rule = make_waf_rule(
-        db, name="remote-waf", listener_id=listener.id,
-        rule_set="remote", rule_set_url="https://example.com/rules.conf",
+        db,
+        name="remote-waf",
+        listener_id=listener.id,
+        rule_set="remote",
+        rule_set_url="https://example.com/rules.conf",
     )
     # Simulate a downloaded file
     path = rule_set_downloader._rule_file_path(rule.name)
@@ -693,5 +699,6 @@ def test_exception_ids_are_unique_per_expanded_rule(db):
     )
     cfg = coraza_config.generate_coraza_spoa_config(db)
     import re
+
     ids = re.findall(r'"id:(\d+),phase:1', cfg)
     assert len(ids) == len(set(ids)), f"duplicate SecRule ids emitted: {ids}"

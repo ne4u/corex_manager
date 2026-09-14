@@ -1,19 +1,20 @@
 from datetime import datetime
-from typing import Optional, List, Dict, Any, Type, TypeVar
-from pydantic import BaseModel, Field, model_validator, field_validator, ConfigDict
-from ._base import _optional_update
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict
+
 
 class TaskResponse(BaseModel):
     id: int
     task_type: str
     status: str
-    payload: Optional[Dict[str, Any]] = None
-    result: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
+    payload: dict[str, Any] | None = None
+    result: dict[str, Any] | None = None
+    error: str | None = None
     created_at: datetime
-    updated_at: Optional[datetime] = None
+    updated_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
 
-__all__ = ['TaskResponse']
+__all__ = ["TaskResponse"]

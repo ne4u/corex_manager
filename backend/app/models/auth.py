@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, Boolean, Text, DateTime, ForeignKey, JSON
+from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
+
 from .base import Base, utcnow
 
 
@@ -45,7 +46,9 @@ class UserPreference(Base):
     theme = Column(String, nullable=True)  # active theme name
     custom_themes = Column(JSON, nullable=True)  # user-created themes as JSON
     language = Column(String, nullable=True)  # UI language code (e.g. 'en', 'es'); null = default
-    datetime_format = Column(String, nullable=True)  # date-fns format string (e.g. 'yyyy-MM-dd HH:mm:ss'); null = default
+    datetime_format = Column(
+        String, nullable=True
+    )  # date-fns format string (e.g. 'yyyy-MM-dd HH:mm:ss'); null = default
     timezone = Column(String, nullable=True)  # 'local', 'utc', or IANA tz (e.g. 'America/New_York'); null = default
     created_at = Column(DateTime, default=utcnow)
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
@@ -53,4 +56,4 @@ class UserPreference(Base):
     user = relationship("User", backref="preferences")
 
 
-__all__ = ['Setting', 'User', 'UserPreference']
+__all__ = ["Setting", "User", "UserPreference"]

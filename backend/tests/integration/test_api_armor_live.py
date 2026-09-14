@@ -20,6 +20,7 @@ The tests configure an API Armor-enabled listener for each scenario through the
 backend API, then send requests through HAProxy and assert the HTTP status
 codes. Each test cleans up its own resources.
 """
+
 import json
 import os
 import secrets
@@ -172,38 +173,50 @@ def _api_settings(token):
 
 
 def _make_backend(token, suffix, variant=""):
-    return _api_call(token, "post", "backends", {
-        "name": f"api-test{variant}-{suffix}",
-        "mode": "http",
-        "protocol": "http",
-        "algorithm": "roundrobin",
-        "health_check_enabled": True,
-        "health_check_uri": "/api/v1/health",
-        "health_check_method": "GET",
-        "servers": [{
-            "name": "api",
-            "address": "api",
-            "port": 8000,
-            "weight": 100,
-            "check": True,
-            "ssl": True,
-            "verify": "none",
-            "check_ssl": True,
-        }],
-    })
+    return _api_call(
+        token,
+        "post",
+        "backends",
+        {
+            "name": f"api-test{variant}-{suffix}",
+            "mode": "http",
+            "protocol": "http",
+            "algorithm": "roundrobin",
+            "health_check_enabled": True,
+            "health_check_uri": "/api/v1/health",
+            "health_check_method": "GET",
+            "servers": [
+                {
+                    "name": "api",
+                    "address": "api",
+                    "port": 8000,
+                    "weight": 100,
+                    "check": True,
+                    "ssl": True,
+                    "verify": "none",
+                    "check_ssl": True,
+                }
+            ],
+        },
+    )
 
 
 def _make_listener(token, suffix, be_id, variant="", options=None):
-    return _api_call(token, "post", "listeners", {
-        "name": f"api-armor{variant}-{suffix}",
-        "bind_address": "0.0.0.0",
-        "bind_port": 80,
-        "mode": "http",
-        "protocol": "http",
-        "enabled": True,
-        "default_backend_id": be_id,
-        "options": options or {"api_armor": True},
-    })
+    return _api_call(
+        token,
+        "post",
+        "listeners",
+        {
+            "name": f"api-armor{variant}-{suffix}",
+            "bind_address": "0.0.0.0",
+            "bind_port": 80,
+            "mode": "http",
+            "protocol": "http",
+            "enabled": True,
+            "default_backend_id": be_id,
+            "options": options or {"api_armor": True},
+        },
+    )
 
 
 def _import_spec(token, suffix, variant="", with_body_schema=True):
@@ -237,10 +250,15 @@ def _import_spec(token, suffix, variant="", with_body_schema=True):
             "info": {"title": "Test API", "version": "1.0.0"},
             "paths": {"/api/v1/test": {"post": {"operationId": "createTest"}}},
         }
-    _api_call(token, "post", "api-armor/specs", {
-        "name": f"test-spec{variant}-{suffix}",
-        "spec": json.dumps(spec),
-    })
+    _api_call(
+        token,
+        "post",
+        "api-armor/specs",
+        {
+            "name": f"test-spec{variant}-{suffix}",
+            "spec": json.dumps(spec),
+        },
+    )
     # Enable the schema for the /api/v1/test POST endpoint if one exists.
     schemas = _api_call(token, "get", "api-armor/schemas")
     for s in schemas:
@@ -262,7 +280,6 @@ def _apply_and_wait(token):
 @pytest.fixture(scope="function")
 def api_key_setup():
     """Create a live API Armor listener with API-key auth, then clean up."""
-    import requests
     import urllib3
 
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -276,21 +293,31 @@ def api_key_setup():
     listener = _make_listener(token, suffix, be["id"])
     _import_spec(token, suffix)
 
-    key_list = _api_call(token, "post", "api-armor/api-key-lists", {
-        "name": f"test-keys-{suffix}",
-        "description": "",
-        "entries": ["secret-key"],
-    })
+    key_list = _api_call(
+        token,
+        "post",
+        "api-armor/api-key-lists",
+        {
+            "name": f"test-keys-{suffix}",
+            "description": "",
+            "entries": ["secret-key"],
+        },
+    )
 
-    _api_call(token, "post", "api-armor/auth-policies", {
-        "name": f"api-key-policy-{suffix}",
-        "auth_type": "api_key",
-        "api_key_header": "X-Api-Key",
-        "api_key_list_id": key_list["id"],
-        "on_failure": "block",
-        "enabled": True,
-        "listener_ids": [listener["id"]],
-    })
+    _api_call(
+        token,
+        "post",
+        "api-armor/auth-policies",
+        {
+            "name": f"api-key-policy-{suffix}",
+            "auth_type": "api_key",
+            "api_key_header": "X-Api-Key",
+            "api_key_list_id": key_list["id"],
+            "on_failure": "block",
+            "enabled": True,
+            "listener_ids": [listener["id"]],
+        },
+    )
 
     _apply_and_wait(token)
 
@@ -363,16 +390,21 @@ def jwt_setup():
     listener = _make_listener(token, suffix, be["id"], variant="-jwt")
     _import_spec(token, suffix, variant="-jwt")
 
-    _api_call(token, "post", "api-armor/auth-policies", {
-        "name": f"jwt-policy-{suffix}",
-        "auth_type": "jwt",
-        "jwt_secret_env": "JWT_SECRET",
-        "jwt_issuer": JWT_ISSUER,
-        "jwt_audience": JWT_AUDIENCE,
-        "on_failure": "block",
-        "enabled": True,
-        "listener_ids": [listener["id"]],
-    })
+    _api_call(
+        token,
+        "post",
+        "api-armor/auth-policies",
+        {
+            "name": f"jwt-policy-{suffix}",
+            "auth_type": "jwt",
+            "jwt_secret_env": "JWT_SECRET",
+            "jwt_issuer": JWT_ISSUER,
+            "jwt_audience": JWT_AUDIENCE,
+            "on_failure": "block",
+            "enabled": True,
+            "listener_ids": [listener["id"]],
+        },
+    )
 
     _apply_and_wait(token)
 
@@ -424,7 +456,10 @@ def test_haproxy_api_armor_jwt_invalid_claims(jwt_setup):
     now = int(time.time())
     wrong_iss = _make_jwt({"sub": "user1", "iss": "wrong", "aud": JWT_AUDIENCE, "exp": now + 300})
     wrong_aud = _make_jwt({"sub": "user1", "iss": JWT_ISSUER, "aud": "wrong", "exp": now + 300})
-    bad_secret = _make_jwt({"sub": "user1", "iss": JWT_ISSUER, "aud": JWT_AUDIENCE, "exp": now + 300}, secret="wrong-secret-for-testing-only-32bytes-long")
+    bad_secret = _make_jwt(
+        {"sub": "user1", "iss": JWT_ISSUER, "aud": JWT_AUDIENCE, "exp": now + 300},
+        secret="wrong-secret-for-testing-only-32bytes-long",
+    )
     expired = _make_jwt({"sub": "user1", "iss": JWT_ISSUER, "aud": JWT_AUDIENCE, "exp": now - 10})
 
     for name, t in [
@@ -578,12 +613,17 @@ def profile_setup():
     _apply_and_wait(token)
 
     # Ingest a baseline observation and finalize the profile.
-    _api_call(token, "post", "api-armor/profiles/ingest", {
-        "method": "POST",
-        "path": "/api/v1/test",
-        "content_type": "application/json",
-        "auth_type": "n",
-    })
+    _api_call(
+        token,
+        "post",
+        "api-armor/profiles/ingest",
+        {
+            "method": "POST",
+            "path": "/api/v1/test",
+            "content_type": "application/json",
+            "auth_type": "n",
+        },
+    )
     profiles = _api_call(token, "get", "api-armor/profiles", {"method": "POST", "path": "/api/v1/test"})
     profile = next((p for p in profiles if p["method"] == "POST" and p["path"] == "/api/v1/test"), None)
     if not profile:

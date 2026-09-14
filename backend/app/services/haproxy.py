@@ -6,31 +6,45 @@ import shutil
 import socket
 import subprocess
 import time
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import UTC, datetime
+from typing import Any
 
-from sqlalchemy import DateTime, JSON, Table, text
-from ..core.database import Base
-
+from sqlalchemy import DateTime, Table, text
 from sqlalchemy.orm import Session, joinedload
+
 from ..core.config import get_settings
+from ..core.database import Base
+from ..models.models import (
+    Backend,
+    BackendRule,
+    CacheConfig,
+    Certificate,
+    CipherSuite,
+    ConfigSnapshot,
+    CustomErrorPage,
+    FcgiApp,
+    Listener,
+    NetworkList,
+    PageProtectPolicy,
+    RateLimit,
+    Redirect,
+    RequestHeader,
+    ResponseHeader,
+    Rewrite,
+    Server,
+)
 from . import coraza_config, dataplane
 from . import ha as ha_service
 from .runtime import get_runtime
-from ..models.models import (
-    Listener, Backend, Server, Certificate, CipherSuite,
-    WafRule, WafException, RateLimit, Redirect, Rewrite,
-    ResponseHeader, RequestHeader, CustomErrorPage, BackendRule,
-    FcgiApp, ConfigSnapshot, PageProtectPolicy, CacheConfig, NetworkList
-)
 
 settings = get_settings()
 
 import logging
+
 logger = logging.getLogger(__name__)
 
 
-def _maybe_peers(db: Optional[Session] = None) -> str:
+def _maybe_peers(db: Session | None = None) -> str:
     """Return `` peers corex-peers`` (with leading space) or empty string.
 
     Appended to every ``stick-table`` directive when HA is enabled and the
@@ -38,6 +52,7 @@ def _maybe_peers(db: Optional[Session] = None) -> str:
     otherwise — preserving byte-for-byte config parity when HA is off.
     """
     return ha_service.maybe_peers(db)
+
 
 # Dedicated backend name for ACME HTTP-01 challenge passthrough.
 # acme.sh --standalone binds port 80 in the api container during issuance;
@@ -140,7 +155,7 @@ def _safe_name(name: str) -> str:
     return _NAME_RE.sub("_", name).strip("_") or "unnamed"
 
 
-def _unique_section_name(base: str, used: set, suffix: Optional[str] = None) -> str:
+def _unique_section_name(base: str, used: set, suffix: str | None = None) -> str:
     """Return a unique HAProxy section name, optionally appending a backend suffix."""
     if base not in used:
         used.add(base)
@@ -159,17 +174,17 @@ def _unique_section_name(base: str, used: set, suffix: Optional[str] = None) -> 
         i += 1
 
 
-def _get_section_names(db: Session) -> Tuple[Dict[int, str], Dict[int, str], str, str]:
+def _get_section_names(db: Session) -> tuple[dict[int, str], dict[int, str], str, str]:
     """Build unique frontend and backend section names that avoid HAProxy 3.3+ name conflicts."""
     listeners = [l for l in db.query(Listener).all() if l.enabled]
     backends = db.query(Backend).all()
     used: set = set()
-    frontend_names: Dict[int, str] = {}
+    frontend_names: dict[int, str] = {}
     for listener in listeners:
         base = _safe_name(listener.name)
         frontend_names[listener.id] = _unique_section_name(base, used)
     stats_name = _unique_section_name("stats", used)
-    backend_names: Dict[int, str] = {}
+    backend_names: dict[int, str] = {}
     for backend in backends:
         base = _safe_name(backend.name)
         backend_names[backend.id] = _unique_section_name(base, used, suffix="be")
@@ -191,7 +206,7 @@ def _safe_token(value: str) -> str:
     return _TOKEN_RE.sub("", value).strip()
 
 
-def _rate_key_track_expr(rate_key: str, rate_header: Optional[str] = None) -> str:
+def _rate_key_track_expr(rate_key: str, rate_header: str | None = None) -> str:
     """Return the HAProxy track expression for a rate-limit counter key.
 
     Supported keys:
@@ -262,12 +277,12 @@ def _safe_query(value: str) -> str:
 def _read_file(path: str) -> str:
     """Return the contents of a file, or an empty string if it doesn't exist."""
     if os.path.exists(path):
-        with open(path, "r", encoding="utf-8", errors="replace") as f:
+        with open(path, encoding="utf-8", errors="replace") as f:
             return f.read()
     return ""
 
 
-def _haproxy_action(action: Optional[str]) -> str:
+def _haproxy_action(action: str | None) -> str:
     """Map a UI ACL action to a valid HAProxy http-request action."""
     if not action or action == "block":
         return "deny"
@@ -276,7 +291,9 @@ def _haproxy_action(action: Optional[str]) -> str:
     return _safe_token(action)
 
 
-def _backend_condition_expression(condition_type: str, condition_name: Optional[str], operator: str, value: Optional[str]) -> str:
+def _backend_condition_expression(
+    condition_type: str, condition_name: str | None, operator: str, value: str | None
+) -> str:
     """Build an inline HAProxy ACL fetch expression for a backend rule condition."""
     op = _safe_token(operator)
     if op == "eq":
@@ -321,7 +338,7 @@ def _backend_rule_condition(rule: BackendRule) -> str:
     return _backend_condition_expression(rule.condition_type, rule.condition_name, rule.operator, rule.value)
 
 
-def _render_haproxy_options(options: Optional[List[dict]], scope: str) -> tuple[list[str], list[str]]:
+def _render_haproxy_options(options: list[dict] | None, scope: str) -> tuple[list[str], list[str]]:
     """Return (extra_bind_opts, extra_section_lines) from a list of haproxy options."""
     bind_opts: list[str] = []
     section_lines: list[str] = []
@@ -360,7 +377,7 @@ def _safe_header_value(value: str) -> str:
     return f'"{value}"'
 
 
-def _format_condition(raw_condition: Optional[str]) -> str:
+def _format_condition(raw_condition: str | None) -> str:
     """Format a header rule condition for HAProxy emission.
 
     Strips a leading 'if ' that the user may have included (HAProxy syntax is
@@ -390,7 +407,7 @@ def _block(title: str, body: str) -> str:
     return f"{title}\n{_indent(body)}\n"
 
 
-_geoip2_support_cache: Optional[bool] = None
+_geoip2_support_cache: bool | None = None
 
 
 def _haproxy_supports_geoip2() -> bool:
@@ -412,10 +429,7 @@ def _haproxy_supports_geoip2() -> bool:
         if not output:
             haproxy_bin = shutil.which("haproxy")
             if haproxy_bin:
-                result = subprocess.run(
-                    [haproxy_bin, "-vv"],
-                    capture_output=True, text=True
-                )
+                result = subprocess.run([haproxy_bin, "-vv"], capture_output=True, text=True)
                 output = (result.stdout or "") + (result.stderr or "")
         if output and "geoip2" in output.lower():
             _geoip2_support_cache = True
@@ -480,7 +494,14 @@ def _generate_geoip2_loader() -> str:
     )
 
 
-def _generate_combined_lua_loader(include_geoip: bool, include_compress: bool, include_resp_transform: bool = False, include_img_2_webp: bool = False, include_api_armor: bool = False, include_req_fp: bool = False) -> str:
+def _generate_combined_lua_loader(
+    include_geoip: bool,
+    include_compress: bool,
+    include_resp_transform: bool = False,
+    include_img_2_webp: bool = False,
+    include_api_armor: bool = False,
+    include_req_fp: bool = False,
+) -> str:
     """Generate a combined Lua loader script for all Rust modules.
 
     The haproxy-geoip2, haproxy-compression, haproxy-resp-transform,
@@ -565,7 +586,7 @@ def _generate_combined_lua_loader(include_geoip: bool, include_compress: bool, i
         parts.append(
             "-- Response transform filter (lua.resp_transform for replace/inject/mask)\n"
             'local ok, rt = pcall(dofile, "/etc/haproxy/resp_transform.lua")\n'
-            "if ok and type(rt) == \"table\" and type(rt.init) == \"function\" then\n"
+            'if ok and type(rt) == "table" and type(rt.init) == "function" then\n'
             "    local rok, rerr = pcall(rt.init, {\n"
             f'        valkey_host = "{vk_host}",\n'
             f"        valkey_port = {vk_port},\n"
@@ -740,9 +761,7 @@ def _default_json_log_format(ja4_enabled: bool, page_protect_enabled: bool = Fal
     Thin wrapper around _default_json_log_fields + _serialize_json_log_format
     for backwards compatibility with callers and tests that expect a string.
     """
-    return _serialize_json_log_format(
-        _default_json_log_fields(ja4_enabled, page_protect_enabled)
-    )
+    return _serialize_json_log_format(_default_json_log_fields(ja4_enabled, page_protect_enabled))
 
 
 def _build_json_log_format(
@@ -773,7 +792,7 @@ def _default_nbthread() -> int:
 
 
 def _effective_tune_bufsize(
-    global_options: Optional[List[dict]],
+    global_options: list[dict] | None,
     compression_enabled: bool = False,
     resp_transform_enabled: bool = False,
     img_2_webp_enabled: bool = False,
@@ -791,11 +810,11 @@ def _effective_tune_bufsize(
     derives from this so the config stays valid when the user changes
     tune.bufsize.
     """
-    for opt in (global_options or []):
+    for opt in global_options or []:
         if opt.get("enabled", True) and _safe_token(str(opt.get("directive", ""))).strip().lower() == "tune.bufsize":
             try:
                 return int(_safe_token(str(opt.get("value", ""))).strip())
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 break
     if img_2_webp_enabled and settings.IMG_2_WEBP_BUFSIZE:
         return settings.IMG_2_WEBP_BUFSIZE
@@ -816,7 +835,7 @@ def _effective_tune_bufsize(
     return auto_bufsize or settings.HAPROXY_DEFAULT_BUFSIZE
 
 
-def _effective_tune_bufsize_from_db(db: Optional[Session]) -> int:
+def _effective_tune_bufsize_from_db(db: Session | None) -> int:
     """Resolve the effective tune.bufsize from persisted settings (for callers
     such as the SPOE config generator that don't receive the toggles)."""
     if db is None:
@@ -829,7 +848,7 @@ def _effective_tune_bufsize_from_db(db: Optional[Session]) -> int:
     try:
         raw = get_setting(db, "haproxy_global_options", "[]")
         global_options = json.loads(raw or "[]") if isinstance(raw, str) else (raw or [])
-    except (json.JSONDecodeError, TypeError):
+    except json.JSONDecodeError, TypeError:
         global_options = []
     return _effective_tune_bufsize(
         global_options,
@@ -843,8 +862,8 @@ def _effective_tune_bufsize_from_db(db: Optional[Session]) -> int:
 
 
 def generate_global_section(
-    ciphers: Optional[List[CipherSuite]] = None,
-    global_options: Optional[List[dict]] = None,
+    ciphers: list[CipherSuite] | None = None,
+    global_options: list[dict] | None = None,
     ja4_enabled: bool = True,
     compression_enabled: bool = False,
     disk_cache_enabled: bool = False,
@@ -854,7 +873,7 @@ def generate_global_section(
     api_armor_enabled: bool = False,
     req_fp_enabled: bool = False,
     quic_enabled: bool = False,
-    db: Optional[Session] = None,
+    db: Session | None = None,
 ) -> str:
     lines = ["global"]
     lines.append(f"    maxconn {settings.HAPROXY_MAXCONN}")
@@ -870,7 +889,7 @@ def generate_global_section(
     # 6. A user-supplied tune.stick-counters value is respected when valid and
     # >= 6, then deduped below.
     tune_stick_counters_value = 6
-    for opt in (global_options or []):
+    for opt in global_options or []:
         if not opt.get("enabled", True):
             continue
         if _safe_token(str(opt.get("directive", ""))).strip().lower() != "tune.stick-counters":
@@ -878,7 +897,7 @@ def generate_global_section(
         raw_value = _safe_token(str(opt.get("value", ""))).strip()
         try:
             user_value = int(raw_value)
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             user_value = 6
         tune_stick_counters_value = max(6, user_value)
         break
@@ -905,8 +924,7 @@ def generate_global_section(
     # always move together.
     if img_2_webp_enabled and settings.IMG_2_WEBP_BUFSIZE:
         user_set_bufsize = any(
-            opt.get("enabled", True)
-            and _safe_token(str(opt.get("directive", ""))).strip().lower() == "tune.bufsize"
+            opt.get("enabled", True) and _safe_token(str(opt.get("directive", ""))).strip().lower() == "tune.bufsize"
             for opt in (global_options or [])
         )
         if not user_set_bufsize:
@@ -922,14 +940,15 @@ def generate_global_section(
     # (proxy header) termination → 500. This is automatically emitted when
     # the user has not set tune.bufsize explicitly (via Global Options or
     # IMG_2_WEBP_BUFSIZE above). See HAPROXY_MULTI_FILTER_BUFSIZE in config.py.
-    lua_response_filter_count = sum([
-        bool(resp_transform_enabled),
-        bool(compression_enabled),
-        bool(img_2_webp_enabled),
-    ])
+    lua_response_filter_count = sum(
+        [
+            bool(resp_transform_enabled),
+            bool(compression_enabled),
+            bool(img_2_webp_enabled),
+        ]
+    )
     user_set_bufsize = any(
-        opt.get("enabled", True)
-        and _safe_token(str(opt.get("directive", ""))).strip().lower() == "tune.bufsize"
+        opt.get("enabled", True) and _safe_token(str(opt.get("directive", ""))).strip().lower() == "tune.bufsize"
         for opt in (global_options or [])
     )
     auto_bufsize = 0
@@ -943,7 +962,12 @@ def generate_global_section(
     # it, so a 512KB value with a large maxconn multiplies memory use by 32×.
     # Operators who still observe PH terminations with Lua actions can set
     # tune.bufsize explicitly in Global Options, or opt in via the env var.
-    if req_fp_enabled and settings.HAPROXY_LUA_REQFP_BUFSIZE and not user_set_bufsize and not settings.IMG_2_WEBP_BUFSIZE:
+    if (
+        req_fp_enabled
+        and settings.HAPROXY_LUA_REQFP_BUFSIZE
+        and not user_set_bufsize
+        and not settings.IMG_2_WEBP_BUFSIZE
+    ):
         auto_bufsize = max(auto_bufsize, settings.HAPROXY_LUA_REQFP_BUFSIZE)
 
     # Large-response bufsize floor (H2 + H3 mux limitation). HAProxy's H2 and
@@ -963,11 +987,14 @@ def generate_global_section(
             auto_bufsize = max(auto_bufsize, settings.HAPROXY_QUIC_MIN_BUFSIZE)
         elif user_set_bufsize:
             user_bufsize_val = None
-            for opt in (global_options or []):
-                if opt.get("enabled", True) and _safe_token(str(opt.get("directive", ""))).strip().lower() == "tune.bufsize":
+            for opt in global_options or []:
+                if (
+                    opt.get("enabled", True)
+                    and _safe_token(str(opt.get("directive", ""))).strip().lower() == "tune.bufsize"
+                ):
                     try:
                         user_bufsize_val = int(_safe_token(str(opt.get("value", ""))).strip())
-                    except (TypeError, ValueError):
+                    except TypeError, ValueError:
                         pass
                     break
             if user_bufsize_val is not None and user_bufsize_val < settings.HAPROXY_QUIC_MIN_BUFSIZE:
@@ -1013,14 +1040,14 @@ def generate_global_section(
     # value <= bufsize is respected; a value > bufsize is capped with a warning
     # comment so the config stays valid when the user lowers tune.bufsize.
     user_h2_max_frame = None
-    for opt in (global_options or []):
+    for opt in global_options or []:
         if not opt.get("enabled", True):
             continue
         if _safe_token(str(opt.get("directive", ""))).strip().lower() != "tune.h2.max-frame-size":
             continue
         try:
             user_h2_max_frame = int(_safe_token(str(opt.get("value", ""))).strip())
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             pass
         break
     if user_h2_max_frame is not None:
@@ -1058,11 +1085,14 @@ def generate_global_section(
     # IP addresses directly) and provides a buffer for reliability if the
     # vector container is temporarily unavailable.
     from .vector_pipeline import corex_source_enabled
+
     if corex_source_enabled(db):
         lines.append(f"    log ring@vector_tcp len {log_max_len} local0 info")
 
     # TLS session cache
-    lines.append("    ssl-default-bind-ciphersuites TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256")
+    lines.append(
+        "    ssl-default-bind-ciphersuites TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256"
+    )
     lines.append("    ssl-default-bind-options ssl-min-ver TLSv1.2 no-tls-tickets")
 
     # HAProxy 3.1+ requires tune.lua.bool-sample-conversion to be set before any
@@ -1070,8 +1100,11 @@ def generate_global_section(
     # are always loaded below, emit this unconditionally near the top of the global
     # section. A user-supplied value in global_options is respected and deduped.
     tune_bool_value = "normal"
-    for opt in (global_options or []):
-        if opt.get("enabled", True) and _safe_token(str(opt.get("directive", ""))).strip().lower() == "tune.lua.bool-sample-conversion":
+    for opt in global_options or []:
+        if (
+            opt.get("enabled", True)
+            and _safe_token(str(opt.get("directive", ""))).strip().lower() == "tune.lua.bool-sample-conversion"
+        ):
             tune_bool_value = _safe_token(str(opt.get("value", ""))).strip() or "normal"
             break
     lines.append(f"    tune.lua.bool-sample-conversion {tune_bool_value}")
@@ -1106,11 +1139,20 @@ def generate_global_section(
 
     if need_api_armor:
         from .settings import get_setting
+
         # Tell the Rust module where the API Armor data bundle and profiling log live.
         api_armor_dir = os.path.abspath(settings.API_ARMOR_DIR)
         api_armor_log = os.path.abspath(settings.API_ARMOR_PROFILE_LOG_PATH)
-        schema_learning = "1" if get_setting(db, "api_armor_schema_learning_enabled", "false").lower() in ("true", "1", "yes") else "0"
-        profiling_learning = "1" if get_setting(db, "api_armor_profiling_learning_enabled", "false").lower() in ("true", "1", "yes") else "0"
+        schema_learning = (
+            "1"
+            if get_setting(db, "api_armor_schema_learning_enabled", "false").lower() in ("true", "1", "yes")
+            else "0"
+        )
+        profiling_learning = (
+            "1"
+            if get_setting(db, "api_armor_profiling_learning_enabled", "false").lower() in ("true", "1", "yes")
+            else "0"
+        )
         lines.append(f"    setenv API_ARMOR_DIR {api_armor_dir}")
         lines.append(f"    setenv API_ARMOR_PROFILING_LOG_PATH {api_armor_log}")
         lines.append(f"    setenv API_ARMOR_SCHEMA_LEARNING_ENABLED {schema_learning}")
@@ -1119,7 +1161,10 @@ def generate_global_section(
         # validator can read them via std::env::var at runtime.
         if db is not None:
             from ..models.api_armor import AuthPolicy
-            for p in db.query(AuthPolicy).filter(AuthPolicy.enabled == True).filter(AuthPolicy.auth_type == "jwt").all():
+
+            for p in (
+                db.query(AuthPolicy).filter(AuthPolicy.enabled == True).filter(AuthPolicy.auth_type == "jwt").all()
+            ):
                 if p.jwt_secret_env:
                     secret = os.environ.get(p.jwt_secret_env, "")
                     if secret:
@@ -1134,14 +1179,16 @@ def generate_global_section(
         )
         try:
             with open(loader_path, "w") as f:
-                f.write(_generate_combined_lua_loader(
-                    include_geoip=need_geoip,
-                    include_compress=need_compress,
-                    include_resp_transform=need_resp_transform,
-                    include_img_2_webp=need_img_2_webp,
-                    include_api_armor=need_api_armor,
-                    include_req_fp=need_req_fp,
-                ))
+                f.write(
+                    _generate_combined_lua_loader(
+                        include_geoip=need_geoip,
+                        include_compress=need_compress,
+                        include_resp_transform=need_resp_transform,
+                        include_img_2_webp=need_img_2_webp,
+                        include_api_armor=need_api_armor,
+                        include_req_fp=need_req_fp,
+                    )
+                )
         except OSError:
             pass  # config generation should not fail on loader write
         lines.append(f"    lua-load-per-thread {loader_path}")
@@ -1161,7 +1208,8 @@ def generate_global_section(
     # Avoid duplicating tune.lua.bool-sample-conversion and tune.stick-counters;
     # they are already emitted at the top of the global section.
     extra_global = [
-        line for line in extra_global
+        line
+        for line in extra_global
         if not line.strip().startswith("tune.lua.bool-sample-conversion")
         and not line.strip().startswith("tune.stick-counters")
         and not line.strip().startswith("tune.h2.max-frame-size")
@@ -1214,6 +1262,7 @@ def generate_global_section(
         # HAProxy's Lua core.tcp():connect() does NOT support DNS hostnames,
         # only IP addresses. Resolve the Valkey hostname to an IP here.
         import socket as _socket
+
         try:
             vk_host = _socket.gethostbyname(str(settings.VALKEY_HOST))
         except Exception:
@@ -1225,7 +1274,7 @@ def generate_global_section(
             "-- Valkey hostname resolved to IP because HAProxy Lua sockets don't\n"
             "-- support DNS resolution.\n"
             'local ok, mod = pcall(dofile, "/etc/haproxy/captcha_ctx.lua")\n'
-            "if ok and type(mod) == \"table\" and type(mod.init) == \"function\" then\n"
+            'if ok and type(mod) == "table" and type(mod.init) == "function" then\n'
             f'    mod.init({{valkey_host = "{vk_host}", valkey_port = {vk_port}, valkey_password = "{vk_pass}"}})\n'
             "else\n"
             '    core.Alert("captcha_ctx init: load failed: " .. tostring(mod))\n'
@@ -1243,8 +1292,7 @@ def generate_global_section(
     # Dynamic nbthread default based on the CPU count. Users can still override
     # by adding an explicit nbthread row in the Global HAProxy Options UI.
     has_user_nbthread = any(
-        opt.get("enabled", True)
-        and _safe_token(str(opt.get("directive", ""))).lower() == "nbthread"
+        opt.get("enabled", True) and _safe_token(str(opt.get("directive", ""))).lower() == "nbthread"
         for opt in (global_options or [])
     )
     if not has_user_nbthread:
@@ -1276,10 +1324,12 @@ def generate_global_section(
     return "\n".join(lines) + "\n\n"
 
 
-def generate_defaults_section(headers: Optional[List[ResponseHeader]] = None,
-                                error_pages: Optional[List[CustomErrorPage]] = None,
-                                ja4_enabled: bool = True,
-                                page_protect_enabled: bool = False) -> str:
+def generate_defaults_section(
+    headers: list[ResponseHeader] | None = None,
+    error_pages: list[CustomErrorPage] | None = None,
+    ja4_enabled: bool = True,
+    page_protect_enabled: bool = False,
+) -> str:
     lines = ["defaults"]
     lines.append("    mode http")
     # Log format is emitted per-HTTP-frontend (not in defaults) because
@@ -1313,7 +1363,7 @@ def generate_defaults_section(headers: Optional[List[ResponseHeader]] = None,
 
     # Global custom response pages (not listener-bound)
     if error_pages:
-        pages_by_code: Dict[int, CustomErrorPage] = {}
+        pages_by_code: dict[int, CustomErrorPage] = {}
         for ep in sorted(error_pages, key=lambda e: e.id or 0):
             if ep.listener_id is not None or ep.listener_ids:
                 continue
@@ -1352,8 +1402,6 @@ def generate_stats_frontend(name: str = "stats") -> str:
     return "\n".join(lines) + "\n\n"
 
 
-
-
 def generate_dataplane_section() -> str:
     """Generate userlist section for the HAProxy Data Plane API."""
     if not settings.DATAPLANE_API_ENABLED:
@@ -1362,6 +1410,7 @@ def generate_dataplane_section() -> str:
     password = settings.DATAPLANE_API_PASSWORD
     if not password:
         import logging
+
         logging.getLogger(__name__).warning(
             "DATAPLANE_API_ENABLED=true but DATAPLANE_API_PASSWORD is not set. "
             "Skipping Data Plane API userlist — the API will not authenticate. "
@@ -1403,8 +1452,9 @@ def render_error_page_preview(content: str) -> str:
     return content
 
 
-def _build_ssl_bind_options(listener: Listener, certs: List[Certificate],
-                             cipher: Optional[CipherSuite], quic: bool = False) -> str:
+def _build_ssl_bind_options(
+    listener: Listener, certs: list[Certificate], cipher: CipherSuite | None, quic: bool = False
+) -> str:
     opts = []
     if listener.ssl_enabled:
         opts.append("ssl")
@@ -1480,7 +1530,7 @@ def _emit_compression_filter(
     backend: Backend,
     compression_enabled: bool,
     has_fcgi: bool = False,
-) -> List[str]:
+) -> list[str]:
     """Emit HAProxy filter directives for per-backend response compression.
 
     Reads compression settings from ``backend.options``:
@@ -1518,7 +1568,7 @@ def _emit_compression_filter(
     level = int(opts.get("compression_level", 3) or 3)
     window = int(opts.get("compression_window", 22) or 22)
 
-    lines: List[str] = []
+    lines: list[str] = []
 
     if algorithm in ("gzip", "deflate", "raw-deflate"):
         # HAProxy native compression filter (no Lua module required).
@@ -1592,7 +1642,7 @@ def _emit_img_2_webp_filter(
     backend: Backend,
     img_2_webp_enabled: bool,
     has_fcgi: bool = False,
-) -> List[str]:
+) -> list[str]:
     """Emit HAProxy filter directives for per-backend image-to-WebP conversion.
 
     Reads image conversion settings from ``backend.options``:
@@ -1626,9 +1676,7 @@ def _emit_img_2_webp_filter(
     if not img_2_webp_enabled:
         # Per-backend option is set but the global module toggle is off —
         # emit a comment so the config is valid but conversion is skipped.
-        lines: List[str] = [
-            f"    # img_2_webp: enabled for this backend but module not enabled in Global Options"
-        ]
+        lines: list[str] = [f"    # img_2_webp: enabled for this backend but module not enabled in Global Options"]
         return lines
 
     if has_fcgi:
@@ -1639,9 +1687,15 @@ def _emit_img_2_webp_filter(
             f" (HAProxy 3.4 fcgi_flt_check rejects Lua filters alongside use-fcgi-app)"
         ]
 
-    quality = int(opts.get("img_2_webp_quality", settings.IMG_2_WEBP_DEFAULT_QUALITY) or settings.IMG_2_WEBP_DEFAULT_QUALITY)
-    max_size = int(opts.get("img_2_webp_max_size", settings.IMG_2_WEBP_MAX_FILE_SIZE) or settings.IMG_2_WEBP_MAX_FILE_SIZE)
-    max_dim = int(opts.get("img_2_webp_max_dim", settings.IMG_2_WEBP_MAX_DIMENSIONS) or settings.IMG_2_WEBP_MAX_DIMENSIONS)
+    quality = int(
+        opts.get("img_2_webp_quality", settings.IMG_2_WEBP_DEFAULT_QUALITY) or settings.IMG_2_WEBP_DEFAULT_QUALITY
+    )
+    max_size = int(
+        opts.get("img_2_webp_max_size", settings.IMG_2_WEBP_MAX_FILE_SIZE) or settings.IMG_2_WEBP_MAX_FILE_SIZE
+    )
+    max_dim = int(
+        opts.get("img_2_webp_max_dim", settings.IMG_2_WEBP_MAX_DIMENSIONS) or settings.IMG_2_WEBP_MAX_DIMENSIONS
+    )
     source_types = str(opts.get("img_2_webp_source_types", "")).strip()
 
     # Initial chunk size for incremental output emission. Not a size ceiling —
@@ -1673,7 +1727,7 @@ def generate_cache_sections(db: Session, img_2_webp_enabled: bool = False) -> st
     entries per Accept variant — without this, a single cached raw image would
     be served to all clients and re-converted on every hit.
     """
-    sections: List[str] = []
+    sections: list[str] = []
     used: set = set()
     for cc in db.query(CacheConfig).filter(CacheConfig.haproxy_enabled == True).all():  # noqa: E712
         backend = db.get(Backend, cc.backend_id)
@@ -1703,11 +1757,11 @@ def generate_cache_sections(db: Session, img_2_webp_enabled: bool = False) -> st
 
 def _emit_cache_directives(
     backend: Backend,
-    cache_config: Optional[CacheConfig],
+    cache_config: CacheConfig | None,
     backend_name: str,
-    cache_section_names: Dict[int, str],
+    cache_section_names: dict[int, str],
     disk_cache_globally_enabled: bool,
-) -> Tuple[List[str], List[str]]:
+) -> tuple[list[str], list[str]]:
     """Emit cache directives for a backend section.
 
     - Memory cache: `http-request cache-use <name>` and `http-response cache-store <name>`.
@@ -1725,16 +1779,19 @@ def _emit_cache_directives(
     if backend.protocol == "tcp":
         return ([], [])
 
-    lines: List[str] = []
-    
+    lines: list[str] = []
+
     # Generate cache rule ACLs (shared by both memory and disk cache)
     # Emit ACLs once for all enabled rules, then emit tier-specific directives
     acl_prefix = f"cacherule_{_safe_name(backend.name)}"
-    either_tier_enabled = cache_config.haproxy_enabled or (cache_config.disk_cache_enabled and disk_cache_globally_enabled)
+    either_tier_enabled = cache_config.haproxy_enabled or (
+        cache_config.disk_cache_enabled and disk_cache_globally_enabled
+    )
 
     # Emit ACLs for ALL enabled rules (both tiers share the same ACLs)
     if either_tier_enabled:
         from .cache_rules import emit_cache_rule_acls
+
         acl_lines = emit_cache_rule_acls(cache_config, acl_prefix)
         lines.extend(acl_lines)
 
@@ -1768,6 +1825,7 @@ def _emit_cache_directives(
         cache_name = cache_section_names.get(backend.id, "")
         if cache_name:
             from .cache_rules import emit_haproxy_cache_rules
+
             # haproxy_cache_condition remains supported as an advanced escape
             # hatch, ANDed onto every rule-generated cache-use line.
             extra = (cache_config.haproxy_cache_condition or "").strip() or None
@@ -1799,7 +1857,8 @@ def _emit_cache_directives(
                 lines.extend(rule_lines)
 
                 # Check for response-phase rules (content_type, status_code)
-                from .cache_rules import emit_response_phase_cache_store_condition, active_rules, REQUEST_PHASE_TYPES
+                from .cache_rules import REQUEST_PHASE_TYPES, active_rules, emit_response_phase_cache_store_condition
+
                 response_store = emit_response_phase_cache_store_condition(cache_config, cache_name)
                 if response_store:
                     # Conditional cache-store based on response attributes.
@@ -1808,7 +1867,9 @@ def _emit_cache_directives(
                     # var (set in frontend) because is_varnish_fetch is a
                     # request-phase ACL incompatible with http-response rules.
                     if disk_cache_active:
-                        response_store = response_store.replace(" if ", " if !{ var(txn.is_varnish_fetch) -m found } ", 1)
+                        response_store = response_store.replace(
+                            " if ", " if !{ var(txn.is_varnish_fetch) -m found } ", 1
+                        )
                     lines.append(response_store)
                 else:
                     # No response-phase rules — gate cache-store on the same
@@ -1824,10 +1885,9 @@ def _emit_cache_directives(
                     # Non-cacheable responses pass through without buffering.
                     all_rules = active_rules(cache_config)
                     cache_rules = [
-                        r for r in all_rules
-                        if r.tier == "memory"
-                        and r.match_type in REQUEST_PHASE_TYPES
-                        and r.action == "cache"
+                        r
+                        for r in all_rules
+                        if r.tier == "memory" and r.match_type in REQUEST_PHASE_TYPES and r.action == "cache"
                     ]
                     if cache_rules:
                         # Emit one cache-store line per cache rule, mirroring
@@ -1869,7 +1929,9 @@ def _emit_cache_directives(
                             lines.append(f"    http-response cache-store {cache_name} if {' '.join(resp_conds)}")
                         # If no cache rules with action=cache, no cache-store emitted
                     elif disk_cache_active:
-                        lines.append(f"    http-response cache-store {cache_name} if !{{ var(txn.is_varnish_fetch) -m found }}")
+                        lines.append(
+                            f"    http-response cache-store {cache_name} if !{{ var(txn.is_varnish_fetch) -m found }}"
+                        )
                     else:
                         lines.append(f"    http-response cache-store {cache_name}")
             else:
@@ -1883,11 +1945,9 @@ def _emit_cache_directives(
 
         # ACLs (is_cache_purge, is_varnish_fetch) were emitted above, before
         # the memory cache section, so they are available for cache-store guards.
-        
+
         # Generate use-server directives for cache rules
-        use_server_lines, acl_conditions = emit_disk_cache_use_server_directives(
-            cache_config, "disk_cache", acl_prefix
-        )
+        use_server_lines, acl_conditions = emit_disk_cache_use_server_directives(cache_config, "disk_cache", acl_prefix)
 
         # Set X-Cache-Backend header conditionally only for cache-eligible
         # client requests; skip internal Varnish fetches so the backend fetch
@@ -1908,14 +1968,18 @@ def _emit_cache_directives(
             # No cache rules, only PURGE/BAN
             header_condition = "is_cache_purge"
 
-        lines.append(f"    http-request set-header X-Cache-Backend {backend_name} if {header_condition} !is_varnish_fetch")
+        lines.append(
+            f"    http-request set-header X-Cache-Backend {backend_name} if {header_condition} !is_varnish_fetch"
+        )
 
         # Mark cache-eligible client requests so response filters (resp_transform)
         # can skip processing on the Varnish→client delivery path. The response from
         # Varnish has already been transformed on the origin→Varnish fetch path, so
         # re-applying the transform would corrupt the body (double transformation,
         # Content-Length removal, flushing failures → blank response).
-        lines.append(f"    http-request set-var(txn.is_disk_cache_eligible) str(1) if {header_condition} !is_varnish_fetch")
+        lines.append(
+            f"    http-request set-var(txn.is_disk_cache_eligible) str(1) if {header_condition} !is_varnish_fetch"
+        )
 
         # use-server directives are returned separately so the caller can emit
         # them AFTER all http-request rules (including resp_transform's
@@ -1936,7 +2000,7 @@ def _emit_cache_directives(
     return (lines, use_server_output)
 
 
-def _trusted_src_condition(db: Session) -> Optional[str]:
+def _trusted_src_condition(db: Session) -> str | None:
     """Build the HAProxy condition fragment that gates set-src on the
     connection coming from a trusted CDN/proxy edge.
 
@@ -1945,8 +2009,8 @@ def _trusted_src_condition(db: Session) -> Optional[str]:
     ``{ src -f <path1> -f <path2> ... }`` — HAProxy ORs multiple ``-f`` files.
     When unset or no named lists still exist, returns None (ungated restore).
     """
-    from .settings import get_setting as _get_setting
     from .security_lists import safe_filename
+    from .settings import get_setting as _get_setting
 
     raw = _get_setting(db, "restore_client_ip_trusted_network_list")
     if not raw:
@@ -1977,7 +2041,7 @@ def _trusted_src_condition(db: Session) -> Optional[str]:
 def _cdn_restore_client_ip_rules(
     db: Session,
     listener: Listener,
-    backend_default: Optional[Backend],
+    backend_default: Backend | None,
     rule_combined_exprs: list,
 ) -> list:
     """Emit http-request set-src rules for CDN-backed backend pools.
@@ -2035,9 +2099,7 @@ def _cdn_restore_client_ip_rules(
         header = _safe_token(getattr(backend, "client_ip_header", None) or "X-Forwarded-For")
         src_expr = f"req.hdr_ip({header},1)"
         hdr_guard = f"{{ req.hdr_ip({header},1) -m found }}"
-        lines.append(
-            f"    http-request set-src {src_expr} if {combined_expr} {hdr_guard}{trusted_suffix}"
-        )
+        lines.append(f"    http-request set-src {src_expr} if {combined_expr} {hdr_guard}{trusted_suffix}")
 
     # Default-backend catch-all: applies when the default backend is CDN-backed.
     if default_cdn:
@@ -2053,8 +2115,8 @@ def _cdn_restore_client_ip_rules(
 def _emit_varnish_fetch_routing(
     db: Session,
     listener: Listener,
-    backend_names: Dict[int, str],
-) -> List[str]:
+    backend_names: dict[int, str],
+) -> list[str]:
     """Emit ACLs + use_backend rules from other listeners' BackendRules.
 
     On a force_https listener (port 80), Varnish fetches skip the HTTPS
@@ -2068,7 +2130,8 @@ def _emit_varnish_fetch_routing(
     """
     # Query BackendRules from all OTHER enabled HTTP-mode listeners.
     other_listeners = [
-        l for l in db.query(Listener).filter(Listener.enabled == True).all()  # noqa: E712
+        l
+        for l in db.query(Listener).filter(Listener.enabled == True).all()  # noqa: E712
         if l.id != listener.id and l.mode == "http"
     ]
     other_listener_ids = [l.id for l in other_listeners]
@@ -2087,7 +2150,7 @@ def _emit_varnish_fetch_routing(
     if not rules:
         return []
 
-    lines: List[str] = []
+    lines: list[str] = []
     seen_backends: set = set()
 
     for br in rules:
@@ -2139,20 +2202,20 @@ def _emit_varnish_fetch_routing(
 def generate_frontend(
     listener: Listener,
     db: Session,
-    frontend_names: Optional[Dict[int, str]] = None,
-    backend_names: Optional[Dict[int, str]] = None,
+    frontend_names: dict[int, str] | None = None,
+    backend_names: dict[int, str] | None = None,
     req_fp_enabled: bool = False,
     req_fp_parse_body: bool = False,
     req_fp_max_body_bytes: int = 1048576,
     req_fp_enforce_max_body: bool = False,
     page_protect_enabled: bool = False,
     page_protect_report_path: str = "/_csp-report",
-    page_protect_beacon: Optional[Dict[str, Any]] = None,
+    page_protect_beacon: dict[str, Any] | None = None,
     api_armor_enabled: bool = False,
     api_armor_max_body_bytes: int = 1048576,
     api_armor_scope: str = "listener",
-    api_armor_backend_ids: Optional[List[int]] = None,
-    api_armor_path_patterns: Optional[List[str]] = None,
+    api_armor_backend_ids: list[int] | None = None,
+    api_armor_path_patterns: list[str] | None = None,
     ja4_enabled: bool = True,
     disk_cache_enabled: bool = False,
     server_timing_metrics_enabled: bool = False,
@@ -2162,12 +2225,14 @@ def generate_frontend(
         cert_ids = [listener.certificate_id]
     certs = db.query(Certificate).filter(Certificate.id.in_(cert_ids)).all() if cert_ids else []
     listener_options = listener.options or {}
-    cipher = db.query(CipherSuite).filter(CipherSuite.name == _safe_token(listener_options.get("cipher_suite", ""))).first()
+    cipher = (
+        db.query(CipherSuite).filter(CipherSuite.name == _safe_token(listener_options.get("cipher_suite", ""))).first()
+    )
     backend_default = db.query(Backend).filter(Backend.id == listener.default_backend_id).first()
     api_armor_backend_ids = api_armor_backend_ids or []
     api_armor_path_patterns = [p for p in (api_armor_path_patterns or []) if isinstance(p, str) and p.strip()]
 
-    def _backend_name(b: Optional[Backend]) -> str:
+    def _backend_name(b: Backend | None) -> str:
         if not b:
             return ""
         if backend_names:
@@ -2192,7 +2257,9 @@ def generate_frontend(
     lines = [f"frontend {listener_name}"]
     lines.append(f"    {bind_line}")
     if listener.quic and listener.ssl_enabled:
-        quic_bind = f"bind quic4@{bind_address}:{bind_port} {_build_ssl_bind_options(listener, certs, cipher, quic=True)}"
+        quic_bind = (
+            f"bind quic4@{bind_address}:{bind_port} {_build_ssl_bind_options(listener, certs, cipher, quic=True)}"
+        )
         if extra_bind:
             quic_bind += " " + " ".join(extra_bind)
         lines.append(f"    {quic_bind}")
@@ -2261,8 +2328,7 @@ def generate_frontend(
                 waf_rule_rate = primary
 
         listener_rate_limits = [
-            rl for rl in db.query(RateLimit).all()
-            if _matches_listener(rl, listener) and rl.enabled
+            rl for rl in db.query(RateLimit).all() if _matches_listener(rl, listener) and rl.enabled
         ]
 
         # Response-code rate limits use a dedicated stick-table backend tracked
@@ -2270,7 +2336,11 @@ def generate_frontend(
         # gpc0_rate and gpc1_rate as stick-table rate stores, so gpc2_rate
         # cannot be used on the frontend stick-table.
         has_resp_code_rate = any(rl.limit_type == "response_code" for rl in listener_rate_limits)
-        needs_stick_table = any(rl.limit_type in ("basic", "advanced", "waf") for rl in listener_rate_limits) or waf_rule_rate is not None
+        needs_stick_table = (
+            any(rl.limit_type in ("basic", "advanced", "waf") for rl in listener_rate_limits)
+            or waf_rule_rate is not None
+        )
+
         # Determine which stores go on the frontend ip stick-table (sc0) vs the
         # string stick-table backend (sc1). Non-src rate keys track on sc1, so
         # their rate stores must be on the string table, not the frontend table.
@@ -2278,14 +2348,23 @@ def generate_frontend(
         # MaxMind DB/map is available.
         def _rl_is_src(rl):
             return _rate_key_track_expr(getattr(rl, "rate_key", "src"), getattr(rl, "rate_header", None)) == "src"
-        src_req_windows = [rl.window_seconds for rl in listener_rate_limits
-                           if rl.limit_type in ("basic", "advanced") and _rl_is_src(rl)]
-        nonsrc_req_windows = [rl.window_seconds for rl in listener_rate_limits
-                              if rl.limit_type in ("basic", "advanced") and not _rl_is_src(rl)]
-        src_waf_windows = [rl.window_seconds for rl in listener_rate_limits
-                           if rl.limit_type == "waf" and _rl_is_src(rl)]
-        nonsrc_waf_windows = [rl.window_seconds for rl in listener_rate_limits
-                              if rl.limit_type == "waf" and not _rl_is_src(rl)]
+
+        src_req_windows = [
+            rl.window_seconds
+            for rl in listener_rate_limits
+            if rl.limit_type in ("basic", "advanced") and _rl_is_src(rl)
+        ]
+        nonsrc_req_windows = [
+            rl.window_seconds
+            for rl in listener_rate_limits
+            if rl.limit_type in ("basic", "advanced") and not _rl_is_src(rl)
+        ]
+        src_waf_windows = [
+            rl.window_seconds for rl in listener_rate_limits if rl.limit_type == "waf" and _rl_is_src(rl)
+        ]
+        nonsrc_waf_windows = [
+            rl.window_seconds for rl in listener_rate_limits if rl.limit_type == "waf" and not _rl_is_src(rl)
+        ]
         waf_rule_uses_sc1 = False
         if needs_stick_table:
             stores = ["conn_cur"]
@@ -2309,9 +2388,12 @@ def generate_frontend(
         # them. ACL definitions are inert — hoisting does not change runtime
         # behavior. The use_backend lines are emitted later in the
         # content-switching region.
-        backend_rules = db.query(BackendRule).filter(
-            BackendRule.listener_id == listener.id, BackendRule.enabled == True
-        ).order_by(BackendRule.priority).all()
+        backend_rules = (
+            db.query(BackendRule)
+            .filter(BackendRule.listener_id == listener.id, BackendRule.enabled == True)
+            .order_by(BackendRule.priority)
+            .all()
+        )
         for br in backend_rules:
             br_backend = db.query(Backend).filter(Backend.id == br.backend_id).first()
             if not br_backend:
@@ -2322,7 +2404,12 @@ def generate_frontend(
             rule_prefix = f"be_rule_{br.id}"
             for idx, cond in enumerate(cond_list, start=1):
                 if isinstance(cond, dict):
-                    ct, cn, op, val = cond["condition_type"], cond.get("condition_name"), cond["operator"], cond.get("value")
+                    ct, cn, op, val = (
+                        cond["condition_type"],
+                        cond.get("condition_name"),
+                        cond["operator"],
+                        cond.get("value"),
+                    )
                 else:
                     ct, cn, op, val = cond.condition_type, cond.condition_name, cond.operator, cond.value
                 expr = _backend_condition_expression(ct, cn, op, val)
@@ -2334,11 +2421,15 @@ def generate_frontend(
             # string and use it inline.
             combined = f"{rule_prefix}_c1"
             for idx in range(1, len(cond_list)):
-                join = cond_list[idx].get("join", "and") if isinstance(cond_list[idx], dict) else getattr(cond_list[idx], "join", "and")
+                join = (
+                    cond_list[idx].get("join", "and")
+                    if isinstance(cond_list[idx], dict)
+                    else getattr(cond_list[idx], "join", "and")
+                )
                 if join == "or":
-                    combined = f"{combined} || {rule_prefix}_c{idx+1}"
+                    combined = f"{combined} || {rule_prefix}_c{idx + 1}"
                 else:
-                    combined = f"{combined} {rule_prefix}_c{idx+1}"
+                    combined = f"{combined} {rule_prefix}_c{idx + 1}"
             rule_combined_acls.append((br, br_backend, combined))
 
         # Restore Client IP — MUST run BEFORE add-header X-Forwarded-For so
@@ -2387,9 +2478,15 @@ def generate_frontend(
             lines.append('    http-request add-header X-Forwarded-For "%[var(txn.orig_src)]"')
         else:
             lines.append('    http-request add-header X-Forwarded-For "%[src]"')
-        lines.append('    http-request set-header X-Forwarded-Port "%[dst_port]" if !{ hdr(X-Forwarded-Port) -m found }')
-        lines.append('    http-request set-header X-Forwarded-Proto "https" if { ssl_fc } !{ hdr(X-Forwarded-Proto) -m found }')
-        lines.append('    http-request set-header X-Forwarded-Proto "http" if !{ ssl_fc } !{ hdr(X-Forwarded-Proto) -m found }')
+        lines.append(
+            '    http-request set-header X-Forwarded-Port "%[dst_port]" if !{ hdr(X-Forwarded-Port) -m found }'
+        )
+        lines.append(
+            '    http-request set-header X-Forwarded-Proto "https" if { ssl_fc } !{ hdr(X-Forwarded-Proto) -m found }'
+        )
+        lines.append(
+            '    http-request set-header X-Forwarded-Proto "http" if !{ ssl_fc } !{ hdr(X-Forwarded-Proto) -m found }'
+        )
         # Forward the JA4 TLS fingerprint to backends so the captcha verify
         # endpoint can compute the same client-binding hash that the HAProxy
         # Lua validation action computes. Only emitted when JA4 is enabled
@@ -2440,7 +2537,9 @@ def generate_frontend(
                     if rl_rk != "src" and rl.limit_type in ("basic", "advanced", "waf"):
                         track_expr = _rate_key_track_expr(rl_rk, getattr(rl, "rate_header", None))
                         if track_expr != "src":
-                            lines.append(f"    http-request track-sc1 {track_expr} table rl_rate_{_safe_name(listener.name)}")
+                            lines.append(
+                                f"    http-request track-sc1 {track_expr} table rl_rate_{_safe_name(listener.name)}"
+                            )
                         break
 
         # Block duration (tarpit) tracking on sc2.
@@ -2540,7 +2639,9 @@ def generate_frontend(
             # If the file doesn't exist, the Lua fetch returns nil → var is empty.
             lines.append("    http-request set-var(txn.acme_content) lua.acme_challenge_file if is_acme_challenge")
             # Serve from webroot if the file exists (primary method).
-            lines.append('    http-request return status 200 content-type "application/octet-stream" lf-string "%[var(txn.acme_content)]" if is_acme_challenge { var(txn.acme_content) -m found }')
+            lines.append(
+                '    http-request return status 200 content-type "application/octet-stream" lf-string "%[var(txn.acme_content)]" if is_acme_challenge { var(txn.acme_content) -m found }'
+            )
 
         # Cap CAPTCHA proxy — route /_cap/ requests through the listener so
         # the browser never talks directly to the Cap service. This fixes
@@ -2571,10 +2672,12 @@ def generate_frontend(
             # stored hash. The token is bound to the client that solved the
             # challenge — a leaked cookie cannot be replayed from a different
             # client (different IP / UA / JA4 fingerprint).
-            lines.append('    http-request set-var(txn.cap_cv_ip) src if { var(txn.cap_cv_val) -m found }')
-            lines.append('    http-request set-var(txn.cap_cv_ua) req.fhdr(user-agent) if { var(txn.cap_cv_val) -m found }')
+            lines.append("    http-request set-var(txn.cap_cv_ip) src if { var(txn.cap_cv_val) -m found }")
+            lines.append(
+                "    http-request set-var(txn.cap_cv_ua) req.fhdr(user-agent) if { var(txn.cap_cv_val) -m found }"
+            )
             if ja4_enabled:
-                lines.append('    http-request set-var(txn.cap_cv_ja4) lua.ja4_fp if { var(txn.cap_cv_val) -m found }')
+                lines.append("    http-request set-var(txn.cap_cv_ja4) lua.ja4_fp if { var(txn.cap_cv_val) -m found }")
             lines.append("    http-request lua.captcha_validate_cookie if { var(txn.cap_cv_val) -m found }")
 
         # Page Protect — CSP violation report capture.
@@ -2621,9 +2724,11 @@ def generate_frontend(
                 lines.append("    http-request set-var(txn.cxid) uuid")
                 lines.append("    http-request track-sc5 var(txn.cxid) table cxid_table")
             # Serve the static beacon JS file
-            beacon_js_path = getattr(settings, 'PAGE_PROTECT_BEACON_JS_PATH', '/etc/haproxy/page-protect-beacon.js')
+            beacon_js_path = getattr(settings, "PAGE_PROTECT_BEACON_JS_PATH", "/etc/haproxy/page-protect-beacon.js")
             lines.append(f"    acl is_beacon_script path -m str {beacon_script_path}")
-            lines.append(f"    http-request return status 200 content-type application/javascript lf-file {beacon_js_path} hdr Cache-Control public,max-age=300,must-revalidate if is_beacon_script")
+            lines.append(
+                f"    http-request return status 200 content-type application/javascript lf-file {beacon_js_path} hdr Cache-Control public,max-age=300,must-revalidate if is_beacon_script"
+            )
             # Capture beacon POSTs (resource lists + cxid from the browser)
             lines.append(f"    acl is_asset_beacon path -m str {beacon_path}")
             lines.append("    http-request wait-for-body time 5s if is_asset_beacon")
@@ -2637,9 +2742,15 @@ def generate_frontend(
             # (sliding window, refreshed on every subsequent request via the
             # track-sc4 rule below).
             if beacon_trust:
-                lines.append("    http-request set-var(txn.cxid_from_beacon) var(txn.asset_beacon),json_query('$.cxid') if is_asset_beacon")
-                lines.append("    http-request set-var(txn.cxid_valid) var(txn.cxid_from_beacon),table_http_req_cnt(cxid_table) if is_asset_beacon")
-                lines.append("    http-request track-sc4 src table beacon_trust_table if is_asset_beacon { var(txn.cxid_valid) -m int gt 0 }")
+                lines.append(
+                    "    http-request set-var(txn.cxid_from_beacon) var(txn.asset_beacon),json_query('$.cxid') if is_asset_beacon"
+                )
+                lines.append(
+                    "    http-request set-var(txn.cxid_valid) var(txn.cxid_from_beacon),table_http_req_cnt(cxid_table) if is_asset_beacon"
+                )
+                lines.append(
+                    "    http-request track-sc4 src table beacon_trust_table if is_asset_beacon { var(txn.cxid_valid) -m int gt 0 }"
+                )
             lines.append("    http-request return status 204 if is_asset_beacon")
             # Beacon Trust — sliding-window TTL refresh: if the IP is already
             # in beacon_trust_table, re-track it to refresh the expiry timer.
@@ -2650,7 +2761,9 @@ def generate_frontend(
             # beacon POSTs, but the guard prevents two track-sc4 lines from
             # matching the same request — see haproxy/haproxy#1170).
             if beacon_trust:
-                lines.append("    http-request track-sc4 src table beacon_trust_table if !is_asset_beacon { src,table_http_req_cnt(beacon_trust_table) -m int gt 0 }")
+                lines.append(
+                    "    http-request track-sc4 src table beacon_trust_table if !is_asset_beacon { src,table_http_req_cnt(beacon_trust_table) -m int gt 0 }"
+                )
 
         # Body buffering for request fingerprint param extraction.
         # When req_fp_parse_body is enabled (and API Armor is not already
@@ -2672,9 +2785,14 @@ def generate_frontend(
             bids: Set[int] = set()
             if l.default_backend_id:
                 bids.add(l.default_backend_id)
-            for br in db.query(BackendRule).filter(
-                BackendRule.listener_id == l.id, BackendRule.enabled == True  # noqa: E712
-            ).all():
+            for br in (
+                db.query(BackendRule)
+                .filter(
+                    BackendRule.listener_id == l.id,
+                    BackendRule.enabled == True,  # noqa: E712
+                )
+                .all()
+            ):
                 if br.backend_id:
                     bids.add(br.backend_id)
             return bids
@@ -2691,12 +2809,16 @@ def generate_frontend(
         # lua.req_fp_capture is also skipped (see below), so the buffered
         # body would never be consumed.
         if req_fp_enabled and req_fp_parse_body and not api_armor_on_listener and not force_https_redirect:
-            lines.append('    acl is_req_fp_body req.hdr(content-type) -m beg application/json application/x-www-form-urlencoded')
+            lines.append(
+                "    acl is_req_fp_body req.hdr(content-type) -m beg application/json application/x-www-form-urlencoded"
+            )
             lines.append(f"    acl is_req_fp_body_oversize req.body_len gt {req_fp_max_body_bytes}")
             if req_fp_enforce_max_body:
                 lines.append("    http-request deny deny_status 413 if is_req_fp_body is_req_fp_body_oversize")
             lines.append("    http-request wait-for-body time 10s if is_req_fp_body !is_req_fp_body_oversize")
-            lines.append("    http-request set-var(txn.req_fp_body) req.body if is_req_fp_body !is_req_fp_body_oversize")
+            lines.append(
+                "    http-request set-var(txn.req_fp_body) req.body if is_req_fp_body !is_req_fp_body_oversize"
+            )
 
         # API Armor — conditional body buffering.
         # The set-var(txn.api_body) must run BEFORE lua.req_fp_capture so that
@@ -2709,16 +2831,22 @@ def generate_frontend(
         # below), so api_body_parse would have no req_fp subfields to work
         # with. API Armor fires on the HTTPS listener after the redirect.
         if api_armor_on_listener and not force_https_redirect:
-            lines.append('    acl is_api_armor req.hdr(content-type) -m beg application/json application/graphql application/x-www-form-urlencoded')
+            lines.append(
+                "    acl is_api_armor req.hdr(content-type) -m beg application/json application/graphql application/x-www-form-urlencoded"
+            )
             api_armor_condition = "is_api_armor"
             if api_armor_path_patterns:
                 for pattern in api_armor_path_patterns:
-                    lines.append(f'    acl is_api_armor_path path_reg -i {_safe_regex(pattern)}')
+                    lines.append(f"    acl is_api_armor_path path_reg -i {_safe_regex(pattern)}")
                 api_armor_condition = "is_api_armor is_api_armor_path"
-            lines.append(f"    http-request deny deny_status 413 if {api_armor_condition} {{ req.body_len gt {api_armor_max_body_bytes} }}")
+            lines.append(
+                f"    http-request deny deny_status 413 if {api_armor_condition} {{ req.body_len gt {api_armor_max_body_bytes} }}"
+            )
             lines.append(f"    http-request wait-for-body time 10s if {api_armor_condition}")
             lines.append(f"    http-request set-var(txn.api_body) req.body if {api_armor_condition}")
-            lines.append(f"    http-request set-var(txn.api_armor_listener_id) int({listener.id}) if {api_armor_condition}")
+            lines.append(
+                f"    http-request set-var(txn.api_armor_listener_id) int({listener.id}) if {api_armor_condition}"
+            )
 
         # GeoIP set-vars — txn.geo_country and txn.geoip_tz are consumed by
         # lua.risk_capture (risk scoring) and may be referenced by future
@@ -2734,8 +2862,8 @@ def generate_frontend(
         elif _haproxy_supports_geoip2():
             geo_db = os.path.abspath(settings.GEOIP_DB_PATH)
             if os.path.exists(geo_db):
-                lines.append(f'    http-request set-var(txn.geo_country) src,geoip2({geo_db},country.iso_code)')
-                lines.append(f'    http-request set-var(txn.geoip_tz) src,geoip2({geo_db},location.time_zone)')
+                lines.append(f"    http-request set-var(txn.geo_country) src,geoip2({geo_db},country.iso_code)")
+                lines.append(f"    http-request set-var(txn.geoip_tz) src,geoip2({geo_db},location.time_zone)")
 
         # HTTP request fingerprint (haproxy-req-fp Rust module) — single-phase
         # design: req_fp_capture builds the 15-field partial fingerprint in
@@ -2759,18 +2887,18 @@ def generate_frontend(
             #
             # Body buffering (txn.api_body / txn.req_fp_body) must be emitted ABOVE
             # this line so the vars are populated when capture runs.
-            lines.append('    http-request lua.req_fp_capture')
+            lines.append("    http-request lua.req_fp_capture")
             # The buffered body is only consumed by req_fp_capture; release it
             # now instead of pinning up to req_fp_max_body_bytes per stream
             # until the response completes. (txn.api_body is still needed by
             # lua.api_body_parse below and is released there.)
             if req_fp_parse_body and not api_armor_on_listener:
-                lines.append('    http-request unset-var(txn.req_fp_body) if is_req_fp_body')
+                lines.append("    http-request unset-var(txn.req_fp_body) if is_req_fp_body")
             # Response-phase fingerprint assembly (Rust module).
             # req_fp_response reads status + content-length via fetches and
             # builds the full fingerprint. It does NOT access res.body_len
             # (which would force HAProxy to buffer the entire response body).
-            lines.append('    http-response lua.req_fp_response')
+            lines.append("    http-response lua.req_fp_response")
 
         # API Armor deeper analysis — runs AFTER req_fp_capture so req_fp
         # subfields are available for security rules.
@@ -2783,6 +2911,7 @@ def generate_frontend(
         if api_armor_on_listener and not force_https_redirect and api_armor_scope == "listener":
             # Tell the Rust module which auth policy applies to this listener.
             from ..models.api_armor import AuthPolicy
+
             listener_ids = {listener.id}
             policy = (
                 db.query(AuthPolicy)
@@ -2801,10 +2930,14 @@ def generate_frontend(
             lines.append(f"    http-request lua.api_body_parse if {api_armor_condition}")
             # Enforce API Armor schema validation and auth policy results.
             # Schema failure blocks with 400; auth failure blocks with 401.
-            lines.append(f"    http-request deny deny_status 400 if {api_armor_condition} !{{ var(txn.api_schema_valid) -m bool }}")
+            lines.append(
+                f"    http-request deny deny_status 400 if {api_armor_condition} !{{ var(txn.api_schema_valid) -m bool }}"
+            )
             if matched_id > 0:
                 if matched_on_failure == "block":
-                    lines.append(f"    http-request deny deny_status 401 if {api_armor_condition} !{{ var(txn.auth_valid) -m bool }}")
+                    lines.append(
+                        f"    http-request deny deny_status 401 if {api_armor_condition} !{{ var(txn.auth_valid) -m bool }}"
+                    )
                 elif matched_on_failure == "log_only":
                     # Log-only: do not block. auth_valid/auth_error are still
                     # available to the backend and to security rules.
@@ -2813,10 +2946,19 @@ def generate_frontend(
                     # Auth failure triggers a CAPTCHA challenge. The listener must
                     # also have the cv cookie validation path (see _listener_has_challenge_action).
                     challenge_url = _safe_token(settings.CAPTCHA_CHALLENGE_URL)
-                    _emit_challenge_redirect(lines, f"{api_armor_condition} !{{ var(txn.auth_valid) -m bool }}", challenge_url, matched_id, "api_armor_auth", f"API Armor auth policy {matched_id}")
+                    _emit_challenge_redirect(
+                        lines,
+                        f"{api_armor_condition} !{{ var(txn.auth_valid) -m bool }}",
+                        challenge_url,
+                        matched_id,
+                        "api_armor_auth",
+                        f"API Armor auth policy {matched_id}",
+                    )
             # Behavioral profile anomaly: deny with 403 when a learned profile is
             # violated. Use a positive ACL match (not !) so missing/false vars pass.
-            lines.append(f"    http-request deny deny_status 403 if {api_armor_condition} {{ var(txn.api.profile_anomaly) -m bool }}")
+            lines.append(
+                f"    http-request deny deny_status 403 if {api_armor_condition} {{ var(txn.api.profile_anomaly) -m bool }}"
+            )
             lines.append(f"    http-request unset-var(txn.api_body) if {api_armor_condition}")
 
         # Request headers are emitted ONLY in backend sections (see
@@ -2838,7 +2980,9 @@ def generate_frontend(
             # Uses the txn var (set during request phase) because the
             # is_varnish_fetch ACL (req.hdr_cnt) is incompatible with
             # http-response rules in HAProxy 3.4+.
-            lines.append(f"    http-response set-header Alt-Svc '{alt_svc}' if !{{ var(txn.is_varnish_fetch) -m found }}")
+            lines.append(
+                f"    http-response set-header Alt-Svc '{alt_svc}' if !{{ var(txn.is_varnish_fetch) -m found }}"
+            )
 
         # Response headers (per listener)
         # Guarded with !{ var(txn.is_varnish_fetch) -m found } so the header
@@ -2892,21 +3036,31 @@ def generate_frontend(
         # Server-Timing supports comma-separated metrics in one header value.
         if beacon_trust or server_timing_metrics_enabled:
             if beacon_trust:
-                lines.append('    acl is_html_response res.hdr(content-type) -m beg text/html')
+                lines.append("    acl is_html_response res.hdr(content-type) -m beg text/html")
             if beacon_trust and server_timing_metrics_enabled:
                 # Combined: cxid + timing on HTML, timing-only on non-HTML
-                lines.append('    http-response set-header Server-Timing "cxid;desc=\\"%[var(txn.cxid)]\\", total;dur=%Tt, connect;dur=%Tc, response;dur=%Tr" if is_html_response')
-                lines.append('    http-response set-header Server-Timing "total;dur=%Tt, connect;dur=%Tc, response;dur=%Tr" if !is_html_response')
+                lines.append(
+                    '    http-response set-header Server-Timing "cxid;desc=\\"%[var(txn.cxid)]\\", total;dur=%Tt, connect;dur=%Tc, response;dur=%Tr" if is_html_response'
+                )
+                lines.append(
+                    '    http-response set-header Server-Timing "total;dur=%Tt, connect;dur=%Tc, response;dur=%Tr" if !is_html_response'
+                )
             elif beacon_trust:
                 # cxid only, HTML only (existing behavior)
-                lines.append('    http-response set-header Server-Timing "cxid;desc=\\"%[var(txn.cxid)]\\"" if is_html_response')
+                lines.append(
+                    '    http-response set-header Server-Timing "cxid;desc=\\"%[var(txn.cxid)]\\"" if is_html_response'
+                )
             else:
                 # Timing metrics only, all responses
-                lines.append('    http-response set-header Server-Timing "total;dur=%Tt, connect;dur=%Tc, response;dur=%Tr"')
+                lines.append(
+                    '    http-response set-header Server-Timing "total;dur=%Tt, connect;dur=%Tc, response;dur=%Tr"'
+                )
 
         # Custom response pages (per listener)
-        errorfiles_dir = os.path.join(os.path.dirname(settings.HAPROXY_CONFIG_PATH), "errorfiles", _safe_path_name(listener.name))
-        pages_by_code: Dict[int, CustomErrorPage] = {}
+        errorfiles_dir = os.path.join(
+            os.path.dirname(settings.HAPROXY_CONFIG_PATH), "errorfiles", _safe_path_name(listener.name)
+        )
+        pages_by_code: dict[int, CustomErrorPage] = {}
         for ep in db.query(CustomErrorPage).order_by(CustomErrorPage.id).all():
             if not _matches_listener(ep, listener):
                 continue
@@ -2924,7 +3078,9 @@ def generate_frontend(
         # This catches clients still within their block duration even if their
         # current rate has dropped below the threshold.
         if has_block_duration:
-            lines.append("    http-request deny deny_status 429 default-errorfiles if { sc_get_gpc0(2) gt 0 } !{ var(txn.sec.skip_ratelimit) -m found }")
+            lines.append(
+                "    http-request deny deny_status 429 default-errorfiles if { sc_get_gpc0(2) gt 0 } !{ var(txn.sec.skip_ratelimit) -m found }"
+            )
 
         # Page Protect hasher bypass — internal agent requests (the hasher
         # fetching scripts to detect code changes) skip logging, risk scoring,
@@ -2937,7 +3093,10 @@ def generate_frontend(
         # bypass precedent).
         _pp_ua = _safe_token(settings.PAGE_PROTECT_HASH_USER_AGENT)
         _pp_token = _safe_token(settings.PAGE_PROTECT_HASHER_BYPASS_TOKEN)
-        _pp_hdr = re.sub(r'[^A-Za-z0-9_-]', '', settings.PAGE_PROTECT_HASHER_BYPASS_HEADER or "X-CoreX-Internal") or "X-CoreX-Internal"
+        _pp_hdr = (
+            re.sub(r"[^A-Za-z0-9_-]", "", settings.PAGE_PROTECT_HASHER_BYPASS_HEADER or "X-CoreX-Internal")
+            or "X-CoreX-Internal"
+        )
         if _pp_ua and _pp_token:
             lines.append(
                 f'    acl is_pp_hasher req.fhdr(user-agent) -m str "{_pp_ua}" req.hdr({_pp_hdr}) -m str "{_pp_token}"'
@@ -2963,12 +3122,14 @@ def generate_frontend(
         # after the redirect.
         if req_fp_enabled and _req_fp_module_available() and not force_https_redirect:
             from . import risk_scoring
+
             _risk_guard = "!is_pp_hasher" if _pp_ua and _pp_token else ""
             risk_scoring.emit_risk_scoring(listener, db, lines, guard=_risk_guard)
 
         # Security Rules — run BEFORE rate-limiting and WAF so skip flags take effect.
         # First-match-wins via txn.sec.done; sets txn.sec.skip_ratelimit / skip_waf.
         from . import security_rules
+
         security_rules.emit_security_rules(listener, db, lines)
 
         waf_rate_limits = []
@@ -2995,11 +3156,19 @@ def generate_frontend(
                 rl_cond = f"{{ sc_http_req_rate({rl_sc}) gt {rl.events} }}{rl_scope_cond}"
                 rl_action = _safe_token(getattr(rl, "action", "block") or "block")
                 if rl_no_log:
-                    lines.append(f"    http-request set-log-level silent if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}")
+                    lines.append(
+                        f"    http-request set-log-level silent if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}"
+                    )
                 if rl_log:
-                    lines.append(f"    http-request set-var(txn.ratelimit.action) str(blocked) if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}")
-                    lines.append(f"    http-request set-var(txn.action) str(blocked) if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }} !{{ var(txn.sec.action) -m found }}")
-                    lines.append(f"    http-request set-var(txn.ratelimit.name) str({rname}) if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}")
+                    lines.append(
+                        f"    http-request set-var(txn.ratelimit.action) str(blocked) if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}"
+                    )
+                    lines.append(
+                        f"    http-request set-var(txn.action) str(blocked) if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }} !{{ var(txn.sec.action) -m found }}"
+                    )
+                    lines.append(
+                        f"    http-request set-var(txn.ratelimit.name) str({rname}) if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}"
+                    )
                 lines.append(f"    http-request set-var(txn.rate_limit_window) str({rl_window})")
                 lines.append(f"    http-request set-var(txn.rate_limit_duration) str({rl_duration})")
                 if rl_action == "challenge":
@@ -3009,21 +3178,41 @@ def generate_frontend(
                         pass
                     else:
                         from ..services.settings import get_setting as _gs
-                        _emit_challenge_redirect(lines, f"{rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}", settings.CAPTCHA_CHALLENGE_URL, rl.id, "rate_limit", rl.name)
+
+                        _emit_challenge_redirect(
+                            lines,
+                            f"{rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}",
+                            settings.CAPTCHA_CHALLENGE_URL,
+                            rl.id,
+                            "rate_limit",
+                            rl.name,
+                        )
                 else:
-                    lines.append(f"    http-request deny deny_status {rl_status} default-errorfiles if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}")
+                    lines.append(
+                        f"    http-request deny deny_status {rl_status} default-errorfiles if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}"
+                    )
                 if rl_duration > 0:
-                    lines.append(f"    http-request sc-inc-gpc0(2) if {rl_cond} {{ sc_get_gpc0(2) eq 0 }} !{{ var(txn.sec.skip_ratelimit) -m found }}")
+                    lines.append(
+                        f"    http-request sc-inc-gpc0(2) if {rl_cond} {{ sc_get_gpc0(2) eq 0 }} !{{ var(txn.sec.skip_ratelimit) -m found }}"
+                    )
             elif rl.limit_type == "advanced" and rl.expression:
                 lines.append(f"    acl ratelimit_{rname} {_safe_token(rl.expression)}")
                 rl_cond = f"ratelimit_{rname} {{ sc_http_req_rate({rl_sc}) gt {rl.events} }}{rl_scope_cond}"
                 rl_action = _safe_token(getattr(rl, "action", "block") or "block")
                 if rl_no_log:
-                    lines.append(f"    http-request set-log-level silent if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}")
+                    lines.append(
+                        f"    http-request set-log-level silent if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}"
+                    )
                 if rl_log:
-                    lines.append(f"    http-request set-var(txn.ratelimit.action) str(blocked) if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}")
-                    lines.append(f"    http-request set-var(txn.action) str(blocked) if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }} !{{ var(txn.sec.action) -m found }}")
-                    lines.append(f"    http-request set-var(txn.ratelimit.name) str({rname}) if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}")
+                    lines.append(
+                        f"    http-request set-var(txn.ratelimit.action) str(blocked) if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}"
+                    )
+                    lines.append(
+                        f"    http-request set-var(txn.action) str(blocked) if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }} !{{ var(txn.sec.action) -m found }}"
+                    )
+                    lines.append(
+                        f"    http-request set-var(txn.ratelimit.name) str({rname}) if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}"
+                    )
                 lines.append(f"    http-request set-var(txn.rate_limit_window) str({rl_window})")
                 lines.append(f"    http-request set-var(txn.rate_limit_duration) str({rl_duration})")
                 if rl_action == "challenge":
@@ -3032,11 +3221,22 @@ def generate_frontend(
                     if listener.force_https and not listener.ssl_enabled:
                         pass
                     else:
-                        _emit_challenge_redirect(lines, f"{rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}", settings.CAPTCHA_CHALLENGE_URL, rl.id, "rate_limit", rl.name)
+                        _emit_challenge_redirect(
+                            lines,
+                            f"{rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}",
+                            settings.CAPTCHA_CHALLENGE_URL,
+                            rl.id,
+                            "rate_limit",
+                            rl.name,
+                        )
                 else:
-                    lines.append(f"    http-request deny deny_status {rl_status} default-errorfiles if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}")
+                    lines.append(
+                        f"    http-request deny deny_status {rl_status} default-errorfiles if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}"
+                    )
                 if rl_duration > 0:
-                    lines.append(f"    http-request sc-inc-gpc0(2) if {rl_cond} {{ sc_get_gpc0(2) eq 0 }} !{{ var(txn.sec.skip_ratelimit) -m found }}")
+                    lines.append(
+                        f"    http-request sc-inc-gpc0(2) if {rl_cond} {{ sc_get_gpc0(2) eq 0 }} !{{ var(txn.sec.skip_ratelimit) -m found }}"
+                    )
             elif rl.limit_type == "response_code":
                 match_code = rl.match_status_code or 404
                 rl_cond = f"{{ sc_gpc0_rate(3) gt {rl.events} }}"
@@ -3050,16 +3250,28 @@ def generate_frontend(
                 # can safely reference the tracked entry here.
                 lines.append(f"    http-after-response sc-inc-gpc0(3) if {{ status {match_code} }}")
                 if rl_no_log:
-                    lines.append(f"    http-request set-log-level silent if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}")
+                    lines.append(
+                        f"    http-request set-log-level silent if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}"
+                    )
                 if rl_log:
-                    lines.append(f"    http-request set-var(txn.ratelimit.action) str(blocked) if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}")
-                    lines.append(f"    http-request set-var(txn.action) str(blocked) if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }} !{{ var(txn.sec.action) -m found }}")
-                    lines.append(f"    http-request set-var(txn.ratelimit.name) str({rname}) if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}")
+                    lines.append(
+                        f"    http-request set-var(txn.ratelimit.action) str(blocked) if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}"
+                    )
+                    lines.append(
+                        f"    http-request set-var(txn.action) str(blocked) if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }} !{{ var(txn.sec.action) -m found }}"
+                    )
+                    lines.append(
+                        f"    http-request set-var(txn.ratelimit.name) str({rname}) if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}"
+                    )
                 lines.append(f"    http-request set-var(txn.rate_limit_window) str({rl_window})")
                 lines.append(f"    http-request set-var(txn.rate_limit_duration) str({rl_duration})")
-                lines.append(f"    http-request deny deny_status {rl_status} default-errorfiles if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}")
+                lines.append(
+                    f"    http-request deny deny_status {rl_status} default-errorfiles if {rl_cond} !{{ var(txn.sec.skip_ratelimit) -m found }}"
+                )
                 if rl_duration > 0:
-                    lines.append(f"    http-request sc-inc-gpc0(2) if {rl_cond} {{ sc_get_gpc0(2) eq 0 }} !{{ var(txn.sec.skip_ratelimit) -m found }}")
+                    lines.append(
+                        f"    http-request sc-inc-gpc0(2) if {rl_cond} {{ sc_get_gpc0(2) eq 0 }} !{{ var(txn.sec.skip_ratelimit) -m found }}"
+                    )
             elif rl.limit_type == "waf":
                 waf_rate_limits.append(rl)
 
@@ -3081,10 +3293,14 @@ def generate_frontend(
             # Copy the Coraza SPOE verdict into txn.waf.* for log-format inclusion.
             # txn.coraza.action is set by the SPOE filter; txn.waf.action mirrors it
             # so the unified log-format can reference a stable var name.
-            lines.append("    http-request set-var(txn.waf.action) var(txn.coraza.action) if !{ var(txn.sec.skip_waf) -m found }")
+            lines.append(
+                "    http-request set-var(txn.waf.action) var(txn.coraza.action) if !{ var(txn.sec.skip_waf) -m found }"
+            )
             # Combined action var: WAF overwrites RL (WAF > RL priority) but only
             # if a security rule didn't already set txn.action (Sec > WAF > RL).
-            lines.append("    http-request set-var(txn.action) var(txn.coraza.action) if { var(txn.coraza.action) -m found } !{ var(txn.sec.skip_waf) -m found } !{ var(txn.sec.action) -m found }")
+            lines.append(
+                "    http-request set-var(txn.action) var(txn.coraza.action) if { var(txn.coraza.action) -m found } !{ var(txn.sec.skip_waf) -m found } !{ var(txn.sec.action) -m found }"
+            )
 
             if action == "allow":
                 lines.append("    http-request allow if { var(txn.coraza.action) -m str allow }")
@@ -3096,14 +3312,22 @@ def generate_frontend(
                     rl_rk = _safe_token(getattr(rl, "rate_key", "src") or "src")
                     rl_is_nonsrc = _rate_key_track_expr(rl_rk, getattr(rl, "rate_header", None)) != "src"
                     rl_sc = 1 if rl_is_nonsrc else 0
-                    lines.append(f"    http-request sc-inc-gpc0({rl_sc}) if {{ var(txn.coraza.action) -m str deny }} !{{ var(txn.sec.skip_waf) -m found }}")
-                    lines.append(f"    http-request sc-inc-gpc0({rl_sc}) if {{ var(txn.coraza.action) -m str drop }} !{{ var(txn.sec.skip_waf) -m found }}")
+                    lines.append(
+                        f"    http-request sc-inc-gpc0({rl_sc}) if {{ var(txn.coraza.action) -m str deny }} !{{ var(txn.sec.skip_waf) -m found }}"
+                    )
+                    lines.append(
+                        f"    http-request sc-inc-gpc0({rl_sc}) if {{ var(txn.coraza.action) -m str drop }} !{{ var(txn.sec.skip_waf) -m found }}"
+                    )
                 if waf_rule_rate:
                     rate_key = _safe_token(waf_rule_rate.rate_key)
                     wr_is_nonsrc = _rate_key_track_expr(rate_key, getattr(waf_rule_rate, "rate_header", None)) != "src"
                     sc_id = 1 if wr_is_nonsrc else 0
-                    lines.append(f"    http-request sc-inc-gpc1({sc_id}) if {{ var(txn.coraza.action) -m str deny }} !{{ var(txn.sec.skip_waf) -m found }}")
-                    lines.append(f"    http-request sc-inc-gpc1({sc_id}) if {{ var(txn.coraza.action) -m str drop }} !{{ var(txn.sec.skip_waf) -m found }}")
+                    lines.append(
+                        f"    http-request sc-inc-gpc1({sc_id}) if {{ var(txn.coraza.action) -m str deny }} !{{ var(txn.sec.skip_waf) -m found }}"
+                    )
+                    lines.append(
+                        f"    http-request sc-inc-gpc1({sc_id}) if {{ var(txn.coraza.action) -m str drop }} !{{ var(txn.sec.skip_waf) -m found }}"
+                    )
 
                 # Rate threshold checks - deny the source immediately if it exceeds a limit.
                 for rl in waf_rate_limits:
@@ -3115,10 +3339,14 @@ def generate_frontend(
                     waf_dur = rl.waf_block_duration or 0
                     lines.append(f"    http-request set-var(txn.rate_limit_window) str({waf_window})")
                     lines.append(f"    http-request set-var(txn.rate_limit_duration) str({waf_dur})")
-                    lines.append(f"    http-request deny deny_status 403 default-errorfiles if {{ sc_gpc0_rate({rl_sc}) gt {threshold} }} !{{ var(txn.sec.skip_waf) -m found }}")
+                    lines.append(
+                        f"    http-request deny deny_status 403 default-errorfiles if {{ sc_gpc0_rate({rl_sc}) gt {threshold} }} !{{ var(txn.sec.skip_waf) -m found }}"
+                    )
                     # Block increment: mark as blocked on first exceedance (only if not already blocked)
                     if waf_dur > 0:
-                        lines.append(f"    http-request sc-inc-gpc0(2) if {{ sc_gpc0_rate({rl_sc}) gt {threshold} }} {{ sc_get_gpc0(2) eq 0 }} !{{ var(txn.sec.skip_waf) -m found }}")
+                        lines.append(
+                            f"    http-request sc-inc-gpc0(2) if {{ sc_gpc0_rate({rl_sc}) gt {threshold} }} {{ sc_get_gpc0(2) eq 0 }} !{{ var(txn.sec.skip_waf) -m found }}"
+                        )
                 if waf_rule_rate:
                     threshold = waf_rule_rate.rate_events or 100
                     rate_status = 429 if _safe_token(waf_rule_rate.rate_action) == "block" else 403
@@ -3126,10 +3354,14 @@ def generate_frontend(
                     rule_dur = waf_rule_rate.rate_duration_seconds or 0
                     lines.append(f"    http-request set-var(txn.rate_limit_window) str({rule_window})")
                     lines.append(f"    http-request set-var(txn.rate_limit_duration) str({rule_dur})")
-                    lines.append(f"    http-request deny deny_status {rate_status} default-errorfiles if {{ sc_gpc1_rate({sc_id}) gt {threshold} }} !{{ var(txn.sec.skip_waf) -m found }}")
+                    lines.append(
+                        f"    http-request deny deny_status {rate_status} default-errorfiles if {{ sc_gpc1_rate({sc_id}) gt {threshold} }} !{{ var(txn.sec.skip_waf) -m found }}"
+                    )
                     # Block increment: mark as blocked on first exceedance (only if not already blocked)
                     if rule_dur > 0:
-                        lines.append(f"    http-request sc-inc-gpc0(2) if {{ sc_gpc1_rate({sc_id}) gt {threshold} }} {{ sc_get_gpc0(2) eq 0 }} !{{ var(txn.sec.skip_waf) -m found }}")
+                        lines.append(
+                            f"    http-request sc-inc-gpc0(2) if {{ sc_gpc1_rate({sc_id}) gt {threshold} }} {{ sc_get_gpc0(2) eq 0 }} !{{ var(txn.sec.skip_waf) -m found }}"
+                        )
 
                 if action == "log":
                     # http-response capture does not accept 'len'; it requires a
@@ -3140,13 +3372,25 @@ def generate_frontend(
                 elif action == "redirect":
                     if redirect_url:
                         # Redirect requests that Coraza decided to deny to a custom URL
-                        lines.append(f"    http-request redirect location {redirect_url} code 302 if {{ var(txn.coraza.action) -m str deny }} !{{ var(txn.sec.skip_waf) -m found }}")
-                        lines.append(f"    http-response set-var(txn.status_source) str(haproxy) if {{ var(txn.coraza.action) -m str deny }} !{{ var(txn.sec.skip_waf) -m found }}")
-                        lines.append(f"    http-response redirect location {redirect_url} code 302 if {{ var(txn.coraza.action) -m str deny }} !{{ var(txn.sec.skip_waf) -m found }}")
+                        lines.append(
+                            f"    http-request redirect location {redirect_url} code 302 if {{ var(txn.coraza.action) -m str deny }} !{{ var(txn.sec.skip_waf) -m found }}"
+                        )
+                        lines.append(
+                            f"    http-response set-var(txn.status_source) str(haproxy) if {{ var(txn.coraza.action) -m str deny }} !{{ var(txn.sec.skip_waf) -m found }}"
+                        )
+                        lines.append(
+                            f"    http-response redirect location {redirect_url} code 302 if {{ var(txn.coraza.action) -m str deny }} !{{ var(txn.sec.skip_waf) -m found }}"
+                        )
                     else:
-                        lines.append(f"    http-request deny deny_status {status} default-errorfiles if {{ var(txn.coraza.action) -m str deny }} !{{ var(txn.sec.skip_waf) -m found }}")
-                        lines.append(f"    http-response set-var(txn.status_source) str(haproxy) if {{ var(txn.coraza.action) -m str deny }} !{{ var(txn.sec.skip_waf) -m found }}")
-                        lines.append(f"    http-response deny deny_status {status} default-errorfiles if {{ var(txn.coraza.action) -m str deny }} !{{ var(txn.sec.skip_waf) -m found }}")
+                        lines.append(
+                            f"    http-request deny deny_status {status} default-errorfiles if {{ var(txn.coraza.action) -m str deny }} !{{ var(txn.sec.skip_waf) -m found }}"
+                        )
+                        lines.append(
+                            f"    http-response set-var(txn.status_source) str(haproxy) if {{ var(txn.coraza.action) -m str deny }} !{{ var(txn.sec.skip_waf) -m found }}"
+                        )
+                        lines.append(
+                            f"    http-response deny deny_status {status} default-errorfiles if {{ var(txn.coraza.action) -m str deny }} !{{ var(txn.sec.skip_waf) -m found }}"
+                        )
                 elif action == "challenge":
                     # Skip challenge on force_https listeners — the request is
                     # redirected to HTTPS where the challenge fires with a
@@ -3159,20 +3403,38 @@ def generate_frontend(
                         waf_cond = "{ var(txn.coraza.action) -m str deny } !{ var(txn.sec.skip_waf) -m found }"
                         _emit_challenge_redirect(lines, waf_cond, challenge_url, primary.id, "waf", primary.name)
                 else:  # block
-                    lines.append(f"    http-request deny deny_status {status} default-errorfiles if {{ var(txn.coraza.action) -m str deny }} !{{ var(txn.sec.skip_waf) -m found }}")
-                    lines.append(f"    http-response set-var(txn.status_source) str(haproxy) if {{ var(txn.coraza.action) -m str deny }} !{{ var(txn.sec.skip_waf) -m found }}")
-                    lines.append(f"    http-response deny deny_status {status} default-errorfiles if {{ var(txn.coraza.action) -m str deny }} !{{ var(txn.sec.skip_waf) -m found }}")
+                    lines.append(
+                        f"    http-request deny deny_status {status} default-errorfiles if {{ var(txn.coraza.action) -m str deny }} !{{ var(txn.sec.skip_waf) -m found }}"
+                    )
+                    lines.append(
+                        f"    http-response set-var(txn.status_source) str(haproxy) if {{ var(txn.coraza.action) -m str deny }} !{{ var(txn.sec.skip_waf) -m found }}"
+                    )
+                    lines.append(
+                        f"    http-response deny deny_status {status} default-errorfiles if {{ var(txn.coraza.action) -m str deny }} !{{ var(txn.sec.skip_waf) -m found }}"
+                    )
 
                 # Coraza "drop" action: use deny (not silent-drop) so the block
                 # is logged and visible to the WAF metrics sampler. silent-drop
                 # suppresses logging entirely, making WAF drops invisible.
-                lines.append(f"    http-request deny deny_status {status} default-errorfiles if {{ var(txn.coraza.action) -m str drop }} !{{ var(txn.sec.skip_waf) -m found }}")
-                lines.append(f"    http-response set-var(txn.status_source) str(haproxy) if {{ var(txn.coraza.action) -m str drop }} !{{ var(txn.sec.skip_waf) -m found }}")
-                lines.append(f"    http-response deny deny_status {status} default-errorfiles if {{ var(txn.coraza.action) -m str drop }} !{{ var(txn.sec.skip_waf) -m found }}")
+                lines.append(
+                    f"    http-request deny deny_status {status} default-errorfiles if {{ var(txn.coraza.action) -m str drop }} !{{ var(txn.sec.skip_waf) -m found }}"
+                )
+                lines.append(
+                    f"    http-response set-var(txn.status_source) str(haproxy) if {{ var(txn.coraza.action) -m str drop }} !{{ var(txn.sec.skip_waf) -m found }}"
+                )
+                lines.append(
+                    f"    http-response deny deny_status {status} default-errorfiles if {{ var(txn.coraza.action) -m str drop }} !{{ var(txn.sec.skip_waf) -m found }}"
+                )
                 if not primary.fail_open:
-                    lines.append("    http-request deny deny_status 500 default-errorfiles if { var(txn.coraza.error) -m int gt 0 } !{ var(txn.sec.skip_waf) -m found }")
-                    lines.append("    http-response set-var(txn.status_source) str(haproxy) if { var(txn.coraza.error) -m int gt 0 } !{ var(txn.sec.skip_waf) -m found }")
-                    lines.append("    http-response deny deny_status 500 default-errorfiles if { var(txn.coraza.error) -m int gt 0 } !{ var(txn.sec.skip_waf) -m found }")
+                    lines.append(
+                        "    http-request deny deny_status 500 default-errorfiles if { var(txn.coraza.error) -m int gt 0 } !{ var(txn.sec.skip_waf) -m found }"
+                    )
+                    lines.append(
+                        "    http-response set-var(txn.status_source) str(haproxy) if { var(txn.coraza.error) -m int gt 0 } !{ var(txn.sec.skip_waf) -m found }"
+                    )
+                    lines.append(
+                        "    http-response deny deny_status 500 default-errorfiles if { var(txn.coraza.error) -m int gt 0 } !{ var(txn.sec.skip_waf) -m found }"
+                    )
 
         # Force HTTP to HTTPS redirect for non-TLS listeners.
         # Placed after Security Rules, Rate Limiting, and WAF so those layers can
@@ -3181,7 +3443,9 @@ def generate_frontend(
         # challenges (so the fallback use_backend to the ACME backend is reached
         # when the webroot token file is not present).
         if listener.force_https and not listener.ssl_enabled:
-            lines.append("    http-request redirect scheme https code 301 if !{ ssl_fc } !is_varnish_fetch !is_acme_challenge")
+            lines.append(
+                "    http-request redirect scheme https code 301 if !{ ssl_fc } !is_varnish_fetch !is_acme_challenge"
+            )
 
         # Redirects (per listener)
         for redirect in db.query(Redirect).order_by(Redirect.priority).all():
@@ -3208,7 +3472,7 @@ def generate_frontend(
                             lines.append(f"    http-request set-query {query} if {condition}")
                     lines.append(
                         f'    http-request return status {ep.code} content-type "{content_type}" '
-                        f'lf-file {ep_path} if {condition}'
+                        f"lf-file {ep_path} if {condition}"
                     )
                 continue
             target = _safe_token(redirect.target)
@@ -3244,7 +3508,9 @@ def generate_frontend(
                 lines.append(f"    acl rewrite_path_{rewrite_name} path_reg {source_regex}")
                 if host_acl:
                     lines.append(host_acl)
-                lines.append(f"    http-request set-path {target} if rewrite_path_{rewrite_name}{host_cond} !is_varnish_fetch")
+                lines.append(
+                    f"    http-request set-path {target} if rewrite_path_{rewrite_name}{host_cond} !is_varnish_fetch"
+                )
             if rewrite.type in ("query", "both"):
                 # For "both" the path_reg / host ACLs were already emitted by the
                 # path block above; for "query"-only we emit them here as the guard.
@@ -3252,7 +3518,9 @@ def generate_frontend(
                     lines.append(f"    acl rewrite_path_{rewrite_name} path_reg {source_regex}")
                     if host_acl:
                         lines.append(host_acl)
-                lines.append(f"    http-request set-query %{{query,regsub({source_regex},{target})}} if rewrite_path_{rewrite_name}{host_cond} !is_varnish_fetch")
+                lines.append(
+                    f"    http-request set-query %{{query,regsub({source_regex},{target})}} if rewrite_path_{rewrite_name}{host_cond} !is_varnish_fetch"
+                )
 
     # ACME HTTP-01 challenge fallback — routes to the API container for
     # backward compat with old --standalone renewals. Only fires for exact
@@ -3261,7 +3529,9 @@ def generate_frontend(
     # Only on plain HTTP listeners — is_acme_challenge ACL is only defined
     # for non-SSL listeners (see above).
     if effective_mode == "http" and not listener.ssl_enabled:
-        lines.append(f"    use_backend {ACME_CHALLENGE_BACKEND_NAME} if is_acme_challenge !{{ var(txn.acme_content) -m found }}")
+        lines.append(
+            f"    use_backend {ACME_CHALLENGE_BACKEND_NAME} if is_acme_challenge !{{ var(txn.acme_content) -m found }}"
+        )
 
     # Cap CAPTCHA proxy — exact-match rules for the challenge page and verify
     # endpoint route to the backend API; everything else under /_cap/ (widget
@@ -3276,6 +3546,7 @@ def generate_frontend(
         # active — other providers (reCAPTCHA, Turnstile) talk directly to
         # Google/Cloudflare and don't need the service proxy backend.
         from .settings import get_setting as _gs
+
         _provider = _gs(db, "captcha_provider", "cap") or "cap"
         if _provider == "cap":
             lines.append(f"    use_backend {CAP_SERVICE_PROXY_BACKEND_NAME} if is_cap_proxy")
@@ -3287,13 +3558,16 @@ def generate_frontend(
     # default_backend instead of a path-based use_backend rule.
     if effective_mode == "http":
         from .settings import get_setting as _mcp_gs
+
         mcp_on = _mcp_gs(db, "mcp_gateway_enabled", str(settings.MCP_GATEWAY_ENABLED)).lower() in ("true", "1", "yes")
         if mcp_on:
             if getattr(listener, "protocol", None) == "mcp":
                 # Dedicated MCP listener — everything goes to the gateway
                 lines.append(f"    default_backend mcp_gateway")
             elif listener_options.get("mcp_route_enabled"):
-                lines.append(f"    use_backend mcp_gateway if {{ path_beg /mcp }} || {{ path_beg /.well-known/oauth-protected-resource }}")
+                lines.append(
+                    f"    use_backend mcp_gateway if {{ path_beg /mcp }} || {{ path_beg /.well-known/oauth-protected-resource }}"
+                )
 
     # Content switching rules (per listener) — use_backend lines only.
     # ACL definitions were hoisted earlier (before rate limiting) so the
@@ -3364,7 +3638,7 @@ def generate_fcgi_app(app: FcgiApp) -> str:
     return "\n".join(lines) + "\n\n"
 
 
-def _fcgi_app_name_for_backend(db: Session, fcgi_app_id: Optional[int]) -> Optional[str]:
+def _fcgi_app_name_for_backend(db: Session, fcgi_app_id: int | None) -> str | None:
     if not fcgi_app_id:
         return None
     app = db.get(FcgiApp, fcgi_app_id)
@@ -3374,18 +3648,18 @@ def _fcgi_app_name_for_backend(db: Session, fcgi_app_id: Optional[int]) -> Optio
 def generate_backend(
     backend: Backend,
     db: Session,
-    backend_names: Optional[Dict[int, str]] = None,
+    backend_names: dict[int, str] | None = None,
     page_protect_enabled: bool = False,
     compression_enabled: bool = False,
     disk_cache_enabled: bool = False,
-    cache_section_names: Optional[Dict[int, str]] = None,
+    cache_section_names: dict[int, str] | None = None,
     resp_transform_enabled: bool = False,
     img_2_webp_enabled: bool = False,
-    page_protect_beacon: Optional[Dict[str, Any]] = None,
+    page_protect_beacon: dict[str, Any] | None = None,
     api_armor_enabled: bool = False,
     api_armor_scope: str = "listener",
-    api_armor_backend_ids: Optional[List[int]] = None,
-    api_armor_path_patterns: Optional[List[str]] = None,
+    api_armor_backend_ids: list[int] | None = None,
+    api_armor_path_patterns: list[str] | None = None,
     api_armor_max_body_bytes: int = 1048576,
 ) -> str:
     backend_name = (backend_names or {}).get(backend.id, _safe_name(backend.name))
@@ -3410,16 +3684,14 @@ def generate_backend(
     # we skip the resp_transform filter and emit a warning comment. The FCGI
     # backend works normally; response transforms are simply not applied.
     from . import resp_transform as _rt_svc
+
     # Check for user-defined transform rules OR beacon injection rules.
     # The beacon JS is injected if either asset tracking or beacon trust is on.
     _beacon = page_protect_beacon or {}
     _beacon_active = _beacon.get("enabled", False) or _beacon.get("trust_enabled", False)
     _beacon_backend_ids = _beacon.get("backend_ids") or []
     _backend_has_beacon = _beacon_active and (not _beacon_backend_ids or backend.id in _beacon_backend_ids)
-    rt_has_rules = (
-        effective_mode == "http"
-        and (_rt_svc._matches_backend_any(db, backend) or _backend_has_beacon)
-    )
+    rt_has_rules = effective_mode == "http" and (_rt_svc._matches_backend_any(db, backend) or _backend_has_beacon)
     rt_will_emit = rt_has_rules and resp_transform_enabled
     fcgi_blocks_rt = bool(fcgi_app_name) and rt_will_emit
 
@@ -3470,13 +3742,16 @@ def generate_backend(
     )
     if api_armor_on_backend:
         from ..models.api_armor import AuthPolicy
+
         ba_condition = "{ var(txn.api_body) -m found }"
         if api_armor_path_patterns:
             for pattern in api_armor_path_patterns:
-                lines.append(f'    acl is_api_armor_path path_reg -i {_safe_regex(pattern)}')
+                lines.append(f"    acl is_api_armor_path path_reg -i {_safe_regex(pattern)}")
             ba_condition += " is_api_armor_path"
         # Default failure mode; listener or backend policies can override.
-        lines.append(f"    http-request set-var(txn.api_auth_on_failure) str(block) if {ba_condition} !{{ var(txn.api_auth_on_failure) -m found }}")
+        lines.append(
+            f"    http-request set-var(txn.api_auth_on_failure) str(block) if {ba_condition} !{{ var(txn.api_auth_on_failure) -m found }}"
+        )
         # Listener-scoped auth policies (first match, only if not already set).
         policies = (
             db.query(AuthPolicy)
@@ -3490,8 +3765,12 @@ def generate_backend(
                 continue
             on_failure = (p.on_failure or "block").lower()
             for lid in p.listener_ids:
-                lines.append(f"    http-request set-var(txn.api_auth_policy_id) int({p.id}) if {ba_condition} !{{ var(txn.api_auth_policy_id) -m found }} {{ var(txn.api_armor_listener_id) -m int eq {lid} }}")
-                lines.append(f"    http-request set-var(txn.api_auth_on_failure) str({on_failure}) if {ba_condition} !{{ var(txn.api_auth_on_failure) -m found }} {{ var(txn.api_armor_listener_id) -m int eq {lid} }}")
+                lines.append(
+                    f"    http-request set-var(txn.api_auth_policy_id) int({p.id}) if {ba_condition} !{{ var(txn.api_auth_policy_id) -m found }} {{ var(txn.api_armor_listener_id) -m int eq {lid} }}"
+                )
+                lines.append(
+                    f"    http-request set-var(txn.api_auth_on_failure) str({on_failure}) if {ba_condition} !{{ var(txn.api_auth_on_failure) -m found }} {{ var(txn.api_armor_listener_id) -m int eq {lid} }}"
+                )
         # Backend-scoped auth policies override listener-scoped ones.
         matched_id = 0
         matched_on_failure = "block"
@@ -3504,11 +3783,22 @@ def generate_backend(
                 lines.append(f"    http-request set-var(txn.api_auth_on_failure) str({on_failure}) if {ba_condition}")
                 break
         lines.append(f"    http-request lua.api_body_parse if {ba_condition}")
-        lines.append(f"    http-request deny deny_status 400 if {ba_condition} !{{ var(txn.api_schema_valid) -m bool }}")
-        lines.append(f"    http-request deny deny_status 401 if {ba_condition} !{{ var(txn.auth_valid) -m bool }} {{ var(txn.api_auth_on_failure) -m str block }}")
+        lines.append(
+            f"    http-request deny deny_status 400 if {ba_condition} !{{ var(txn.api_schema_valid) -m bool }}"
+        )
+        lines.append(
+            f"    http-request deny deny_status 401 if {ba_condition} !{{ var(txn.auth_valid) -m bool }} {{ var(txn.api_auth_on_failure) -m str block }}"
+        )
         if matched_id > 0 and matched_on_failure == "challenge":
             challenge_url = _safe_token(settings.CAPTCHA_CHALLENGE_URL)
-            _emit_challenge_redirect(lines, f"{ba_condition} !{{ var(txn.auth_valid) -m bool }}", challenge_url, matched_id, "api_armor_auth", f"API Armor auth policy {matched_id}")
+            _emit_challenge_redirect(
+                lines,
+                f"{ba_condition} !{{ var(txn.auth_valid) -m bool }}",
+                challenge_url,
+                matched_id,
+                "api_armor_auth",
+                f"API Armor auth policy {matched_id}",
+            )
         # Listener-scoped challenge actions: we cannot know which listener will
         # be used at config time, so we emit a generic challenge for any listener
         # policy where on_failure=challenge and the listener id matched.
@@ -3517,9 +3807,18 @@ def generate_backend(
                 continue
             for lid in p.listener_ids:
                 challenge_url = _safe_token(settings.CAPTCHA_CHALLENGE_URL)
-                _emit_challenge_redirect(lines, f"{ba_condition} !{{ var(txn.auth_valid) -m bool }} {{ var(txn.api_auth_on_failure) -m str challenge }} {{ var(txn.api_armor_listener_id) -m int eq {lid} }}", challenge_url, p.id, "api_armor_auth", f"API Armor auth policy {p.id}")
+                _emit_challenge_redirect(
+                    lines,
+                    f"{ba_condition} !{{ var(txn.auth_valid) -m bool }} {{ var(txn.api_auth_on_failure) -m str challenge }} {{ var(txn.api_armor_listener_id) -m int eq {lid} }}",
+                    challenge_url,
+                    p.id,
+                    "api_armor_auth",
+                    f"API Armor auth policy {p.id}",
+                )
         # Behavioral profile anomaly: deny with 403 when a learned profile is violated.
-        lines.append(f"    http-request deny deny_status 403 if {ba_condition} {{ var(txn.api.profile_anomaly) -m bool }}")
+        lines.append(
+            f"    http-request deny deny_status 403 if {ba_condition} {{ var(txn.api.profile_anomaly) -m bool }}"
+        )
         lines.append(f"    http-request unset-var(txn.api_body) if {ba_condition}")
 
     # Page Protect — CSP response headers (per backend).
@@ -3539,6 +3838,7 @@ def generate_backend(
     # is available in both frontend and backend http-response rules.
     if effective_mode == "http" and page_protect_enabled:
         from .page_protect import build_csp_header
+
         beacon = page_protect_beacon or {}
         beacon_active = beacon.get("enabled", False) or beacon.get("trust_enabled", False)
         beacon_backend_ids = beacon.get("backend_ids") or []
@@ -3589,7 +3889,7 @@ def generate_backend(
                 condition = f" if {{ rand(100) lt {sample_rate} }} !{{ var(txn.is_varnish_fetch) -m found }}"
             else:
                 condition = " if !{ var(txn.is_varnish_fetch) -m found }"
-            lines.append(f'    http-response set-header {header_name} {_safe_header_value(csp_value)}{condition}')
+            lines.append(f"    http-response set-header {header_name} {_safe_header_value(csp_value)}{condition}")
 
     # Cache directives (per backend) — memory cache (HAProxy native) and disk
     # cache routing header. Server-line replacement for disk cache happens below.
@@ -3597,11 +3897,17 @@ def generate_backend(
     # AFTER all http-request rules (HAProxy warns if http-request appears after
     # use-server in the config, even though http-request is always processed
     # first at runtime).
-    cache_config = db.query(CacheConfig).filter(CacheConfig.backend_id == backend.id).first() if effective_mode == "http" else None
-    disk_cache_active = bool(cache_config and cache_config.disk_cache_enabled and disk_cache_enabled and effective_mode == "http")
-    use_server_lines: List[str] = []
+    cache_config = (
+        db.query(CacheConfig).filter(CacheConfig.backend_id == backend.id).first() if effective_mode == "http" else None
+    )
+    disk_cache_active = bool(
+        cache_config and cache_config.disk_cache_enabled and disk_cache_enabled and effective_mode == "http"
+    )
+    use_server_lines: list[str] = []
     if effective_mode == "http":
-        cache_lines, use_server_lines = _emit_cache_directives(backend, cache_config, backend_name, cache_section_names or {}, disk_cache_enabled)
+        cache_lines, use_server_lines = _emit_cache_directives(
+            backend, cache_config, backend_name, cache_section_names or {}, disk_cache_enabled
+        )
         lines.extend(cache_lines)
         if cache_config and cache_config.disk_cache_enabled and not disk_cache_enabled:
             lines.append("    # disk cache requested but not enabled in Global Options")
@@ -3660,7 +3966,9 @@ def generate_backend(
                 if detok_prefixes:
                     prefix_re = "|".join(re.escape(p) for p in detok_prefixes)
                     lines.append(f'    http-request lua.detokenize_query if {{ query -m reg "{prefix_re}" }}')
-                    lines.append("    http-request set-query %[var(txn.detok_query)] if { var(txn.detok_query) -m found }")
+                    lines.append(
+                        "    http-request set-query %[var(txn.detok_query)] if { var(txn.detok_query) -m found }"
+                    )
             elif not resp_transform_enabled:
                 lines.append("    # resp_transform: rules exist but module not enabled in Global Options")
             # When fcgi_blocks_rt is True, the warning comment was already emitted above
@@ -3741,7 +4049,7 @@ def generate_backend(
             default_server += " fall 3 rise 2"
         lines.append(default_server)
 
-    servers: List[Server] = (
+    servers: list[Server] = (
         db.query(Server)
         .filter(Server.backend_id == backend.id)
         .options(joinedload(Server.ca_certificate), joinedload(Server.client_certificate))
@@ -3760,12 +4068,18 @@ def generate_backend(
         varnish_host = _safe_token(settings.VARNISH_CONTAINER_NAME)
         varnish_port = int(settings.VARNISH_PORT)
         _resolver_name = getattr(settings, "HAPROXY_RESOLVER_NAME", "docker")
-        lines.append(f"    server disk_cache {varnish_host}:{varnish_port} check resolvers {_resolver_name} init-addr none backup")
+        lines.append(
+            f"    server disk_cache {varnish_host}:{varnish_port} check resolvers {_resolver_name} init-addr none backup"
+        )
 
     for s in servers:
         server_name = _safe_name(s.name)
         server_port = max(1, min(65535, int(s.port))) if s.port else 80
-        cookie_arg = f" cookie {server_name}" if backend.sticky_sessions and backend.cookie_name and effective_mode == "http" else ""
+        cookie_arg = (
+            f" cookie {server_name}"
+            if backend.sticky_sessions and backend.cookie_name and effective_mode == "http"
+            else ""
+        )
         parts = [
             f"server {server_name} {_safe_token(s.address)}:{server_port}",
             f"weight {s.weight}",
@@ -3858,7 +4172,7 @@ def _is_ip_address(host: str) -> bool:
     return False
 
 
-def _coraza_spoa_servers() -> List[str]:
+def _coraza_spoa_servers() -> list[str]:
     """Return HAProxy server lines for the Coraza SPOA backend."""
     targets = _safe_token(settings.CORAZA_SPOA_TARGETS or "").split(",")
     if not targets or not targets[0]:
@@ -3954,10 +4268,10 @@ def generate_acme_challenge_backend() -> str:
 
 
 def _emit_challenge_redirect(
-    lines: List[str],
+    lines: list[str],
     condition: str,
     challenge_url: str,
-    rule_id: Optional[int],
+    rule_id: int | None,
     rule_type: str,
     rule_name: str,
 ) -> None:
@@ -3994,7 +4308,9 @@ def _emit_challenge_redirect(
     # attacks (user cannot manipulate the redirect destination).
     lines.append("    http-request set-var(txn.captcha_scheme) str(https) if { ssl_fc }")
     lines.append("    http-request set-var(txn.captcha_scheme) str(http) unless { ssl_fc }")
-    lines.append("    http-request set-var-fmt(txn.captcha_redirect) %[var(txn.captcha_scheme)]://%[req.hdr(host)]%[pathq]")
+    lines.append(
+        "    http-request set-var-fmt(txn.captcha_redirect) %[var(txn.captcha_scheme)]://%[req.hdr(host)]%[pathq]"
+    )
     safe_name = _safe_token(rule_name).replace(" ", "_") if rule_name else "-"
     rid = rule_id if rule_id is not None else 0
     # Store the rule context (rule_id, rule_type, rule_name, request_id, redirect_url)
@@ -4009,9 +4325,7 @@ def _emit_challenge_redirect(
     # "_" because the parser treats each space-separated word as a separate
     # argument — a multi-word rule name like "low header count" would produce
     # 5 arguments instead of 3, and HAProxy would reject the config.
-    lines.append(
-        f'    http-request lua.captcha_store_ctx {rid} {rule_type} {safe_name} if {condition}'
-    )
+    lines.append(f"    http-request lua.captcha_store_ctx {rid} {rule_type} {safe_name} if {condition}")
     redirect_url = f"{challenge_url}?cid=%[var(txn.captcha_cid_token)]"
     lines.append(f"    http-request redirect location {redirect_url} code 302 if {condition}")
 
@@ -4027,6 +4341,7 @@ def _listener_has_challenge_action(db: Session, listener_id: int) -> bool:
     HTTPS listener after the redirect.
     """
     from . import coraza_config, security_rules
+
     listener = db.query(Listener).filter(Listener.id == listener_id).first()
     if listener and listener.force_https and not listener.ssl_enabled:
         return False
@@ -4035,7 +4350,11 @@ def _listener_has_challenge_action(db: Session, listener_id: int) -> bool:
         if rule.enabled and _safe_token(getattr(rule, "action", "")) == "challenge":
             return True
         # WAF rate_action are checked in the generator's WAF rate section
-        if rule.enabled and getattr(rule, "rate_enabled", False) and _safe_token(getattr(rule, "rate_action", "")) == "challenge":
+        if (
+            rule.enabled
+            and getattr(rule, "rate_enabled", False)
+            and _safe_token(getattr(rule, "rate_action", "")) == "challenge"
+        ):
             return True
     # Security rules
     for rule in security_rules.rules_for_listener(db, listener_id):
@@ -4051,6 +4370,7 @@ def _listener_has_challenge_action(db: Session, listener_id: int) -> bool:
             return True
     # API Armor auth policies
     from ..models.api_armor import AuthPolicy
+
     for p in db.query(AuthPolicy).filter(AuthPolicy.enabled == True).all():  # noqa: E712
         if p.on_failure == "challenge":
             lids = p.listener_ids or []
@@ -4110,16 +4430,19 @@ def generate_cap_proxy_backends(db: Session = None) -> str:
     needs_service_proxy = True
     if db is not None:
         from .settings import get_setting as _gs
+
         provider_name = _gs(db, "captcha_provider", "cap") or "cap"
         if provider_name != "cap":
             needs_service_proxy = False
 
-    parts = [f"""backend {CAP_API_PROXY_BACKEND_NAME}
+    parts = [
+        f"""backend {CAP_API_PROXY_BACKEND_NAME}
     mode http
     http-request set-path /api/v1/waf/captcha if {{ path -m str {cap_path}/challenge }}
     http-request set-path /api/v1/waf/verify-captcha if {{ path -m str {cap_path}/verify }}
     server api {api_host}:{api_port} ssl verify none sni str({api_host})
-"""]
+"""
+    ]
 
     if needs_service_proxy:
         # Parse host:port from CAPTCHA_SERVICE_URL
@@ -4151,16 +4474,17 @@ def write_coraza_spoe_config(db: Session = None, coraza_backend_name: str = "cor
 
 def generate_config(
     db: Session,
-    frontend_names: Optional[Dict[int, str]] = None,
-    backend_names: Optional[Dict[int, str]] = None,
-    stats_name: Optional[str] = None,
-    coraza_name: Optional[str] = None,
-    compression_enabled_override: Optional[bool] = None,
-    resp_transform_enabled_override: Optional[bool] = None,
-    img_2_webp_enabled_override: Optional[bool] = None,
+    frontend_names: dict[int, str] | None = None,
+    backend_names: dict[int, str] | None = None,
+    stats_name: str | None = None,
+    coraza_name: str | None = None,
+    compression_enabled_override: bool | None = None,
+    resp_transform_enabled_override: bool | None = None,
+    img_2_webp_enabled_override: bool | None = None,
 ) -> str:
-    from ..services.settings import get_setting
     import json
+
+    from ..services.settings import get_setting
 
     ciphers = db.query(CipherSuite).all()
     listeners = db.query(Listener).all()
@@ -4171,37 +4495,55 @@ def generate_config(
 
     global_options_raw = get_setting(db, "haproxy_global_options", "[]")
     try:
-        global_options = json.loads(global_options_raw or "[]") if isinstance(global_options_raw, str) else (global_options_raw or [])
+        global_options = (
+            json.loads(global_options_raw or "[]")
+            if isinstance(global_options_raw, str)
+            else (global_options_raw or [])
+        )
     except json.JSONDecodeError:
         global_options = []
 
     # Lua fingerprint toggles (DB setting with env fallback)
     ja4_enabled = get_setting(db, "ja4_enabled", str(settings.JA4_ENABLED)).lower() in ("true", "1", "yes")
     req_fp_enabled = get_setting(db, "req_fp_enabled", str(settings.REQ_FP_ENABLED)).lower() in ("true", "1", "yes")
-    req_fp_parse_body = get_setting(db, "req_fp_parse_body", str(settings.REQ_FP_PARSE_BODY)).lower() in ("true", "1", "yes")
+    req_fp_parse_body = get_setting(db, "req_fp_parse_body", str(settings.REQ_FP_PARSE_BODY)).lower() in (
+        "true",
+        "1",
+        "yes",
+    )
     req_fp_max_body_bytes = int(get_setting(db, "req_fp_max_body_bytes", str(settings.REQ_FP_MAX_BODY_BYTES)))
-    req_fp_enforce_max_body = get_setting(db, "req_fp_enforce_max_body", str(settings.REQ_FP_ENFORCE_MAX_BODY)).lower() in ("true", "1", "yes")
+    req_fp_enforce_max_body = get_setting(
+        db, "req_fp_enforce_max_body", str(settings.REQ_FP_ENFORCE_MAX_BODY)
+    ).lower() in ("true", "1", "yes")
 
     # Server-Timing metrics toggle (DB setting with env fallback)
-    server_timing_metrics_enabled = get_setting(db, "server_timing_metrics_enabled", str(settings.SERVER_TIMING_METRICS_ENABLED)).lower() in ("true", "1", "yes")
+    server_timing_metrics_enabled = get_setting(
+        db, "server_timing_metrics_enabled", str(settings.SERVER_TIMING_METRICS_ENABLED)
+    ).lower() in ("true", "1", "yes")
 
     # API Armor toggle (DB setting with env fallback) — loads the Rust Lua
     # module globally and gates conditional body buffering + API/GraphQL/auth
     # inspection per-listener. Also reads the max body size setting.
-    api_armor_enabled = get_setting(db, "api_armor_enabled", str(settings.API_ARMOR_ENABLED)).lower() in ("true", "1", "yes")
+    api_armor_enabled = get_setting(db, "api_armor_enabled", str(settings.API_ARMOR_ENABLED)).lower() in (
+        "true",
+        "1",
+        "yes",
+    )
     api_armor_max_body_bytes = int(get_setting(db, "api_armor_max_body_bytes", str(settings.API_ARMOR_MAX_BODY_BYTES)))
     api_armor_scope = get_setting(db, "api_armor_scope", settings.API_ARMOR_SCOPE).lower()
     if api_armor_scope not in ("listener", "backend", "path"):
         api_armor_scope = "listener"
     api_armor_backend_ids_raw = get_setting(db, "api_armor_backend_ids", settings.API_ARMOR_BACKEND_IDS) or "[]"
     try:
-        api_armor_backend_ids = [int(x) for x in json.loads(api_armor_backend_ids_raw) if isinstance(x, (int, str)) and str(x).isdigit()]
-    except (json.JSONDecodeError, TypeError):
+        api_armor_backend_ids = [
+            int(x) for x in json.loads(api_armor_backend_ids_raw) if isinstance(x, (int, str)) and str(x).isdigit()
+        ]
+    except json.JSONDecodeError, TypeError:
         api_armor_backend_ids = []
     api_armor_path_patterns_raw = get_setting(db, "api_armor_path_patterns", settings.API_ARMOR_PATH_PATTERNS) or "[]"
     try:
         api_armor_path_patterns = [str(x) for x in json.loads(api_armor_path_patterns_raw) if x]
-    except (json.JSONDecodeError, TypeError):
+    except json.JSONDecodeError, TypeError:
         api_armor_path_patterns = []
 
     # Defensive guard: API Armor depends on req_fp subfields at runtime
@@ -4225,12 +4567,20 @@ def generate_config(
     if compression_enabled_override is not None:
         compression_enabled = compression_enabled_override
     else:
-        compression_enabled = get_setting(db, "compression_enabled", str(settings.COMPRESSION_ENABLED)).lower() in ("true", "1", "yes")
+        compression_enabled = get_setting(db, "compression_enabled", str(settings.COMPRESSION_ENABLED)).lower() in (
+            "true",
+            "1",
+            "yes",
+        )
 
     # Disk cache toggle (DB setting with env fallback) — gates the disk cache
     # (file-backed) option per-backend. Memory cache (HAProxy native) is always
     # available and does not require this toggle.
-    disk_cache_enabled = get_setting(db, "disk_cache_enabled", str(settings.DISK_CACHE_ENABLED)).lower() in ("true", "1", "yes")
+    disk_cache_enabled = get_setting(db, "disk_cache_enabled", str(settings.DISK_CACHE_ENABLED)).lower() in (
+        "true",
+        "1",
+        "yes",
+    )
 
     # Response transform toggle (DB setting with env fallback) — loads the
     # haproxy-resp-transform Rust Lua module globally and gates replace/inject/mask
@@ -4238,7 +4588,9 @@ def generate_config(
     if resp_transform_enabled_override is not None:
         resp_transform_enabled = resp_transform_enabled_override
     else:
-        resp_transform_enabled = get_setting(db, "resp_transform_enabled", str(settings.RESP_TRANSFORM_ENABLED)).lower() in ("true", "1", "yes")
+        resp_transform_enabled = get_setting(
+            db, "resp_transform_enabled", str(settings.RESP_TRANSFORM_ENABLED)
+        ).lower() in ("true", "1", "yes")
 
     # Image conversion toggle (DB setting with env fallback) — loads the
     # haproxy-img-2-webp Rust Lua module globally and gates per-backend
@@ -4247,10 +4599,15 @@ def generate_config(
     if img_2_webp_enabled_override is not None:
         img_2_webp_enabled = img_2_webp_enabled_override
     else:
-        img_2_webp_enabled = get_setting(db, "img_2_webp_enabled", str(settings.IMG_2_WEBP_ENABLED)).lower() in ("true", "1", "yes")
+        img_2_webp_enabled = get_setting(db, "img_2_webp_enabled", str(settings.IMG_2_WEBP_ENABLED)).lower() in (
+            "true",
+            "1",
+            "yes",
+        )
 
     # Page Protect toggle + report path (DB setting with env fallback)
-    from .page_protect import is_page_protect_enabled, get_report_path, get_beacon_settings
+    from .page_protect import get_beacon_settings, get_report_path, is_page_protect_enabled
+
     page_protect_enabled = is_page_protect_enabled(db)
     page_protect_report_path = get_report_path(db)
     page_protect_beacon = get_beacon_settings(db) if page_protect_enabled else None
@@ -4266,7 +4623,20 @@ def generate_config(
         frontend_names, backend_names, stats_name, coraza_name = _get_section_names(db)
 
     config = "# Generated by coreX Manager\n# Do not edit manually\n\n"
-    config += generate_global_section(ciphers, global_options, ja4_enabled=ja4_enabled, compression_enabled=compression_enabled, disk_cache_enabled=disk_cache_enabled, resp_transform_enabled=resp_transform_enabled, img_2_webp_enabled=img_2_webp_enabled, captcha_challenge_enabled=_any_listener_has_challenge(db), api_armor_enabled=api_armor_enabled, req_fp_enabled=req_fp_enabled, quic_enabled=_any_listener_has_quic(db), db=db)
+    config += generate_global_section(
+        ciphers,
+        global_options,
+        ja4_enabled=ja4_enabled,
+        compression_enabled=compression_enabled,
+        disk_cache_enabled=disk_cache_enabled,
+        resp_transform_enabled=resp_transform_enabled,
+        img_2_webp_enabled=img_2_webp_enabled,
+        captcha_challenge_enabled=_any_listener_has_challenge(db),
+        api_armor_enabled=api_armor_enabled,
+        req_fp_enabled=req_fp_enabled,
+        quic_enabled=_any_listener_has_quic(db),
+        db=db,
+    )
     # HA peers section (stick-table replication) — only emitted when HA is
     # enabled and ≥2 HAProxy instances are configured. Empty string otherwise.
     config += ha_service.generate_peers_section(db)
@@ -4279,7 +4649,7 @@ def generate_config(
     config += generate_cache_sections(db, img_2_webp_enabled=img_2_webp_enabled)
 
     # Build a map of backend_id → cache section name for use in generate_backend.
-    cache_section_names: Dict[int, str] = {}
+    cache_section_names: dict[int, str] = {}
     used: set = set(backend_names.values()) if backend_names else set()
     for cc in db.query(CacheConfig).filter(CacheConfig.haproxy_enabled == True).all():  # noqa: E712
         backend = db.get(Backend, cc.backend_id)
@@ -4290,12 +4660,25 @@ def generate_config(
     for listener in listeners:
         if listener.enabled:
             config += generate_frontend(
-                listener, db, frontend_names=frontend_names, backend_names=backend_names,
-                req_fp_enabled=req_fp_enabled, req_fp_parse_body=req_fp_parse_body, req_fp_max_body_bytes=req_fp_max_body_bytes, req_fp_enforce_max_body=req_fp_enforce_max_body,
-                page_protect_enabled=page_protect_enabled, page_protect_report_path=page_protect_report_path, page_protect_beacon=page_protect_beacon,
-                api_armor_enabled=api_armor_enabled, api_armor_max_body_bytes=api_armor_max_body_bytes,
-                api_armor_scope=api_armor_scope, api_armor_backend_ids=api_armor_backend_ids, api_armor_path_patterns=api_armor_path_patterns,
-                ja4_enabled=ja4_enabled, disk_cache_enabled=disk_cache_enabled, server_timing_metrics_enabled=server_timing_metrics_enabled,
+                listener,
+                db,
+                frontend_names=frontend_names,
+                backend_names=backend_names,
+                req_fp_enabled=req_fp_enabled,
+                req_fp_parse_body=req_fp_parse_body,
+                req_fp_max_body_bytes=req_fp_max_body_bytes,
+                req_fp_enforce_max_body=req_fp_enforce_max_body,
+                page_protect_enabled=page_protect_enabled,
+                page_protect_report_path=page_protect_report_path,
+                page_protect_beacon=page_protect_beacon,
+                api_armor_enabled=api_armor_enabled,
+                api_armor_max_body_bytes=api_armor_max_body_bytes,
+                api_armor_scope=api_armor_scope,
+                api_armor_backend_ids=api_armor_backend_ids,
+                api_armor_path_patterns=api_armor_path_patterns,
+                ja4_enabled=ja4_enabled,
+                disk_cache_enabled=disk_cache_enabled,
+                server_timing_metrics_enabled=server_timing_metrics_enabled,
             )
 
     for app in fcgi_apps:
@@ -4303,11 +4686,21 @@ def generate_config(
 
     for backend in backends:
         config += generate_backend(
-            backend, db, backend_names=backend_names, page_protect_enabled=page_protect_enabled, compression_enabled=compression_enabled,
-            disk_cache_enabled=disk_cache_enabled, cache_section_names=cache_section_names, resp_transform_enabled=resp_transform_enabled,
-            img_2_webp_enabled=img_2_webp_enabled, page_protect_beacon=page_protect_beacon,
-            api_armor_enabled=api_armor_enabled, api_armor_scope=api_armor_scope, api_armor_backend_ids=api_armor_backend_ids,
-            api_armor_path_patterns=api_armor_path_patterns, api_armor_max_body_bytes=api_armor_max_body_bytes,
+            backend,
+            db,
+            backend_names=backend_names,
+            page_protect_enabled=page_protect_enabled,
+            compression_enabled=compression_enabled,
+            disk_cache_enabled=disk_cache_enabled,
+            cache_section_names=cache_section_names,
+            resp_transform_enabled=resp_transform_enabled,
+            img_2_webp_enabled=img_2_webp_enabled,
+            page_protect_beacon=page_protect_beacon,
+            api_armor_enabled=api_armor_enabled,
+            api_armor_scope=api_armor_scope,
+            api_armor_backend_ids=api_armor_backend_ids,
+            api_armor_path_patterns=api_armor_path_patterns,
+            api_armor_max_body_bytes=api_armor_max_body_bytes,
         )
 
     # WAF rate-limit stick-table backends for non-src rate keys
@@ -4340,7 +4733,11 @@ def generate_config(
         config += generate_cap_proxy_backends(db)
 
     # MCP Gateway — backend + internal upstreams (only when feature is enabled)
-    mcp_enabled = get_setting(db, "mcp_gateway_enabled", str(settings.MCP_GATEWAY_ENABLED)).lower() in ("true", "1", "yes")
+    mcp_enabled = get_setting(db, "mcp_gateway_enabled", str(settings.MCP_GATEWAY_ENABLED)).lower() in (
+        "true",
+        "1",
+        "yes",
+    )
     if mcp_enabled:
         config += generate_mcp_gateway_backend(db)
         config += generate_mcp_upstreams(db)
@@ -4358,6 +4755,7 @@ def generate_config(
     # source can parse the frames (non-transparent/legacy framing causes
     # "unable to parse input as valid syslog message" errors in Vector).
     from .vector_pipeline import corex_source_enabled, vector_syslog_target
+
     if corex_source_enabled(db):
         target = vector_syslog_target()
         config += (
@@ -4383,6 +4781,7 @@ def generate_mcp_gateway_backend(db: Session) -> str:
     ``mcp-gateway:8081``; ``"rust"`` routes to ``mcp-gateway-rs:8089``.
     """
     from .settings import get_setting
+
     backend_choice = get_setting(db, "mcp_gateway_backend", settings.MCP_GATEWAY_BACKEND).lower()
     if backend_choice in ("rust", "rs", "mcp-gateway-rs"):
         host = settings.MCP_GATEWAY_RS_INTERNAL_HOST
@@ -4415,8 +4814,8 @@ def generate_mcp_upstreams(db: Session) -> str:
     Only emitted when at least one enabled McpServer has enabled replicas.
     Single-replica servers use McpServer.url directly (no internal config).
     """
-    from .mcp_config import get_multi_replica_servers
     from ..models.models import McpServerReplica
+    from .mcp_config import get_multi_replica_servers
 
     multi_servers = get_multi_replica_servers(db)
     if not multi_servers:
@@ -4444,10 +4843,14 @@ def generate_mcp_upstreams(db: Session) -> str:
     # One backend per multi-replica server
     for server in multi_servers:
         ns = _safe_name(server.namespace)
-        replicas = db.query(McpServerReplica).filter(
-            McpServerReplica.server_id == server.id,
-            McpServerReplica.enabled == True,  # noqa: E712
-        ).all()
+        replicas = (
+            db.query(McpServerReplica)
+            .filter(
+                McpServerReplica.server_id == server.id,
+                McpServerReplica.enabled == True,  # noqa: E712
+            )
+            .all()
+        )
 
         be_lines = [
             f"\nbackend mcp_up_{ns}",
@@ -4460,6 +4863,7 @@ def generate_mcp_upstreams(db: Session) -> str:
 
         # Primary server line
         from urllib.parse import urlparse
+
         parsed = urlparse(server.url)
         scheme = "https" if parsed.scheme == "https" else "http"
         verify_str = "ssl verify" if server.verify_tls and scheme == "https" else ""
@@ -4488,7 +4892,7 @@ def generate_mcp_upstreams(db: Session) -> str:
                 r_host_port = f"{r_parsed.hostname}:443"
             else:
                 r_host_port = f"{r_parsed.hostname}:80"
-            be_lines.append(f"    server replica_{i+1} {r_scheme}://{r_host_port} check {r_verify}".rstrip())
+            be_lines.append(f"    server replica_{i + 1} {r_scheme}://{r_host_port} check {r_verify}".rstrip())
 
         sections.append("\n".join(be_lines) + "\n")
 
@@ -4498,6 +4902,7 @@ def generate_mcp_upstreams(db: Session) -> str:
 def _generate_waf_rate_backends(db: Session) -> str:
     """Emit string-type stick-table backends for WAF rules with non-src rate keys."""
     from . import coraza_config
+
     sections = []
     seen_names = set()
     for listener in db.query(Listener).all():
@@ -4541,21 +4946,14 @@ def _generate_rl_rate_backends(db: Session) -> str:
     for listener in db.query(Listener).all():
         if not listener.enabled:
             continue
-        listener_rls = [
-            rl for rl in db.query(RateLimit).all()
-            if _matches_listener(rl, listener) and rl.enabled
-        ]
+        listener_rls = [rl for rl in db.query(RateLimit).all() if _matches_listener(rl, listener) and rl.enabled]
+
         # Use the resolved track expression — ASN may fall back to src
         def _rl_is_src(rl):
             return _rate_key_track_expr(getattr(rl, "rate_key", "src"), getattr(rl, "rate_header", None)) == "src"
-        needs_http_req = any(
-            rl.limit_type in ("basic", "advanced") and not _rl_is_src(rl)
-            for rl in listener_rls
-        )
-        needs_gpc0 = any(
-            rl.limit_type == "waf" and not _rl_is_src(rl)
-            for rl in listener_rls
-        )
+
+        needs_http_req = any(rl.limit_type in ("basic", "advanced") and not _rl_is_src(rl) for rl in listener_rls)
+        needs_gpc0 = any(rl.limit_type == "waf" and not _rl_is_src(rl) for rl in listener_rls)
         if not (needs_http_req or needs_gpc0):
             continue
         lname = _safe_name(listener.name)
@@ -4566,15 +4964,20 @@ def _generate_rl_rate_backends(db: Session) -> str:
         stores = []
         max_window = 60
         if needs_http_req:
-            windows = [rl.window_seconds for rl in listener_rls
-                       if rl.limit_type in ("basic", "advanced")
-                       and _safe_token(getattr(rl, "rate_key", "src") or "src") != "src"]
+            windows = [
+                rl.window_seconds
+                for rl in listener_rls
+                if rl.limit_type in ("basic", "advanced")
+                and _safe_token(getattr(rl, "rate_key", "src") or "src") != "src"
+            ]
             max_window = max(windows) if windows else 60
             stores.append(f"http_req_rate({max_window}s)")
         if needs_gpc0:
-            waf_windows = [rl.window_seconds for rl in listener_rls
-                           if rl.limit_type == "waf"
-                           and _safe_token(getattr(rl, "rate_key", "src") or "src") != "src"]
+            waf_windows = [
+                rl.window_seconds
+                for rl in listener_rls
+                if rl.limit_type == "waf" and _safe_token(getattr(rl, "rate_key", "src") or "src") != "src"
+            ]
             waf_max = max(waf_windows) if waf_windows else 60
             max_window = max(max_window, waf_max)
             stores.append(f"gpc0_rate({waf_max}s)")
@@ -4595,6 +4998,7 @@ def _generate_block_tables(db: Session) -> str:
     listener.
     """
     from . import coraza_config
+
     sections = []
     seen_names = set()
     for listener in db.query(Listener).all():
@@ -4692,7 +5096,7 @@ def _generate_resp_code_tables(db: Session) -> str:
     return "".join(sections)
 
 
-def _generate_beacon_trust_tables(db: Optional[Session] = None) -> str:
+def _generate_beacon_trust_tables(db: Session | None = None) -> str:
     """Emit stick-table backends for beacon trust (IP trust via Page Protect beacon).
 
     Two tables are always emitted (even when Page Protect beacon is disabled) so
@@ -4720,31 +5124,40 @@ def _generate_beacon_trust_tables(db: Optional[Session] = None) -> str:
 
 def write_config(
     db: Session,
-    created_by: Optional[str] = None,
-    previous_config: Optional[str] = None,
-    comment: Optional[str] = None,
+    created_by: str | None = None,
+    previous_config: str | None = None,
+    comment: str | None = None,
 ) -> str:
     print("[WRITE_CONFIG] step 1 — generate_config", flush=True)
     logger.info("write_config: step 1 — generate_config")
     frontend_names, backend_names, stats_name, coraza_name = _get_section_names(db)
-    config = generate_config(db, frontend_names=frontend_names, backend_names=backend_names, stats_name=stats_name, coraza_name=coraza_name)
+    config = generate_config(
+        db, frontend_names=frontend_names, backend_names=backend_names, stats_name=stats_name, coraza_name=coraza_name
+    )
 
     logger.info("write_config: step 2 — write_security_list_files")
     from .security_lists import write_security_list_files
+
     write_security_list_files(db)
 
     logger.info("write_config: step 2b — write_risk_rules_data_file")
     try:
         from .risk_scoring import write_risk_rules_data_file
+
         write_risk_rules_data_file(db)
     except Exception as e:
         logger.warning("Failed to write risk rules data file: %s", e)
 
     logger.info("write_config: step 3 — MCP config bundle")
     try:
-        from .mcp_config import write_config_bundle, write_applied_mcp_bundle
+        from .mcp_config import write_applied_mcp_bundle, write_config_bundle
         from .settings import get_setting as _mcp_get_setting
-        mcp_on = _mcp_get_setting(db, "mcp_gateway_enabled", str(settings.MCP_GATEWAY_ENABLED)).lower() in ("true", "1", "yes")
+
+        mcp_on = _mcp_get_setting(db, "mcp_gateway_enabled", str(settings.MCP_GATEWAY_ENABLED)).lower() in (
+            "true",
+            "1",
+            "yes",
+        )
         if mcp_on:
             write_config_bundle(db)
             write_applied_mcp_bundle(db)
@@ -4753,11 +5166,13 @@ def write_config(
 
     logger.info("write_config: step 4 — resp_transform_files")
     from .resp_transform import write_resp_transform_files
+
     write_resp_transform_files(db)
 
     logger.info("write_config: step 4b — write_api_armor_files")
     try:
         from .api_armor_writer import write_api_armor_files
+
         write_api_armor_files(db)
     except Exception as e:
         logger.warning("Failed to write API Armor data files: %s", e)
@@ -4768,6 +5183,7 @@ def write_config(
     # is only present in the HAProxy build context, not the backend container.
     try:
         from .page_protect_beacon_js import BEACON_JS
+
         beacon_dest = settings.PAGE_PROTECT_BEACON_JS_PATH
         os.makedirs(os.path.dirname(beacon_dest) or ".", exist_ok=True)
         with open(beacon_dest, "w") as f:
@@ -4776,8 +5192,8 @@ def write_config(
         logger.warning("Failed to write beacon JS file: %s", e)
 
     logger.info("write_config: step 5 — coraza config")
-    waf_configs: Optional[Dict[str, str]] = None
-    previous_waf_configs: Optional[Dict[str, str]] = None
+    waf_configs: dict[str, str] | None = None
+    previous_waf_configs: dict[str, str] | None = None
     if settings.CORAZA_SPOA_ENABLED:
         previous_waf_configs = {}
         waf_configs = {}
@@ -4805,7 +5221,7 @@ def write_config(
     if previous_config is not None:
         old_config = previous_config
     elif os.path.exists(applied_path):
-        with open(applied_path, "r") as f:
+        with open(applied_path) as f:
             old_config = f.read()
     with open(path, "w") as f:
         f.write(config)
@@ -4823,6 +5239,7 @@ def write_config(
     logger.info("write_config: step 7b — vector.toml")
     try:
         from .vector_pipeline import write_vector_config
+
         write_vector_config(db)
     except Exception as e:
         logger.warning("Failed to write vector.toml: %s", e)
@@ -4830,14 +5247,20 @@ def write_config(
     print("[WRITE_CONFIG] step 8 — varnish VCL", flush=True)
     logger.info("write_config: step 8 — varnish VCL")
     from .settings import get_setting as _get_setting
-    disk_cache_on = _get_setting(db, "disk_cache_enabled", str(settings.DISK_CACHE_ENABLED)).lower() in ("true", "1", "yes")
-    varnish_config: Optional[str] = None
-    previous_varnish_config: Optional[str] = None
+
+    disk_cache_on = _get_setting(db, "disk_cache_enabled", str(settings.DISK_CACHE_ENABLED)).lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+    varnish_config: str | None = None
+    previous_varnish_config: str | None = None
     if disk_cache_on:
         any_disk = db.query(CacheConfig).filter(CacheConfig.disk_cache_enabled == True).first()  # noqa: E712
         if any_disk:
             try:
                 from . import varnish
+
                 previous_varnish_config = _read_file(settings.VARNISH_VCL_PATH)
                 varnish_config = varnish.write_vcl(db)
             except Exception as exc:
@@ -4879,13 +5302,14 @@ def write_config(
     # Lazy import: services.config imports this module at top level.
     try:
         from .config import invalidate_config_status
+
         invalidate_config_status()
     except Exception:
         pass
     return config
 
 
-def _haproxy_check_docker(config_path: str) -> Tuple[bool, str]:
+def _haproxy_check_docker(config_path: str) -> tuple[bool, str]:
     """Run haproxy -c inside the running haproxy container via the runtime backend.
 
     Delegates to ``get_runtime().validate_haproxy_config()`` which dispatches
@@ -4899,7 +5323,7 @@ def _haproxy_check_docker(config_path: str) -> Tuple[bool, str]:
     return runtime.validate_haproxy_config(config_path)
 
 
-def _haproxy_check_local(config_path: str) -> Tuple[bool, str]:
+def _haproxy_check_local(config_path: str) -> tuple[bool, str]:
     """Fallback: validate against a locally installed haproxy binary."""
     haproxy_bin = shutil.which("haproxy")
     if not haproxy_bin:
@@ -4907,7 +5331,9 @@ def _haproxy_check_local(config_path: str) -> Tuple[bool, str]:
     try:
         result = subprocess.run(
             [haproxy_bin, "-c", "-f", config_path],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         output = (result.stdout or "") + (result.stderr or "")
         return result.returncode == 0, output.strip()
@@ -4917,13 +5343,14 @@ def _haproxy_check_local(config_path: str) -> Tuple[bool, str]:
         return False, f"haproxy local check failed: {e}"
 
 
-def validate_config_text(config_text: str) -> Tuple[bool, str]:
+def validate_config_text(config_text: str) -> tuple[bool, str]:
     """Validate a HAProxy config string using the haproxy container if available.
 
     Returns a tuple of (is_valid, details) where details is any stdout/stderr
     from the HAProxy check, in particular the error messages on failure.
     """
     import tempfile
+
     data_dir = os.path.dirname(settings.HAPROXY_CONFIG_PATH)
     with tempfile.NamedTemporaryFile("w", suffix=".cfg", delete=False, dir=data_dir) as f:
         f.write(config_text)
@@ -4942,7 +5369,7 @@ def validate_config_text(config_text: str) -> Tuple[bool, str]:
             pass
 
 
-def validate_config() -> Tuple[bool, str]:
+def validate_config() -> tuple[bool, str]:
     """Validate the current HAProxy config file.
 
     Returns (is_valid, details) where details is the HAProxy output on failure
@@ -4976,7 +5403,7 @@ def _send_master_command(cmd: str) -> str:
             while True:
                 try:
                     chunk = s.recv(4096)
-                except socket.timeout:
+                except TimeoutError:
                     break
                 if not chunk:
                     break
@@ -5026,15 +5453,23 @@ def reload_haproxy() -> dict:
             logger.info("reload_haproxy: dataplane reload ok")
             result = dp_result
         else:
-            logger.warning("reload_haproxy: dataplane reload failed (%s), falling back to socket", dp_result.get("message"))
+            logger.warning(
+                "reload_haproxy: dataplane reload failed (%s), falling back to socket", dp_result.get("message")
+            )
             logger.info("reload_haproxy: step 3 — _socket_reload (fallback)")
             socket_result = _socket_reload()
             if socket_result.get("status") == "ok":
                 logger.info("reload_haproxy: socket reload ok")
-                result = {**socket_result, "message": f"{socket_result['message']} (Data Plane API fallback: {dp_result.get('message')})"}
+                result = {
+                    **socket_result,
+                    "message": f"{socket_result['message']} (Data Plane API fallback: {dp_result.get('message')})",
+                }
             else:
                 logger.error("reload_haproxy: both dataplane and socket reload failed")
-                return {"status": "error", "message": f"{dp_result.get('message')}; socket fallback: {socket_result.get('message')}"}
+                return {
+                    "status": "error",
+                    "message": f"{dp_result.get('message')}; socket fallback: {socket_result.get('message')}",
+                }
     else:
         print("[RELOAD] step 2 — _socket_reload", flush=True)
         logger.info("reload_haproxy: step 2 — _socket_reload")
@@ -5049,8 +5484,10 @@ def reload_haproxy() -> dict:
     if result.get("status") == "ok":
         try:
             import time as _time
+
             _time.sleep(2)
             from .beacon_trust_persist import seed_beacon_trust_table
+
             seed_beacon_trust_table()
         except Exception as exc:
             logger.warning("beacon_trust re-seed after reload failed: %s", exc)
@@ -5093,12 +5530,12 @@ def _jsonable(value: Any) -> Any:
     return value
 
 
-def _serialize_row(row: Any, table: Table) -> Dict[str, Any]:
+def _serialize_row(row: Any, table: Table) -> dict[str, Any]:
     return {col.name: _jsonable(row[col.name]) for col in table.columns}
 
 
-def _build_db_snapshot(db: Session) -> Dict[str, List[Dict[str, Any]]]:
-    snapshot: Dict[str, List[Dict[str, Any]]] = {}
+def _build_db_snapshot(db: Session) -> dict[str, list[dict[str, Any]]]:
+    snapshot: dict[str, list[dict[str, Any]]] = {}
     for table in Base.metadata.tables.values():
         if table.name in _SNAPSHOT_EXCLUDED:
             continue
@@ -5111,7 +5548,7 @@ def _build_db_snapshot(db: Session) -> Dict[str, List[Dict[str, Any]]]:
     return snapshot
 
 
-def _write_db_snapshot(snapshot: Dict[str, List[Dict[str, Any]]], path: str) -> None:
+def _write_db_snapshot(snapshot: dict[str, list[dict[str, Any]]], path: str) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:
         json.dump(snapshot, f, indent=2, default=str)
@@ -5119,24 +5556,21 @@ def _write_db_snapshot(snapshot: Dict[str, List[Dict[str, Any]]], path: str) -> 
 
 def _max_snapshots(db: Session) -> int:
     from ..services.settings import get_setting
+
     try:
         return int(get_setting(db, "max_snapshots", "10") or 10)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return 10
 
 
 def _prune_snapshots(db: Session) -> None:
     from ..models.models import ConfigSnapshot
+
     max_keep = _max_snapshots(db)
     total = db.query(ConfigSnapshot).count()
     if total <= max_keep:
         return
-    to_remove = (
-        db.query(ConfigSnapshot)
-        .order_by(ConfigSnapshot.created_at.desc())
-        .offset(max_keep)
-        .all()
-    )
+    to_remove = db.query(ConfigSnapshot).order_by(ConfigSnapshot.created_at.desc()).offset(max_keep).all()
     for snap in to_remove:
         # Delete the dated snapshot file on disk to save space, but KEEP the
         # ConfigSnapshot DB record. Audit events reference it via snapshot_id
@@ -5153,9 +5587,9 @@ def _prune_snapshots(db: Session) -> None:
         db.commit()
 
 
-def _build_snapshot_diff(configs: Dict[str, str], previous: Dict[str, str]) -> str:
+def _build_snapshot_diff(configs: dict[str, str], previous: dict[str, str]) -> str:
     """Build a combined unified diff for all generated files (HAProxy + WAF)."""
-    parts: List[str] = []
+    parts: list[str] = []
     for label, current in configs.items():
         old = previous.get(label) or ""
         diff = "\n".join(
@@ -5175,13 +5609,13 @@ def _build_snapshot_diff(configs: Dict[str, str], previous: Dict[str, str]) -> s
 def save_config_snapshot(
     db: Session,
     config_text: str,
-    previous_config: Optional[str] = None,
-    waf_configs: Optional[Dict[str, str]] = None,
-    previous_waf_configs: Optional[Dict[str, str]] = None,
-    varnish_config: Optional[str] = None,
-    previous_varnish_config: Optional[str] = None,
-    created_by: Optional[str] = None,
-    comment: Optional[str] = None,
+    previous_config: str | None = None,
+    waf_configs: dict[str, str] | None = None,
+    previous_waf_configs: dict[str, str] | None = None,
+    varnish_config: str | None = None,
+    previous_varnish_config: str | None = None,
+    created_by: str | None = None,
+    comment: str | None = None,
 ) -> ConfigSnapshot:
     """Persist a JSON snapshot of all configuration tables.
 
@@ -5194,7 +5628,7 @@ def save_config_snapshot(
     print("[SNAPSHOT] building db snapshot", flush=True)
     snapshot = _build_db_snapshot(db)
     print(f"[SNAPSHOT] db snapshot done: {len(snapshot)} tables", flush=True)
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S_%f")
+    timestamp = datetime.now(UTC).strftime("%Y%m%d%H%M%S_%f")
     snapshot_dir = _snapshots_dir()
     dated_path = os.path.join(snapshot_dir, f"snapshot_{timestamp}.json")
 
@@ -5203,8 +5637,8 @@ def save_config_snapshot(
     _write_db_snapshot(snapshot, dated_path)
     print("[SNAPSHOT] snapshot files written", flush=True)
 
-    configs: Dict[str, str] = {"haproxy.cfg": config_text}
-    previous: Dict[str, str] = {"haproxy.cfg": previous_config or ""}
+    configs: dict[str, str] = {"haproxy.cfg": config_text}
+    previous: dict[str, str] = {"haproxy.cfg": previous_config or ""}
     if waf_configs:
         configs.update(waf_configs)
         previous.update(previous_waf_configs or {})
@@ -5231,7 +5665,8 @@ def save_config_snapshot(
     # The audit log uses this (not snapshot_id FKs) to determine which
     # events are pending vs applied — see audit_events.py.
     from .settings import set_setting as _set_setting
-    _set_setting(db, "last_applied_at", (record.created_at or datetime.now(timezone.utc)).isoformat())
+
+    _set_setting(db, "last_applied_at", (record.created_at or datetime.now(UTC)).isoformat())
     print("[SNAPSHOT] last_applied_at set", flush=True)
 
     print("[SNAPSHOT] pruning old snapshots", flush=True)
@@ -5253,7 +5688,7 @@ def _parse_value(value: Any, col: Any) -> Any:
     return value
 
 
-def _reset_sequences(db: Session, snapshot: Dict[str, List[Dict[str, Any]]]) -> None:
+def _reset_sequences(db: Session, snapshot: dict[str, list[dict[str, Any]]]) -> None:
     """Reset auto-increment sequences after a snapshot restore.
 
     On SQLite, updates the sqlite_sequence table so the next insert doesn't
@@ -5288,13 +5723,9 @@ def _reset_sequences(db: Session, snapshot: Dict[str, List[Dict[str, Any]]]) -> 
             pk_col = next((c for c in table.columns if c.name == "id"), None)
             if pk_col is None:
                 continue
-            seq_result = db.execute(text(
-                f"SELECT pg_get_serial_sequence('{table.name}', 'id')"
-            )).scalar()
+            seq_result = db.execute(text(f"SELECT pg_get_serial_sequence('{table.name}', 'id')")).scalar()
             if seq_result:
-                db.execute(text(
-                    f"SELECT setval('{seq_result}', {max(ids)}, true)"
-                ))
+                db.execute(text(f"SELECT setval('{seq_result}', {max(ids)}, true)"))
         db.commit()
 
 
@@ -5310,9 +5741,7 @@ def _clear_excluded_table_fks(db: Session) -> None:
     For nullable FKs: SET NULL (preserves observational data, detaches from config).
     For non-nullable FKs: DELETE the rows (can't preserve them without the parent).
     """
-    included_table_names = {
-        t.name for t in Base.metadata.sorted_tables if t.name not in _SNAPSHOT_EXCLUDED
-    }
+    included_table_names = {t.name for t in Base.metadata.sorted_tables if t.name not in _SNAPSHOT_EXCLUDED}
     for table in Base.metadata.sorted_tables:
         if table.name not in _SNAPSHOT_EXCLUDED:
             continue
@@ -5327,13 +5756,13 @@ def _clear_excluded_table_fks(db: Session) -> None:
                 db.execute(table.delete())
 
 
-def load_config_snapshot(db: Session, path: Optional[str] = None) -> None:
+def load_config_snapshot(db: Session, path: str | None = None) -> None:
     """Restore configuration tables from a saved JSON snapshot."""
     path = path or _snapshot_path()
     if not os.path.exists(path):
         raise FileNotFoundError(f"No configuration snapshot exists at {path}")
 
-    with open(path, "r") as f:
+    with open(path) as f:
         snapshot = json.load(f)
 
     sorted_tables = list(Base.metadata.sorted_tables)
@@ -5365,16 +5794,17 @@ def load_config_snapshot(db: Session, path: Optional[str] = None) -> None:
     _reset_sequences(db, snapshot)
 
 
-def revert_to_applied_config(db: Session, created_by: Optional[str] = None) -> Dict[str, Any]:
+def revert_to_applied_config(db: Session, created_by: str | None = None) -> dict[str, Any]:
     """Restore the database to the last applied configuration and reload HAProxy."""
     load_config_snapshot(db)
     write_config(db, created_by=created_by)
     return reload_haproxy()
 
 
-def rollback_to_snapshot(db: Session, snapshot_id: int, created_by: Optional[str] = None) -> Dict[str, Any]:
+def rollback_to_snapshot(db: Session, snapshot_id: int, created_by: str | None = None) -> dict[str, Any]:
     """Restore the database to a named ConfigSnapshot and reload HAProxy."""
     from ..models.models import ConfigSnapshot
+
     snap = db.get(ConfigSnapshot, snapshot_id)
     if not snap:
         raise ValueError(f"Snapshot {snapshot_id} not found")

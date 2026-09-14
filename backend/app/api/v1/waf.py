@@ -1,35 +1,34 @@
 """WAF rule, exception, CRS, and snapshot endpoints."""
-import json
+
 import os
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile, status
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from typing import Any
+
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
-from starlette.background import BackgroundTask
-from ..deps import get_current_user, get_db, oauth2_scheme, require_admin, require_write, rate_limit, rate_limit_by_ip
+
 from ...core.config import get_settings
 from ...models.models import *
 from ...schemas.settings import SettingCreate, SettingResponse
 from ...schemas.waf import *
 from ...services.coraza_config import *
-from ...services.haproxy import reload_haproxy, write_config
 from ...services.settings import get_setting, set_setting
-from ...services.tasks import get_task, queue_task
-from ...services.waf_metrics import get_waf_metrics
+from ..deps import get_current_user, get_db, rate_limit, rate_limit_by_ip, require_admin, require_write
 
 settings = get_settings()
 router = APIRouter()
 
 
 # WAF
-@router.get("/waf-rules", response_model=List[WafRuleResponse])
+@router.get("/waf-rules", response_model=list[WafRuleResponse])
 def list_waf_rules(db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
     return db.query(WafRule).all()
 
 
 @router.post("/waf-rules", response_model=WafRuleResponse)
-def create_waf_rule(r: WafRuleCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def create_waf_rule(
+    r: WafRuleCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     obj = WafRule(**r.model_dump())
     db.add(obj)
     db.commit()
@@ -38,7 +37,9 @@ def create_waf_rule(r: WafRuleCreate, db: Session = Depends(get_db), user=Depend
 
 
 @router.put("/waf-rules/{rid}", response_model=WafRuleResponse)
-def update_waf_rule(rid: int, r_in: WafRuleUpdate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def update_waf_rule(
+    rid: int, r_in: WafRuleUpdate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     obj = db.get(WafRule, rid)
     if not obj:
         raise HTTPException(status_code=404, detail="WAF rule not found")
@@ -59,13 +60,15 @@ def delete_waf_rule(rid: int, db: Session = Depends(get_db), user=Depends(requir
     return {"status": "ok"}
 
 
-@router.get("/waf-exceptions", response_model=List[WafExceptionResponse])
+@router.get("/waf-exceptions", response_model=list[WafExceptionResponse])
 def list_waf_exceptions(db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
     return db.query(WafException).all()
 
 
 @router.post("/waf-exceptions", response_model=WafExceptionResponse)
-def create_waf_exception(e: WafExceptionCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def create_waf_exception(
+    e: WafExceptionCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     obj = WafException(**e.model_dump())
     db.add(obj)
     db.commit()
@@ -74,7 +77,13 @@ def create_waf_exception(e: WafExceptionCreate, db: Session = Depends(get_db), u
 
 
 @router.put("/waf-exceptions/{eid}", response_model=WafExceptionResponse)
-def update_waf_exception(eid: int, e_in: WafExceptionUpdate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def update_waf_exception(
+    eid: int,
+    e_in: WafExceptionUpdate,
+    db: Session = Depends(get_db),
+    user=Depends(require_write),
+    _=Depends(rate_limit),
+):
     obj = db.get(WafException, eid)
     if not obj:
         raise HTTPException(status_code=404, detail="Exception not found")
@@ -100,6 +109,7 @@ def get_waf_exception_options(db: Session = Depends(get_db), user=Depends(get_cu
     """Merged suggestion catalog (rule ids/tags/msgs/zones/variables) used to
     populate the exception editor's type-ahead fields."""
     from ...services.waf_exception_options import get_exception_options
+
     return get_exception_options(db)
 
 
@@ -107,6 +117,7 @@ def get_waf_exception_options(db: Session = Depends(get_db), user=Depends(get_cu
 def preview_waf_exception(e: WafExceptionPreviewRequest, user=Depends(get_current_user), _=Depends(rate_limit)):
     """Render the Coraza directives an exception would generate, without saving."""
     from ...services.coraza_config import _exception_lines
+
     obj = WafException(**e.model_dump())
     conditional, unconditional = _exception_lines([obj])
     return {"conditional": conditional, "unconditional": unconditional}
@@ -120,7 +131,7 @@ def get_captcha_challenge(
     _=Depends(rate_limit_by_ip),
 ):
     from ...core.valkey_client import cache_get, cache_set
-    from ...services.captcha_providers import get_provider, render_challenge_page, render_error_page
+    from ...services.captcha_providers import render_challenge_page, render_error_page
 
     cfg = get_settings()
     provider_name = get_setting(db, "captcha_provider", "cap") or "cap"
@@ -128,7 +139,9 @@ def get_captcha_challenge(
     site_key = _get_provider_site_key(db, provider_name, cfg)
     if not site_key:
         return HTMLResponse(
-            render_error_page("CAPTCHA Not Configured", "Set the site key and secret for the active captcha provider.", "", 503),
+            render_error_page(
+                "CAPTCHA Not Configured", "Set the site key and secret for the active captcha provider.", "", 503
+            ),
             status_code=503,
         )
     # Look up the challenge context from Valkey using the opaque token.
@@ -197,15 +210,15 @@ def get_captcha_challenge(
 async def verify_captcha(
     request: Request,
     cid: str = Form(""),
-    cap_token: Optional[str] = Form(None),
-    g_recaptcha_response: Optional[str] = Form(None, alias="g-recaptcha-response"),
-    cf_turnstile_response: Optional[str] = Form(None, alias="cf-turnstile-response"),
+    cap_token: str | None = Form(None),
+    g_recaptcha_response: str | None = Form(None, alias="g-recaptcha-response"),
+    cf_turnstile_response: str | None = Form(None, alias="cf-turnstile-response"),
     db: Session = Depends(get_db),
     _=Depends(rate_limit_by_ip),
 ):
     from ...core import valkey_client
     from ...core.valkey_client import cache_get
-    from ...services.captcha_providers import get_provider, render_error_page
+    from ...services.captcha_providers import render_error_page
 
     cfg = get_settings()
     # Require the server-side challenge context bound to this cid. The token
@@ -248,7 +261,12 @@ async def verify_captcha(
     if not secret:
         _log_challenge_event(db, rule_id, rule_type, rule_name, "failed", request_id=request_id or None)
         return HTMLResponse(
-            render_error_page("Verification Failed", "Captcha secret is not configured. Set the secret key for the active captcha provider.", request_id, 400),
+            render_error_page(
+                "Verification Failed",
+                "Captcha secret is not configured. Set the secret key for the active captcha provider.",
+                request_id,
+                400,
+            ),
             status_code=400,
         )
     if not token:
@@ -262,7 +280,9 @@ async def verify_captcha(
     except Exception as exc:
         _log_challenge_event(db, rule_id, rule_type, rule_name, "failed", request_id=request_id or None)
         return HTMLResponse(
-            render_error_page("Service Unavailable", f"Captcha verification service is temporarily unavailable.", request_id, 502),
+            render_error_page(
+                "Service Unavailable", f"Captcha verification service is temporarily unavailable.", request_id, 502
+            ),
             status_code=502,
         )
 
@@ -293,8 +313,10 @@ async def verify_captcha(
     # recomputes this hash from the live request and compares it to the stored
     # value, so a leaked cookie cannot be replayed from a different client.
     import secrets as _secrets
+
     from ...core.valkey_client import set_cv_token
     from ...services.captcha_providers import compute_cv_binding_hash
+
     cookie_token = _secrets.token_hex(32)
     client_ip = request.client.host if request.client else ""
     user_agent = request.headers.get("user-agent", "")
@@ -338,6 +360,7 @@ def _same_origin_redirect(url: str, request: Request) -> str:
     userinfo tricks like ``https://legit@evil``) falls back to ``"/"``.
     """
     from urllib.parse import urlparse
+
     try:
         parsed = urlparse(url)
     except Exception:
@@ -351,7 +374,7 @@ def _same_origin_redirect(url: str, request: Request) -> str:
     return url
 
 
-def _get_provider_site_key(db: Session, provider_name: str, cfg: Any) -> Optional[str]:
+def _get_provider_site_key(db: Session, provider_name: str, cfg: Any) -> str | None:
     """Return the site key for the active provider (settings table > env var)."""
     if provider_name == "cap":
         return get_setting(db, "cap_site_key") or cfg.CAPTCHA_SITE_KEY
@@ -362,7 +385,7 @@ def _get_provider_site_key(db: Session, provider_name: str, cfg: Any) -> Optiona
     return None
 
 
-def _get_provider_secret(db: Session, provider_name: str, cfg: Any) -> Optional[str]:
+def _get_provider_secret(db: Session, provider_name: str, cfg: Any) -> str | None:
     """Return the secret for the active provider (settings table > env var)."""
     if provider_name == "cap":
         return get_setting(db, "cap_secret") or cfg.CAPTCHA_SECRET
@@ -376,6 +399,7 @@ def _get_provider_secret(db: Session, provider_name: str, cfg: Any) -> Optional[
 def _build_provider(db: Session, provider_name: str, cfg: Any):
     """Build a provider instance, reading version/min_score for reCAPTCHA."""
     from ...services.captcha_providers import get_provider
+
     if provider_name == "recaptcha":
         version = get_setting(db, "recaptcha_version") or cfg.RECAPTCHA_VERSION or "v2"
         min_score = float(get_setting(db, "recaptcha_min_score") or cfg.RECAPTCHA_MIN_SCORE or 0.5)
@@ -383,7 +407,9 @@ def _build_provider(db: Session, provider_name: str, cfg: Any):
     return get_provider(provider_name)
 
 
-def _log_challenge_event(db: Session, rule_id: int, rule_type: str, rule_name: str, event_type: str, request_id: Optional[str] = None) -> None:
+def _log_challenge_event(
+    db: Session, rule_id: int, rule_type: str, rule_name: str, event_type: str, request_id: str | None = None
+) -> None:
     """Log a ChallengeEvent for per-rule solve rate statistics.
 
     Events without a rule association (rule_id <= 0) are dropped. Challenges
@@ -397,38 +423,44 @@ def _log_challenge_event(db: Session, rule_id: int, rule_type: str, rule_name: s
         return
     try:
         from ...models.waf import ChallengeEvent
+
         # If the rule name was not captured (e.g. Valkey context missing at
         # challenge-issue time), look it up from the source table so the stats
         # UI shows a human-readable label instead of "Rule #<id>".
         effective_name = rule_name or None
         if not effective_name and rule_id > 0:
             effective_name = _lookup_rule_name(db, rule_type, rule_id)
-        db.add(ChallengeEvent(
-            rule_type=rule_type,
-            rule_id=rule_id if rule_id > 0 else None,
-            rule_name=effective_name,
-            event_type=event_type,
-            client_ip=None,
-            request_id=request_id,
-        ))
+        db.add(
+            ChallengeEvent(
+                rule_type=rule_type,
+                rule_id=rule_id if rule_id > 0 else None,
+                rule_name=effective_name,
+                event_type=event_type,
+                client_ip=None,
+                request_id=request_id,
+            )
+        )
         db.commit()
     except Exception:
         db.rollback()
 
 
-def _lookup_rule_name(db: Session, rule_type: str, rule_id: int) -> Optional[str]:
+def _lookup_rule_name(db: Session, rule_type: str, rule_id: int) -> str | None:
     """Look up a rule's name by type and ID from the source table."""
     try:
         if rule_type == "waf":
             from ...models.waf import WafRule
+
             rule = db.query(WafRule).filter(WafRule.id == rule_id).first()
             return rule.name if rule else None
         elif rule_type == "security":
             from ...models.models import SecurityRule
+
             rule = db.query(SecurityRule).filter(SecurityRule.id == rule_id).first()
             return rule.name if rule else None
         elif rule_type == "rate_limit":
             from ...models.models import RateLimit
+
             rule = db.query(RateLimit).filter(RateLimit.id == rule_id).first()
             return rule.name if rule else None
     except Exception:
@@ -440,11 +472,12 @@ def _lookup_rule_name(db: Session, rule_type: str, rule_id: int) -> Optional[str
 def get_waf_logs(limit: int = Query(100, le=1000), user=Depends(get_current_user), _=Depends(rate_limit)):
     from ...core.config import get_settings
     from ...services.waf_metrics import _parse_line
+
     path = get_settings().CORAZA_SPOA_LOG_PATH
     if not os.path.exists(path):
         return {"events": []}
     try:
-        with open(path, "r", encoding="utf-8", errors="replace") as f:
+        with open(path, encoding="utf-8", errors="replace") as f:
             lines = f.readlines()
         events = []
         for line in lines[-limit:]:
@@ -462,12 +495,13 @@ def get_waf_logs(limit: int = Query(100, le=1000), user=Depends(get_current_user
 
 @router.get("/waf/health")
 def get_waf_health(user=Depends(get_current_user), _=Depends(rate_limit)):
-    from ...core.config import get_settings
-    from ...services.coraza_config import write_coraza_spoa_config
-    from ...core.database import SessionLocal
     import socket
     import time
     from collections import deque
+
+    from ...core.config import get_settings
+    from ...core.database import SessionLocal
+    from ...services.coraza_config import write_coraza_spoa_config
 
     cfg = get_settings()
     config_ok = os.path.exists(cfg.CORAZA_SPOA_CONFIG_PATH)
@@ -504,7 +538,7 @@ def get_waf_health(user=Depends(get_current_user), _=Depends(rate_limit)):
 
     if log_ok:
         try:
-            with open(cfg.CORAZA_SPOA_LOG_PATH, "r") as f:
+            with open(cfg.CORAZA_SPOA_LOG_PATH) as f:
                 last_lines = deque(f, maxlen=1)
                 if last_lines:
                     last_log_line = last_lines[0].strip()
@@ -527,15 +561,18 @@ def get_waf_health(user=Depends(get_current_user), _=Depends(rate_limit)):
 
 # ---- CRS management ----
 
+
 @router.get("/waf/crs/status")
 def get_crs_status_endpoint(db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
     from ...services.crs_downloader import get_crs_status
+
     return get_crs_status(db)
 
 
 @router.post("/waf/crs/download")
 def download_crs_endpoint(db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
     from ...services.crs_downloader import download_crs
+
     result = download_crs(db, created_by=user.username if user else None)
     if not result["ok"]:
         raise HTTPException(status_code=400, detail=result.get("error", "Download failed"))
@@ -545,12 +582,16 @@ def download_crs_endpoint(db: Session = Depends(get_db), user=Depends(require_wr
 @router.get("/waf/crs/snapshots")
 def list_crs_snapshots_endpoint(db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
     from ...services.crs_downloader import list_crs_snapshots
+
     return list_crs_snapshots(db)
 
 
 @router.post("/waf/crs/rollback/{snapshot_id}")
-def rollback_crs_endpoint(snapshot_id: int, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def rollback_crs_endpoint(
+    snapshot_id: int, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     from ...services.crs_downloader import rollback_crs
+
     result = rollback_crs(db, snapshot_id, created_by=user.username if user else None)
     if not result["ok"]:
         raise HTTPException(status_code=400, detail=result.get("error", "Rollback failed"))
@@ -558,8 +599,11 @@ def rollback_crs_endpoint(snapshot_id: int, db: Session = Depends(get_db), user=
 
 
 @router.delete("/waf/crs/snapshots/{snapshot_id}")
-def delete_crs_snapshot_endpoint(snapshot_id: int, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def delete_crs_snapshot_endpoint(
+    snapshot_id: int, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     from ...services.crs_downloader import delete_crs_snapshot
+
     result = delete_crs_snapshot(db, snapshot_id)
     if not result["ok"]:
         raise HTTPException(status_code=400, detail=result.get("error", "Delete failed"))
@@ -567,8 +611,11 @@ def delete_crs_snapshot_endpoint(snapshot_id: int, db: Session = Depends(get_db)
 
 
 @router.put("/waf/crs/pinned-version", response_model=SettingResponse)
-def set_crs_pinned_version_endpoint(s_in: SettingCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def set_crs_pinned_version_endpoint(
+    s_in: SettingCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     from ...services.settings import set_setting
+
     version = s_in.value.strip() or None
     return set_setting(db, "crs_pinned_version", version)
 
@@ -605,8 +652,10 @@ def import_waf_rules(data: dict, db: Session = Depends(get_db), user=Depends(req
     return {"status": "ok"}
 
 
-@router.get("/waf/rule-versions", response_model=List[WafRuleVersionResponse])
-def list_waf_rule_versions(waf_rule_id: Optional[int] = None, db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
+@router.get("/waf/rule-versions", response_model=list[WafRuleVersionResponse])
+def list_waf_rule_versions(
+    waf_rule_id: int | None = None, db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)
+):
     q = db.query(WafRuleVersion)
     if waf_rule_id:
         q = q.filter(WafRuleVersion.waf_rule_id == waf_rule_id)
@@ -636,7 +685,7 @@ def _waf_rule_version_max(db: Session) -> int:
     default = str(settings.WAF_RULE_VERSION_MAX_PER_RULE)
     try:
         return int(get_setting(db, "waf_rule_version_max_per_rule", default) or default)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return settings.WAF_RULE_VERSION_MAX_PER_RULE
 
 
@@ -675,15 +724,19 @@ def refresh_rule_set(rid: int, db: Session = Depends(get_db), user=Depends(requi
     if not rule.rule_set_url:
         raise HTTPException(status_code=400, detail="No rule set URL configured")
     from ...services.rule_set_downloader import download_rule_set
+
     ok = download_rule_set(db, rule)
     if ok:
         from ...services import coraza_config
+
         coraza_config.write_coraza_spoa_config(db)
     return {"ok": ok, "error": rule.rule_set_last_error}
 
 
 @router.post("/waf/rules/{rid}/snapshot", response_model=WafRuleVersionResponse)
-def snapshot_waf_rule(rid: int, version: str, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def snapshot_waf_rule(
+    rid: int, version: str, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     rule = db.get(WafRule, rid)
     if not rule:
         raise HTTPException(status_code=404, detail="WAF rule not found")
@@ -701,7 +754,9 @@ def snapshot_waf_rule(rid: int, version: str, db: Session = Depends(get_db), use
 
 
 @router.post("/waf/rules/{rid}/restore/{vid}", response_model=WafRuleResponse)
-def restore_waf_rule(rid: int, vid: int, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def restore_waf_rule(
+    rid: int, vid: int, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     rule = db.get(WafRule, rid)
     if not rule:
         raise HTTPException(status_code=404, detail="WAF rule not found")
@@ -731,23 +786,27 @@ def get_waf_rule_version_max(db: Session = Depends(get_db), user=Depends(get_cur
 
 
 @router.put("/waf/rule-versions/max", response_model=SettingResponse)
-def set_waf_rule_version_max(s_in: SettingCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def set_waf_rule_version_max(
+    s_in: SettingCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     try:
         val = int(s_in.value)
         if val < 0:
             raise ValueError
-    except (TypeError, ValueError):
-        raise HTTPException(status_code=400, detail="waf_rule_version_max_per_rule must be a non-negative integer (0 = unlimited)")
+    except TypeError, ValueError:
+        raise HTTPException(
+            status_code=400, detail="waf_rule_version_max_per_rule must be a non-negative integer (0 = unlimited)"
+        )
     return set_setting(db, "waf_rule_version_max_per_rule", str(val))
 
 
 @router.delete("/waf/rule-versions/{vid}")
-def delete_waf_rule_version(vid: int, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def delete_waf_rule_version(
+    vid: int, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     snap = db.query(WafRuleVersion).filter(WafRuleVersion.id == vid).first()
     if not snap:
         raise HTTPException(status_code=404, detail="Snapshot not found")
     db.delete(snap)
     db.commit()
     return {"status": "ok"}
-
-

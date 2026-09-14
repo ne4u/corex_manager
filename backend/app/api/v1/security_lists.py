@@ -1,29 +1,25 @@
 """Security list and dynamic feed endpoints."""
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, status, Response
+
+from datetime import UTC, datetime
+
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from ..deps import get_current_user, get_db, require_admin, require_write, rate_limit
+
 from ...core.config import get_settings
 from ...models.models import *
 from ...schemas.security_lists import *
+from ...services.security_list_feeds import refresh_feed as refresh_dynamic_feed
 from ...services.security_lists import (
-    validate_network_value,
+    build_in_use_message,
+    find_list_references,
+    get_country_options,
     validate_asn_value,
     validate_country_code,
     validate_ja4_value,
+    validate_network_value,
     validate_pattern_value,
-    get_country_options,
-    find_list_references,
-    build_in_use_message,
 )
-from ...services.security_list_feeds import refresh_feed as refresh_dynamic_feed
-from ...services.security_rules import (
-    parse_expression,
-    translate,
-    validate_expression,
-    reorder_rules,
-)
+from ..deps import get_current_user, get_db, rate_limit, require_write
 
 settings = get_settings()
 router = APIRouter()
@@ -113,17 +109,19 @@ def _touch_list(db: Session, model_cls, lid: int):
     """Bump a list's updated_at timestamp to now (used when entries change)."""
     lst = db.get(model_cls, lid)
     if lst:
-        lst.updated_at = datetime.now(timezone.utc)
+        lst.updated_at = datetime.now(UTC)
 
 
 # --- Network lists ---
-@router.get("/security-lists/network", response_model=List[NetworkListResponse])
+@router.get("/security-lists/network", response_model=list[NetworkListResponse])
 def list_network_lists(db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
     return [_network_list_response(l) for l in db.query(NetworkList).all()]
 
 
 @router.post("/security-lists/network", response_model=NetworkListResponse)
-def create_network_list(a: NetworkListCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def create_network_list(
+    a: NetworkListCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     obj = NetworkList(name=a.name, description=a.description)
     db.add(obj)
     db.commit()
@@ -141,7 +139,9 @@ def create_network_list(a: NetworkListCreate, db: Session = Depends(get_db), use
 
 
 @router.put("/security-lists/network/{lid}", response_model=NetworkListResponse)
-def update_network_list(lid: int, a_in: NetworkListUpdate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def update_network_list(
+    lid: int, a_in: NetworkListUpdate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     obj = db.get(NetworkList, lid)
     if not obj:
         raise HTTPException(status_code=404, detail="Network list not found")
@@ -160,7 +160,9 @@ def update_network_list(lid: int, a_in: NetworkListUpdate, db: Session = Depends
 
 
 @router.delete("/security-lists/network/{lid}")
-def delete_network_list(lid: int, force: bool = False, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def delete_network_list(
+    lid: int, force: bool = False, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     obj = db.get(NetworkList, lid)
     if not obj:
         raise HTTPException(status_code=404, detail="Network list not found")
@@ -171,7 +173,10 @@ def delete_network_list(lid: int, force: bool = False, db: Session = Depends(get
         raise HTTPException(status_code=409, detail=in_use_msg)
     feed = refs["feed"]
     if feed and not force:
-        raise HTTPException(status_code=409, detail=f"List is targeted by dynamic feed '{feed.name}'. Delete the feed first or pass force=true.")
+        raise HTTPException(
+            status_code=409,
+            detail=f"List is targeted by dynamic feed '{feed.name}'. Delete the feed first or pass force=true.",
+        )
     if feed:
         db.delete(feed)
     db.delete(obj)
@@ -179,15 +184,23 @@ def delete_network_list(lid: int, force: bool = False, db: Session = Depends(get
     return {"status": "ok"}
 
 
-@router.get("/security-lists/network/{lid}/entries", response_model=List[NetworkListEntryResponse])
-def list_network_entries(lid: int, db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
+@router.get("/security-lists/network/{lid}/entries", response_model=list[NetworkListEntryResponse])
+def list_network_entries(
+    lid: int, db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)
+):
     if not db.get(NetworkList, lid):
         raise HTTPException(status_code=404, detail="Network list not found")
     return db.query(NetworkListEntry).filter(NetworkListEntry.list_id == lid).all()
 
 
 @router.post("/security-lists/network/{lid}/entries", response_model=NetworkListEntryResponse)
-def create_network_entry(lid: int, e: NetworkListEntryCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def create_network_entry(
+    lid: int,
+    e: NetworkListEntryCreate,
+    db: Session = Depends(get_db),
+    user=Depends(require_write),
+    _=Depends(rate_limit),
+):
     if not db.get(NetworkList, lid):
         raise HTTPException(status_code=404, detail="Network list not found")
     try:
@@ -203,7 +216,14 @@ def create_network_entry(lid: int, e: NetworkListEntryCreate, db: Session = Depe
 
 
 @router.put("/security-lists/network/{lid}/entries/{eid}", response_model=NetworkListEntryResponse)
-def update_network_entry(lid: int, eid: int, e_in: NetworkListEntryUpdate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def update_network_entry(
+    lid: int,
+    eid: int,
+    e_in: NetworkListEntryUpdate,
+    db: Session = Depends(get_db),
+    user=Depends(require_write),
+    _=Depends(rate_limit),
+):
     obj = db.query(NetworkListEntry).filter(NetworkListEntry.list_id == lid, NetworkListEntry.id == eid).first()
     if not obj:
         raise HTTPException(status_code=404, detail="Entry not found")
@@ -222,7 +242,9 @@ def update_network_entry(lid: int, eid: int, e_in: NetworkListEntryUpdate, db: S
 
 
 @router.delete("/security-lists/network/{lid}/entries/{eid}")
-def delete_network_entry(lid: int, eid: int, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def delete_network_entry(
+    lid: int, eid: int, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     obj = db.query(NetworkListEntry).filter(NetworkListEntry.list_id == lid, NetworkListEntry.id == eid).first()
     if not obj:
         raise HTTPException(status_code=404, detail="Entry not found")
@@ -233,13 +255,15 @@ def delete_network_entry(lid: int, eid: int, db: Session = Depends(get_db), user
 
 
 # --- ASN lists ---
-@router.get("/security-lists/asn", response_model=List[AsnListResponse])
+@router.get("/security-lists/asn", response_model=list[AsnListResponse])
 def list_asn_lists(db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
     return [_asn_list_response(l) for l in db.query(AsnList).all()]
 
 
 @router.post("/security-lists/asn", response_model=AsnListResponse)
-def create_asn_list(a: AsnListCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def create_asn_list(
+    a: AsnListCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     obj = AsnList(name=a.name, description=a.description)
     db.add(obj)
     db.commit()
@@ -257,7 +281,9 @@ def create_asn_list(a: AsnListCreate, db: Session = Depends(get_db), user=Depend
 
 
 @router.put("/security-lists/asn/{lid}", response_model=AsnListResponse)
-def update_asn_list(lid: int, a_in: AsnListUpdate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def update_asn_list(
+    lid: int, a_in: AsnListUpdate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     obj = db.get(AsnList, lid)
     if not obj:
         raise HTTPException(status_code=404, detail="ASN list not found")
@@ -276,7 +302,9 @@ def update_asn_list(lid: int, a_in: AsnListUpdate, db: Session = Depends(get_db)
 
 
 @router.delete("/security-lists/asn/{lid}")
-def delete_asn_list(lid: int, force: bool = False, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def delete_asn_list(
+    lid: int, force: bool = False, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     obj = db.get(AsnList, lid)
     if not obj:
         raise HTTPException(status_code=404, detail="ASN list not found")
@@ -286,7 +314,10 @@ def delete_asn_list(lid: int, force: bool = False, db: Session = Depends(get_db)
         raise HTTPException(status_code=409, detail=in_use_msg)
     feed = refs["feed"]
     if feed and not force:
-        raise HTTPException(status_code=409, detail=f"List is targeted by dynamic feed '{feed.name}'. Delete the feed first or pass force=true.")
+        raise HTTPException(
+            status_code=409,
+            detail=f"List is targeted by dynamic feed '{feed.name}'. Delete the feed first or pass force=true.",
+        )
     if feed:
         db.delete(feed)
     db.delete(obj)
@@ -294,7 +325,7 @@ def delete_asn_list(lid: int, force: bool = False, db: Session = Depends(get_db)
     return {"status": "ok"}
 
 
-@router.get("/security-lists/asn/{lid}/entries", response_model=List[AsnListEntryResponse])
+@router.get("/security-lists/asn/{lid}/entries", response_model=list[AsnListEntryResponse])
 def list_asn_entries(lid: int, db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
     if not db.get(AsnList, lid):
         raise HTTPException(status_code=404, detail="ASN list not found")
@@ -302,7 +333,9 @@ def list_asn_entries(lid: int, db: Session = Depends(get_db), user=Depends(get_c
 
 
 @router.post("/security-lists/asn/{lid}/entries", response_model=AsnListEntryResponse)
-def create_asn_entry(lid: int, e: AsnListEntryCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def create_asn_entry(
+    lid: int, e: AsnListEntryCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     if not db.get(AsnList, lid):
         raise HTTPException(status_code=404, detail="ASN list not found")
     try:
@@ -318,7 +351,14 @@ def create_asn_entry(lid: int, e: AsnListEntryCreate, db: Session = Depends(get_
 
 
 @router.put("/security-lists/asn/{lid}/entries/{eid}", response_model=AsnListEntryResponse)
-def update_asn_entry(lid: int, eid: int, e_in: AsnListEntryUpdate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def update_asn_entry(
+    lid: int,
+    eid: int,
+    e_in: AsnListEntryUpdate,
+    db: Session = Depends(get_db),
+    user=Depends(require_write),
+    _=Depends(rate_limit),
+):
     obj = db.query(AsnListEntry).filter(AsnListEntry.list_id == lid, AsnListEntry.id == eid).first()
     if not obj:
         raise HTTPException(status_code=404, detail="Entry not found")
@@ -337,7 +377,9 @@ def update_asn_entry(lid: int, eid: int, e_in: AsnListEntryUpdate, db: Session =
 
 
 @router.delete("/security-lists/asn/{lid}/entries/{eid}")
-def delete_asn_entry(lid: int, eid: int, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def delete_asn_entry(
+    lid: int, eid: int, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     obj = db.query(AsnListEntry).filter(AsnListEntry.list_id == lid, AsnListEntry.id == eid).first()
     if not obj:
         raise HTTPException(status_code=404, detail="Entry not found")
@@ -348,12 +390,12 @@ def delete_asn_entry(lid: int, eid: int, db: Session = Depends(get_db), user=Dep
 
 
 # --- GeoIP lists ---
-@router.get("/security-lists/geo", response_model=List[GeoListResponse])
+@router.get("/security-lists/geo", response_model=list[GeoListResponse])
 def list_geo_lists(db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
     return [_geo_list_response(l) for l in db.query(GeoList).all()]
 
 
-@router.get("/security-lists/geo/countries", response_model=List[GeoCountryOption])
+@router.get("/security-lists/geo/countries", response_model=list[GeoCountryOption])
 def list_geo_countries(user=Depends(get_current_user), _=Depends(rate_limit)):
     """Return a sorted list of country codes and their full English names.
 
@@ -364,7 +406,9 @@ def list_geo_countries(user=Depends(get_current_user), _=Depends(rate_limit)):
 
 
 @router.post("/security-lists/geo", response_model=GeoListResponse)
-def create_geo_list(a: GeoListCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def create_geo_list(
+    a: GeoListCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     obj = GeoList(name=a.name, description=a.description)
     db.add(obj)
     db.commit()
@@ -382,7 +426,9 @@ def create_geo_list(a: GeoListCreate, db: Session = Depends(get_db), user=Depend
 
 
 @router.put("/security-lists/geo/{lid}", response_model=GeoListResponse)
-def update_geo_list(lid: int, a_in: GeoListUpdate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def update_geo_list(
+    lid: int, a_in: GeoListUpdate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     obj = db.get(GeoList, lid)
     if not obj:
         raise HTTPException(status_code=404, detail="GeoIP list not found")
@@ -401,7 +447,9 @@ def update_geo_list(lid: int, a_in: GeoListUpdate, db: Session = Depends(get_db)
 
 
 @router.delete("/security-lists/geo/{lid}")
-def delete_geo_list(lid: int, force: bool = False, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def delete_geo_list(
+    lid: int, force: bool = False, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     obj = db.get(GeoList, lid)
     if not obj:
         raise HTTPException(status_code=404, detail="GeoIP list not found")
@@ -411,7 +459,10 @@ def delete_geo_list(lid: int, force: bool = False, db: Session = Depends(get_db)
         raise HTTPException(status_code=409, detail=in_use_msg)
     feed = refs["feed"]
     if feed and not force:
-        raise HTTPException(status_code=409, detail=f"List is targeted by dynamic feed '{feed.name}'. Delete the feed first or pass force=true.")
+        raise HTTPException(
+            status_code=409,
+            detail=f"List is targeted by dynamic feed '{feed.name}'. Delete the feed first or pass force=true.",
+        )
     if feed:
         db.delete(feed)
     db.delete(obj)
@@ -419,7 +470,7 @@ def delete_geo_list(lid: int, force: bool = False, db: Session = Depends(get_db)
     return {"status": "ok"}
 
 
-@router.get("/security-lists/geo/{lid}/entries", response_model=List[GeoListEntryResponse])
+@router.get("/security-lists/geo/{lid}/entries", response_model=list[GeoListEntryResponse])
 def list_geo_entries(lid: int, db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
     if not db.get(GeoList, lid):
         raise HTTPException(status_code=404, detail="GeoIP list not found")
@@ -427,7 +478,9 @@ def list_geo_entries(lid: int, db: Session = Depends(get_db), user=Depends(get_c
 
 
 @router.post("/security-lists/geo/{lid}/entries", response_model=GeoListEntryResponse)
-def create_geo_entry(lid: int, e: GeoListEntryCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def create_geo_entry(
+    lid: int, e: GeoListEntryCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     if not db.get(GeoList, lid):
         raise HTTPException(status_code=404, detail="GeoIP list not found")
     try:
@@ -443,7 +496,14 @@ def create_geo_entry(lid: int, e: GeoListEntryCreate, db: Session = Depends(get_
 
 
 @router.put("/security-lists/geo/{lid}/entries/{eid}", response_model=GeoListEntryResponse)
-def update_geo_entry(lid: int, eid: int, e_in: GeoListEntryUpdate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def update_geo_entry(
+    lid: int,
+    eid: int,
+    e_in: GeoListEntryUpdate,
+    db: Session = Depends(get_db),
+    user=Depends(require_write),
+    _=Depends(rate_limit),
+):
     obj = db.query(GeoListEntry).filter(GeoListEntry.list_id == lid, GeoListEntry.id == eid).first()
     if not obj:
         raise HTTPException(status_code=404, detail="Entry not found")
@@ -462,7 +522,9 @@ def update_geo_entry(lid: int, eid: int, e_in: GeoListEntryUpdate, db: Session =
 
 
 @router.delete("/security-lists/geo/{lid}/entries/{eid}")
-def delete_geo_entry(lid: int, eid: int, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def delete_geo_entry(
+    lid: int, eid: int, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     obj = db.query(GeoListEntry).filter(GeoListEntry.list_id == lid, GeoListEntry.id == eid).first()
     if not obj:
         raise HTTPException(status_code=404, detail="Entry not found")
@@ -473,13 +535,15 @@ def delete_geo_entry(lid: int, eid: int, db: Session = Depends(get_db), user=Dep
 
 
 # --- JA4 lists ---
-@router.get("/security-lists/ja4", response_model=List[Ja4ListResponse])
+@router.get("/security-lists/ja4", response_model=list[Ja4ListResponse])
 def list_ja4_lists(db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
     return [_ja4_list_response(l) for l in db.query(Ja4List).all()]
 
 
 @router.post("/security-lists/ja4", response_model=Ja4ListResponse)
-def create_ja4_list(a: Ja4ListCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def create_ja4_list(
+    a: Ja4ListCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     obj = Ja4List(name=a.name, description=a.description)
     db.add(obj)
     db.commit()
@@ -497,7 +561,9 @@ def create_ja4_list(a: Ja4ListCreate, db: Session = Depends(get_db), user=Depend
 
 
 @router.put("/security-lists/ja4/{lid}", response_model=Ja4ListResponse)
-def update_ja4_list(lid: int, a_in: Ja4ListUpdate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def update_ja4_list(
+    lid: int, a_in: Ja4ListUpdate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     obj = db.get(Ja4List, lid)
     if not obj:
         raise HTTPException(status_code=404, detail="JA4 list not found")
@@ -516,7 +582,9 @@ def update_ja4_list(lid: int, a_in: Ja4ListUpdate, db: Session = Depends(get_db)
 
 
 @router.delete("/security-lists/ja4/{lid}")
-def delete_ja4_list(lid: int, force: bool = False, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def delete_ja4_list(
+    lid: int, force: bool = False, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     obj = db.get(Ja4List, lid)
     if not obj:
         raise HTTPException(status_code=404, detail="JA4 list not found")
@@ -526,7 +594,10 @@ def delete_ja4_list(lid: int, force: bool = False, db: Session = Depends(get_db)
         raise HTTPException(status_code=409, detail=in_use_msg)
     feed = refs["feed"]
     if feed and not force:
-        raise HTTPException(status_code=409, detail=f"List is targeted by dynamic feed '{feed.name}'. Delete the feed first or pass force=true.")
+        raise HTTPException(
+            status_code=409,
+            detail=f"List is targeted by dynamic feed '{feed.name}'. Delete the feed first or pass force=true.",
+        )
     if feed:
         db.delete(feed)
     db.delete(obj)
@@ -534,7 +605,7 @@ def delete_ja4_list(lid: int, force: bool = False, db: Session = Depends(get_db)
     return {"status": "ok"}
 
 
-@router.get("/security-lists/ja4/{lid}/entries", response_model=List[Ja4ListEntryResponse])
+@router.get("/security-lists/ja4/{lid}/entries", response_model=list[Ja4ListEntryResponse])
 def list_ja4_entries(lid: int, db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
     if not db.get(Ja4List, lid):
         raise HTTPException(status_code=404, detail="JA4 list not found")
@@ -542,7 +613,9 @@ def list_ja4_entries(lid: int, db: Session = Depends(get_db), user=Depends(get_c
 
 
 @router.post("/security-lists/ja4/{lid}/entries", response_model=Ja4ListEntryResponse)
-def create_ja4_entry(lid: int, e: Ja4ListEntryCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def create_ja4_entry(
+    lid: int, e: Ja4ListEntryCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     if not db.get(Ja4List, lid):
         raise HTTPException(status_code=404, detail="JA4 list not found")
     try:
@@ -558,7 +631,14 @@ def create_ja4_entry(lid: int, e: Ja4ListEntryCreate, db: Session = Depends(get_
 
 
 @router.put("/security-lists/ja4/{lid}/entries/{eid}", response_model=Ja4ListEntryResponse)
-def update_ja4_entry(lid: int, eid: int, e_in: Ja4ListEntryUpdate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def update_ja4_entry(
+    lid: int,
+    eid: int,
+    e_in: Ja4ListEntryUpdate,
+    db: Session = Depends(get_db),
+    user=Depends(require_write),
+    _=Depends(rate_limit),
+):
     obj = db.query(Ja4ListEntry).filter(Ja4ListEntry.list_id == lid, Ja4ListEntry.id == eid).first()
     if not obj:
         raise HTTPException(status_code=404, detail="Entry not found")
@@ -577,7 +657,9 @@ def update_ja4_entry(lid: int, eid: int, e_in: Ja4ListEntryUpdate, db: Session =
 
 
 @router.delete("/security-lists/ja4/{lid}/entries/{eid}")
-def delete_ja4_entry(lid: int, eid: int, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def delete_ja4_entry(
+    lid: int, eid: int, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     obj = db.query(Ja4ListEntry).filter(Ja4ListEntry.list_id == lid, Ja4ListEntry.id == eid).first()
     if not obj:
         raise HTTPException(status_code=404, detail="Entry not found")
@@ -588,13 +670,15 @@ def delete_ja4_entry(lid: int, eid: int, db: Session = Depends(get_db), user=Dep
 
 
 # --- Pattern lists ---
-@router.get("/security-lists/pattern", response_model=List[PatternListResponse])
+@router.get("/security-lists/pattern", response_model=list[PatternListResponse])
 def list_pattern_lists(db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
     return [_pattern_list_response(l) for l in db.query(PatternList).all()]
 
 
 @router.post("/security-lists/pattern", response_model=PatternListResponse)
-def create_pattern_list(a: PatternListCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def create_pattern_list(
+    a: PatternListCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     obj = PatternList(name=a.name, description=a.description)
     db.add(obj)
     db.commit()
@@ -612,7 +696,9 @@ def create_pattern_list(a: PatternListCreate, db: Session = Depends(get_db), use
 
 
 @router.put("/security-lists/pattern/{lid}", response_model=PatternListResponse)
-def update_pattern_list(lid: int, a_in: PatternListUpdate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def update_pattern_list(
+    lid: int, a_in: PatternListUpdate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     obj = db.get(PatternList, lid)
     if not obj:
         raise HTTPException(status_code=404, detail="Pattern list not found")
@@ -631,7 +717,9 @@ def update_pattern_list(lid: int, a_in: PatternListUpdate, db: Session = Depends
 
 
 @router.delete("/security-lists/pattern/{lid}")
-def delete_pattern_list(lid: int, force: bool = False, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def delete_pattern_list(
+    lid: int, force: bool = False, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     obj = db.get(PatternList, lid)
     if not obj:
         raise HTTPException(status_code=404, detail="Pattern list not found")
@@ -641,7 +729,10 @@ def delete_pattern_list(lid: int, force: bool = False, db: Session = Depends(get
         raise HTTPException(status_code=409, detail=in_use_msg)
     feed = refs["feed"]
     if feed and not force:
-        raise HTTPException(status_code=409, detail=f"List is targeted by dynamic feed '{feed.name}'. Delete the feed first or pass force=true.")
+        raise HTTPException(
+            status_code=409,
+            detail=f"List is targeted by dynamic feed '{feed.name}'. Delete the feed first or pass force=true.",
+        )
     if feed:
         db.delete(feed)
     db.delete(obj)
@@ -649,15 +740,23 @@ def delete_pattern_list(lid: int, force: bool = False, db: Session = Depends(get
     return {"status": "ok"}
 
 
-@router.get("/security-lists/pattern/{lid}/entries", response_model=List[PatternListEntryResponse])
-def list_pattern_entries(lid: int, db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
+@router.get("/security-lists/pattern/{lid}/entries", response_model=list[PatternListEntryResponse])
+def list_pattern_entries(
+    lid: int, db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)
+):
     if not db.get(PatternList, lid):
         raise HTTPException(status_code=404, detail="Pattern list not found")
     return db.query(PatternListEntry).filter(PatternListEntry.list_id == lid).all()
 
 
 @router.post("/security-lists/pattern/{lid}/entries", response_model=PatternListEntryResponse)
-def create_pattern_entry(lid: int, e: PatternListEntryCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def create_pattern_entry(
+    lid: int,
+    e: PatternListEntryCreate,
+    db: Session = Depends(get_db),
+    user=Depends(require_write),
+    _=Depends(rate_limit),
+):
     if not db.get(PatternList, lid):
         raise HTTPException(status_code=404, detail="Pattern list not found")
     try:
@@ -673,7 +772,14 @@ def create_pattern_entry(lid: int, e: PatternListEntryCreate, db: Session = Depe
 
 
 @router.put("/security-lists/pattern/{lid}/entries/{eid}", response_model=PatternListEntryResponse)
-def update_pattern_entry(lid: int, eid: int, e_in: PatternListEntryUpdate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def update_pattern_entry(
+    lid: int,
+    eid: int,
+    e_in: PatternListEntryUpdate,
+    db: Session = Depends(get_db),
+    user=Depends(require_write),
+    _=Depends(rate_limit),
+):
     obj = db.query(PatternListEntry).filter(PatternListEntry.list_id == lid, PatternListEntry.id == eid).first()
     if not obj:
         raise HTTPException(status_code=404, detail="Entry not found")
@@ -692,7 +798,9 @@ def update_pattern_entry(lid: int, eid: int, e_in: PatternListEntryUpdate, db: S
 
 
 @router.delete("/security-lists/pattern/{lid}/entries/{eid}")
-def delete_pattern_entry(lid: int, eid: int, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def delete_pattern_entry(
+    lid: int, eid: int, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     obj = db.query(PatternListEntry).filter(PatternListEntry.list_id == lid, PatternListEntry.id == eid).first()
     if not obj:
         raise HTTPException(status_code=404, detail="Entry not found")
@@ -703,13 +811,15 @@ def delete_pattern_entry(lid: int, eid: int, db: Session = Depends(get_db), user
 
 
 # --- Dynamic feeds ---
-@router.get("/security-lists/feeds", response_model=List[DynamicFeedResponse])
+@router.get("/security-lists/feeds", response_model=list[DynamicFeedResponse])
 def list_dynamic_feeds(db: Session = Depends(get_db), user=Depends(get_current_user), _=Depends(rate_limit)):
     return db.query(DynamicFeed).all()
 
 
 @router.post("/security-lists/feeds", response_model=DynamicFeedResponse)
-def create_dynamic_feed(f: DynamicFeedCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def create_dynamic_feed(
+    f: DynamicFeedCreate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     target_list_id = f.target_list_id
     if target_list_id is None:
         # Create a new empty list named after the feed.
@@ -760,7 +870,9 @@ def create_dynamic_feed(f: DynamicFeedCreate, db: Session = Depends(get_db), use
 
 
 @router.put("/security-lists/feeds/{fid}", response_model=DynamicFeedResponse)
-def update_dynamic_feed(fid: int, f_in: DynamicFeedUpdate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def update_dynamic_feed(
+    fid: int, f_in: DynamicFeedUpdate, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)
+):
     obj = db.get(DynamicFeed, fid)
     if not obj:
         raise HTTPException(status_code=404, detail="Dynamic feed not found")
@@ -772,7 +884,13 @@ def update_dynamic_feed(fid: int, f_in: DynamicFeedUpdate, db: Session = Depends
 
 
 @router.delete("/security-lists/feeds/{fid}")
-def delete_dynamic_feed(fid: int, delete_list: bool = False, db: Session = Depends(get_db), user=Depends(require_write), _=Depends(rate_limit)):
+def delete_dynamic_feed(
+    fid: int,
+    delete_list: bool = False,
+    db: Session = Depends(get_db),
+    user=Depends(require_write),
+    _=Depends(rate_limit),
+):
     obj = db.get(DynamicFeed, fid)
     if not obj:
         raise HTTPException(status_code=404, detail="Dynamic feed not found")
@@ -800,5 +918,3 @@ def refresh_feed_now(fid: int, db: Session = Depends(get_db), user=Depends(requi
     result = refresh_dynamic_feed(db, obj)
     db.refresh(obj)
     return result
-
-

@@ -14,10 +14,11 @@ Parsed entry lists are cached in Valkey for ``STICK_TABLE_CACHE_TTL_SECONDS`` (d
 so repeated pagination clicks on a 100k+ entry table don't re-fetch+re-parse the whole
 dump. The cache is invalidated on clear operations.
 """
+
 import logging
 import re
 import socket
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from ..core import valkey_client
 from ..core.config import get_settings
@@ -30,6 +31,7 @@ settings = get_settings()
 # Low-level socket helper (longer timeout for large `show table` dumps)
 # ---------------------------------------------------------------------------
 
+
 def _send_table_command(cmd: str, timeout: float = 15.0) -> str:
     """Send a command to the HAProxy socket with a longer timeout for table dumps.
 
@@ -37,7 +39,6 @@ def _send_table_command(cmd: str, timeout: float = 15.0) -> str:
     on tables with hundreds of thousands of entries.
     """
     import os
-    from . import stats
 
     path = settings.HAPROXY_SOCKET_PATH
     if not os.path.exists(path):
@@ -56,7 +57,7 @@ def _send_table_command(cmd: str, timeout: float = 15.0) -> str:
             while True:
                 try:
                     chunk = s.recv(16384)
-                except socket.timeout:
+                except TimeoutError:
                     break
                 if not chunk:
                     break
@@ -76,13 +77,13 @@ _TABLE_HEADER_RE = re.compile(
 )
 
 
-def parse_show_tables(raw: str) -> List[Dict[str, Any]]:
+def parse_show_tables(raw: str) -> list[dict[str, Any]]:
     """Parse the output of ``show table`` into a list of table summaries.
 
     Each line looks like:
         # table: beacon_trust_table, type: ip, size:1048576 used:1234
     """
-    tables: List[Dict[str, Any]] = []
+    tables: list[dict[str, Any]] = []
     for line in raw.splitlines():
         line = line.strip()
         if not line or not line.startswith("#"):
@@ -90,12 +91,14 @@ def parse_show_tables(raw: str) -> List[Dict[str, Any]]:
         m = _TABLE_HEADER_RE.match(line)
         if not m:
             continue
-        tables.append({
-            "name": m.group("name").strip(),
-            "type": m.group("type").strip(),
-            "size": int(m.group("size")),
-            "used": int(m.group("used")),
-        })
+        tables.append(
+            {
+                "name": m.group("name").strip(),
+                "type": m.group("type").strip(),
+                "size": int(m.group("size")),
+                "used": int(m.group("used")),
+            }
+        )
     tables.sort(key=lambda t: t["name"])
     return tables
 
@@ -106,7 +109,7 @@ def parse_show_tables(raw: str) -> List[Dict[str, Any]]:
 _ENTRY_PREFIX_RE = re.compile(r"^0x[0-9a-fA-F]+:\s")
 
 
-def _parse_entry_line(line: str) -> Optional[Dict[str, Any]]:
+def _parse_entry_line(line: str) -> dict[str, Any] | None:
     """Parse a single entry line from ``show table <name>`` output."""
     line = line.strip()
     if not line or line.startswith("#") or line.startswith("table:"):
@@ -115,7 +118,7 @@ def _parse_entry_line(line: str) -> Optional[Dict[str, Any]]:
     line = _ENTRY_PREFIX_RE.sub("", line, count=1)
     # Now split into `key=value` tokens. The key value may contain `=` only inside
     # the value, so split on whitespace first, then split each token on the first `=`.
-    entry: Dict[str, Any] = {"key": "", "use": 0, "exp": 0, "stores": {}}
+    entry: dict[str, Any] = {"key": "", "use": 0, "exp": 0, "stores": {}}
     tokens = line.split()
     for tok in tokens:
         if "=" not in tok:
@@ -142,9 +145,9 @@ def _parse_entry_line(line: str) -> Optional[Dict[str, Any]]:
     return entry
 
 
-def parse_show_table(raw: str) -> List[Dict[str, Any]]:
+def parse_show_table(raw: str) -> list[dict[str, Any]]:
     """Parse the output of ``show table <name>`` into a list of entry dicts."""
-    entries: List[Dict[str, Any]] = []
+    entries: list[dict[str, Any]] = []
     for line in raw.splitlines():
         parsed = _parse_entry_line(line)
         if parsed is not None:
@@ -156,16 +159,17 @@ def parse_show_table(raw: str) -> List[Dict[str, Any]]:
 # Public API
 # ---------------------------------------------------------------------------
 
+
 def _cache_key(name: str) -> str:
     return f"stick_table:{name}"
 
 
-def _get_cached(name: str) -> Optional[Dict[str, Any]]:
+def _get_cached(name: str) -> dict[str, Any] | None:
     """Return the cached ``{type, size, used, entries}`` blob, or None."""
     return valkey_client.cache_get(_cache_key(name))
 
 
-def _set_cached(name: str, blob: Dict[str, Any]) -> None:
+def _set_cached(name: str, blob: dict[str, Any]) -> None:
     valkey_client.cache_set(
         _cache_key(name),
         blob,
@@ -184,7 +188,7 @@ def _invalidate_cache(name: str) -> None:
         valkey_client._reset_client()
 
 
-def list_tables() -> List[Dict[str, Any]]:
+def list_tables() -> list[dict[str, Any]]:
     """Return a list of all HAProxy stick-tables with their type/size/used counts."""
     raw = _send_table_command("show table")
     if not raw or raw.startswith("error:"):
@@ -196,8 +200,8 @@ def get_table(
     name: str,
     limit: int = 100,
     offset: int = 0,
-    search: Optional[str] = None,
-) -> Dict[str, Any]:
+    search: str | None = None,
+) -> dict[str, Any]:
     """Fetch a paginated, optionally filtered slice of a stick-table's entries.
 
     Returns ``{name, type, size, used, total, offset, limit, entries}``.
@@ -224,7 +228,7 @@ def get_table(
                 "entries": [],
             }
         # Extract table metadata from the header line
-        header_meta: Dict[str, Any] = {"type": "", "size": 0, "used": 0}
+        header_meta: dict[str, Any] = {"type": "", "size": 0, "used": 0}
         for line in raw.splitlines():
             line = line.strip()
             if line.startswith("#"):
@@ -258,7 +262,7 @@ def get_table(
         filtered = entries
 
     total = len(filtered)
-    page = filtered[offset:offset + limit]
+    page = filtered[offset : offset + limit]
 
     return {
         "name": name,
@@ -272,7 +276,7 @@ def get_table(
     }
 
 
-def clear_entry(name: str, key: str) -> Dict[str, Any]:
+def clear_entry(name: str, key: str) -> dict[str, Any]:
     """Remove a single entry from a stick-table. Returns ``{ok, cleared}``."""
     raw = _send_table_command(f"clear table {name} key {key}")
     ok = not (raw and raw.startswith("error:"))
@@ -281,7 +285,7 @@ def clear_entry(name: str, key: str) -> Dict[str, Any]:
     return {"ok": ok, "cleared": 1 if ok else 0}
 
 
-def clear_table(name: str) -> Dict[str, Any]:
+def clear_table(name: str) -> dict[str, Any]:
     """Remove all entries from a stick-table. Returns ``{ok, cleared}``."""
     raw = _send_table_command(f"clear table {name}")
     ok = not (raw and raw.startswith("error:"))

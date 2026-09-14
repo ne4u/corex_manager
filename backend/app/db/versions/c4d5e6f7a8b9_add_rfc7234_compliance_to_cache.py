@@ -5,17 +5,17 @@ Revises: b3c4d5e6f7a8
 Create Date: 2026-08-14 00:00:00.000000
 
 """
-from typing import Sequence, Union
 
-from alembic import op
+from collections.abc import Sequence
+
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = 'c4d5e6f7a8b9'
-down_revision: Union[str, Sequence[str], None] = 'b3c4d5e6f7a8'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+revision: str = "c4d5e6f7a8b9"
+down_revision: str | Sequence[str] | None = "b3c4d5e6f7a8"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -26,13 +26,13 @@ def upgrade() -> None:
     "no-cache" reload does not bypass the shared cache for everyone. Existing
     rows inherit the server default of False.
     """
-    with op.batch_alter_table('cache_configs', schema=None) as batch_op:
+    with op.batch_alter_table("cache_configs", schema=None) as batch_op:
         batch_op.add_column(
-            sa.Column('haproxy_rfc7234_compliance', sa.Boolean(), nullable=True, server_default=sa.text('false'))
+            sa.Column("haproxy_rfc7234_compliance", sa.Boolean(), nullable=True, server_default=sa.text("false"))
         )
 
 
 def downgrade() -> None:
     """Remove haproxy_rfc7234_compliance column from cache_configs."""
-    with op.batch_alter_table('cache_configs', schema=None) as batch_op:
-        batch_op.drop_column('haproxy_rfc7234_compliance')
+    with op.batch_alter_table("cache_configs", schema=None) as batch_op:
+        batch_op.drop_column("haproxy_rfc7234_compliance")

@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, Boolean, Text, DateTime, ForeignKey, JSON
+from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
+
 from .base import Base, utcnow
 
 
@@ -200,4 +201,4 @@ class BackendRule(Base):
     backend = relationship("Backend")
 
 
-__all__ = ['Backend', 'BackendRule', 'Certificate', 'CipherSuite', 'FcgiApp', 'Listener', 'Server']
+__all__ = ["Backend", "BackendRule", "Certificate", "CipherSuite", "FcgiApp", "Listener", "Server"]

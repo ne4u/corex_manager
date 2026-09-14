@@ -1,10 +1,12 @@
 import logging
 import os
 import sys
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from contextlib import asynccontextmanager
+
 from .core.config import get_settings
 from .core.database import init_db
 
@@ -14,24 +16,24 @@ logging.basicConfig(
     level=getattr(logging, _settings.LOG_LEVEL.upper(), logging.INFO),
     format="%(levelname)s [%(name)s] %(message)s",
 )
-from .core.middleware import AuditEventMiddleware, ProxyHeadersMiddleware
-from .core.password_expiry_middleware import PasswordExpiryMiddleware
 from .api.routers import router as api_router
 from .api.v1 import build_v1_router
-from .services.metrics import start_sampler as start_metrics_sampler
-from .services.waf_metrics import start_waf_sampler
-from .services.tasks import start_task_worker, AutoRenewScheduler
-from .services.audit import start_audit_worker
-from .services.geoip import GeoIpDownloader
-from .services.security_list_feeds import DynamicFeedUpdater
-from .services.rule_set_downloader import RuleSetUpdater
-from .services.page_protect_sampler import start_page_protect_sampler
-from .services.page_protect_hasher import start_page_protect_hasher
-from .services.cache_metrics import start_sampler as start_cache_metrics_sampler
-from .services.mcp_metrics import start_mcp_sampler
-from .services.mcp_catalog_sync import start_mcp_catalog_sync
-from .services.beacon_trust_persist import start_beacon_trust_persist, seed_beacon_trust_table
+from .core.middleware import AuditEventMiddleware, ProxyHeadersMiddleware
+from .core.password_expiry_middleware import PasswordExpiryMiddleware
 from .services import coraza_config
+from .services.audit import start_audit_worker
+from .services.beacon_trust_persist import seed_beacon_trust_table, start_beacon_trust_persist
+from .services.cache_metrics import start_sampler as start_cache_metrics_sampler
+from .services.geoip import GeoIpDownloader
+from .services.mcp_catalog_sync import start_mcp_catalog_sync
+from .services.mcp_metrics import start_mcp_sampler
+from .services.metrics import start_sampler as start_metrics_sampler
+from .services.page_protect_hasher import start_page_protect_hasher
+from .services.page_protect_sampler import start_page_protect_sampler
+from .services.rule_set_downloader import RuleSetUpdater
+from .services.security_list_feeds import DynamicFeedUpdater
+from .services.tasks import AutoRenewScheduler, start_task_worker
+from .services.waf_metrics import start_waf_sampler
 
 _geoip_downloader = GeoIpDownloader(interval_hours=_settings.GEOIP_DOWNLOAD_INTERVAL_HOURS)
 _security_list_feed_updater = DynamicFeedUpdater()
@@ -44,6 +46,7 @@ async def lifespan(app: FastAPI):
     init_db()
     from .core.database import SessionLocal
     from .services.certificates import migrate_cert_bundles
+
     db = SessionLocal()
     try:
         # Resolve the Page Protect hasher bypass token early — before any
@@ -51,6 +54,7 @@ async def lifespan(app: FastAPI):
         # stable across restarts (persisted to DB) so the HAProxy config
         # doesn't differ from the .applied snapshot on every restart.
         from .services.page_protect import resolve_pp_hasher_token
+
         resolve_pp_hasher_token(db)
         coraza_config.write_coraza_spoa_config(db)
         # Seed vector.toml on first boot so the vector container has a valid
@@ -58,6 +62,7 @@ async def lifespan(app: FastAPI):
         # unapplied until the user applies them (config diff banner).
         try:
             from .services.vector_pipeline import write_vector_config
+
             write_vector_config(db, restart=False, only_if_missing=True)
         except Exception as _v_exc:
             logging.getLogger(__name__).warning("vector.toml startup write failed: %s", _v_exc)
@@ -67,10 +72,16 @@ async def lifespan(app: FastAPI):
         # stale VCL would otherwise persist until the next config apply.
         # Rewriting here makes an API restart sufficient to recover, and also
         # seeds the file on first boot so varnishd has something to load.
-        from .services.settings import get_setting as _get_setting
-        from .services import varnish as _varnish
         import os as _os
-        _disk_cache_on = _get_setting(db, "disk_cache_enabled", str(_settings.DISK_CACHE_ENABLED)).lower() in ("true", "1", "yes")
+
+        from .services import varnish as _varnish
+        from .services.settings import get_setting as _get_setting
+
+        _disk_cache_on = _get_setting(db, "disk_cache_enabled", str(_settings.DISK_CACHE_ENABLED)).lower() in (
+            "true",
+            "1",
+            "yes",
+        )
         if _disk_cache_on:
             try:
                 _vcl_text = _varnish.generate_vcl(db)
@@ -98,6 +109,7 @@ async def lifespan(app: FastAPI):
     try:
         from .api.v1.captcha import prune_challenge_events
         from .core.database import SessionLocal as _CapSL
+
         _cap_db = _CapSL()
         try:
             _deleted = prune_challenge_events(_cap_db)
@@ -111,8 +123,9 @@ async def lifespan(app: FastAPI):
     # MCP server and skill into the gateway's DB tables, then regenerates the
     # config bundle. Guarded by MCP_GATEWAY_ENABLED + MCP_SELF_REGISTER.
     try:
-        from .services.mcp_self_register import ensure_self_registration
         from .core.database import SessionLocal as _SL
+        from .services.mcp_self_register import ensure_self_registration
+
         _reg_db = _SL()
         try:
             ensure_self_registration(_reg_db)
@@ -124,9 +137,10 @@ async def lifespan(app: FastAPI):
     # The mcp-gateway worker also refreshes on startup; this is a best-effort
     # fallback to populate builder metadata when the worker is delayed or down.
     try:
-        from .services.mcp_policies import trigger_background_catalog_refresh
         from .core.database import SessionLocal as _McpSL
         from .models.mcp import McpServer
+        from .services.mcp_policies import trigger_background_catalog_refresh
+
         _mcp_db = _McpSL()
         try:
             enabled_ids = [s.id for s in _mcp_db.query(McpServer).filter(McpServer.enabled == True).all()]  # noqa: E712
@@ -150,6 +164,7 @@ async def lifespan(app: FastAPI):
         _rule_set_updater.start()
     # Page Protect — start sampler + hasher if enabled in settings
     from .services.page_protect import is_page_protect_enabled, is_page_protect_hashing_enabled
+
     pp_db = SessionLocal()
     try:
         if is_page_protect_enabled(pp_db):
@@ -166,8 +181,10 @@ async def lifespan(app: FastAPI):
         logging.getLogger(__name__).warning("beacon_trust re-seed on startup failed: %s", _exc)
     start_beacon_trust_persist()
     # API Armor — start profiler and schema learner if enabled
-    from .services.api_armor_profiler import start_profiler as start_api_armor_profiler, stop_profiler as stop_api_armor_profiler
+    from .services.api_armor_profiler import start_profiler as start_api_armor_profiler
+    from .services.api_armor_profiler import stop_profiler as stop_api_armor_profiler
     from .services.api_armor_schema_learner import start_schema_learner, stop_schema_learner
+
     start_api_armor_profiler()
     start_schema_learner()
     yield
@@ -208,7 +225,11 @@ app.include_router(build_v1_router(), prefix="/api/v1")
 
 # Serve static frontend build if available
 _project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_static_candidates = ["/app/static", os.path.join(_project_dir, "..", "frontend", "dist"), os.path.join(_project_dir, "static")]
+_static_candidates = [
+    "/app/static",
+    os.path.join(_project_dir, "..", "frontend", "dist"),
+    os.path.join(_project_dir, "static"),
+]
 _static_dir = next((p for p in _static_candidates if os.path.isdir(p)), None)
 if _static_dir:
     app.mount("/", StaticFiles(directory=_static_dir, html=True), name="static")

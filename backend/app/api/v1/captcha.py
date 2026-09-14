@@ -1,21 +1,21 @@
 """CAPTCHA configuration, stats, and Cap admin API proxy endpoints."""
-import asyncio
+
 import base64
 import json
 import logging
-from datetime import datetime, timezone, timedelta
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import func, text
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ...core.config import get_settings
-from ..deps import get_current_user, get_db, rate_limit, require_write
 from ...models.waf import ChallengeEvent
 from ...services.settings import get_setting, set_setting
+from ..deps import get_current_user, get_db, rate_limit, require_write
 
 router = APIRouter()
 settings = get_settings()
@@ -32,7 +32,7 @@ def prune_challenge_events(db: Session) -> int:
     Called on startup (and lazily from stats endpoints) to keep the
     ``challenge_events`` table bounded. Returns the number of rows deleted.
     """
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=_RETENTION_DAYS)).replace(tzinfo=None)
+    cutoff = (datetime.now(UTC) - timedelta(days=_RETENTION_DAYS)).replace(tzinfo=None)
     result = db.query(ChallengeEvent).filter(ChallengeEvent.created_at < cutoff).delete()
     db.commit()
     return result
@@ -69,7 +69,7 @@ def _resolve_rule_names(db: Session, rows: list) -> None:
     # Second pass: collect all (rule_type, rule_id) pairs that need a DB
     # lookup. We look up every row with a rule_id — not just ones with a
     # NULL name — so that renames are reflected.
-    pending: Dict[str, list] = {}
+    pending: dict[str, list] = {}
     for r in rows:
         rid = getattr(r, "rule_id", None)
         rt = getattr(r, "rule_type", None)
@@ -78,8 +78,9 @@ def _resolve_rule_names(db: Session, rows: list) -> None:
     if not pending:
         return
     # Lazy imports to avoid circular dependencies
+    from ...models.models import RateLimit, SecurityRule
     from ...models.waf import WafRule
-    from ...models.models import SecurityRule, RateLimit
+
     _lookup = {
         "waf": lambda ids: {r.id: r.name for r in db.query(WafRule).filter(WafRule.id.in_(ids)).all()},
         "security": lambda ids: {r.id: r.name for r in db.query(SecurityRule).filter(SecurityRule.id.in_(ids)).all()},
@@ -109,21 +110,22 @@ def _resolve_rule_names(db: Session, rows: list) -> None:
 # Schemas
 # ---------------------------------------------------------------------------
 
+
 class CaptchaSettings(BaseModel):
     captcha_provider: str = "cap"  # "cap", "recaptcha", "turnstile"
     captcha_valid_seconds: int = Field(default=3600, ge=0)
     # Cap (labeled "Native" in the UI — the built-in provider)
-    cap_site_key: Optional[str] = None
+    cap_site_key: str | None = None
     cap_secret_configured: bool = False
     cap_service_url: str = ""
     cap_widget_cdn_url: str = ""
     # reCAPTCHA
-    recaptcha_site_key: Optional[str] = None
+    recaptcha_site_key: str | None = None
     recaptcha_secret_configured: bool = False
     recaptcha_version: str = "v2"
     recaptcha_min_score: float = 0.5
     # Turnstile
-    turnstile_site_key: Optional[str] = None
+    turnstile_site_key: str | None = None
     turnstile_secret_configured: bool = False
     # Shared
     challenge_url: str = ""
@@ -131,56 +133,56 @@ class CaptchaSettings(BaseModel):
 
 
 class CaptchaSettingsUpdate(BaseModel):
-    captcha_provider: Optional[str] = None
-    captcha_valid_seconds: Optional[int] = Field(default=None, ge=0)
+    captcha_provider: str | None = None
+    captcha_valid_seconds: int | None = Field(default=None, ge=0)
     # Cap (Native)
-    cap_site_key: Optional[str] = None
-    cap_secret: Optional[str] = None  # write-only
+    cap_site_key: str | None = None
+    cap_secret: str | None = None  # write-only
     # reCAPTCHA
-    recaptcha_site_key: Optional[str] = None
-    recaptcha_secret: Optional[str] = None  # write-only
-    recaptcha_version: Optional[str] = None
-    recaptcha_min_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    recaptcha_site_key: str | None = None
+    recaptcha_secret: str | None = None  # write-only
+    recaptcha_version: str | None = None
+    recaptcha_min_score: float | None = Field(default=None, ge=0.0, le=1.0)
     # Turnstile
-    turnstile_site_key: Optional[str] = None
-    turnstile_secret: Optional[str] = None  # write-only
+    turnstile_site_key: str | None = None
+    turnstile_secret: str | None = None  # write-only
 
 
 class CapKeyCreate(BaseModel):
-    name: Optional[str] = None
-    instrumentation: Optional[bool] = None
-    blockAutomatedBrowsers: Optional[bool] = None
-    corsOrigins: Optional[List[str]] = None
-    rsw: Optional[bool] = None
-    rswT: Optional[int] = Field(default=None, ge=10000, le=300000)
+    name: str | None = None
+    instrumentation: bool | None = None
+    blockAutomatedBrowsers: bool | None = None
+    corsOrigins: list[str] | None = None
+    rsw: bool | None = None
+    rswT: int | None = Field(default=None, ge=10000, le=300000)
 
 
 class CapKeyConfigUpdate(BaseModel):
-    name: Optional[str] = Field(default=None, max_length=600)
-    difficulty: Optional[int] = Field(default=None, ge=1, le=8)
-    challengeCount: Optional[int] = Field(default=None, ge=1, le=500)
-    instrumentation: Optional[bool] = None
-    obfuscationLevel: Optional[int] = Field(default=None, ge=1, le=10)
-    blockAutomatedBrowsers: Optional[bool] = None
-    ratelimitMax: Optional[int] = Field(default=None, ge=1, le=10000)
-    ratelimitDuration: Optional[int] = Field(default=None, ge=1000, le=3600000)
-    corsOrigins: Optional[Any] = None
-    blockNonBrowserUA: Optional[bool] = None
-    requiredHeaders: Optional[List[str]] = None
-    rsw: Optional[bool] = None
-    rswT: Optional[int] = Field(default=None, ge=10000, le=300000)
+    name: str | None = Field(default=None, max_length=600)
+    difficulty: int | None = Field(default=None, ge=1, le=8)
+    challengeCount: int | None = Field(default=None, ge=1, le=500)
+    instrumentation: bool | None = None
+    obfuscationLevel: int | None = Field(default=None, ge=1, le=10)
+    blockAutomatedBrowsers: bool | None = None
+    ratelimitMax: int | None = Field(default=None, ge=1, le=10000)
+    ratelimitDuration: int | None = Field(default=None, ge=1000, le=3600000)
+    corsOrigins: Any | None = None
+    blockNonBrowserUA: bool | None = None
+    requiredHeaders: list[str] | None = None
+    rsw: bool | None = None
+    rswT: int | None = Field(default=None, ge=10000, le=300000)
 
 
 class ChallengeStatRow(BaseModel):
     rule_type: str
-    rule_id: Optional[int] = None
-    rule_name: Optional[str] = None
+    rule_id: int | None = None
+    rule_name: str | None = None
     rule_deleted: bool = False
     issued: int = 0
     solved: int = 0
     failed: int = 0
     solve_rate: float = 0.0
-    last_issued: Optional[str] = None
+    last_issued: str | None = None
 
 
 class ChallengeTimeSeriesPoint(BaseModel):
@@ -194,19 +196,19 @@ class ChallengeEventRow(BaseModel):
     id: int
     created_at: str
     rule_type: str
-    rule_id: Optional[int] = None
-    rule_name: Optional[str] = None
+    rule_id: int | None = None
+    rule_name: str | None = None
     rule_deleted: bool = False
     event_type: str
-    request_id: Optional[str] = None
-    client_ip: Optional[str] = None
+    request_id: str | None = None
+    client_ip: str | None = None
 
 
 # ---------------------------------------------------------------------------
 # Cap session management
 # ---------------------------------------------------------------------------
 
-_cap_session_cache: Dict[str, Any] = {}
+_cap_session_cache: dict[str, Any] = {}
 
 
 async def _get_cap_session() -> str:
@@ -223,13 +225,14 @@ async def _get_cap_session() -> str:
     # Fallback: check env for CAP_ADMIN_KEY
     if not admin_key:
         import os
+
         admin_key = os.environ.get("CAP_ADMIN_KEY", "")
     if not admin_key:
         raise HTTPException(status_code=503, detail="CAP_ADMIN_KEY not configured")
     # Check cache
     cached = _cap_session_cache.get("token")
     cached_expires = _cap_session_cache.get("expires", 0)
-    if cached and datetime.now(timezone.utc).timestamp() < cached_expires - 60:
+    if cached and datetime.now(UTC).timestamp() < cached_expires - 60:
         return cached
     # Login
     base_url = settings.CAPTCHA_SERVICE_URL.rstrip("/")
@@ -251,7 +254,7 @@ async def _get_cap_session() -> str:
     bearer_value = base64.b64encode(envelope.encode()).decode()
     # Cache for 29 days (Cap sessions last 30 days)
     _cap_session_cache["token"] = bearer_value
-    _cap_session_cache["expires"] = (datetime.now(timezone.utc) + timedelta(days=29)).timestamp()
+    _cap_session_cache["expires"] = (datetime.now(UTC) + timedelta(days=29)).timestamp()
     return bearer_value
 
 
@@ -304,6 +307,7 @@ def _cap_error(status_code: int, detail: str) -> HTTPException:
 # ---------------------------------------------------------------------------
 # Settings endpoints
 # ---------------------------------------------------------------------------
+
 
 def _build_captcha_settings(db: Session) -> CaptchaSettings:
     """Build a CaptchaSettings response from DB settings + env fallbacks."""
@@ -386,11 +390,12 @@ def update_captcha_settings_route(
 # Challenge event stats endpoints
 # ---------------------------------------------------------------------------
 
-@router.get("/captcha/stats", response_model=List[ChallengeStatRow])
+
+@router.get("/captcha/stats", response_model=list[ChallengeStatRow])
 def get_challenge_stats_route(
-    from_ts: Optional[int] = Query(None),
-    to_ts: Optional[int] = Query(None),
-    rule_type: Optional[str] = Query(None),
+    from_ts: int | None = Query(None),
+    to_ts: int | None = Query(None),
+    rule_type: str | None = Query(None),
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
     _=Depends(rate_limit),
@@ -400,19 +405,19 @@ def get_challenge_stats_route(
     # for long periods without a restart (startup pruning alone is insufficient).
     prune_challenge_events(db)
     # Clamp to retention window — stats are only kept for _RETENTION_DAYS.
-    retention_start = (datetime.now(timezone.utc) - timedelta(days=_RETENTION_DAYS)).replace(tzinfo=None)
+    retention_start = (datetime.now(UTC) - timedelta(days=_RETENTION_DAYS)).replace(tzinfo=None)
     q = db.query(
         ChallengeEvent.rule_type,
         ChallengeEvent.rule_id,
         ChallengeEvent.event_type,
         func.count().label("cnt"),
     )
-    effective_from = datetime.fromtimestamp(from_ts, tz=timezone.utc).replace(tzinfo=None) if from_ts else retention_start
+    effective_from = datetime.fromtimestamp(from_ts, tz=UTC).replace(tzinfo=None) if from_ts else retention_start
     if effective_from < retention_start:
         effective_from = retention_start
     q = q.filter(ChallengeEvent.created_at >= effective_from)
     if to_ts:
-        q = q.filter(ChallengeEvent.created_at <= datetime.fromtimestamp(to_ts, tz=timezone.utc).replace(tzinfo=None))
+        q = q.filter(ChallengeEvent.created_at <= datetime.fromtimestamp(to_ts, tz=UTC).replace(tzinfo=None))
     if rule_type:
         q = q.filter(ChallengeEvent.rule_type == rule_type)
     # Group by (rule_type, rule_id, event_type) — NOT rule_name. Including
@@ -422,14 +427,14 @@ def get_challenge_stats_route(
     q = q.group_by(ChallengeEvent.rule_type, ChallengeEvent.rule_id, ChallengeEvent.event_type)
     rows = q.all()
     # Aggregate into per-rule rows (keyed by type+id only)
-    agg: Dict[tuple, Dict[str, int]] = {}
+    agg: dict[tuple, dict[str, int]] = {}
     for r in rows:
         key = (r.rule_type, r.rule_id)
         if key not in agg:
             agg[key] = {"issued": 0, "solved": 0, "failed": 0}
         agg[key][r.event_type] = r.cnt
     # Fetch the last-issued timestamp per rule in a single query.
-    last_issued_map: Dict[tuple, Optional[datetime]] = {}
+    last_issued_map: dict[tuple, datetime | None] = {}
     li_q = db.query(
         ChallengeEvent.rule_type,
         ChallengeEvent.rule_id,
@@ -439,7 +444,7 @@ def get_challenge_stats_route(
         ChallengeEvent.event_type == "issued",
     )
     if to_ts:
-        li_q = li_q.filter(ChallengeEvent.created_at <= datetime.fromtimestamp(to_ts, tz=timezone.utc).replace(tzinfo=None))
+        li_q = li_q.filter(ChallengeEvent.created_at <= datetime.fromtimestamp(to_ts, tz=UTC).replace(tzinfo=None))
     if rule_type:
         li_q = li_q.filter(ChallengeEvent.rule_type == rule_type)
     li_q = li_q.group_by(ChallengeEvent.rule_type, ChallengeEvent.rule_id)
@@ -451,22 +456,24 @@ def get_challenge_stats_route(
         solved = counts["solved"]
         solve_rate = (solved / issued * 100) if issued > 0 else 0.0
         last = last_issued_map.get((rt, rid))
-        result.append(ChallengeStatRow(
-            rule_type=rt,
-            rule_id=rid,
-            rule_name=None,  # resolved from DB below
-            issued=issued,
-            solved=solved,
-            failed=counts["failed"],
-            solve_rate=round(solve_rate, 1),
-            last_issued=last.isoformat() if last else None,
-        ))
+        result.append(
+            ChallengeStatRow(
+                rule_type=rt,
+                rule_id=rid,
+                rule_name=None,  # resolved from DB below
+                issued=issued,
+                solved=solved,
+                failed=counts["failed"],
+                solve_rate=round(solve_rate, 1),
+                last_issued=last.isoformat() if last else None,
+            )
+        )
     # Resolve current rule names from the DB (handles renames + deleted rules).
     _resolve_rule_names(db, result)
     return result
 
 
-@router.get("/captcha/stats/{rule_type}/{rule_id}", response_model=List[ChallengeTimeSeriesPoint])
+@router.get("/captcha/stats/{rule_type}/{rule_id}", response_model=list[ChallengeTimeSeriesPoint])
 def get_challenge_timeseries_route(
     rule_type: str,
     rule_id: int,
@@ -476,7 +483,7 @@ def get_challenge_timeseries_route(
     _=Depends(rate_limit),
 ):
     """Time series of challenge events for a specific rule (hourly buckets)."""
-    start = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=hours)
+    start = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=hours)
     q = db.query(
         ChallengeEvent.event_type,
         ChallengeEvent.created_at,
@@ -487,34 +494,36 @@ def get_challenge_timeseries_route(
     )
     rows = q.all()
     # Bucket into hours
-    buckets: Dict[int, Dict[str, int]] = {}
+    buckets: dict[int, dict[str, int]] = {}
     for r in rows:
         bucket = int(r.created_at.replace(minute=0, second=0, microsecond=0).timestamp())
         if bucket not in buckets:
             buckets[bucket] = {"issued": 0, "solved": 0, "failed": 0}
         buckets[bucket][r.event_type] += 1
     # Fill in empty buckets
-    now_hour = int(datetime.now(timezone.utc).replace(tzinfo=None, minute=0, second=0, microsecond=0).timestamp())
+    now_hour = int(datetime.now(UTC).replace(tzinfo=None, minute=0, second=0, microsecond=0).timestamp())
     result = []
     for i in range(hours):
         b = now_hour - (hours - 1 - i) * 3600
         counts = buckets.get(b, {"issued": 0, "solved": 0, "failed": 0})
-        result.append(ChallengeTimeSeriesPoint(
-            bucket=b,
-            issued=counts["issued"],
-            solved=counts["solved"],
-            failed=counts["failed"],
-        ))
+        result.append(
+            ChallengeTimeSeriesPoint(
+                bucket=b,
+                issued=counts["issued"],
+                solved=counts["solved"],
+                failed=counts["failed"],
+            )
+        )
     return result
 
 
-@router.get("/captcha/events", response_model=List[ChallengeEventRow])
+@router.get("/captcha/events", response_model=list[ChallengeEventRow])
 def get_challenge_events_route(
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
-    rule_type: Optional[str] = Query(None),
-    event_type: Optional[str] = Query(None),
-    request_id: Optional[str] = Query(None),
+    rule_type: str | None = Query(None),
+    event_type: str | None = Query(None),
+    request_id: str | None = Query(None),
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
     _=Depends(rate_limit),
@@ -523,7 +532,7 @@ def get_challenge_events_route(
     # Prune stale events so the table stays bounded even when the server runs
     # for long periods without a restart (startup pruning alone is insufficient).
     prune_challenge_events(db)
-    retention_start = (datetime.now(timezone.utc) - timedelta(days=_RETENTION_DAYS)).replace(tzinfo=None)
+    retention_start = (datetime.now(UTC) - timedelta(days=_RETENTION_DAYS)).replace(tzinfo=None)
     q = db.query(ChallengeEvent).filter(ChallengeEvent.created_at >= retention_start)
     if rule_type:
         q = q.filter(ChallengeEvent.rule_type == rule_type)
@@ -554,6 +563,7 @@ def get_challenge_events_route(
 # ---------------------------------------------------------------------------
 # Cap admin API proxy endpoints
 # ---------------------------------------------------------------------------
+
 
 @router.get("/captcha/keys")
 async def list_cap_keys(
@@ -618,7 +628,9 @@ async def update_cap_key_config(
 ):
     """Update Cap key configuration."""
     try:
-        res = await _cap_api_call("PUT", f"/server/keys/{site_key}/config", json_body=body.model_dump(exclude_none=True))
+        res = await _cap_api_call(
+            "PUT", f"/server/keys/{site_key}/config", json_body=body.model_dump(exclude_none=True)
+        )
         if res.status_code != 200:
             raise _cap_error(res.status_code, res.text)
         return res.json()

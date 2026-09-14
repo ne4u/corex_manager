@@ -5,11 +5,11 @@ downloads the .conf file from the configured URL. The file is verified against
 an optional SHA256 hash and written to the shared volume for the coraza-spoa
 container to include.
 """
+
 import hashlib
 import logging
 import os
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 import requests
 from sqlalchemy.orm import Session
@@ -24,7 +24,7 @@ settings = get_settings()
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _rule_file_path(rule_name: str) -> str:
@@ -91,7 +91,7 @@ class RuleSetUpdater(PeriodicTask):
     in ``_update_due_rules`` prevents redundant rule-set downloads regardless.
     """
 
-    def __init__(self, poll_interval_seconds: Optional[int] = None):
+    def __init__(self, poll_interval_seconds: int | None = None):
         super().__init__(
             name="rule_set_download_poll",
             interval_seconds=(
@@ -112,11 +112,15 @@ class RuleSetUpdater(PeriodicTask):
 
     def _update_due_rules(self, db: Session):
         now = _utcnow()
-        rules = db.query(WafRule).filter(
-            WafRule.enabled == True,  # noqa: E712
-            WafRule.rule_set == "remote",
-            WafRule.rule_set_url.isnot(None),
-        ).all()
+        rules = (
+            db.query(WafRule)
+            .filter(
+                WafRule.enabled == True,  # noqa: E712
+                WafRule.rule_set == "remote",
+                WafRule.rule_set_url.isnot(None),
+            )
+            .all()
+        )
 
         changed = False
         for rule in rules:
@@ -147,4 +151,5 @@ class RuleSetUpdater(PeriodicTask):
         if changed:
             # Regenerate Coraza config to pick up the new Include
             from . import coraza_config
+
             coraza_config.write_coraza_spoa_config(db)

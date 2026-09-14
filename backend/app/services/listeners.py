@@ -1,5 +1,5 @@
-from fastapi import HTTPException
 from sqlalchemy.orm import Session
+
 from ..models.proxy import BackendRule, Listener
 from ..schemas.listeners import ListenerCreate, ListenerUpdate
 

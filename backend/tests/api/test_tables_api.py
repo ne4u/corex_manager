@@ -1,4 +1,5 @@
 """API tests for the /haproxy/tables endpoints (System → Tables tab)."""
+
 from unittest.mock import patch
 
 
@@ -43,8 +44,13 @@ def test_get_table_paginated(client):
 
 def test_get_table_with_search(client):
     payload = {
-        "name": "t1", "type": "ip", "size": 100, "used": 3,
-        "total": 2, "offset": 0, "limit": 100,
+        "name": "t1",
+        "type": "ip",
+        "size": 100,
+        "used": 3,
+        "total": 2,
+        "offset": 0,
+        "limit": 100,
         "entries": [
             {"key": "10.0.0.1", "use": 0, "exp": 100, "stores": {}},
             {"key": "10.0.0.2", "use": 0, "exp": 100, "stores": {}},
@@ -97,9 +103,9 @@ def test_clear_requires_admin(client):
     test the admin guard we override require_admin's underlying get_current_user
     with a viewer and check that the dependency rejects.
     """
-    from app.api.deps import get_current_user, require_admin
-    from app.models.models import User
+    from app.api.deps import get_current_user
     from app.main import app
+    from app.models.models import User
 
     viewer = User(username="viewer", role="viewer", is_admin=False, hashed_password="x")
     # require_admin calls get_current_user internally; override it to return a viewer

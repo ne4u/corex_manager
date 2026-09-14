@@ -1,9 +1,8 @@
 """Unit tests for the password policy service."""
-from datetime import datetime, timedelta, timezone
+
+from datetime import UTC, datetime, timedelta
 
 import pytest
-
-from app.core.security import get_password_hash
 from app.models.models import Setting, User
 from app.services.password_policy import (
     get_password_policy,
@@ -105,7 +104,7 @@ def test_is_password_expired_not_yet(db):
     user = User(
         username="u2",
         hashed_password="x",
-        password_changed_at=datetime.now(timezone.utc),
+        password_changed_at=datetime.now(UTC),
     )
     db.add(user)
     db.commit()
@@ -120,7 +119,7 @@ def test_is_password_expired_past(db):
     user = User(
         username="u3",
         hashed_password="x",
-        password_changed_at=datetime.now(timezone.utc) - timedelta(days=60),
+        password_changed_at=datetime.now(UTC) - timedelta(days=60),
     )
     db.add(user)
     db.commit()
@@ -134,7 +133,7 @@ def test_is_password_expired_falls_back_to_created_at(db):
     user = User(
         username="u4",
         hashed_password="x",
-        created_at=datetime.now(timezone.utc) - timedelta(days=60),
+        created_at=datetime.now(UTC) - timedelta(days=60),
     )
     db.add(user)
     db.commit()
@@ -143,6 +142,7 @@ def test_is_password_expired_falls_back_to_created_at(db):
     # otherwise set it on insert). This simulates a row where the backfill
     # didn't run or the column was manually cleared.
     from sqlalchemy import text
+
     db.execute(text("UPDATE users SET password_changed_at = NULL WHERE id = :id"), {"id": user.id})
     db.commit()
     db.refresh(user)
@@ -159,6 +159,7 @@ def test_is_password_expired_no_timestamps(db):
     db.refresh(user)
     # Force both timestamps to NULL to simulate a completely bare row.
     from sqlalchemy import text
+
     db.execute(
         text("UPDATE users SET password_changed_at = NULL, created_at = NULL WHERE id = :id"),
         {"id": user.id},

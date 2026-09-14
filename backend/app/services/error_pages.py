@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+
 from ..models.logging import CustomErrorPage
 from ..schemas.error_pages import (
     CustomErrorPageCreate,

@@ -4,11 +4,12 @@ from collections import OrderedDict
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
+
+from ..core.config import get_settings
 from ..core.database import get_db
 from ..core.security import decode_access_token
 from ..core.valkey_client import check_rate_limit, is_token_revoked
-from ..core.config import get_settings
-from ..models.models import User, UserTeam, Team
+from ..models.models import Team, User, UserTeam
 
 settings = get_settings()
 
@@ -28,7 +29,7 @@ ROLE_LEVEL = {
 # instance merged into the current session via db.merge(load=False), which
 # avoids a DB round-trip while keeping the object usable for column access.
 # ---------------------------------------------------------------------------
-_user_cache: "OrderedDict[str, tuple[float, User]]" = OrderedDict()
+_user_cache: OrderedDict[str, tuple[float, User]] = OrderedDict()
 _USER_CACHE_TTL = 30  # seconds
 _USER_CACHE_MAX = 256
 
@@ -133,13 +134,18 @@ def require_team_access(team_id: int):
 
     Admins always pass. Operators/viewers must have a UserTeam membership.
     """
+
     def _guard(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> User:
         if user.is_admin or user.role == "admin":
             return user
-        membership = db.query(UserTeam).filter(
-            UserTeam.user_id == user.id,
-            UserTeam.team_id == team_id,
-        ).first()
+        membership = (
+            db.query(UserTeam)
+            .filter(
+                UserTeam.user_id == user.id,
+                UserTeam.team_id == team_id,
+            )
+            .first()
+        )
         if not membership:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -154,7 +160,4 @@ def get_user_team_ids(db: Session, user: User) -> list[int]:
     """Return list of team IDs the user belongs to (admin = all teams)."""
     if user.is_admin or user.role == "admin":
         return [t.id for t in db.query(Team).all()]
-    return [
-        m.team_id for m in
-        db.query(UserTeam).filter(UserTeam.user_id == user.id).all()
-    ]
+    return [m.team_id for m in db.query(UserTeam).filter(UserTeam.user_id == user.id).all()]

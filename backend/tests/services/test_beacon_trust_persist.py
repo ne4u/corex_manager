@@ -1,7 +1,8 @@
 """Tests for the beacon_trust_persist service (table export parsing, Valkey
 round-trip, re-seed command generation).
 """
-from unittest.mock import patch, MagicMock
+
+from unittest.mock import MagicMock, patch
 
 from app.services import beacon_trust_persist
 

@@ -1,15 +1,16 @@
-import json
+from typing import Any
+
 import httpx
-from typing import Any, Dict, List, Optional, Tuple
+
 from ..core.config import get_settings
 
 settings = get_settings()
 
 
 def _client(
-    base_url: Optional[str] = None,
-    user: Optional[str] = None,
-    password: Optional[str] = None,
+    base_url: str | None = None,
+    user: str | None = None,
+    password: str | None = None,
 ) -> httpx.Client:
     """Build an httpx client for the Data Plane API.
 
@@ -42,10 +43,10 @@ def _convert_to_array(value: Any) -> Any:
 
 
 def get_info(
-    base_url: Optional[str] = None,
-    user: Optional[str] = None,
-    password: Optional[str] = None,
-) -> Dict[str, Any]:
+    base_url: str | None = None,
+    user: str | None = None,
+    password: str | None = None,
+) -> dict[str, Any]:
     """Get HAProxy process info from the Data Plane API.
 
     When ``base_url`` is provided, queries that specific instance (HA mode);
@@ -63,10 +64,10 @@ def get_info(
 
 
 def get_stats(
-    base_url: Optional[str] = None,
-    user: Optional[str] = None,
-    password: Optional[str] = None,
-) -> List[Dict[str, Any]]:
+    base_url: str | None = None,
+    user: str | None = None,
+    password: str | None = None,
+) -> list[dict[str, Any]]:
     """Get HAProxy stats from the Data Plane API.
 
     When ``base_url`` is provided, queries that specific instance (HA mode).
@@ -84,10 +85,10 @@ def get_stats(
 
 def push_config(
     config_text: str,
-    base_url: Optional[str] = None,
-    user: Optional[str] = None,
-    password: Optional[str] = None,
-) -> Dict[str, Any]:
+    base_url: str | None = None,
+    user: str | None = None,
+    password: str | None = None,
+) -> dict[str, Any]:
     """Push a raw HAProxy configuration to the Data Plane API.
 
     Uses the raw configuration endpoint, which replaces the active config.
@@ -136,10 +137,10 @@ def push_config(
 
 
 def reload_haproxy(
-    base_url: Optional[str] = None,
-    user: Optional[str] = None,
-    password: Optional[str] = None,
-) -> Dict[str, Any]:
+    base_url: str | None = None,
+    user: str | None = None,
+    password: str | None = None,
+) -> dict[str, Any]:
     """Trigger HAProxy reload through the Data Plane API.
 
     When ``base_url`` is provided, reloads that specific instance (HA mode).

@@ -1,21 +1,20 @@
 """Tests for the CRS downloader service."""
+
 import io
 import json
 import os
 import zipfile
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from app.services import crs_downloader
 from app.services.crs_downloader import (
+    _next_snapshot_id,
+    _prune_crs_snapshots,
+    delete_crs_snapshot,
     download_crs,
+    get_crs_status,
     list_crs_snapshots,
     rollback_crs,
-    delete_crs_snapshot,
-    get_crs_status,
-    _prune_crs_snapshots,
-    _next_snapshot_id,
 )
 from app.services.settings import get_setting, set_setting
 
@@ -25,9 +24,15 @@ def _make_crs_zip(version: str = "4.0.0") -> bytes:
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:
         top = f"coreruleset-{version}-minimal"
-        zf.writestr(f"{top}/crs-setup.conf.example", "# CRS setup\nSecDefaultAction \"phase:1,pass,nolog\"\n")
-        zf.writestr(f"{top}/rules/REQUEST-901-INITIALIZATION.conf", "# Init rules\nSecRule &TX:paranoia_level \"@eq 0\" \"id:901001,phase:1,pass,nolog\"\n")
-        zf.writestr(f"{top}/rules/REQUEST-949-BLOCKING-EVALUATION.conf", "# Blocking\nSecRule TX:anomaly_score @gt 5 \"id:949110,phase:1,deny\"\n")
+        zf.writestr(f"{top}/crs-setup.conf.example", '# CRS setup\nSecDefaultAction "phase:1,pass,nolog"\n')
+        zf.writestr(
+            f"{top}/rules/REQUEST-901-INITIALIZATION.conf",
+            '# Init rules\nSecRule &TX:paranoia_level "@eq 0" "id:901001,phase:1,pass,nolog"\n',
+        )
+        zf.writestr(
+            f"{top}/rules/REQUEST-949-BLOCKING-EVALUATION.conf",
+            '# Blocking\nSecRule TX:anomaly_score @gt 5 "id:949110,phase:1,deny"\n',
+        )
     return buf.getvalue()
 
 
@@ -137,7 +142,9 @@ def test_download_crs_network_error(db, tmp_path, monkeypatch):
     api_resp.json.return_value = _mock_github_response("v4.0.0")
     api_resp.raise_for_status = MagicMock()
 
-    with patch("app.services.crs_downloader.requests.get", side_effect=[api_resp, requests.RequestException("timeout")]):
+    with patch(
+        "app.services.crs_downloader.requests.get", side_effect=[api_resp, requests.RequestException("timeout")]
+    ):
         result = download_crs(db)
 
     assert result["ok"] is False
@@ -146,8 +153,36 @@ def test_download_crs_network_error(db, tmp_path, monkeypatch):
 
 def test_list_crs_snapshots_sorted_newest_first(db, monkeypatch):
     """Snapshots are sorted by created_at descending."""
-    set_setting(db, "crs_snapshot_1", json.dumps({"id": 1, "version": "v3.3.0", "dir_version": "3.3.0", "file_hash": "aaa", "file_path": "/x", "created_at": "2024-01-01T00:00:00", "created_by": "a"}))
-    set_setting(db, "crs_snapshot_2", json.dumps({"id": 2, "version": "v4.0.0", "dir_version": "4.0.0", "file_hash": "bbb", "file_path": "/y", "created_at": "2024-06-01T00:00:00", "created_by": "b"}))
+    set_setting(
+        db,
+        "crs_snapshot_1",
+        json.dumps(
+            {
+                "id": 1,
+                "version": "v3.3.0",
+                "dir_version": "3.3.0",
+                "file_hash": "aaa",
+                "file_path": "/x",
+                "created_at": "2024-01-01T00:00:00",
+                "created_by": "a",
+            }
+        ),
+    )
+    set_setting(
+        db,
+        "crs_snapshot_2",
+        json.dumps(
+            {
+                "id": 2,
+                "version": "v4.0.0",
+                "dir_version": "4.0.0",
+                "file_hash": "bbb",
+                "file_path": "/y",
+                "created_at": "2024-06-01T00:00:00",
+                "created_by": "b",
+            }
+        ),
+    )
 
     snapshots = list_crs_snapshots(db)
     assert len(snapshots) == 2
@@ -166,8 +201,36 @@ def test_rollback_crs_switches_active_version(db, tmp_path, monkeypatch):
         with open(os.path.join(d, "crs-setup.conf.example"), "w") as f:
             f.write("# setup\n")
 
-    set_setting(db, "crs_snapshot_1", json.dumps({"id": 1, "version": "v3.3.0", "dir_version": "3.3.0", "file_hash": "aaa", "file_path": "/x", "created_at": "2024-01-01T00:00:00", "created_by": "a"}))
-    set_setting(db, "crs_snapshot_2", json.dumps({"id": 2, "version": "v4.0.0", "dir_version": "4.0.0", "file_hash": "bbb", "file_path": "/y", "created_at": "2024-06-01T00:00:00", "created_by": "b"}))
+    set_setting(
+        db,
+        "crs_snapshot_1",
+        json.dumps(
+            {
+                "id": 1,
+                "version": "v3.3.0",
+                "dir_version": "3.3.0",
+                "file_hash": "aaa",
+                "file_path": "/x",
+                "created_at": "2024-01-01T00:00:00",
+                "created_by": "a",
+            }
+        ),
+    )
+    set_setting(
+        db,
+        "crs_snapshot_2",
+        json.dumps(
+            {
+                "id": 2,
+                "version": "v4.0.0",
+                "dir_version": "4.0.0",
+                "file_hash": "bbb",
+                "file_path": "/y",
+                "created_at": "2024-06-01T00:00:00",
+                "created_by": "b",
+            }
+        ),
+    )
     set_setting(db, "crs_active_version", "4.0.0")
 
     with patch("app.services.coraza_config.write_coraza_spoa_config"):
@@ -181,7 +244,21 @@ def test_rollback_crs_switches_active_version(db, tmp_path, monkeypatch):
 def test_rollback_crs_missing_files(db, tmp_path, monkeypatch):
     """Rollback fails if the version directory doesn't exist."""
     monkeypatch.setattr(crs_downloader.settings, "CRS_DIR", str(tmp_path))
-    set_setting(db, "crs_snapshot_1", json.dumps({"id": 1, "version": "v3.3.0", "dir_version": "3.3.0", "file_hash": "aaa", "file_path": "/x", "created_at": "2024-01-01T00:00:00", "created_by": "a"}))
+    set_setting(
+        db,
+        "crs_snapshot_1",
+        json.dumps(
+            {
+                "id": 1,
+                "version": "v3.3.0",
+                "dir_version": "3.3.0",
+                "file_hash": "aaa",
+                "file_path": "/x",
+                "created_at": "2024-01-01T00:00:00",
+                "created_by": "a",
+            }
+        ),
+    )
 
     result = rollback_crs(db, 1)
     assert result["ok"] is False
@@ -203,7 +280,21 @@ def test_delete_crs_snapshot_removes_record(db, tmp_path, monkeypatch):
     with open(os.path.join(d, "crs-setup.conf.example"), "w") as f:
         f.write("# setup\n")
 
-    set_setting(db, "crs_snapshot_1", json.dumps({"id": 1, "version": "v3.3.0", "dir_version": "3.3.0", "file_hash": "aaa", "file_path": d, "created_at": "2024-01-01T00:00:00", "created_by": "a"}))
+    set_setting(
+        db,
+        "crs_snapshot_1",
+        json.dumps(
+            {
+                "id": 1,
+                "version": "v3.3.0",
+                "dir_version": "3.3.0",
+                "file_hash": "aaa",
+                "file_path": d,
+                "created_at": "2024-01-01T00:00:00",
+                "created_by": "a",
+            }
+        ),
+    )
     set_setting(db, "crs_active_version", "4.0.0")
 
     result = delete_crs_snapshot(db, 1)
@@ -216,7 +307,21 @@ def test_delete_crs_snapshot_removes_record(db, tmp_path, monkeypatch):
 def test_delete_crs_snapshot_prevents_deleting_active(db, tmp_path, monkeypatch):
     """Cannot delete the active version's snapshot."""
     monkeypatch.setattr(crs_downloader.settings, "CRS_DIR", str(tmp_path))
-    set_setting(db, "crs_snapshot_1", json.dumps({"id": 1, "version": "v4.0.0", "dir_version": "4.0.0", "file_hash": "aaa", "file_path": "/x", "created_at": "2024-01-01T00:00:00", "created_by": "a"}))
+    set_setting(
+        db,
+        "crs_snapshot_1",
+        json.dumps(
+            {
+                "id": 1,
+                "version": "v4.0.0",
+                "dir_version": "4.0.0",
+                "file_hash": "aaa",
+                "file_path": "/x",
+                "created_at": "2024-01-01T00:00:00",
+                "created_by": "a",
+            }
+        ),
+    )
     set_setting(db, "crs_active_version", "4.0.0")
 
     result = delete_crs_snapshot(db, 1)
@@ -228,11 +333,21 @@ def test_prune_crs_snapshots_respects_max(db, monkeypatch):
     """Pruning removes oldest snapshots beyond the max."""
     monkeypatch.setattr(crs_downloader.settings, "CRS_SNAPSHOT_MAX", 2)
     for i in range(1, 5):
-        set_setting(db, f"crs_snapshot_{i}", json.dumps({
-            "id": i, "version": f"v{i}.0.0", "dir_version": f"{i}.0.0",
-            "file_hash": "x", "file_path": "/x",
-            "created_at": f"2024-0{i}-01T00:00:00", "created_by": "a",
-        }))
+        set_setting(
+            db,
+            f"crs_snapshot_{i}",
+            json.dumps(
+                {
+                    "id": i,
+                    "version": f"v{i}.0.0",
+                    "dir_version": f"{i}.0.0",
+                    "file_hash": "x",
+                    "file_path": "/x",
+                    "created_at": f"2024-0{i}-01T00:00:00",
+                    "created_by": "a",
+                }
+            ),
+        )
 
     removed = _prune_crs_snapshots(db)
     assert removed == 2

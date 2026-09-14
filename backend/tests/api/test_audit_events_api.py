@@ -1,7 +1,6 @@
 """Integration tests for the /audit-events endpoints."""
-import json
 
-import pytest
+from datetime import UTC
 
 
 def test_list_audit_events_empty(client, db):
@@ -67,8 +66,9 @@ def test_audit_events_filter_by_action(client, db):
 
 def test_audit_events_has_snapshot_filter(client, db):
     """Pending/applied filter uses last_applied_at timestamp, not snapshot_id FK."""
+    from datetime import datetime
+
     from app.services.settings import set_setting
-    from datetime import datetime, timedelta, timezone
 
     # Create a backend (will be pending — no last_applied_at set yet)
     client.post("/api/v1/backends", json={"name": "snap-filter-test", "protocol": "http"})
@@ -81,7 +81,7 @@ def test_audit_events_has_snapshot_filter(client, db):
     assert all(e["snapshot_id"] is None for e in events)
 
     # Set last_applied_at to now — the event was created before this, so it's applied
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     set_setting(db, "last_applied_at", now.isoformat())
     db.commit()
 
@@ -102,11 +102,12 @@ def test_audit_events_has_snapshot_filter(client, db):
 
 def test_audit_events_pending_after_apply_then_new_event(client, db):
     """After last_applied_at is set, new events show as pending, old as applied."""
+    from datetime import datetime, timedelta
+
     from app.services.settings import set_setting
-    from datetime import datetime, timedelta, timezone
 
     # Set last_applied_at to 10 minutes ago
-    past = datetime.now(timezone.utc) - timedelta(minutes=10)
+    past = datetime.now(UTC) - timedelta(minutes=10)
     set_setting(db, "last_applied_at", past.isoformat())
     db.commit()
 

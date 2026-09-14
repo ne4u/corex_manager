@@ -4,10 +4,10 @@ import os
 import re
 import threading
 import time
-import geoip2.database
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
+import geoip2.database
 from sqlalchemy.orm import Session
 
 from ..core.config import get_settings
@@ -28,11 +28,13 @@ _ACTIONS = {
 }
 
 _FIELD_RE = re.compile(r'\[(\w+) "([^"]*)"\]')
-_ACTION_RE = re.compile(r'Coraza:\s*(Access allowed|Access denied|Access dropped|Access redirected|Warning)(?:\s+\(phase \d+\))?\.' )
+_ACTION_RE = re.compile(
+    r"Coraza:\s*(Access allowed|Access denied|Access dropped|Access redirected|Warning)(?:\s+\(phase \d+\))?\."
+)
 
 # CRS anomaly-score messages include a varying total score. Collapse them into
 # a single breakdown key so they group together when breaking down by message.
-_ANOMALY_SCORE_RE = re.compile(r'^Inbound Anomaly Score Exceeded \(Total Score:?\s*[0-9]+\)$')
+_ANOMALY_SCORE_RE = re.compile(r"^Inbound Anomaly Score Exceeded \(Total Score:?\s*[0-9]+\)$")
 
 
 def _normalize_breakdown_value(breakdown: str, value: str) -> str:
@@ -54,8 +56,8 @@ def _action_from_message(message: str) -> str:
     return "unknown"
 
 
-def _parse_message(message: str) -> Dict[str, Any]:
-    fields: Dict[str, str] = {}
+def _parse_message(message: str) -> dict[str, Any]:
+    fields: dict[str, str] = {}
     for key, value in _FIELD_RE.findall(message):
         if key in ("id", "severity", "msg", "uri", "client", "unique_id") and value:
             fields[key] = value
@@ -85,7 +87,7 @@ def _parse_message(message: str) -> Dict[str, Any]:
     }
 
 
-def _stringify(value: Any) -> Optional[str]:
+def _stringify(value: Any) -> str | None:
     if value is None:
         return None
     if isinstance(value, str):
@@ -95,7 +97,7 @@ def _stringify(value: Any) -> Optional[str]:
     return str(value)
 
 
-def _action_from_match(match: Dict[str, Any]) -> Optional[str]:
+def _action_from_match(match: dict[str, Any]) -> str | None:
     action = match.get("action")
     if isinstance(action, str) and action:
         return action
@@ -112,10 +114,13 @@ def _action_from_match(match: Dict[str, Any]) -> Optional[str]:
     return None
 
 
-def _extract_from_match(match: Dict[str, Any], time: Any = None, level: Any = None) -> Optional[Dict[str, Any]]:
+def _extract_from_match(match: dict[str, Any], time: Any = None, level: Any = None) -> dict[str, Any] | None:
     if not isinstance(match, dict):
         return None
-    if not any(match.get(k) for k in ("action", "rule_id", "id", "msg", "message", "client", "uri", "unique_id", "file", "severity")):
+    if not any(
+        match.get(k)
+        for k in ("action", "rule_id", "id", "msg", "message", "client", "uri", "unique_id", "file", "severity")
+    ):
         return None
 
     rule_id_raw = match.get("rule_id")
@@ -138,7 +143,7 @@ def _extract_from_match(match: Dict[str, Any], time: Any = None, level: Any = No
     }
 
 
-def _parse_line(line: str) -> Optional[Dict[str, Any]]:
+def _parse_line(line: str) -> dict[str, Any] | None:
     line = line.strip()
     if not line:
         return None
@@ -198,7 +203,7 @@ def _parse_line(line: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def _geo_country(ip: Optional[str], reader: Optional[geoip2.database.Reader]) -> Optional[str]:
+def _geo_country(ip: str | None, reader: geoip2.database.Reader | None) -> str | None:
     if not ip or not reader:
         return "unknown"
     try:
@@ -215,7 +220,7 @@ def _offset_path() -> str:
 
 def _read_offset() -> int:
     try:
-        with open(_offset_path(), "r") as f:
+        with open(_offset_path()) as f:
             return int(f.read().strip() or "0")
     except Exception:
         return 0
@@ -238,7 +243,7 @@ def sample_waf_metrics() -> None:
         return
 
     db = None
-    reader: Optional[geoip2.database.Reader] = None
+    reader: geoip2.database.Reader | None = None
     try:
         last_offset = _read_offset()
         current_size = os.path.getsize(path)
@@ -255,7 +260,7 @@ def sample_waf_metrics() -> None:
             except Exception:
                 pass
 
-        with open(path, "r", encoding="utf-8", errors="replace") as f:
+        with open(path, encoding="utf-8", errors="replace") as f:
             f.seek(last_offset)
             for line in f:
                 parsed = _parse_line(line)
@@ -268,7 +273,7 @@ def sample_waf_metrics() -> None:
                     continue
                 parsed["country"] = _geo_country(parsed.get("client"), reader)
                 metric = WafMetric(
-                    captured_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                    captured_at=datetime.now(UTC).replace(tzinfo=None),
                     action=parsed["action"],
                     rule_id=parsed.get("rule_id"),
                     severity=parsed.get("severity"),
@@ -289,7 +294,7 @@ def sample_waf_metrics() -> None:
                 reader.close()
             except Exception:
                 pass
-        _write_offset(current_size if 'current_size' in locals() else 0)
+        _write_offset(current_size if "current_size" in locals() else 0)
         if db:
             try:
                 db.close()
@@ -298,13 +303,13 @@ def sample_waf_metrics() -> None:
 
 
 def prune_waf_metrics(db: Session) -> int:
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=settings.WAF_METRICS_RETENTION_DAYS)).replace(tzinfo=None)
+    cutoff = (datetime.now(UTC) - timedelta(days=settings.WAF_METRICS_RETENTION_DAYS)).replace(tzinfo=None)
     result = db.query(WafMetric).filter(WafMetric.captured_at < cutoff).delete()
     db.commit()
     return result
 
 
-def prune_waf_log_file(max_lines: Optional[int] = None) -> int:
+def prune_waf_log_file(max_lines: int | None = None) -> int:
     """Truncate the raw coraza-spoa.log file to the last ``max_lines`` lines.
 
     Returns the number of lines removed (0 if the file was already within the
@@ -322,7 +327,7 @@ def prune_waf_log_file(max_lines: Optional[int] = None) -> int:
         return 0
 
     try:
-        with open(path, "r", encoding="utf-8", errors="replace") as f:
+        with open(path, encoding="utf-8", errors="replace") as f:
             lines = f.readlines()
         if len(lines) <= max_lines:
             return 0
@@ -378,8 +383,8 @@ def start_waf_sampler() -> None:
 
 
 def _bucket(ts: datetime, step: int) -> datetime:
-    epoch = ts.replace(tzinfo=timezone.utc).timestamp()
-    return datetime.fromtimestamp((epoch // step) * step, tz=timezone.utc)
+    epoch = ts.replace(tzinfo=UTC).timestamp()
+    return datetime.fromtimestamp((epoch // step) * step, tz=UTC)
 
 
 def _auto_step(start: datetime, end: datetime) -> int:
@@ -399,11 +404,11 @@ def _auto_step(start: datetime, end: datetime) -> int:
 def get_waf_metrics(
     db: Session,
     start: datetime,
-    end: Optional[datetime] = None,
-    step: Optional[int] = None,
+    end: datetime | None = None,
+    step: int | None = None,
     breakdown: str = "action",
-) -> Dict[str, Any]:
-    end = (end or datetime.now(timezone.utc)).replace(tzinfo=None)
+) -> dict[str, Any]:
+    end = (end or datetime.now(UTC)).replace(tzinfo=None)
     start = start.replace(tzinfo=None) if start else (end - timedelta(minutes=5))
     step = step or _auto_step(start, end)
 
@@ -421,7 +426,7 @@ def get_waf_metrics(
         return {"time": [], "series": [], "breakdown": breakdown, "totals": {}}
 
     # Build time buckets and series by breakdown value
-    buckets: Dict[datetime, List[WafMetric]] = {}
+    buckets: dict[datetime, list[WafMetric]] = {}
     for row in rows:
         ts = _bucket(row.captured_at, step)
         buckets.setdefault(ts, []).append(row)
@@ -433,13 +438,13 @@ def get_waf_metrics(
         series_keys.add(value)
 
     # Count totals per breakdown key
-    totals: Dict[str, int] = {}
+    totals: dict[str, int] = {}
     for row in rows:
         value = _normalize_breakdown_value(breakdown, getattr(row, breakdown) or "unknown")
         totals[value] = totals.get(value, 0) + 1
 
     timestamps = sorted(buckets)
-    series: List[Dict[str, Any]] = []
+    series: list[dict[str, Any]] = []
     for key in sorted(series_keys):
         data = []
         for ts in timestamps:
@@ -457,4 +462,3 @@ def get_waf_metrics(
         "breakdown": breakdown,
         "totals": totals,
     }
-

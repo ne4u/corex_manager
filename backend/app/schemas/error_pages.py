@@ -1,11 +1,11 @@
-from datetime import datetime
-from typing import Optional, List, Dict, Any, Type, TypeVar
-from pydantic import BaseModel, Field, model_validator, field_validator, ConfigDict
+from pydantic import BaseModel, ConfigDict
+
 from ._base import _optional_update
 
+
 class CustomErrorPageBase(BaseModel):
-    listener_id: Optional[int] = None
-    listener_ids: Optional[List[int]] = None
+    listener_id: int | None = None
+    listener_ids: list[int] | None = None
     code: int
     content_type: str = "text/html"
     content: str
@@ -29,4 +29,10 @@ class CustomErrorPagePreview(BaseModel):
     content_type: str = "text/html"
 
 
-__all__ = ['CustomErrorPageBase', 'CustomErrorPageCreate', 'CustomErrorPagePreview', 'CustomErrorPageResponse', 'CustomErrorPageUpdate']
+__all__ = [
+    "CustomErrorPageBase",
+    "CustomErrorPageCreate",
+    "CustomErrorPagePreview",
+    "CustomErrorPageResponse",
+    "CustomErrorPageUpdate",
+]
