@@ -926,6 +926,8 @@
       "maxDimensionHelp": "Maximale Bildabmessung in Pixeln (Breite oder Höhe). Größere Bilder werden unverändert durchgelassen.",
       "maxFileSize": "Max Dateigröße (Bytes)",
       "maxFileSizeHelp": "Maximale Antwortkörpergröße in Bytes für Konvertierung. Größere Körper werden unverändert durchgelassen.",
+      "minFileSize": "Min. Dateigröße (Bytes)",
+      "minFileSizeHelp": "Minimale Antwortkörpergröße in Bytes für Konvertierung. Kleinere Körper werden unverändert durchgelassen. 0 deaktiviert die Grenze.",
       "sourceTypes": "Quelltypen",
       "sourceTypesHelp": "Kommagetrennte MIME-Typ-Präfixe für Konvertierung. Standard: image/jpeg,image/png,image/gif",
       "sourceTypesPlaceholder": "image/jpeg,image/png,image/gif"

@@ -1,7 +1,7 @@
 //! HAProxy filter for on-the-fly image-to-WebP conversion.
 //!
 //! Registers the `lua.img_2_webp` filter, declared per-backend:
-//!   `filter lua.img_2_webp quality:80 max_size:10000000 max_dim:4096`
+//!   `filter lua.img_2_webp quality:80 min_size:1024 max_size:10000000 max_dim:4096`
 //!
 //! The filter performs content negotiation based on the request's `Accept`
 //! header. When the client accepts `image/webp` and the response is an
@@ -136,6 +136,11 @@ pub struct Img2WebpFilter {
 struct Img2WebpOptions {
     /// WebP encoding quality (0.0-100.0). 100 = lossless-ish, 0 = worst.
     quality: f32,
+    /// Minimum response body size (bytes) to attempt converting. Smaller
+    /// responses pass through unchanged: below ~1KB the WebP container and
+    /// bitstream overhead mean conversion rarely wins, and the decode/encode
+    /// CPU cost is pure waste. 0 disables the floor.
+    min_size: usize,
     /// Maximum response body size (bytes) to attempt converting. Larger
     /// responses pass through unchanged to avoid OOM and high latency.
     max_size: usize,
@@ -160,6 +165,7 @@ impl Default for Img2WebpOptions {
     fn default() -> Self {
         Img2WebpOptions {
             quality: 80.0,
+            min_size: 1024, // 1 KB
             max_size: 10_000_000, // 10 MB
             max_dim: 4096,
             source_types: DEFAULT_SOURCE_TYPES.iter().map(|s| s.to_string()).collect(),
@@ -224,7 +230,7 @@ impl Img2WebpFilter {
             return Ok(());
         }
 
-        // Require a known Content-Length and enforce max_size up front.
+        // Require a known Content-Length and enforce min_size/max_size up front.
         //
         // The decision must be made here, in the http_headers phase, because
         // Content-Type is committed here and cannot be changed later. Deciding
@@ -239,7 +245,7 @@ impl Img2WebpFilter {
             Some(cl) => cl as usize,
             None => return Ok(()),
         };
-        if content_length > self.options.max_size {
+        if content_length < self.options.min_size || content_length > self.options.max_size {
             return Ok(());
         }
 
@@ -510,6 +516,10 @@ impl Img2WebpFilter {
             if let Some(val) = arg.strip_prefix("quality:") {
                 if let Ok(q) = val.trim().parse::<f32>() {
                     options.quality = q.clamp(0.0, 100.0);
+                }
+            } else if let Some(val) = arg.strip_prefix("min_size:") {
+                if let Ok(s) = val.trim().parse::<usize>() {
+                    options.min_size = s;
                 }
             } else if let Some(val) = arg.strip_prefix("max_size:") {
                 if let Ok(s) = val.trim().parse::<usize>() {

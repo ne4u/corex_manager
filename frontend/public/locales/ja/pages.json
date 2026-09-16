@@ -926,6 +926,8 @@
       "maxDimensionHelp": "Maximum image dimension in pixels (width or height). Larger images pass through unchanged.",
       "maxFileSize": "最大ファイルサイズ (バイト)",
       "maxFileSizeHelp": "Maximum response body size in bytes to attempt converting. Larger bodies pass through unchanged.",
+      "minFileSize": "最小ファイルサイズ (バイト)",
+      "minFileSizeHelp": "Minimum response body size in bytes to attempt converting. Smaller bodies pass through unchanged. Set to 0 to disable.",
       "sourceTypes": "ソースタイプ",
       "sourceTypesHelp": "Comma-separated source MIME-type prefixes eligible for conversion. Default: image/jpeg,image/png,image/gif",
       "sourceTypesPlaceholder": "image/jpeg,image/png,image/gif"

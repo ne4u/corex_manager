@@ -926,6 +926,8 @@
       "maxDimensionHelp": "Dimensione massima in pixel.",
       "maxFileSize": "Dimensione max file (byte)",
       "maxFileSizeHelp": "Dimensione massima in byte per conversione.",
+      "minFileSize": "Dimensione min file (byte)",
+      "minFileSizeHelp": "Dimensione minima in byte per conversione. 0 disattiva il limite.",
       "sourceTypes": "Tipi sorgente",
       "sourceTypesHelp": "Prefissi MIME separati da virgole.",
       "sourceTypesPlaceholder": "image/jpeg,image/png,image/gif"

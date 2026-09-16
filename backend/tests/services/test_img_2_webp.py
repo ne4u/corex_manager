@@ -84,6 +84,34 @@ def test_img_2_webp_max_size_and_max_dim(db):
     assert "max_dim:2048" in cfg
 
 
+def test_img_2_webp_min_size_default(db):
+    """min_size defaults to IMG_2_WEBP_MIN_FILE_SIZE (1KB) when not set."""
+    backend = make_backend(db)
+    backend.options = {"img_2_webp_enabled": True}
+    make_server(db, backend.id)
+    cfg = haproxy.generate_config(db, img_2_webp_enabled_override=True)
+    assert "min_size:1024" in cfg
+
+
+def test_img_2_webp_min_size_explicit(db):
+    """img_2_webp_min_size option is emitted in the filter line."""
+    backend = make_backend(db)
+    backend.options = {"img_2_webp_enabled": True, "img_2_webp_min_size": 4096}
+    make_server(db, backend.id)
+    cfg = haproxy.generate_config(db, img_2_webp_enabled_override=True)
+    assert "min_size:4096" in cfg
+
+
+def test_img_2_webp_min_size_zero_disables(db):
+    """An explicit img_2_webp_min_size of 0 is emitted as 0 (floor disabled),
+    not silently replaced by the default."""
+    backend = make_backend(db)
+    backend.options = {"img_2_webp_enabled": True, "img_2_webp_min_size": 0}
+    make_server(db, backend.id)
+    cfg = haproxy.generate_config(db, img_2_webp_enabled_override=True)
+    assert "min_size:0" in cfg
+
+
 def test_img_2_webp_source_types(db):
     """source_types option is emitted as type: argument."""
     backend = make_backend(db)

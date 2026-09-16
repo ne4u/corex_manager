@@ -230,6 +230,10 @@ class Settings(BaseSettings):
     # cache entries for WebP vs original).
     IMG_2_WEBP_ENABLED: bool = False
     IMG_2_WEBP_DEFAULT_QUALITY: int = 80
+    # Minimum response body size to attempt converting. Below ~1KB the WebP
+    # container/bitstream overhead means conversion rarely wins, and the
+    # decode+encode CPU is pure waste. 0 disables the floor.
+    IMG_2_WEBP_MIN_FILE_SIZE: int = 1_024  # 1 KB
     IMG_2_WEBP_MAX_FILE_SIZE: int = 10_000_000  # 10 MB
     IMG_2_WEBP_MAX_DIMENSIONS: int = 4096
     # Optional `tune.bufsize` override for image conversion. 0 = do not emit

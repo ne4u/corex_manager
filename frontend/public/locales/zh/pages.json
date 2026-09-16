@@ -926,6 +926,8 @@
       "maxDimensionHelp": "最大图像尺寸 (像素)。",
       "maxFileSize": "最大文件大小 (字节)",
       "maxFileSizeHelp": "最大响应体大小 (字节)。",
+      "minFileSize": "最小文件大小 (字节)",
+      "minFileSizeHelp": "最小响应体大小 (字节)，低于此值不转换。0 表示禁用。",
       "sourceTypes": "源类型",
       "sourceTypesHelp": "逗号分隔的 MIME 类型前缀。",
       "sourceTypesPlaceholder": "image/jpeg,image/png,image/gif"

@@ -365,6 +365,16 @@ export default function Backends() {
                     />
                   </div>
                   <div>
+                    <LabelWithTooltip tooltip={t('pages:backends.imageConversion.minFileSizeHelp')}>{t('pages:backends.imageConversion.minFileSize')}</LabelWithTooltip>
+                    <input
+                      type="number"
+                      className="input"
+                      min={0}
+                      value={form.options?.img_2_webp_min_size ?? 1024}
+                      onChange={e => setForm({ ...form, options: { ...form.options, img_2_webp_min_size: Number(e.target.value) } })}
+                    />
+                  </div>
+                  <div>
                     <LabelWithTooltip tooltip={t('pages:backends.imageConversion.maxFileSizeHelp')}>{t('pages:backends.imageConversion.maxFileSize')}</LabelWithTooltip>
                     <input
                       type="number"

@@ -1651,6 +1651,7 @@ def _emit_img_2_webp_filter(
     Reads image conversion settings from ``backend.options``:
       - ``img_2_webp_enabled``: bool — enable conversion for this backend
       - ``img_2_webp_quality``: WebP quality 0-100 (default 80)
+      - ``img_2_webp_min_size``: min response body size in bytes (default 1KB)
       - ``img_2_webp_max_size``: max response body size in bytes (default 10MB)
       - ``img_2_webp_max_dim``: max image dimension in pixels (default 4096)
       - ``img_2_webp_source_types``: comma-separated source MIME prefixes
@@ -1693,6 +1694,12 @@ def _emit_img_2_webp_filter(
     quality = int(
         opts.get("img_2_webp_quality", settings.IMG_2_WEBP_DEFAULT_QUALITY) or settings.IMG_2_WEBP_DEFAULT_QUALITY
     )
+    # Explicit 0 is meaningful here (disables the floor), so don't use
+    # `or` — it would silently replace 0 with the default.
+    min_size_opt = opts.get("img_2_webp_min_size")
+    min_size = int(
+        min_size_opt if min_size_opt is not None else settings.IMG_2_WEBP_MIN_FILE_SIZE
+    )
     max_size = int(
         opts.get("img_2_webp_max_size", settings.IMG_2_WEBP_MAX_FILE_SIZE) or settings.IMG_2_WEBP_MAX_FILE_SIZE
     )
@@ -1707,6 +1714,7 @@ def _emit_img_2_webp_filter(
 
     args = [
         f"quality:{max(0, min(100, quality))}",
+        f"min_size:{max(0, min_size)}",
         f"max_size:{max(1, max_size)}",
         f"max_dim:{max(1, max_dim)}",
         f"max_buffer:{max_buffer}",

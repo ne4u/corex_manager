@@ -926,6 +926,8 @@
       "maxDimensionHelp": "Максимальный размер в пикселях.",
       "maxFileSize": "Макс размер файла (байт)",
       "maxFileSizeHelp": "Максимальный размер в байтах для конвертации.",
+      "minFileSize": "Минимальный размер файла (байт)",
+      "minFileSizeHelp": "Минимальный размер в байтах для конвертации. 0 отключает ограничение.",
       "sourceTypes": "Типы источника",
       "sourceTypesHelp": "Префиксы MIME через запятую.",
       "sourceTypesPlaceholder": "image/jpeg,image/png,image/gif"
