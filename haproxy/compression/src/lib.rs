@@ -6,10 +6,24 @@ use haproxy_api::{Core, FilterMethod, FilterResult, Headers, HttpMessage, Txn, U
 use mlua::prelude::{Lua, LuaResult, LuaTable, LuaUserData, LuaValue};
 use zstd::stream::Encoder as ZstdEncoder;
 
-/// Chunk size for send()-based EOM flush. Conservative for the default
+/// Initial chunk size for send()-based EOM flush. Conservative for the default
 /// tune.bufsize of 16384 — using a larger value causes send() to fail
 /// immediately when the channel buffer is smaller than the chunk.
 const EOM_SEND_CHUNK: usize = 12288;
+
+/// Minimum chunk size for send()-based EOM flush. Allows progress even when
+/// the channel's available HTX data space is very small (e.g. after headers or
+/// with a small tune.bufsize).
+const EOM_MIN_SEND_CHUNK: usize = 1024;
+
+/// Maximum send() attempts within a single http_payload callback to avoid
+/// spinning if the channel repeatedly refuses data.
+const EOM_MAX_SEND_ATTEMPTS: u32 = 64;
+
+/// Maximum consecutive http_payload callbacks with zero forward progress
+/// before giving up on the EOM flush. Prevents holding a stream forever when
+/// the client/downstream is not draining.
+const EOM_MAX_STALLED_CALLBACKS: u32 = 100;
 
 /// Global cumulative counter of bytes saved by brotli/zstd compression.
 ///
@@ -73,14 +87,13 @@ impl Encoder {
             // brotlic::CompressorWriter::into_inner returns
             // Result<Vec<u8>, IntoInnerError<CompressorWriter<Vec<u8>>>>
             // — map the IntoInnerError to io::Error.
-            Encoder::Brotli(w) => w.into_inner().map_err(|e| std::io::Error::other(e)),
+            Encoder::Brotli(w) => w.into_inner().map_err(std::io::Error::other),
             Encoder::Zstd(w) => w.finish(),
         }
     }
 }
 
 /// A Lua filter that applies brotli or zstd compression to HTTP responses.
-#[derive(Default)]
 pub struct CompressionFilter {
     enabled: bool,
     /// The encoding negotiated for this request ("br" or "zstd").
@@ -105,6 +118,11 @@ pub struct CompressionFilter {
     /// True when we've entered the EOM flush phase (encoder finalized,
     /// EOM unset, pending_out being drained via send()).
     eom_flushing: bool,
+    /// Current send() chunk size during the EOM flush phase. Halved on
+    /// backpressure to make progress with small available HTX space.
+    flush_chunk: usize,
+    /// Consecutive EOM-flush callbacks with no forward progress.
+    flush_stalled: u32,
 }
 
 /// Options for the compression filter.
@@ -120,6 +138,24 @@ struct CompressionFilterOptions {
 }
 
 impl LuaUserData for CompressionFilterOptions {}
+
+impl Default for CompressionFilter {
+    fn default() -> Self {
+        CompressionFilter {
+            enabled: false,
+            encoding: String::new(),
+            writer: None,
+            original_bytes: 0,
+            options: CompressionFilterOptions::default(),
+            body_buf: Vec::new(),
+            pending_out: Vec::new(),
+            pending_pos: 0,
+            eom_flushing: false,
+            flush_chunk: EOM_SEND_CHUNK,
+            flush_stalled: 0,
+        }
+    }
+}
 
 impl Default for CompressionFilterOptions {
     fn default() -> Self {
@@ -254,24 +290,69 @@ impl CompressionFilter {
     }
 
     /// Send pending compressed output (from the EOM flush phase) via msg.send().
-    /// Returns the number of bytes sent in this call. send() returns 0 on
-    /// backpressure (not an error), so the caller can retry on the next
-    /// http_payload callback without propagating a 500.
-    fn flush_pending(&mut self, msg: &HttpMessage) -> LuaResult<usize> {
-        let mut total_sent = 0;
-        while self.pending_pos < self.pending_out.len() {
+    ///
+    /// `msg.send()` inserts data at the filter position and immediately
+    /// forwards it. It returns the number of bytes sent, or -1 when the
+    /// channel's free HTX space is too small for the requested chunk.
+    ///
+    /// To avoid getting stuck when the buffer only has a small amount of free
+    /// space, the requested chunk size is halved on each refusal until it
+    /// reaches `EOM_MIN_SEND_CHUNK`. If the channel still cannot accept the
+    /// minimum chunk, we stop and wait for the next `http_payload` callback.
+    fn flush_pending(&mut self, lua: &Lua, msg: &HttpMessage) -> LuaResult<usize> {
+        let before = self.pending_pos;
+        let mut attempts = 0;
+
+        while self.pending_pos < self.pending_out.len() && attempts < EOM_MAX_SEND_ATTEMPTS {
+            attempts += 1;
             let remaining = self.pending_out.len() - self.pending_pos;
-            let n = remaining.min(EOM_SEND_CHUNK);
+            let n = remaining.min(self.flush_chunk);
             let sent = msg.send(&self.pending_out[self.pending_pos..self.pending_pos + n])?;
             if sent > 0 {
                 self.pending_pos += sent as usize;
-                total_sent += sent as usize;
+                // Reset chunk to the default after forward progress so the next
+                // callback starts with the largest feasible chunk.
+                self.flush_chunk = EOM_SEND_CHUNK;
                 continue;
             }
-            // send() refused (channel full) — stop and wait for next callback.
+            // send() returned 0 or -1 (channel full). Try a smaller chunk.
+            if self.flush_chunk > EOM_MIN_SEND_CHUNK {
+                self.flush_chunk = (self.flush_chunk / 2).max(EOM_MIN_SEND_CHUNK);
+                continue;
+            }
+            // No room even for the minimum chunk; stop and wait for the next
+            // http_payload callback after the mux drains the buffer.
             break;
         }
-        Ok(total_sent)
+
+        if self.pending_pos > before {
+            self.flush_stalled = 0;
+        } else if self.eom_flushing && self.pending_pos < self.pending_out.len() {
+            self.flush_stalled += 1;
+            if self.flush_stalled >= EOM_MAX_STALLED_CALLBACKS {
+                if let Ok(core) = Core::new(lua) {
+                    let _ = core.log(
+                        haproxy_api::LogLevel::Err,
+                        format!(
+                            "compression: EOM flush stalled for {} callbacks; giving up with {} of {} bytes unsent",
+                            self.flush_stalled,
+                            self.pending_out.len() - self.pending_pos,
+                            self.pending_out.len()
+                        ),
+                    );
+                }
+                // Release the message rather than holding the stream forever.
+                // We re-set EOM so the response stream terminates cleanly even
+                // though the tail was truncated; the client sees a partial body.
+                self.eom_flushing = false;
+                self.pending_out.clear();
+                self.pending_pos = 0;
+                self.flush_chunk = EOM_SEND_CHUNK;
+                msg.set_eom(true)?;
+            }
+        }
+
+        Ok(self.pending_pos - before)
     }
 
     /// Parse the Accept-Encoding header and return the preferred encoding
@@ -400,14 +481,14 @@ impl UserFilter for CompressionFilter {
         Ok(FilterResult::Continue)
     }
 
-    fn http_payload(&mut self, _: &Lua, _: Txn, msg: HttpMessage) -> LuaResult<Option<usize>> {
+    fn http_payload(&mut self, lua: &Lua, _: Txn, msg: HttpMessage) -> LuaResult<Option<usize>> {
         // --- EOM flush phase: drain pending compressed output via send() ---
         // This phase is entered when msg.set() at EOM can't hold the entire
         // compressed payload. We unset EOM, buffer the compressed data, and
-        // send() it in chunks across multiple callbacks. send() returns 0
-        // on backpressure (not an error), so we can retry without a 500.
+        // send() it in chunks across multiple callbacks. send() returns -1 or
+        // 0 on backpressure (not an error), so we can retry without a 500.
         if self.eom_flushing {
-            let _sent = self.flush_pending(&msg)?;
+            let _sent = self.flush_pending(lua, &msg)?;
             if self.pending_pos >= self.pending_out.len() {
                 // All compressed output sent — re-set EOM.
                 self.pending_out.clear();
@@ -475,18 +556,22 @@ impl UserFilter for CompressionFilter {
                 }
 
                 // Remove the raw chunk from the channel, then try to set
-                // the compressed data in its place.
+                // the compressed data in its place. Note: http_msg:set()
+                // returns -1 (not a Lua error) when the data doesn't fit,
+                // so the return value must be checked, not is_err().
                 msg.remove(None, None)?;
-                if msg.set(&data, None, None).is_err() {
+                if msg.set(&data, None, None)? < 0 {
                     // msg.set() failed — compressed data exceeds
                     // htx_free_data_space(). Fall back to send()-based
                     // flushing: unset EOM, buffer the compressed data,
                     // and send() it in chunks across multiple callbacks.
                     msg.set_eom(false)?;
+                    self.flush_chunk = EOM_SEND_CHUNK;
+                    self.flush_stalled = 0;
                     self.pending_out = data;
                     self.pending_pos = 0;
                     self.eom_flushing = true;
-                    let _sent = self.flush_pending(&msg)?;
+                    let _sent = self.flush_pending(lua, &msg)?;
                     if self.pending_pos >= self.pending_out.len() {
                         self.pending_out.clear();
                         self.pending_pos = 0;
