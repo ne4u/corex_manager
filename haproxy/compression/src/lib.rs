@@ -57,21 +57,9 @@ impl Write for Encoder {
 }
 
 impl Encoder {
-    /// Borrow the inner output buffer (compressed bytes produced so far).
-    /// Currently unused (body buffering approach doesn't drain mid-stream),
-    /// but retained for potential future streaming use.
-    #[allow(dead_code)]
-    fn get_ref(&self) -> &Vec<u8> {
-        match self {
-            Encoder::Brotli(w) => w.get_ref(),
-            Encoder::Zstd(w) => w.get_ref(),
-        }
-    }
-
-    /// Mutably borrow the inner output buffer (for draining via `clear()`).
-    /// Currently unused (body buffering approach doesn't drain mid-stream),
-    /// but retained for potential future streaming use.
-    #[allow(dead_code)]
+    /// Mutably borrow the inner output buffer. Compressed bytes produced by
+    /// `write()` accumulate here; the payload callback drains them into
+    /// `pending_out` via `Vec::append`.
     fn get_mut(&mut self) -> &mut Vec<u8> {
         match self {
             Encoder::Brotli(w) => w.get_mut(),
@@ -103,15 +91,12 @@ pub struct CompressionFilter {
     /// encoder for this response. Used at EOM to compute bytes saved.
     original_bytes: u64,
     options: CompressionFilterOptions,
-    /// Buffered raw response body (accumulated until EOM, then compressed).
-    /// We buffer the full body rather than streaming through the encoder
-    /// because brotli's flush() produces partial metadata blocks that cause
-    /// ERR_CONTENT_DECODING_FAILED under HTTP/2 multiplexing.
-    body_buf: Vec<u8>,
-    // --- EOM flush state (send()-based fallback for large compressed output) ---
-    /// When non-empty, compressed output that hasn't been fully sent yet.
-    /// Populated at EOM when msg.set() can't hold the entire compressed
-    /// payload. Drained across multiple http_payload callbacks via send().
+    // --- Output staging (send()-based forwarding of compressed output) ---
+    /// Compressed bytes produced by the encoder but not yet sent. Input is
+    /// streamed through the encoder per payload callback (never flush()ed
+    /// mid-stream — brotli flush() emits partial metadata blocks that cause
+    /// ERR_CONTENT_DECODING_FAILED under HTTP/2 multiplexing) and produced
+    /// output is staged here for send() draining.
     pending_out: Vec<u8>,
     /// Current read position within `pending_out`.
     pending_pos: usize,
@@ -147,7 +132,6 @@ impl Default for CompressionFilter {
             writer: None,
             original_bytes: 0,
             options: CompressionFilterOptions::default(),
-            body_buf: Vec::new(),
             pending_out: Vec::new(),
             pending_pos: 0,
             eom_flushing: false,
@@ -228,6 +212,18 @@ impl CompressionFilter {
                 skip_encoding = !found;
             }
         }
+        // Do not encode responses with no defined transfer length
+        // (close-delimited bodies): their end is signalled only by the
+        // connection closing and HTX_FL_EOM is never set, so the filter
+        // cannot reliably detect end-of-body to finalize the compressed
+        // stream. Mirrors HAProxy's native compression filter which requires
+        // HTTP_MSGF_XFER_LEN.
+        skip_encoding |= !headers.get_first::<LuaValue>("content-length")?.is_some()
+            && !headers
+                .get::<String>("transfer-encoding")?
+                .iter()
+                .any(|v| v.to_ascii_lowercase().contains("chunked"));
+
         if skip_encoding {
             return Ok(());
         }
@@ -483,10 +479,10 @@ impl UserFilter for CompressionFilter {
 
     fn http_payload(&mut self, lua: &Lua, _: Txn, msg: HttpMessage) -> LuaResult<Option<usize>> {
         // --- EOM flush phase: drain pending compressed output via send() ---
-        // This phase is entered when msg.set() at EOM can't hold the entire
-        // compressed payload. We unset EOM, buffer the compressed data, and
-        // send() it in chunks across multiple callbacks. send() returns -1 or
-        // 0 on backpressure (not an error), so we can retry without a 500.
+        // Entered at end-of-message when the encoder's final output could not
+        // be flushed in a single callback. EOM is unset while output remains
+        // so the response cannot terminate early. send() returns -1 or 0 on
+        // backpressure (not an error), so we can retry without a 500.
         if self.eom_flushing {
             let _sent = self.flush_pending(lua, &msg)?;
             if self.pending_pos >= self.pending_out.len() {
@@ -506,84 +502,105 @@ impl UserFilter for CompressionFilter {
             return Ok(None);
         }
 
-        if let Some(chunk) = msg.body(None, Some(-1))? {
-            let chunk_bytes = chunk.as_bytes();
-            let chunk: &[u8] = &chunk_bytes;
+        // Sample EOM before touching the body: msg.remove() may discard
+        // trailing non-DATA blocks (the EOM/EOT marker), and msg.body()
+        // returns nil once the channel is input-closed with no data left —
+        // e.g. when the final DATA block was consumed in an earlier callback
+        // and only the EOM marker arrives in this one. Handling EOM only
+        // inside `if let Some(chunk) = body()` would silently drop the whole
+        // response body in that case.
+        let eom = msg.eom()?;
 
-            if !msg.eom()? {
-                // Mid-stream: buffer the raw chunk and remove it from the
-                // channel. We compress the entire body at EOM rather than
-                // streaming through the encoder, because brotli's flush()
-                // produces partial metadata blocks that cause
-                // ERR_CONTENT_DECODING_FAILED under HTTP/2 multiplexing.
-                if !chunk.is_empty() {
-                    self.body_buf.extend_from_slice(chunk);
-                    self.original_bytes += chunk.len() as u64;
-                }
-                msg.remove(None, None)?;
-            } else {
-                // End of message: append the final chunk, then compress
-                // the entire buffered body in one shot.
-                if !chunk.is_empty() {
-                    self.body_buf.extend_from_slice(chunk);
-                    self.original_bytes += chunk.len() as u64;
-                }
-
-                // Write the full body to the encoder and finalize.
-                {
-                    let writer = self
-                        .writer
-                        .as_mut()
-                        .expect("Compression writer must exist at EOM");
-                    writer
-                        .write_all(&self.body_buf)
-                        .expect("Failed to write body to compression encoder");
-                }
-                self.body_buf.clear();
-
-                let encoder = self
-                    .writer
-                    .take()
-                    .expect("Compression writer must exist at EOM");
-                let data = encoder
-                    .finish()
-                    .expect("Failed to finalize compression encoder");
-
-                // Accumulate bytes saved (original - compressed).
-                let compressed_size = data.len() as u64;
-                if self.original_bytes > compressed_size {
-                    BYTES_SAVED.fetch_add(self.original_bytes - compressed_size, Ordering::Relaxed);
-                }
-
-                // Remove the raw chunk from the channel, then try to set
-                // the compressed data in its place. Note: http_msg:set()
-                // returns -1 (not a Lua error) when the data doesn't fit,
-                // so the return value must be checked, not is_err().
-                msg.remove(None, None)?;
-                if msg.set(&data, None, None)? < 0 {
-                    // msg.set() failed — compressed data exceeds
-                    // htx_free_data_space(). Fall back to send()-based
-                    // flushing: unset EOM, buffer the compressed data,
-                    // and send() it in chunks across multiple callbacks.
+        // Drain output produced by an earlier chunk before consuming more
+        // input. send() inserts at the filter's current offset — before any
+        // held input — so ordering is preserved, and holding the input while
+        // output is pending applies backpressure to the upstream producer.
+        if self.pending_pos < self.pending_out.len() {
+            self.flush_pending(lua, &msg)?;
+            if self.pending_pos < self.pending_out.len() {
+                // Could not finish draining. If input is still held in the
+                // channel the response cannot end anyway (unconsumed data
+                // blocks the ENDING state), so plain backpressure suffices.
+                // With no input left, the EOM marker alone would let the
+                // response complete while output is still pending — hide it
+                // and finish via the flush phase.
+                if eom && msg.input()? == 0 {
                     msg.set_eom(false)?;
-                    self.flush_chunk = EOM_SEND_CHUNK;
-                    self.flush_stalled = 0;
-                    self.pending_out = data;
-                    self.pending_pos = 0;
                     self.eom_flushing = true;
-                    let _sent = self.flush_pending(lua, &msg)?;
-                    if self.pending_pos >= self.pending_out.len() {
-                        self.pending_out.clear();
-                        self.pending_pos = 0;
-                        self.eom_flushing = false;
-                        msg.set_eom(true)?;
-                        return Ok(None);
-                    }
-                    // Still have pending output — hold the stream.
-                    return Ok(Some(0));
                 }
+                return Ok(Some(0));
             }
+            self.pending_out.clear();
+            self.pending_pos = 0;
         }
+
+        // Consume available input: feed it to the encoder, move whatever
+        // output it produced into pending_out, and remove the raw bytes from
+        // the channel. Compressing incrementally spreads the CPU cost over
+        // every payload callback instead of one large synchronous burst at
+        // EOM — a multi-MB compress call blocks the worker thread long
+        // enough to starve other streams (e.g. SPOE/WAF processing), which
+        // surfaced as intermittent 500s under load.
+        if let Some(chunk) = msg.body(None, Some(-1))? {
+            let chunk = chunk.as_bytes();
+            if !chunk.is_empty() {
+                let writer = self
+                    .writer
+                    .as_mut()
+                    .expect("Compression writer must exist");
+                writer
+                    .write_all(&chunk)
+                    .expect("Failed to write to compression encoder");
+                self.original_bytes += chunk.len() as u64;
+                self.pending_out.append(writer.get_mut());
+            }
+            msg.remove(None, None)?;
+
+            // The input's buffer space is now free — flush what was produced.
+            self.flush_pending(lua, &msg)?;
+            if self.pending_pos < self.pending_out.len() {
+                if eom {
+                    // All input is consumed; EOM would end the response while
+                    // output is still pending. Hide EOM and let the flush
+                    // phase drain the remainder.
+                    msg.set_eom(false)?;
+                    self.eom_flushing = true;
+                }
+                return Ok(Some(0));
+            }
+            self.pending_out.clear();
+            self.pending_pos = 0;
+        }
+
+        if !eom {
+            return Ok(None);
+        }
+
+        // End of message: all input has been consumed (or none ever arrived).
+        // Finalize the encoder and flush the tail through the same machinery.
+        let encoder = self
+            .writer
+            .take()
+            .expect("Compression writer must exist at EOM");
+        let data = encoder
+            .finish()
+            .expect("Failed to finalize compression encoder");
+
+        // Accumulate bytes saved (original - compressed).
+        let compressed_size = data.len() as u64;
+        if self.original_bytes > compressed_size {
+            BYTES_SAVED.fetch_add(self.original_bytes - compressed_size, Ordering::Relaxed);
+        }
+
+        self.pending_out = data;
+        self.pending_pos = 0;
+        self.flush_pending(lua, &msg)?;
+        if self.pending_pos < self.pending_out.len() {
+            msg.set_eom(false)?;
+            self.eom_flushing = true;
+            return Ok(Some(0));
+        }
+        self.pending_out.clear();
         Ok(None)
     }
 
