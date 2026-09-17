@@ -230,6 +230,10 @@ export default function SecurityRules() {
   const [form, setForm] = useState(initialForm())
   const [error, setError] = useState('')
   const [dragOverId, setDragOverId] = useState<number | null>(null)
+  // '' = all rules, 'global' = unscoped rules only, '<id>' = rules that
+  // apply to that listener (unscoped + scoped to it — matches the backend's
+  // rules_for_listener semantics).
+  const [listenerFilter, setListenerFilter] = useState<string>('')
 
   function initialForm() {
     return {
@@ -317,25 +321,18 @@ export default function SecurityRules() {
     return found ? t(found.labelKey) : a
   }
 
-  // Group rules by listener. "All" group (rules with no listener scope) is
-  // always first; remaining groups are sorted by listener name and only shown
-  // if they contain at least one rule.
-  const groupedRules = useMemo(() => {
-    const groups: { key: string; label: string; rules: SecurityRule[] }[] = []
-    groups.push({
-      key: 'all',
-      label: t('securityRules.allListeners'),
-      rules: rules.filter(r => !r.listener_ids || r.listener_ids.length === 0),
-    })
-    const sortedListeners = [...listenerList].sort((a, b) => a.name.localeCompare(b.name))
-    for (const l of sortedListeners) {
-      const groupRules = rules.filter(r => r.listener_ids?.includes(l.id))
-      if (groupRules.length > 0) {
-        groups.push({ key: String(l.id), label: l.name, rules: groupRules })
-      }
-    }
-    return groups
-  }, [rules, listenerList])
+  // Single flat list sorted by priority — position in the list IS the
+  // evaluation order. Scope only filters which listeners a rule applies to;
+  // it does not affect ordering. The listener filter below answers "which
+  // rules fire on listener X" (unscoped rules apply to every listener).
+  const listenerName = (id: number) => listenerList.find(l => l.id === id)?.name ?? `#${id}`
+
+  const visibleRules = useMemo(() => {
+    if (!listenerFilter) return rules
+    if (listenerFilter === 'global') return rules.filter(r => !r.listener_ids || r.listener_ids.length === 0)
+    const lid = Number(listenerFilter)
+    return rules.filter(r => !r.listener_ids || r.listener_ids.length === 0 || r.listener_ids.includes(lid))
+  }, [rules, listenerFilter])
 
   return (
     <div className="space-y-4">
@@ -372,17 +369,33 @@ export default function SecurityRules() {
         </div>
       </div>
 
-      {/* Rules grouped by listener — single table so columns align across groups */}
+      {/* Flat rules table — row position is the real evaluation order */}
       {rules.length === 0 ? (
         <div className="rounded-lg border border-border bg-card shadow-sm p-4 text-muted-foreground">{t('securityRules.noRulesYet')}</div>
       ) : (
         <div className="rounded-lg border border-border bg-card p-6 shadow-sm overflow-x-auto">
+          <div className="flex items-center gap-2 mb-3">
+            <label htmlFor="sr-listener-filter" className="text-sm text-muted-foreground whitespace-nowrap">{t('securityRules.filterByListener')}</label>
+            <select
+              id="sr-listener-filter"
+              className="input w-auto"
+              value={listenerFilter}
+              onChange={e => setListenerFilter(e.target.value)}
+            >
+              <option value="">{t('securityRules.showAllRules')}</option>
+              <option value="global">{t('securityRules.globalOnly')}</option>
+              {listenerList.map(l => (
+                <option key={l.id} value={String(l.id)}>{l.name}</option>
+              ))}
+            </select>
+          </div>
           <table className="w-full text-sm text-start">
             <thead className="text-muted-foreground border-b border-border">
               <tr>
                 <th className="p-2 w-8"></th>
                 <th className="p-2 w-16">{t('securityRules.tableHeaders.order')}</th>
                 <th className="p-2">{t('securityRules.tableHeaders.name')}</th>
+                <th className="p-2 w-44">{t('securityRules.tableHeaders.listeners')}</th>
                 <th className="p-2 w-24">{t('securityRules.tableHeaders.enabled')}</th>
                 <th className="p-2 w-40 whitespace-nowrap">{t('securityRules.tableHeaders.action')}</th>
                 <th className="p-2">{t('securityRules.tableHeaders.expression')}</th>
@@ -391,65 +404,68 @@ export default function SecurityRules() {
               </tr>
             </thead>
             <tbody>
-              {groupedRules.map(group => (
-                <React.Fragment key={group.key}>
-                  <tr className="border-b border-border bg-card/60">
-                    <td colSpan={8} className="p-3">
-                      <span className="font-semibold text-sm">{group.label}</span>
-                      <span className="text-xs text-muted-foreground ms-2">({group.rules.length === 1 ? t('securityRules.ruleCount', { count: group.rules.length }) : t('securityRules.rulesCount', { count: group.rules.length })})</span>
+              {visibleRules.length === 0 ? (
+                <tr className="border-b border-border">
+                  <td colSpan={9} className="p-4 text-sm text-muted-foreground">
+                    {listenerFilter === 'global' ? t('securityRules.noRulesForAllListeners') : t('securityRules.noRulesForListener')}
+                  </td>
+                </tr>
+              ) : (
+                visibleRules.map(r => (
+                  <tr
+                    key={r.id}
+                    className={`border-b border-border ${dragOverId === r.id ? 'bg-muted' : ''}`}
+                    draggable
+                    onDragStart={(e) => { e.dataTransfer.setData('text/plain', String(r.id)); e.dataTransfer.effectAllowed = 'move' }}
+                    onDragOver={(e) => { e.preventDefault(); setDragOverId(r.id) }}
+                    onDrop={(e) => { e.preventDefault(); const dragged = Number(e.dataTransfer.getData('text/plain')); if (dragged !== r.id) { setDragOverId(null); reorder(dragged, r.id) } }}
+                    onDragEnd={() => setDragOverId(null)}
+                  >
+                    <td className="p-2 cursor-grab"><GripVertical className="h-4 w-4 text-muted-foreground" /></td>
+                    <td className="p-2 text-muted-foreground">{r.priority + 1}</td>
+                    <td className="p-2 font-medium">{r.name}</td>
+                    <td className="p-2">
+                      {!r.listener_ids || r.listener_ids.length === 0 ? (
+                        <span className="px-2 py-0.5 rounded text-xs bg-primary/20 text-primary whitespace-nowrap">{t('securityRules.allListeners')}</span>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {r.listener_ids.map(id => (
+                            <span key={id} className="px-2 py-0.5 rounded text-xs bg-muted text-secondary-foreground whitespace-nowrap">{listenerName(id)}</span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                    <td className="p-2">
+                      <button
+                        onClick={() => toggleEnabled(r)}
+                        className={`px-2 py-0.5 rounded text-xs font-medium ${r.enabled ? 'bg-green-500/20 text-green-400' : 'bg-subtle text-muted-foreground'}`}
+                      >
+                        {r.enabled ? t('common:status.enabled') : t('common:status.disabled')}
+                      </button>
+                    </td>
+                    <td className="p-2 whitespace-nowrap">
+                      <span className={`px-2 py-0.5 rounded text-xs ${
+                        r.action === 'block' ? 'bg-red-500/20 text-red-400' :
+                        r.action === 'allow' ? 'bg-green-500/20 text-green-400' :
+                        r.action === 'redirect' ? 'bg-yellow-500/20 text-yellow-400' :
+                        r.action === 'custom_response' ? 'bg-purple-500/20 text-purple-400' :
+                        r.action === 'challenge' ? 'bg-cyan-500/20 text-cyan-400' :
+                        'bg-blue-500/20 text-blue-400'
+                      }`}>{actionLabel(r.action)}</span>
+                    </td>
+                    <td className="p-2 text-xs text-muted-foreground max-w-xs truncate" title={r.expression}>
+                      <code className="text-secondary-foreground">{r.expression}</code>
+                    </td>
+                    <td className="p-2 text-xs text-muted-foreground whitespace-nowrap">{formatDateTime(r.updated_at)}</td>
+                    <td className="p-2 whitespace-nowrap">
+                      <div className="flex gap-1">
+                        <IconButton icon={Pencil} aria-label={t('common:actions.edit')} onClick={() => openEdit(r)} />
+                        <IconButton icon={Trash2} variant="danger" aria-label={t('common:actions.delete')} onClick={() => remove(r)} />
+                      </div>
                     </td>
                   </tr>
-                  {group.rules.length === 0 ? (
-                    <tr className="border-b border-border">
-                      <td colSpan={8} className="p-4 text-sm text-muted-foreground">{t('securityRules.noRulesForAllListeners')}</td>
-                    </tr>
-                  ) : (
-                    group.rules.map((r, gi) => (
-                      <tr
-                        key={r.id}
-                        className={`border-b border-border ${dragOverId === r.id ? 'bg-muted' : ''}`}
-                        draggable
-                        onDragStart={(e) => { e.dataTransfer.setData('text/plain', String(r.id)); e.dataTransfer.effectAllowed = 'move' }}
-                        onDragOver={(e) => { e.preventDefault(); setDragOverId(r.id) }}
-                        onDrop={(e) => { e.preventDefault(); const dragged = Number(e.dataTransfer.getData('text/plain')); if (dragged !== r.id) { setDragOverId(null); reorder(dragged, r.id) } }}
-                        onDragEnd={() => setDragOverId(null)}
-                      >
-                        <td className="p-2 cursor-grab"><GripVertical className="h-4 w-4 text-muted-foreground" /></td>
-                        <td className="p-2 text-muted-foreground">{gi + 1}</td>
-                        <td className="p-2 font-medium">{r.name}</td>
-                        <td className="p-2">
-                          <button
-                            onClick={() => toggleEnabled(r)}
-                            className={`px-2 py-0.5 rounded text-xs font-medium ${r.enabled ? 'bg-green-500/20 text-green-400' : 'bg-subtle text-muted-foreground'}`}
-                          >
-                            {r.enabled ? t('common:status.enabled') : t('common:status.disabled')}
-                          </button>
-                        </td>
-                        <td className="p-2 whitespace-nowrap">
-                          <span className={`px-2 py-0.5 rounded text-xs ${
-                            r.action === 'block' ? 'bg-red-500/20 text-red-400' :
-                            r.action === 'allow' ? 'bg-green-500/20 text-green-400' :
-                            r.action === 'redirect' ? 'bg-yellow-500/20 text-yellow-400' :
-                            r.action === 'custom_response' ? 'bg-purple-500/20 text-purple-400' :
-                            r.action === 'challenge' ? 'bg-cyan-500/20 text-cyan-400' :
-                            'bg-blue-500/20 text-blue-400'
-                          }`}>{actionLabel(r.action)}</span>
-                        </td>
-                        <td className="p-2 text-xs text-muted-foreground max-w-xs truncate" title={r.expression}>
-                          <code className="text-secondary-foreground">{r.expression}</code>
-                        </td>
-                        <td className="p-2 text-xs text-muted-foreground whitespace-nowrap">{formatDateTime(r.updated_at)}</td>
-                        <td className="p-2 whitespace-nowrap">
-                          <div className="flex gap-1">
-                            <IconButton icon={Pencil} aria-label={t('common:actions.edit')} onClick={() => openEdit(r)} />
-                            <IconButton icon={Trash2} variant="danger" aria-label={t('common:actions.delete')} onClick={() => remove(r)} />
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </React.Fragment>
-              ))}
+                ))
+              )}
             </tbody>
           </table>
         </div>
