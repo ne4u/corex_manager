@@ -121,7 +121,7 @@ services:
 
   coraza-spoa:
     container_name: coraza-spoa
-    image: ghcr.io/corazawaf/coraza-spoa:0.7.2
+    image: ghcr.io/corazawaf/coraza-spoa:0.7.3
     # The distroless image has no shell; run the binary directly.
     command: ["/coraza-spoa", "--config", "/app/data/coraza-spoa.yaml"]
     user: "0:0"
