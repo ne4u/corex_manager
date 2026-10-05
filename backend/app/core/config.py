@@ -45,7 +45,10 @@ class Settings(BaseSettings):
     # acme.sh
     ACME_SH_ENABLED: bool = True
     ACME_SH_HOME: str = "/app/certs/.acme.sh"
-    ACME_SH_BIN: str = "/app/certs/.acme.sh/acme.sh"
+    # The binary lives outside /app/certs — that path is a volume mount and
+    # would shadow a binary baked into the image. ACME_SH_HOME stays on the
+    # volume so account keys and per-domain state persist.
+    ACME_SH_BIN: str = "/opt/acme.sh/acme.sh"
     ACME_SH_CA: str = "letsencrypt"  # or zerossl, etc.
 
     # ACME HTTP-01 challenge — HAProxy serves challenge files directly from the

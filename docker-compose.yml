@@ -35,7 +35,7 @@ services:
       - DATAPLANE_API_ENABLED=${DATAPLANE_API_ENABLED:-false}
       - ACME_SH_ENABLED=true
       - ACME_SH_HOME=/app/certs/.acme.sh
-      - ACME_SH_BIN=/app/certs/.acme.sh/acme.sh
+      - ACME_SH_BIN=/opt/acme.sh/acme.sh
       - VALKEY_HOST=valkey
       - VALKEY_PORT=6379
       - VALKEY_PASSWORD=${VALKEY_PASSWORD:-}

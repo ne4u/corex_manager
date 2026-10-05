@@ -32,7 +32,7 @@ RUN apk add --no-cache \
     && mkdir -p /tmp/acme.sh-src \
     && tar -xzf /tmp/acme.sh.tar.gz -C /tmp/acme.sh-src --strip-components=1 \
     && cd /tmp/acme.sh-src \
-    && sh acme.sh --install --home /app/certs/.acme.sh --nocron \
+    && sh acme.sh --install --home /opt/acme.sh --nocron \
     && rm -rf /tmp/acme.sh.tar.gz /tmp/acme.sh-src
 
 COPY requirements.txt .
