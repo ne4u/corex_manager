@@ -36,11 +36,6 @@ def _scope_check_lines(primary: WafRule) -> list[str]:
     if path:
         pat = _escape_pattern(path)
         checks.append(f'SecRule REQUEST_URI "!@beginsWith {pat}" "id:990100,phase:1,pass,nolog,skipAfter:{marker}"')
-    methods = _safe_token(primary.http_methods)
-    if methods:
-        # Coraza @within expects a comma-separated list.
-        mlist = ",".join(m.strip() for m in methods.split(",") if m.strip())
-        checks.append(f'SecRule REQUEST_METHOD "!@within {mlist}" "id:990101,phase:1,pass,nolog,skipAfter:{marker}"')
     ctypes = _safe_token(primary.content_types)
     if ctypes:
         ctypes_list = [c.strip() for c in ctypes.split(",") if c.strip()]
@@ -326,6 +321,21 @@ def _app_directives(
         f'SecAction "id:900002,phase:1,nolog,pass,setvar:tx.inbound_anomaly_score_threshold={inbound}"',
         f'SecAction "id:900003,phase:1,nolog,pass,setvar:tx.outbound_anomaly_score_threshold={outbound}"',
     ]
+
+    # Methods listed on any bound rule extend the CRS allowed-methods policy.
+    # Rule 911100 enforces tx.allowed_methods, whose crs-setup default
+    # (GET HEAD POST OPTIONS) would otherwise reject PUT/DELETE/PATCH.
+    allowed_methods = ["GET", "HEAD", "POST", "OPTIONS"]
+    for r in rules:
+        for m in _safe_token(r.http_methods).split(","):
+            m = re.sub(r"[^A-Za-z0-9_-]", "", m).upper()
+            if m and m not in allowed_methods:
+                allowed_methods.append(m)
+    if len(allowed_methods) > 4:
+        lines.append(
+            f"SecAction \"id:990110,phase:1,nolog,pass,"
+            f"setvar:'tx.allowed_methods={' '.join(allowed_methods)}'\""
+        )
 
     # Rule set version / plugin metadata
     for r in rules:

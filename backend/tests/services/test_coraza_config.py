@@ -129,14 +129,34 @@ def test_generate_coraza_spoa_config_scope_checks(db):
         name="waf",
         listener_id=listener.id,
         path_pattern="/api",
-        http_methods="GET,POST",
+        http_methods="GET,PUT,POST,DELETE",
         content_types="application/json",
     )
     cfg = coraza_config.generate_coraza_spoa_config(db)
     assert "!@beginsWith /api" in cfg
-    assert "!@within GET,POST" in cfg
+    # http_methods feeds tx.allowed_methods (CRS rule 911100) instead of a
+    # scope skip — listed methods are allowed, others are denied by CRS.
+    assert "!@within" not in cfg
+    assert "tx.allowed_methods=GET HEAD POST OPTIONS PUT DELETE" in cfg
     assert "!@beginsWith application/json" in cfg
     assert "SecMarker HAPROXY-WAF-SCOPE-END" in cfg
+
+
+def test_allowed_methods_not_set_without_http_methods(db):
+    backend = make_backend(db)
+    listener = make_listener(db, backend=backend)
+    make_waf_rule(db, name="waf", listener_id=listener.id)
+    cfg = coraza_config.generate_coraza_spoa_config(db)
+    assert "tx.allowed_methods" not in cfg
+
+
+def test_allowed_methods_subsets_of_defaults_emit_nothing(db):
+    """A rule listing only default-allowed methods adds no redundant setvar."""
+    backend = make_backend(db)
+    listener = make_listener(db, backend=backend)
+    make_waf_rule(db, name="waf", listener_id=listener.id, http_methods="GET,POST")
+    cfg = coraza_config.generate_coraza_spoa_config(db)
+    assert "tx.allowed_methods" not in cfg
 
 
 def test_generate_coraza_spoa_config_exceptions(db):

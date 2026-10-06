@@ -1736,7 +1736,7 @@
       "captchaValidSeconds": "How long a challenge session remains valid.",
       "statusCode": "HTTP status returned when a rule triggers and the action uses it.",
       "pathPattern": "Limit the rule to paths matching this pattern.",
-      "httpMethods": "Comma-separated methods the rule applies to.",
+      "httpMethods": "Comma-separated HTTP methods to allow. Extends the CRS default (GET HEAD POST OPTIONS); unlisted methods are denied.",
       "contentTypes": "Comma-separated response content types the rule applies to.",
       "failOpen": "Allow traffic if the Coraza SPOA is unreachable.",
       "rateBasedRule": "Enable request-rate limiting inside this rule.",
