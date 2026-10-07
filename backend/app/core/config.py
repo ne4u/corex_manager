@@ -50,6 +50,12 @@ class Settings(BaseSettings):
     # volume so account keys and per-domain state persist.
     ACME_SH_BIN: str = "/opt/acme.sh/acme.sh"
     ACME_SH_CA: str = "letsencrypt"  # or zerossl, etc.
+    # DNS-01: fixed wait (seconds) for TXT propagation before the CA validates.
+    # 0 (default) = use acme.sh's built-in public-DoH check; >0 replaces it
+    # with a fixed sleep — useful when the provider's authoritative NS fleet
+    # replicates slowly and LE secondary validation reports NXDOMAIN even
+    # though public resolvers already see the record.
+    ACME_SH_DNS_SLEEP: int = 0
 
     # ACME HTTP-01 challenge — HAProxy serves challenge files directly from the
     # shared webroot volume (primary method). The API container fallback is only

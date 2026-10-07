@@ -17,24 +17,98 @@ from .dns_providers import (
 
 settings = get_settings()
 
-# acme.sh has a known bug where it emits hundreds of
-# "[: INFO: integer expression expected" lines to stderr. These are noise
-# from the acme.sh script itself (a bad `[ "$var" -eq N ]` test) and drown
-# out the real error message. It also appends a generic "Please add '--debug'"
-# and "See: https://..." footer to every error. Filter both out.
-_ACME_NOISE_RE = re.compile(r"\[: (INFO|DEBUG|ERROR): integer expression expected")
+# acme.sh has a known bug where it emits hundreds of shell test-builtin
+# errors to stderr — e.g. "[: INFO: integer expression expected" (bash/dash)
+# or "sh: INFO: out of range" (busybox ash on Alpine). They come from the
+# `[ "$SYS_LOG" -ge N ]` numeric tests in _info/_err/_debug running with a
+# non-numeric SYS_LOG value, and they drown out the real error message.
+# acme.sh also appends a generic "Please add '--debug'" and "See: https://..."
+# footer to every error. Filter both out.
+#
+# Pattern shape: "<shell>: <one-word operand>: <test error>" spanning the
+# whole line. Requiring a single-token operand avoids eating real messages
+# like "[date] ASN value out of range".
+_ACME_NOISE_RE = re.compile(
+    r".*:\s*[^\s:]+:\s*"
+    r"(?:integer expression expected|out of range|illegal number|bad number|unexpected operator|argument expected)\s*$"
+)
 _ACME_FOOTER_RE = re.compile(
     r"Please add '--debug' or '--log' to see more information\.|See: https://github\.com/acmesh-official/acme\.sh/wiki/How-to-debug-acme\.sh"
 )
+
+
+def _filter_acme_lines(output: str) -> list[str]:
+    return [l for l in output.splitlines() if not _ACME_NOISE_RE.search(l) and not _ACME_FOOTER_RE.search(l)]
 
 
 def _clean_acme_output(output: str) -> str:
     """Remove acme.sh's noise lines and generic debug footer from error output."""
     if not output:
         return output
-    lines = output.splitlines()
-    cleaned = [l for l in lines if not _ACME_NOISE_RE.search(l) and not _ACME_FOOTER_RE.search(l)]
-    return "\n".join(cleaned).strip() or output
+    return "\n".join(_filter_acme_lines(output)).strip() or output
+
+
+def _acme_error_message(result: subprocess.CompletedProcess) -> str:
+    """Best error text from an acme.sh/certbot run.
+
+    Prefers cleaned stderr; falls back to cleaned stdout — acme.sh logs
+    progress details (provider API responses, record adds) on stdout, which
+    ``result.stderr or result.stdout`` would discard whenever stderr is
+    non-empty (even when stderr is pure noise).
+    """
+    for stream in (result.stderr, result.stdout):
+        if not stream:
+            continue
+        lines = _filter_acme_lines(stream)
+        if lines:
+            return "\n".join(lines).strip()
+    return (result.stderr or result.stdout or "").strip()
+
+
+def _acme_env(extra: dict | None = None) -> dict:
+    """Environment for an acme.sh subprocess.
+
+    Drops a non-numeric SYS_LOG: acme.sh numeric-tests it in every log call
+    (`[ "$SYS_LOG" -ge N ]`), and a value like "INFO" makes busybox/dash emit
+    "sh: INFO: out of range" per log line, flooding stderr.
+    """
+    env = os.environ.copy()
+    sys_log = env.get("SYS_LOG")
+    if sys_log is not None and not sys_log.isdigit():
+        env.pop("SYS_LOG")
+    if extra:
+        env.update(extra)
+    return env
+
+
+def _sanitize_acme_account_conf() -> None:
+    """Drop non-numeric SYS_LOG entries from acme.sh's account.conf.
+
+    acme.sh sources account.conf on every run, so a stale `SYS_LOG='INFO'`
+    line (e.g. saved by `acme.sh --syslog info` — it doesn't validate the
+    value) persists and produces "sh: INFO: out of range" on every log call
+    under busybox/dash. Removing the bad line restores quiet logging.
+    """
+    conf = os.path.join(settings.ACME_SH_HOME, "account.conf")
+    try:
+        with open(conf) as f:
+            lines = f.readlines()
+    except OSError:
+        return
+
+    def _bad_syslog(line: str) -> bool:
+        if not re.match(r"\s*(?:SAVED_)?SYS_LOG\s*=", line):
+            return False
+        value = line.split("=", 1)[1].strip().strip("'\"")
+        return not value.isdigit()
+
+    if not any(_bad_syslog(line) for line in lines):
+        return
+    try:
+        with open(conf, "w") as f:
+            f.writelines(line for line in lines if not _bad_syslog(line))
+    except OSError:
+        pass
 
 
 def _acme_sh_bin() -> str:
@@ -226,6 +300,7 @@ def generate_certificate(cert: Certificate, db: Session, issue: bool = True) -> 
 
 def _install_acme_sh_cert(cert: Certificate, cert_dir: str) -> dict:
     """Copy an acme.sh issued cert into the project cert directory."""
+    _sanitize_acme_account_conf()
     install_cmd = _acme_sh_base(cert.acme_ca, cert.email) + [
         "--install-cert",
         "-d",
@@ -241,9 +316,9 @@ def _install_acme_sh_cert(cert: Certificate, cert_dir: str) -> dict:
         "--reloadcmd",
         "echo 'certificate installed'",
     ]
-    install = subprocess.run(install_cmd, capture_output=True, text=True)
+    install = subprocess.run(install_cmd, capture_output=True, text=True, env=_acme_env())
     if install.returncode != 0:
-        return {"status": "error", "message": _clean_acme_output(install.stderr or install.stdout)}
+        return {"status": "error", "message": _acme_error_message(install)}
     try:
         _write_haproxy_bundle(cert)
     except Exception as exc:
@@ -256,6 +331,7 @@ def _run_acme_sh(cert: Certificate, db: Session) -> dict:
     cert_dir = _cert_dir(cert)
     os.makedirs(cert_dir, exist_ok=True)
     os.makedirs(settings.ACME_SH_HOME, exist_ok=True)
+    _sanitize_acme_account_conf()
 
     domains = [cert.domain]
     if cert.is_wildcard:
@@ -267,7 +343,7 @@ def _run_acme_sh(cert: Certificate, db: Session) -> dict:
         cmd.extend(["-d", f"*.{cert.domain}"])
     cmd.extend(["--keylength", _acme_keylength(cert.key_type)])
 
-    env = os.environ.copy()
+    dns_env: dict = {}
     if cert.acme_challenge == "dns":
         config = get_provider_credentials_config(cert.dns_provider, "acme.sh")
         if not config:
@@ -281,10 +357,16 @@ def _run_acme_sh(cert: Certificate, db: Session) -> dict:
             if not code:
                 return {"status": "error", "message": "Custom DNS provider code is required for acme.sh"}
         cmd.extend(["--dns", code])
+        if settings.ACME_SH_DNS_SLEEP > 0:
+            # Replaces acme.sh's built-in DoH propagation check with a fixed
+            # wait — useful when the provider's authoritative nameservers
+            # replicate slowly and Let's Encrypt secondary validation sees
+            # NXDOMAIN while public resolvers already have the record.
+            cmd.extend(["--dnssleep", str(settings.ACME_SH_DNS_SLEEP)])
         if cert.dns_credentials:
             for k, v in cert.dns_credentials.items():
                 if not k.startswith("_"):
-                    env[k] = v
+                    dns_env[k] = v
     else:
         # Use webroot mode so acme.sh writes challenge files to the shared
         # volume that HAProxy serves directly — no port 80 listener needed in
@@ -294,9 +376,9 @@ def _run_acme_sh(cert: Certificate, db: Session) -> dict:
         cmd.extend(["--webroot", webroot])
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, env=env)
+        result = subprocess.run(cmd, capture_output=True, text=True, env=_acme_env(dns_env))
         if result.returncode != 0:
-            return {"status": "error", "message": _clean_acme_output(result.stderr or result.stdout)}
+            return {"status": "error", "message": _acme_error_message(result)}
 
         install = _install_acme_sh_cert(cert, cert_dir)
         if install.get("status") != "ok":
@@ -384,7 +466,7 @@ def _run_certbot(cert: Certificate, db: Session) -> dict:
     try:
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
-            return {"status": "error", "message": _clean_acme_output(result.stderr or result.stdout)}
+            return {"status": "error", "message": _acme_error_message(result)}
 
         src_dir = os.path.join(config_dir, "live", domains[0])
         for src_name, dst_name in [
@@ -411,16 +493,17 @@ def _run_certbot(cert: Certificate, db: Session) -> dict:
 
 def _renew_acme_sh(cert: Certificate, db: Session) -> dict:
     cert_dir = _cert_dir(cert)
+    _sanitize_acme_account_conf()
     cmd = _acme_sh_base(cert.acme_ca, cert.email) + ["--renew", "-d", cert.domain]
-    env = os.environ.copy()
+    dns_env: dict = {}
     if cert.acme_challenge == "dns" and cert.dns_credentials:
         for k, v in cert.dns_credentials.items():
             if not k.startswith("_"):
-                env[k] = v
+                dns_env[k] = v
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, env=env)
+        result = subprocess.run(cmd, capture_output=True, text=True, env=_acme_env(dns_env))
         if result.returncode != 0:
-            return {"status": "error", "message": _clean_acme_output(result.stderr or result.stdout)}
+            return {"status": "error", "message": _acme_error_message(result)}
         # Re-install the renewed cert to the project cert directory and rebuild bundle
         install = _install_acme_sh_cert(cert, cert_dir)
         if install.get("status") != "ok":
