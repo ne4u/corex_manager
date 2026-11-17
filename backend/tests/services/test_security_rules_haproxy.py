@@ -127,6 +127,43 @@ def test_emit_security_rules_first_match_guard(db):
     assert all("!{ var(txn.sec.done) -m found }" in l for l in lines if "http-request" in l)
 
 
+def test_emit_security_rules_done_guard_per_or_group(db):
+    """A multi-OR-group expression must carry the done-guard on EVERY group —
+    HAProxy conditions are a flat OR-list of AND'ed terms, so a single
+    trailing guard only applies to the last group."""
+    listener = make_listener(db)
+    make_security_rule(
+        db, name="or-rule", expression='ip.src = "1.2.3.4" or http.host = "b.com"', action="block", log=False
+    )
+    lines: list = []
+    emit_security_rules(listener, db, lines)
+    guard = "!{ var(txn.sec.done) -m found }"
+    for line in lines:
+        if "http-request" not in line:
+            continue
+        cond = line.split(" if ", 1)[1]
+        groups = cond.split(" or ")
+        assert len(groups) == 2
+        assert all(g.endswith(guard) for g in groups)
+
+
+def test_emit_security_rules_or_inside_quoted_value_not_split(db):
+    """An ' or ' inside a quoted string value must not be treated as a
+    group separator."""
+    listener = make_listener(db)
+    make_security_rule(db, name="q", expression='http.host = "a or b.com"', action="block", log=False)
+    lines: list = []
+    emit_security_rules(listener, db, lines)
+    joined = "\n".join(lines)
+    assert '-m str "a or b.com"' in joined
+    for line in lines:
+        if "http-request" not in line:
+            continue
+        cond = line.split(" if ", 1)[1]
+        # Exactly one guard, appended after the whole (single-group) condition
+        assert cond.count("!{ var(txn.sec.done) -m found }") == 1
+
+
 def test_emit_security_rules_listener_scoping(db):
     listener1 = make_listener(db, name="l1")
     listener2 = make_listener(db, name="l2")

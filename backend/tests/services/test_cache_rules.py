@@ -9,6 +9,7 @@ import pytest
 from app.services import haproxy, varnish
 from app.services.cache_rules import (
     emit_haproxy_cache_rules,
+    emit_response_phase_cache_store_condition,
     haproxy_acl_criterion,
     normalize_pattern,
     vcl_condition,
@@ -678,3 +679,59 @@ def test_cache_use_unguarded_when_disk_cache_inactive(db):
     assert len(cache_use_lines) >= 1
     for line in cache_use_lines:
         assert "is_disk_cache_eligible" not in line
+
+
+# ---------------------------------------------------------------------------
+# Response-phase cache-store condition — HAProxy condition syntax
+#
+# HAProxy conditions are a flat OR-list of AND'ed terms: no ||, &&, or
+# parenthesized grouping. The emitter must expand each rule's OR-branches
+# to DNF, negate earlier bypass rules per group, and apply extra guards
+# to every group.
+# ---------------------------------------------------------------------------
+
+
+def test_response_phase_cache_store_valid_haproxy_syntax(db):
+    """Response-phase cache rules must emit a flat ' or '-joined list of
+    { } terms — '||' / '&&' / '(...)' are not valid HAProxy condition syntax
+    and previously produced un-parseable configs."""
+    cc = make_cache_config(db, make_backend(db, name="rsc").id, haproxy_enabled=True)
+    make_cache_rule(db, cc.id, match_type="status_code", pattern="5xx", action="bypass", tier="memory", priority=0)
+    make_cache_rule(db, cc.id, match_type="content_type", pattern="image/*", action="cache", tier="memory", priority=1)
+    make_cache_rule(db, cc.id, match_type="status_code", pattern="200,301", action="cache", tier="memory", priority=2)
+
+    line = emit_response_phase_cache_store_condition(cc, "cache_rsc")
+    assert " || " not in line
+    assert " && " not in line
+    cond = line.split(" if ", 1)[1]
+    assert not cond.lstrip().startswith("(")
+    groups = cond.split(" or ")
+    # image/* branch + one group per status code in the "200,301" list
+    assert len(groups) == 3
+    # the earlier 5xx bypass negates every cache branch
+    assert all("!{ status 500:599 }" in g for g in groups)
+
+
+def test_response_phase_cache_store_extra_guard_on_every_group(db):
+    """extra_guard must be appended to EVERY OR group — a single leading
+    term would only apply to the first group."""
+    cc = make_cache_config(db, make_backend(db, name="rsg").id, haproxy_enabled=True)
+    make_cache_rule(db, cc.id, match_type="status_code", pattern="200,301", action="cache", tier="memory", priority=0)
+
+    line = emit_response_phase_cache_store_condition(
+        cc, "cache_rsg", extra_guard="!{ var(txn.is_varnish_fetch) -m found }"
+    )
+    groups = line.split(" if ", 1)[1].split(" or ")
+    assert len(groups) == 2
+    assert all(g.endswith("!{ var(txn.is_varnish_fetch) -m found }") for g in groups)
+
+
+def test_response_phase_cache_store_all_bypass_comment(db):
+    """When all response-phase rules are bypasses, emit a comment instead
+    of a cache-store line."""
+    cc = make_cache_config(db, make_backend(db, name="rsb").id, haproxy_enabled=True)
+    make_cache_rule(db, cc.id, match_type="status_code", pattern="5xx", action="bypass", tier="memory", priority=0)
+
+    line = emit_response_phase_cache_store_condition(cc, "cache_rsb")
+    assert line.lstrip().startswith("#")
+    assert "cache-store" not in line

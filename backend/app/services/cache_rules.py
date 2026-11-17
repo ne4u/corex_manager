@@ -332,14 +332,21 @@ def emit_response_phase_cache_store_condition(
     cache_config,
     cache_name: str,
     indent: str = "    ",
+    extra_guard: str | None = None,
 ) -> str | None:
     """Emit conditional http-response cache-store for response-phase rules.
 
     Returns cache-store line with conditions if there are response-phase rules,
     or None if only request-phase rules exist (unconditional cache-store).
 
-    Response-phase rules (content_type, status_code) add conditions to cache-store
-    to filter what gets cached based on the response.
+    HAProxy conditions are a flat OR-list of AND'ed terms — there is no || / &&
+    or parenthesized grouping — so each rule's OR-branches are expanded to DNF:
+    a "cache" rule matching A|B after earlier "bypass" rules X,Y becomes
+    "A !X !Y or B !X !Y".
+
+    ``extra_guard`` is an optional HAProxy condition term appended to every
+    OR group (e.g. the !is_varnish_fetch txn-var check when disk cache is
+    active — a single leading term would only apply to the first OR group).
     """
     all_rules = active_rules(cache_config)
     # Filter for memory tier and response-phase match types
@@ -350,31 +357,30 @@ def emit_response_phase_cache_store_condition(
         return None
 
     # Build condition from response-phase rules (first-match-wins, with bypass negation)
-    conditions = []
-    preceding_bypass = []
+    or_groups: list[str] = []
+    preceding_bypass_terms: list[str] = []
 
     for rule in response_rules:
+        terms = haproxy_response_condition_terms(rule)
         if rule.action == "bypass":
-            # Track bypass conditions to negate in later cache rules
-            preceding_bypass.append(haproxy_response_condition(rule))
+            # Track bypass conditions to negate in later cache rules.
+            # NOT (A or B) = !A and !B — each branch becomes a negated term.
+            preceding_bypass_terms.extend(f"!{t}" for t in terms)
             continue
 
-        # Cache rule - add condition with negation of earlier bypasses
-        rule_cond = haproxy_response_condition(rule)
-        if preceding_bypass:
-            # Negate all preceding bypass conditions
-            negated = " && ".join([f"!({cond})" for cond in preceding_bypass])
-            conditions.append(f"({rule_cond} && {negated})")
-        else:
-            conditions.append(f"({rule_cond})")
+        # Cache rule - one OR group per branch, each AND'ed with the negated
+        # earlier bypass conditions and the extra guard.
+        for term in terms:
+            group = [term] + preceding_bypass_terms
+            if extra_guard:
+                group.append(extra_guard)
+            or_groups.append(" ".join(group))
 
-    if not conditions:
+    if not or_groups:
         # All response rules are bypasses - don't cache anything
         return f"{indent}# All response-phase rules are bypass rules — nothing cached"
 
-    # Combine all cache conditions with OR
-    combined = " || ".join(conditions)
-    return f"{indent}http-response cache-store {cache_name} if {combined}"
+    return f"{indent}http-response cache-store {cache_name} if {' or '.join(or_groups)}"
 
 
 def emit_cache_rule_acls(
@@ -405,38 +411,37 @@ def emit_cache_rule_acls(
     return lines
 
 
-def haproxy_response_condition(rule) -> str:
-    """Return HAProxy condition for response-phase rules (content_type, status_code).
+def haproxy_response_condition_terms(rule) -> list[str]:
+    """Return this rule's OR-branches as a list of HAProxy condition terms.
 
-    These are used in http-response cache-store conditions.
+    Each term is a `{ ... }` block usable inside a cache-store condition;
+    multiple terms mean the rule matches when ANY is true (logical OR within
+    the rule, e.g. a status_code list like "200,301").
     """
     pattern = rule.pattern
     if rule.match_type == "content_type":
         if pattern.endswith("/*"):
             # Wildcard match (e.g., "image/*")
             prefix = pattern[:-2]
-            return f"res.hdr(Content-Type) -m beg {prefix}/"
+            return [f"{{ res.hdr(Content-Type) -m beg {prefix}/ }}"]
         # Exact match
-        return f"res.hdr(Content-Type) -m beg {pattern}"
+        return [f"{{ res.hdr(Content-Type) -m beg {pattern} }}"]
 
     if rule.match_type == "status_code":
         if "," in pattern:
             # Multiple codes: 200,301,404
-            codes = pattern.split(",")
-            conditions = []
-            for code in codes:
+            terms = []
+            for code in pattern.split(","):
                 if code.endswith("xx"):
-                    first_digit = code[0]
-                    conditions.append(f"{{ status {first_digit}00:599 }}")
+                    terms.append(f"{{ status {code[0]}00:599 }}")
                 else:
-                    conditions.append(f"{{ status {code} }}")
-            return " || ".join(conditions)
+                    terms.append(f"{{ status {code} }}")
+            return terms
         if pattern.endswith("xx"):
             # Range: 2xx, 4xx, 5xx
-            first_digit = pattern[0]
-            return f"{{ status {first_digit}00:599 }}"
+            return [f"{{ status {pattern[0]}00:599 }}"]
         # Specific code
-        return f"{{ status {pattern} }}"
+        return [f"{{ status {pattern} }}"]
 
     raise ValueError(f"Not a response-phase match type: {rule.match_type}")
 

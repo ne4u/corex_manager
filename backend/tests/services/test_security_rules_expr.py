@@ -351,8 +351,23 @@ class TestTranslator:
     def test_query_param(self):
         ast = parse_expression('http.request.uri.query["page"] = "admin"')
         cond, phase = translate(ast, self.db)
-        assert "url_query" in cond
-        assert "-m reg" in cond
+        assert "{ query -m reg" in cond
+        assert phase == "request"
+
+    def test_query_param_escapes_dollar_anchor(self):
+        # The ($|&) tail must be emitted as (\$|&) — a bare '$' before '|'
+        # triggers HAProxy env-var expansion and fails config parsing.
+        ast = parse_expression('http.request.uri.query["page"] = "admin"')
+        cond, _ = translate(ast, self.db)
+        assert "(\\$|&)" in cond
+        assert "($|&)" not in cond
+
+    def test_regex_dollar_anchor_escaped(self):
+        # A trailing '$' regex anchor must be escaped to '\$' or HAProxy
+        # reads '$"' as an environment variable reference.
+        ast = parse_expression('http.request.uri.path ~ "^/x/[0-9]+$"')
+        cond, phase = translate(ast, self.db)
+        assert '[0-9]+\\$"' in cond
         assert phase == "request"
 
 

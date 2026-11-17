@@ -58,7 +58,7 @@ _FIELD_MAP: dict[str, tuple[str, str, str]] = {
     "http.request.uri.path": ("path", "request", "string"),
     "http.request.uri": ("url", "request", "string"),
     "http.request.full_uri": ("base", "request", "string"),
-    "http.request.uri.query": ("url_query", "request", "string"),
+    "http.request.uri.query": ("query", "request", "string"),
     "http.host": ("req.hdr(host)", "request", "string"),
     "http.request.user_agent": ("req.fhdr(user-agent)", "request", "string"),
     "http.request.referer": ("req.hdr(referer)", "request", "string"),
@@ -140,7 +140,7 @@ _FIELD_MAP: dict[str, tuple[str, str, str]] = {
 _BRACKET_FIELDS: dict[str, str] = {
     "http.request.headers": "req.hdr({key})",
     "http.request.cookies": "req.cook({key})",
-    "http.request.uri.query": "url_query",  # special: regex-based
+    "http.request.uri.query": "query",  # special: regex-based
     "http.response.headers": "res.hdr({key})",
     # API Armor: arbitrary JWT claim access
     "auth.claim": "var(txn.auth.claim_{key})",
@@ -345,7 +345,7 @@ def _haproxy_string_value(value: str) -> str:
     # HAProxy string values: use backslash-escaped quotes
     if re.match(r"^[A-Za-z0-9_./:-]+$", value):
         return value
-    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"').replace("$", "\\$")
     return f'"{escaped}"'
 
 
@@ -494,12 +494,13 @@ def _translate_leaf(node: dict[str, Any], db: Session) -> str:
         if fetch == "__query_param__":
             key = bracket_key
             if op == "=" and isinstance(value, str):
-                # Match query param key=value
-                regex = f"(^|&){re.escape(key)}={re.escape(value)}($|&)"
-                cond = f'{{ url_query -m reg "{regex}" }}'
+                # Match query param key=value. _escape_regex re-escapes the
+                # re.escape() output for HAProxy word parsing (\ and $).
+                regex = f"(^|&){_escape_regex(re.escape(key))}={_escape_regex(re.escape(value))}(\\$|&)"
+                cond = f'{{ query -m reg "{regex}" }}'
             elif op == "exists":
-                regex = f"(^|&){re.escape(key)}="
-                cond = f'{{ url_query -m reg "{regex}" }}'
+                regex = f"(^|&){_escape_regex(re.escape(key))}="
+                cond = f'{{ query -m reg "{regex}" }}'
             else:
                 raise ValueError(f"Query param {key!r} only supports = and exists operators")
             return f"!{cond}" if negated else cond
@@ -630,8 +631,10 @@ def _translate_leaf(node: dict[str, Any], db: Session) -> str:
 
 def _escape_regex(s: str) -> str:
     """Escape a string for use inside a HAProxy regex double-quoted string."""
-    # Escape backslash and double quote for HAProxy string context
-    return s.replace("\\", "\\\\").replace('"', '\\"')
+    # Escape backslash and double quote for HAProxy string context, and '$'
+    # because HAProxy expands $VAR environment variables while parsing words
+    # (even inside quotes) — an unescaped '$' anchor breaks config parsing.
+    return s.replace("\\", "\\\\").replace('"', '\\"').replace("$", "\\$")
 
 
 def _resolve_list_path(db: Session, list_type: str, list_name: str) -> str:
@@ -728,9 +731,55 @@ _LOG_VALUE_RE = re.compile(r"[\r\n;\\\"']")
 _API_ARMOR_VAR_RE = re.compile(r"var\(txn\.(?:gql_|api_|auth_|api\.profile_anomaly)")
 
 
+def _split_or_groups(condition: str) -> list[str]:
+    """Split a translated condition on top-level `` or `` separators.
+
+    Tracks { } nesting and "..." quoting (with backslash escapes) so an
+    `` or `` inside a condition block or quoted string is not treated as a
+    group separator.
+    """
+    groups: list[str] = []
+    depth = 0
+    in_str = escaped = False
+    start = i = 0
+    while i < len(condition):
+        ch = condition[i]
+        if escaped:
+            escaped = False
+        elif ch == "\\":
+            escaped = True
+        elif in_str:
+            if ch == '"':
+                in_str = False
+        elif ch == '"':
+            in_str = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+        elif depth == 0 and condition.startswith(" or ", i):
+            groups.append(condition[start:i])
+            i += 4
+            start = i
+            continue
+        i += 1
+    groups.append(condition[start:])
+    return groups
+
+
+def _done_guarded_condition(condition: str) -> str:
+    """Append _DONE_GUARD to every OR group.
+
+    HAProxy conditions are a flat OR-list of AND'ed terms, so the guard must
+    be repeated in each group or earlier groups would fire even after a
+    previous rule set txn.sec.done (breaking first-match-wins).
+    """
+    return " or ".join(f"{g} {_DONE_GUARD}" for g in _split_or_groups(condition))
+
+
 def _api_armor_guarded_condition(condition: str) -> str:
     """Prepend is_api_armor and append _DONE_GUARD to each OR group."""
-    groups = condition.split(" or ")
+    groups = _split_or_groups(condition)
     return " or ".join(f"is_api_armor {g} {_DONE_GUARD}" for g in groups)
 
 
@@ -743,7 +792,9 @@ def _safe_log_value(value: str) -> str:
     """
     if not value:
         return '""'
-    return '"' + _LOG_VALUE_RE.sub("", str(value)) + '"'
+    # '$' is escaped so HAProxy doesn't treat it as an environment variable
+    # reference when parsing the quoted word.
+    return '"' + _LOG_VALUE_RE.sub("", str(value)).replace("$", "\\$") + '"'
 
 
 def rules_for_listener(db: Session, listener_id: int) -> list[Any]:
@@ -809,7 +860,7 @@ def _emit_request_rule(
     if _API_ARMOR_VAR_RE.search(condition):
         guarded_cond = _api_armor_guarded_condition(condition)
     else:
-        guarded_cond = f"{condition} {_DONE_GUARD}"
+        guarded_cond = _done_guarded_condition(condition)
 
     # no_log: suppress the entire request log line for matching requests
     if getattr(rule, "no_log", False):
@@ -832,7 +883,7 @@ def _emit_request_rule(
         return
 
     if rule.action == "redirect":
-        url = rule.redirect_url or "/"
+        url = _escape_regex(rule.redirect_url or "/")
         code = rule.redirect_code or 302
         lines.append(f"    http-request redirect location {url} code {code} if {guarded_cond}")
         return
@@ -910,7 +961,7 @@ def _emit_response_rule(rule: Any, condition: str, lines: list[str], block_statu
         # Response allow doesn't set txn.sec.done (request phase already ran)
         pass
     elif rule.action == "redirect":
-        url = rule.redirect_url or "/"
+        url = _escape_regex(rule.redirect_url or "/")
         code = rule.redirect_code or 302
         lines.append(f"    http-response set-var(txn.status_source) str(haproxy) if {condition}")
         lines.append(f"    http-response redirect location {url} code {code} if {condition}")

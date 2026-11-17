@@ -250,10 +250,17 @@ def _rate_key_track_expr(rate_key: str, rate_header: str | None = None) -> str:
 
 
 def _safe_regex(value: str) -> str:
-    """Sanitize a regex value while preserving regex metacharacters."""
+    """Sanitize a regex value while preserving regex metacharacters.
+
+    The result is emitted as a bare HAProxy config word, so backslashes are
+    doubled (word parsing consumes '\\' -> '\') and '$' is escaped — a bare
+    '$' mid-word triggers HAProxy environment-variable expansion and fails
+    config parsing ("forbidden first char in environment variable name").
+    """
     if not isinstance(value, str):
         value = str(value)
-    return _REGEX_SANITIZE_RE.sub("", value).strip()
+    value = _REGEX_SANITIZE_RE.sub("", value).strip()
+    return value.replace("\\", "\\\\").replace("$", "\\$")
 
 
 def _safe_fcgi_param_value(value: str) -> str:
@@ -1870,17 +1877,16 @@ def _emit_cache_directives(
                 # Check for response-phase rules (content_type, status_code)
                 from .cache_rules import REQUEST_PHASE_TYPES, active_rules, emit_response_phase_cache_store_condition
 
-                response_store = emit_response_phase_cache_store_condition(cache_config, cache_name)
+                # Add !is_varnish_fetch when disk cache is active to avoid
+                # double-caching Varnish responses in memory. Use the txn
+                # var (set in frontend) because is_varnish_fetch is a
+                # request-phase ACL incompatible with http-response rules.
+                response_store = emit_response_phase_cache_store_condition(
+                    cache_config,
+                    cache_name,
+                    extra_guard="!{ var(txn.is_varnish_fetch) -m found }" if disk_cache_active else None,
+                )
                 if response_store:
-                    # Conditional cache-store based on response attributes.
-                    # Add !is_varnish_fetch when disk cache is active to avoid
-                    # double-caching Varnish responses in memory. Use the txn
-                    # var (set in frontend) because is_varnish_fetch is a
-                    # request-phase ACL incompatible with http-response rules.
-                    if disk_cache_active:
-                        response_store = response_store.replace(
-                            " if ", " if !{ var(txn.is_varnish_fetch) -m found } ", 1
-                        )
                     lines.append(response_store)
                 else:
                     # No response-phase rules — gate cache-store on the same

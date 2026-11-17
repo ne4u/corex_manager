@@ -375,7 +375,9 @@ def _safe_log_value(value: str) -> str:
     """Sanitize a value for use inside a HAProxy set-var str(...) expression."""
     if not value:
         return '""'
-    return '"' + _LOG_VALUE_RE.sub("", str(value)) + '"'
+    # '$' is escaped so HAProxy doesn't treat it as an environment variable
+    # reference when parsing the quoted word.
+    return '"' + _LOG_VALUE_RE.sub("", str(value)).replace("$", "\\$") + '"'
 
 
 def emit_risk_scoring(listener: Any, db: Session, lines: list[str], guard: str = "") -> None:
@@ -396,7 +398,6 @@ def emit_risk_scoring(listener: Any, db: Session, lines: list[str], guard: str =
     unchanged.
     """
     rules = rules_for_listener(db, listener.id)
-    guard_suffix = f" {guard}" if guard else ""
 
     # Phase 1: always emit risk_capture (even with 0 rules, so txn.risk_fp.*
     # vars are available to Security Rules that reference them).
@@ -434,7 +435,14 @@ def emit_risk_scoring(listener: Any, db: Session, lines: list[str], guard: str =
         # juxtaposed, OR groups joined by "or"). Do NOT add extra braces —
         # `{ { ... } }` is rejected by HAProxy ("missing fetch method in ACL
         # expression '{'"). Match the convention used by _emit_request_rule.
-        lines.append(f"    http-request set-var(txn.risk.match_{rule.id}) bool(1) if {condition}{guard_suffix}")
+        # The guard must be appended to every top-level OR group — HAProxy
+        # conditions are a flat OR-list of AND'ed terms, so a trailing guard
+        # would only apply to the last group.
+        if guard:
+            guarded = " or ".join(f"{g} {guard}" for g in security_rules._split_or_groups(condition))
+        else:
+            guarded = condition
+        lines.append(f"    http-request set-var(txn.risk.match_{rule.id}) bool(1) if {guarded}")
 
     # Phase 3: compute score
     lines.append("    # Risk Scoring Phase 3: compute score from match flags (Lua)")
