@@ -2109,7 +2109,13 @@
       "title": "API 스키마",
       "noSchemas": "정의된 스키마가 없습니다.",
       "schemaJson": "스키마 JSON",
-      "samples": "{{count}} 샘플"
+      "samples": "{{count}} 샘플",
+      "delete": "삭제",
+      "deleteAll": "학습된 항목 삭제",
+      "confirmDelete": "{{method}} {{path}}을(를) 삭제할까요? 다음 Apply에서 HAProxy에서 제거됩니다. 일치하는 트래픽이 다시 학습합니다.",
+      "confirmDeleteAll": "학습된 스키마 {{count}}개를 모두 삭제할까요? OpenAPI 스키마는 유지됩니다. 다음 Apply에서 HAProxy에서 제거됩니다. 일치하는 트래픽이 다시 학습합니다.",
+      "deleted": "학습된 스키마 {{count}}개를 삭제했습니다.",
+      "failedToDelete": "스키마를 삭제하지 못했습니다."
     },
     "auth": {
       "title": "인증 정책",

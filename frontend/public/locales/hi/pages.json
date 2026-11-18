@@ -2109,7 +2109,13 @@
       "title": "API स्कीमा",
       "noSchemas": "कोई स्कीमा परिभाषित नहीं।",
       "schemaJson": "स्कीमा JSON",
-      "samples": "{{count}} नमूने"
+      "samples": "{{count}} नमूने",
+      "delete": "हटाएं",
+      "deleteAll": "सीखी गई हटाएं",
+      "confirmDelete": "{{method}} {{path}} हटाएं? अगला Apply इसे HAProxy से हटा देता है। मेल खाता ट्रैफ़िक इसे फिर सीखता है।",
+      "confirmDeleteAll": "सभी {{count}} सीखी गई स्कीमा हटाएं? OpenAPI स्कीमा रहती हैं। अगला Apply उन्हें HAProxy से हटा देता है। मेल खाता ट्रैफ़िक उन्हें फिर सीखता है।",
+      "deleted": "{{count}} सीखी गई स्कीमा हटाई गईं।",
+      "failedToDelete": "स्कीमा हटाना विफल रहा।"
     },
     "auth": {
       "title": "ऑथ नीतियाँ",

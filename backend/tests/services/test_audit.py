@@ -427,11 +427,21 @@ def test_is_config_change_cache_flush():
     assert is_config_change("POST", "/api/v1/cache/clear-all") is False
 
 
+def test_derive_action_delete_api_schemas():
+    """Learned-schema deletes get their own action names."""
+    action, rtype, rid = derive_action("DELETE", "/api/v1/api-armor/schemas/9")
+    assert (action, rtype, rid) == ("delete_api_schema", "api_schema", "9")
+    action, rtype, rid = derive_action("DELETE", "/api/v1/api-armor/schemas/learned")
+    assert (action, rtype, rid) == ("delete_learned_api_schemas", "api_schema", None)
+
+
 def test_is_config_change_api_armor_runtime():
     """API Armor runtime/observational data is not consumed by generators."""
     assert is_config_change("POST", "/api/v1/api-armor/specs") is False
     assert is_config_change("DELETE", "/api/v1/api-armor/specs/3") is False
     assert is_config_change("PUT", "/api/v1/api-armor/schemas/3") is False
+    assert is_config_change("DELETE", "/api/v1/api-armor/schemas/learned") is False
+    assert is_config_change("DELETE", "/api/v1/api-armor/schemas/3") is False
     assert is_config_change("POST", "/api/v1/api-armor/auth-policies") is False
     assert is_config_change("PUT", "/api/v1/api-armor/auth-policies/2") is False
     assert is_config_change("DELETE", "/api/v1/api-armor/auth-policies/2") is False

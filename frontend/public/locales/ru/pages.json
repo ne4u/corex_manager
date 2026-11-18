@@ -2109,7 +2109,13 @@
       "title": "API схемы",
       "noSchemas": "Схемы не определены.",
       "schemaJson": "JSON схемы",
-      "samples": "{{count}} образцов"
+      "samples": "{{count}} образцов",
+      "delete": "Удалить",
+      "deleteAll": "Удалить изученные",
+      "confirmDelete": "Удалить {{method}} {{path}}? Следующий Apply уберёт его из HAProxy. Совпадающий трафик изучит его снова.",
+      "confirmDeleteAll": "Удалить все {{count}} изученных схем? Схемы OpenAPI остаются. Следующий Apply уберёт их из HAProxy. Совпадающий трафик изучит их снова.",
+      "deleted": "Удалено изученных схем: {{count}}.",
+      "failedToDelete": "Не удалось удалить схему."
     },
     "auth": {
       "title": "Политики аутентификации",

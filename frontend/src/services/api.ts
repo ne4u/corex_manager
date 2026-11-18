@@ -624,6 +624,8 @@ export const apiArmor = {
     list: (params?: Record<string, unknown>) => api.get('/api-armor/schemas', { params }),
     update: (id: number, data: Record<string, unknown>) => api.put(`/api-armor/schemas/${id}`, data),
     learn: (data: Record<string, unknown>) => api.post('/api-armor/schemas/learn', data),
+    delete: (id: number) => api.delete(`/api-armor/schemas/${id}`),
+    deleteLearned: () => api.delete('/api-armor/schemas/learned'),
   },
   profiles: {
     list: (params?: Record<string, unknown>) => api.get('/api-armor/profiles', { params }),

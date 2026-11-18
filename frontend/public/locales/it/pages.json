@@ -2109,7 +2109,13 @@
       "title": "Schemi API",
       "noSchemas": "Nessuno schema definito.",
       "schemaJson": "Schema JSON",
-      "samples": "{{count}} campioni"
+      "samples": "{{count}} campioni",
+      "delete": "Elimina",
+      "deleteAll": "Elimina appresi",
+      "confirmDelete": "Eliminare {{method}} {{path}}? Il prossimo Apply lo rimuove da HAProxy. Il traffico corrispondente lo riapprende.",
+      "confirmDeleteAll": "Eliminare tutti i {{count}} schemi appresi? Gli schemi OpenAPI restano. Il prossimo Apply li rimuove da HAProxy. Il traffico corrispondente li riapprende.",
+      "deleted": "Eliminati {{count}} schemi appresi.",
+      "failedToDelete": "Eliminazione dello schema non riuscita."
     },
     "auth": {
       "title": "Policy di Auth",

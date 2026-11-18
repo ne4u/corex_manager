@@ -561,6 +561,79 @@ def test_learn_schema(client, db):
     assert resp2.json()["sample_count"] == 2
 
 
+def _learn(client, method, path, body):
+    return client.post(
+        "/api/v1/api-armor/schemas/learn",
+        json={"method": method, "path": path, "body": body},
+    )
+
+
+def test_delete_learned_schema_starts_fresh(client, db):
+    """DELETE /api-armor/schemas/{sid} removes a learned row so the next learn is new."""
+    from app.models.api_armor import ApiSchema
+
+    first = _learn(client, "POST", "/api/v1/users", {"name": "alice"})
+    sid = first.json()["id"]
+    _learn(client, "POST", "/api/v1/users", {"name": "bob"})
+    resp = client.delete(f"/api/v1/api-armor/schemas/{sid}")
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "ok"}
+    assert db.query(ApiSchema).filter(ApiSchema.id == sid).count() == 0
+
+    again = _learn(client, "POST", "/api/v1/users", {"name": "carol"})
+    assert again.status_code == 200
+    # A merge into the deleted row would have raised sample_count to 3.
+    # SQLite may reuse the freed row id, so identity is the sample count.
+    assert again.json()["sample_count"] == 1
+    assert again.json()["source"] == "learned"
+    assert db.query(ApiSchema).filter(ApiSchema.source == "learned").count() == 1
+
+
+def test_delete_schema_missing(client):
+    """DELETE /api-armor/schemas/{sid} returns 404 when the row is gone."""
+    resp = client.delete("/api/v1/api-armor/schemas/99999")
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "Schema not found"
+
+
+def test_delete_openapi_schema_rejected(client, db):
+    """OpenAPI schemas stay until their spec is deleted."""
+    from app.models.api_armor import ApiSchema
+
+    client.post("/api/v1/api-armor/specs", json={"name": "test-spec", "spec": SAMPLE_OPENAPI})
+    sid = client.get("/api/v1/api-armor/schemas").json()[0]["id"]
+    resp = client.delete(f"/api/v1/api-armor/schemas/{sid}")
+    assert resp.status_code == 409
+    assert resp.json()["detail"] == "OpenAPI schemas are removed by deleting their spec"
+    assert db.get(ApiSchema, sid) is not None
+
+
+def test_delete_learned_schemas_bulk(client, db):
+    """DELETE /api-armor/schemas/learned removes only learned rows."""
+    from app.models.api_armor import ApiSchema
+
+    client.post("/api/v1/api-armor/specs", json={"name": "test-spec", "spec": SAMPLE_OPENAPI})
+    _learn(client, "POST", "/wrong", {"a": 1})
+    _learn(client, "PUT", "/also-wrong", {"b": 2})
+    resp = client.delete("/api/v1/api-armor/schemas/learned")
+    assert resp.status_code == 200
+    assert resp.json() == {"deleted": 2}
+    remaining = db.query(ApiSchema).all()
+    assert len(remaining) == 1
+    assert remaining[0].source == "openapi"
+
+
+def test_delete_learned_schemas_empty(client, db):
+    """DELETE /api-armor/schemas/learned reports zero when nothing was learned."""
+    from app.models.api_armor import ApiSchema
+
+    client.post("/api/v1/api-armor/specs", json={"name": "test-spec", "spec": SAMPLE_OPENAPI})
+    resp = client.delete("/api/v1/api-armor/schemas/learned")
+    assert resp.status_code == 200
+    assert resp.json() == {"deleted": 0}
+    assert db.query(ApiSchema).count() == 1
+
+
 # ----- Profiles & Anomalies -----
 
 

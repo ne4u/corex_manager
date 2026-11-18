@@ -2109,7 +2109,13 @@
       "title": "API模式",
       "noSchemas": "未定义模式。",
       "schemaJson": "模式JSON",
-      "samples": "{{count}}个样本"
+      "samples": "{{count}}个样本",
+      "delete": "删除",
+      "deleteAll": "删除已学习",
+      "confirmDelete": "删除 {{method}} {{path}}？下次 Apply 会将其从 HAProxy 中移除。匹配的流量会再次学习它。",
+      "confirmDeleteAll": "删除全部 {{count}} 个已学习模式？OpenAPI 模式会保留。下次 Apply 会将它们从 HAProxy 中移除。匹配的流量会再次学习它们。",
+      "deleted": "已删除 {{count}} 个已学习模式。",
+      "failedToDelete": "删除模式失败。"
     },
     "auth": {
       "title": "认证策略",

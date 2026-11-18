@@ -333,9 +333,10 @@ function SchemasTab() {
   const [msg, setMsg] = useState<Msg | null>(null)
   const [editing, setEditing] = useState<any | null>(null)
   const [learn, setLearn] = useState<any | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<any | 'all' | null>(null)
 
-  const load = () => {
-    setMsg(null)
+  const load = (keepMessage = false) => {
+    if (!keepMessage) setMsg(null)
     apiArmor.schemas.list().then((r) => setSchemas(r.data)).catch(() => setMsg({ text: t('pages:apiArmor.schemas.failedToLoadSchemas'), isError: true }))
   }
 
@@ -365,6 +366,7 @@ function SchemasTab() {
       schemaJson: JSON.stringify(s.schema_def, null, 2),
     })
     setLearn(null)
+    setConfirmDelete(null)
   }
 
   const doLearn = async () => {
@@ -383,14 +385,54 @@ function SchemasTab() {
     }
   }
 
+  const learnedCount = schemas.filter((s) => s.source !== 'openapi').length
+
+  const delOne = async (s: any) => {
+    try {
+      await apiArmor.schemas.delete(s.id)
+      setConfirmDelete(null)
+      setMsg({ text: t('pages:apiArmor.schemas.deleted', { count: 1 }), isError: false })
+      load(true)
+    } catch (e: any) {
+      setConfirmDelete(null)
+      setMsg({ text: e?.response?.data?.detail || t('pages:apiArmor.schemas.failedToDelete'), isError: true })
+    }
+  }
+
+  const delAll = async () => {
+    try {
+      const r = await apiArmor.schemas.deleteLearned()
+      setConfirmDelete(null)
+      setMsg({ text: t('pages:apiArmor.schemas.deleted', { count: r.data?.deleted ?? 0 }), isError: false })
+      load(true)
+    } catch (e: any) {
+      setConfirmDelete(null)
+      setMsg({ text: e?.response?.data?.detail || t('pages:apiArmor.schemas.failedToDelete'), isError: true })
+    }
+  }
+
   return (
     <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4 max-w-4xl">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">{t('pages:apiArmor.schemas.title')}</h2>
-        <button className="btn-primary flex items-center gap-1" onClick={() => { setLearn({ method: 'POST', path: '/', body: '{}' }); setEditing(null) }}>
-          <Plus className="h-4 w-4" /> {t('pages:apiArmor.schemas.learn')}
-        </button>
+        <div className="flex items-center gap-3">
+          {learnedCount > 0 && (
+            <button className="text-red-400 hover:underline text-sm flex items-center gap-1" onClick={() => { setConfirmDelete('all'); setEditing(null); setLearn(null) }}>
+              <Trash2 className="h-4 w-4" /> {t('pages:apiArmor.schemas.deleteAll')}
+            </button>
+          )}
+          <button className="btn-primary flex items-center gap-1" onClick={() => { setLearn({ method: 'POST', path: '/', body: '{}' }); setEditing(null); setConfirmDelete(null) }}>
+            <Plus className="h-4 w-4" /> {t('pages:apiArmor.schemas.learn')}
+          </button>
+        </div>
       </div>
+      {confirmDelete === 'all' && (
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-muted-foreground">{t('pages:apiArmor.schemas.confirmDeleteAll', { count: learnedCount })}</span>
+          <button className="text-red-400 hover:underline" onClick={delAll}>{t('common:yes', 'Yes')}</button>
+          <button className="text-primary hover:underline" onClick={() => setConfirmDelete(null)}>{t('common:cancel', 'Cancel')}</button>
+        </div>
+      )}
       {msg && <p className={`text-sm ${msg.isError ? 'text-red-400' : 'text-green-400'}`}>{msg.text}</p>}
 
       {learn && (
@@ -434,15 +476,29 @@ function SchemasTab() {
                 <span className={`text-xs px-2 py-0.5 rounded ${s.source === 'openapi' ? 'bg-blue-900' : 'bg-green-900'}`}>{s.source}</span>
                 {s.enabled === false && <span className="text-xs text-muted-foreground">({t('pages:apiArmor.schemas.enabled')}: off)</span>}
               </div>
-              <button onClick={() => startEdit(s)} className="text-primary hover:underline text-xs flex items-center gap-1">
-                <Pencil className="h-3 w-3" /> {t('pages:apiArmor.schemas.edit')}
-              </button>
+              <div className="flex items-center gap-2">
+                <button onClick={() => startEdit(s)} className="text-primary hover:underline text-xs flex items-center gap-1">
+                  <Pencil className="h-3 w-3" /> {t('pages:apiArmor.schemas.edit')}
+                </button>
+                {s.source !== 'openapi' && (
+                  <button onClick={() => setConfirmDelete(s)} className="text-red-400 hover:underline text-xs flex items-center gap-1">
+                    <Trash2 className="h-3 w-3" /> {t('pages:apiArmor.schemas.delete')}
+                  </button>
+                )}
+              </div>
             </div>
             <div className="text-xs text-muted-foreground mt-1">{s.name} • {t('pages:apiArmor.schemas.samples', { count: s.sample_count })}</div>
             <details className="mt-2">
               <summary className="text-xs text-muted-foreground cursor-pointer">{t('pages:apiArmor.schemas.schemaJson')}</summary>
               <pre className="text-xs text-muted-foreground mt-1 overflow-auto max-h-48">{JSON.stringify(s.schema_def, null, 2)}</pre>
             </details>
+            {confirmDelete !== 'all' && confirmDelete?.id === s.id && (
+              <div className="mt-2 flex items-center gap-2 text-xs">
+                <span className="text-muted-foreground">{t('pages:apiArmor.schemas.confirmDelete', { method: s.method, path: s.path })}</span>
+                <button className="text-red-400 hover:underline" onClick={() => delOne(s)}>{t('common:yes', 'Yes')}</button>
+                <button className="text-primary hover:underline" onClick={() => setConfirmDelete(null)}>{t('common:cancel', 'Cancel')}</button>
+              </div>
+            )}
           </div>
         ))}
         {schemas.length === 0 && <p className="text-sm text-muted-foreground">{t('pages:apiArmor.schemas.noSchemas')}</p>}

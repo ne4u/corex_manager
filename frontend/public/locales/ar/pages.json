@@ -2109,7 +2109,13 @@
       "title": "مخططات API",
       "noSchemas": "لا توجد مخططات معرّفة.",
       "schemaJson": "مخطط JSON",
-      "samples": "{{count}} عينات"
+      "samples": "{{count}} عينات",
+      "delete": "حذف",
+      "deleteAll": "حذف المتعلَّمة",
+      "confirmDelete": "حذف {{method}} {{path}}؟ يزيله Apply التالي من HAProxy. تعيد الحركة المطابقة تعلّمه.",
+      "confirmDeleteAll": "حذف كل المخططات المتعلَّمة ({{count}})؟ تبقى مخططات OpenAPI. يزيلها Apply التالي من HAProxy. تعيد الحركة المطابقة تعلّمها.",
+      "deleted": "تم حذف {{count}} من المخططات المتعلَّمة.",
+      "failedToDelete": "فشل حذف المخطط."
     },
     "auth": {
       "title": "سياسات المصادقة",

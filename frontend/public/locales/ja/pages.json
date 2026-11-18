@@ -2109,7 +2109,13 @@
       "title": "APIスキーマ",
       "noSchemas": "スキーマが定義されていません。",
       "schemaJson": "スキーマJSON",
-      "samples": "{{count}}サンプル"
+      "samples": "{{count}}サンプル",
+      "delete": "削除",
+      "deleteAll": "学習済みを削除",
+      "confirmDelete": "{{method}} {{path}} を削除しますか？次の Apply で HAProxy から外れます。一致するトラフィックは再び学習します。",
+      "confirmDeleteAll": "学習済みスキーマ {{count}} 件をすべて削除しますか？OpenAPI スキーマは残ります。次の Apply で HAProxy から外れます。一致するトラフィックは再び学習します。",
+      "deleted": "学習済みスキーマを {{count}} 件削除しました。",
+      "failedToDelete": "スキーマの削除に失敗しました。"
     },
     "auth": {
       "title": "認証ポリシー",

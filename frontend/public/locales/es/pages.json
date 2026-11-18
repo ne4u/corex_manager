@@ -2109,7 +2109,13 @@
       "title": "Esquemas de API",
       "noSchemas": "No hay esquemas definidos.",
       "schemaJson": "Esquema JSON",
-      "samples": "{{count}} muestras"
+      "samples": "{{count}} muestras",
+      "delete": "Eliminar",
+      "deleteAll": "Eliminar aprendidos",
+      "confirmDelete": "¿Eliminar {{method}} {{path}}? El próximo Apply lo quita de HAProxy. El tráfico coincidente lo vuelve a aprender.",
+      "confirmDeleteAll": "¿Eliminar los {{count}} esquemas aprendidos? Los esquemas OpenAPI se conservan. El próximo Apply los quita de HAProxy. El tráfico coincidente los vuelve a aprender.",
+      "deleted": "Se eliminaron {{count}} esquema(s) aprendido(s).",
+      "failedToDelete": "No se pudo eliminar el esquema."
     },
     "auth": {
       "title": "Políticas de Auth",

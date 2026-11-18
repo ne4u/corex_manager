@@ -442,6 +442,50 @@ def update_schema(
     )
 
 
+@router.delete("/api-armor/schemas/learned")
+def delete_learned_schemas(
+    db: Session = Depends(get_db),
+    user=Depends(require_write),
+    _=Depends(rate_limit),
+):
+    """Delete every learned schema. OpenAPI schemas stay with their spec.
+
+    Rows leave the published schema index on the next config apply.
+    """
+    count = (
+        db.query(ApiSchema)
+        .filter(ApiSchema.source == "learned")
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    return {"deleted": count}
+
+
+@router.delete("/api-armor/schemas/{sid}")
+def delete_schema(
+    sid: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_write),
+    _=Depends(rate_limit),
+):
+    """Delete one learned schema so a later observation starts fresh.
+
+    OpenAPI schemas belong to an uploaded spec and are removed with it.
+    The row leaves the published schema index on the next config apply.
+    """
+    schema = db.get(ApiSchema, sid)
+    if not schema:
+        raise HTTPException(status_code=404, detail="Schema not found")
+    if schema.source != "learned":
+        raise HTTPException(
+            status_code=409,
+            detail="OpenAPI schemas are removed by deleting their spec",
+        )
+    db.delete(schema)
+    db.commit()
+    return {"status": "ok"}
+
+
 # ----- Auth Policies -----
 
 

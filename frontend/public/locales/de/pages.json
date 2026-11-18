@@ -2109,7 +2109,13 @@
       "title": "API-Schemata",
       "noSchemas": "Keine Schemata definiert.",
       "schemaJson": "Schema-JSON",
-      "samples": "{{count}} Beispiele"
+      "samples": "{{count}} Beispiele",
+      "delete": "Löschen",
+      "deleteAll": "Gelernte löschen",
+      "confirmDelete": "{{method}} {{path}} löschen? Der nächste Apply entfernt es aus HAProxy. Passender Traffic lernt es erneut.",
+      "confirmDeleteAll": "Alle {{count}} gelernten Schemata löschen? OpenAPI-Schemata bleiben. Der nächste Apply entfernt sie aus HAProxy. Passender Traffic lernt sie erneut.",
+      "deleted": "{{count}} gelernte Schemata gelöscht.",
+      "failedToDelete": "Schema konnte nicht gelöscht werden."
     },
     "auth": {
       "title": "Auth-Richtlinien",

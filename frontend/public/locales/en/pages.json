@@ -2304,7 +2304,13 @@
       "learnTitle": "Manual schema learn",
       "learnBody": "Request body to learn from",
       "learned": "Learned {{count}} schema(s).",
-      "failedToLearn": "Failed to learn schema."
+      "failedToLearn": "Failed to learn schema.",
+      "delete": "Delete",
+      "deleteAll": "Delete learned",
+      "confirmDelete": "Delete {{method}} {{path}}? The next Apply drops it from HAProxy. Matching traffic learns it again.",
+      "confirmDeleteAll": "Delete all {{count}} learned schemas? OpenAPI schemas stay. The next Apply drops them from HAProxy. Matching traffic learns them again.",
+      "deleted": "Deleted {{count}} learned schema(s).",
+      "failedToDelete": "Failed to delete schema."
     },
     "auth": {
       "title": "Auth Policies",
