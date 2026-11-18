@@ -50,6 +50,59 @@ def compute_cv_binding_hash(ip: str, user_agent: str, ja4: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Cap widget asset resolution
+# ---------------------------------------------------------------------------
+
+# Paths served by the Cap standalone server itself (added in standalone
+# v1.0.9). Reachable same-origin through the HAProxy /_cap service proxy,
+# which strips the proxy prefix before forwarding.
+CAP_SERVICE_WIDGET_PATH = "assets/widget.js"
+CAP_SERVICE_WASM_PATH = "assets/cap_wasm_bg.wasm"
+
+
+def resolve_cap_widget_assets(cfg: Any, db: Any = None) -> tuple[str, str]:
+    """Resolve (widget_url, wasm_url) for the Cap challenge page.
+
+    The ``cap_widget_source`` setting picks the JS source:
+      - "service": serve the widget + WASM bundled with the installed Cap
+        instance via the /_cap service proxy (requires Cap standalone
+        >=1.0.9, which exposes /assets/widget.js and /assets/cap_wasm_bg.wasm).
+      - "cdn" (default): editable URLs — the ``cap_widget_cdn_url`` /
+        ``cap_widget_wasm_url`` settings, falling back to the
+        CAPTCHA_WIDGET_*_URL env vars.
+    """
+    source = "cdn"
+    widget_url = getattr(cfg, "CAPTCHA_WIDGET_CDN_URL", "") or ""
+    wasm_url = getattr(cfg, "CAPTCHA_WIDGET_WASM_URL", "") or ""
+    if db is not None:
+        try:
+            from ..services.settings import get_setting as _gs
+
+            source = _gs(db, "cap_widget_source", "cdn") or "cdn"
+            widget_url = _gs(db, "cap_widget_cdn_url") or widget_url
+            wasm_url = _gs(db, "cap_widget_wasm_url") or wasm_url
+        except Exception:  # settings table unavailable — env fallbacks suffice
+            logger.debug("cap widget settings lookup failed; using env defaults")
+    if source == "service":
+        cap_path = (getattr(cfg, "CAPTCHA_PROXY_PATH", "/_cap") or "/_cap").rstrip("/")
+        return f"{cap_path}/{CAP_SERVICE_WIDGET_PATH}", f"{cap_path}/{CAP_SERVICE_WASM_PATH}"
+    return widget_url, wasm_url
+
+
+def _csp_origin(url: str) -> str | None:
+    """Return the scheme://host origin for an absolute http(s) URL, else None."""
+    from urllib.parse import urlparse
+
+    try:
+        p = urlparse(url)
+    except ValueError:
+        return None
+    if p.scheme in ("http", "https") and p.netloc:
+        return f"{p.scheme}://{p.netloc}"
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Base class
 # ---------------------------------------------------------------------------
 
@@ -64,11 +117,11 @@ class CaptchaProvider:
         """Return the widget HTML element (not the full page)."""
         raise NotImplementedError
 
-    def render_script_html(self, cfg: Any) -> str:
+    def render_script_html(self, cfg: Any, db: Any = None) -> str:
         """Return <script> tags for the widget."""
         raise NotImplementedError
 
-    def get_csp_directives(self) -> str:
+    def get_csp_directives(self, cfg: Any = None, db: Any = None) -> str:
         """Return CSP directives for the challenge page."""
         raise NotImplementedError
 
@@ -110,12 +163,16 @@ class CapProvider(CaptchaProvider):
             f'<input type="hidden" name="cap_token" />'
         )
 
-    def render_script_html(self, cfg: Any) -> str:
-        widget_cdn = cfg.CAPTCHA_WIDGET_CDN_URL
+    def render_script_html(self, cfg: Any, db: Any = None) -> str:
+        widget_url, wasm_url = resolve_cap_widget_assets(cfg, db)
+        wasm_line = (
+            f'<script>window.CAP_CUSTOM_WASM_URL = "{_html.escape(wasm_url)}";</script>\n  '
+            if wasm_url
+            else ""
+        )
         return (
-            "<script>window.CAP_CUSTOM_WASM_URL = "
-            '"https://cdn.jsdelivr.net/npm/@cap.js/wasm@0.0.7/browser/cap_wasm_bg.wasm";</script>\n'
-            f'  <script src="{_html.escape(widget_cdn)}" async defer></script>\n'
+            wasm_line
+            + f'<script src="{_html.escape(widget_url)}" async defer></script>\n'
             "  <script>\n"
             "  // The Cap widget clears its light DOM children on init, so the\n"
             "  // hidden cap_token input lives outside the widget. Listen for\n"
@@ -138,16 +195,26 @@ class CapProvider(CaptchaProvider):
             "  </script>"
         )
 
-    def get_csp_directives(self) -> str:
+    def get_csp_directives(self, cfg: Any = None, db: Any = None) -> str:
         # Cap renders its widget inside an iframe with srcdoc, which inherits
         # this page's CSP. The widget's bundled JS uses eval/new Function for
         # its proof-of-work solver and embeds small images as data: URIs, so
         # script-src needs 'unsafe-eval' and img-src needs data:.
+        remote_hosts = {"https://cdn.jsdelivr.net"}
+        if cfg is not None:
+            widget_url, wasm_url = resolve_cap_widget_assets(cfg, db)
+            for url in (widget_url, wasm_url):
+                # Only absolute http(s) URLs need a CSP entry — same-origin
+                # paths (e.g. the /_cap service proxy) are covered by 'self'.
+                origin = _csp_origin(url)
+                if origin:
+                    remote_hosts.add(origin)
+        hosts = " ".join(sorted(remote_hosts))
         return (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net 'wasm-unsafe-eval'; "
+            f"script-src 'self' 'unsafe-inline' 'unsafe-eval' {hosts} 'wasm-unsafe-eval'; "
             "worker-src blob:; "
-            "connect-src 'self' https://cdn.jsdelivr.net; "
+            f"connect-src 'self' {hosts}; "
             "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data:; "
             "frame-src 'self'"
@@ -240,10 +307,10 @@ class RecaptchaProvider(CaptchaProvider):
         # v2 — checkbox/image challenge
         return f'<div class="g-recaptcha" data-sitekey="{_html.escape(site_key)}" style="display:inline-block;"></div>'
 
-    def render_script_html(self, cfg: Any) -> str:
+    def render_script_html(self, cfg: Any, db: Any = None) -> str:
         return '<script src="https://www.google.com/recaptcha/api.js" async defer></script>'
 
-    def get_csp_directives(self) -> str:
+    def get_csp_directives(self, cfg: Any = None, db: Any = None) -> str:
         return (
             "default-src 'self'; "
             "script-src 'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com; "
@@ -294,10 +361,10 @@ class TurnstileProvider(CaptchaProvider):
     def render_widget_html(self, site_key: str, proxy_path: str) -> str:
         return f'<div class="cf-turnstile" data-sitekey="{_html.escape(site_key)}" style="display:inline-block;"></div>'
 
-    def render_script_html(self, cfg: Any) -> str:
+    def render_script_html(self, cfg: Any, db: Any = None) -> str:
         return '<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>'
 
-    def get_csp_directives(self) -> str:
+    def get_csp_directives(self, cfg: Any = None, db: Any = None) -> str:
         return (
             "default-src 'self'; "
             "script-src 'self' https://challenges.cloudflare.com 'unsafe-inline'; "

@@ -3,6 +3,7 @@
 import base64
 import json
 import logging
+import re
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -118,7 +119,9 @@ class CaptchaSettings(BaseModel):
     cap_site_key: str | None = None
     cap_secret_configured: bool = False
     cap_service_url: str = ""
+    cap_widget_source: str = "cdn"  # "cdn" (editable URL) or "service" (installed Cap instance)
     cap_widget_cdn_url: str = ""
+    cap_widget_wasm_url: str = ""
     # reCAPTCHA
     recaptcha_site_key: str | None = None
     recaptcha_secret_configured: bool = False
@@ -138,6 +141,9 @@ class CaptchaSettingsUpdate(BaseModel):
     # Cap (Native)
     cap_site_key: str | None = None
     cap_secret: str | None = None  # write-only
+    cap_widget_source: str | None = None
+    cap_widget_cdn_url: str | None = None
+    cap_widget_wasm_url: str | None = None
     # reCAPTCHA
     recaptcha_site_key: str | None = None
     recaptcha_secret: str | None = None  # write-only
@@ -330,7 +336,9 @@ def _build_captcha_settings(db: Session) -> CaptchaSettings:
         cap_site_key=cap_site_key,
         cap_secret_configured=bool(cap_secret),
         cap_service_url=settings.CAPTCHA_SERVICE_URL,
-        cap_widget_cdn_url=settings.CAPTCHA_WIDGET_CDN_URL,
+        cap_widget_source=get_setting(db, "cap_widget_source", "cdn") or "cdn",
+        cap_widget_cdn_url=get_setting(db, "cap_widget_cdn_url") or settings.CAPTCHA_WIDGET_CDN_URL,
+        cap_widget_wasm_url=get_setting(db, "cap_widget_wasm_url") or settings.CAPTCHA_WIDGET_WASM_URL,
         recaptcha_site_key=recaptcha_site_key,
         recaptcha_secret_configured=bool(recaptcha_secret),
         recaptcha_version=recaptcha_version,
@@ -351,6 +359,25 @@ def get_captcha_settings_route(
     return _build_captcha_settings(db)
 
 
+# Widget/WASM URLs land inside HTML attributes and a JS string literal on the
+# challenge page, so restrict them to absolute http(s) URLs or same-origin
+# paths with no whitespace, quotes, or backslashes.
+_WIDGET_URL_RE = re.compile(r"^(https?://|/)[^\s\"'<>`\\]+$")
+_CAP_WIDGET_SOURCES = ("cdn", "service")
+
+
+def _validate_widget_url(value: str, field: str) -> str:
+    v = value.strip()
+    if not v:  # empty clears the override → env default applies
+        return ""
+    if len(v) > 1000 or not _WIDGET_URL_RE.match(v):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid {field}: must be an http(s) URL or same-origin path",
+        )
+    return v
+
+
 @router.put("/captcha/settings", response_model=CaptchaSettings)
 def update_captcha_settings_route(
     s_in: CaptchaSettingsUpdate,
@@ -369,6 +396,17 @@ def update_captcha_settings_route(
         set_setting(db, "cap_site_key", s_in.cap_site_key)
     if s_in.cap_secret is not None:
         set_setting(db, "cap_secret", s_in.cap_secret)
+    if s_in.cap_widget_source is not None:
+        if s_in.cap_widget_source not in _CAP_WIDGET_SOURCES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid cap_widget_source (expected one of {', '.join(_CAP_WIDGET_SOURCES)})",
+            )
+        set_setting(db, "cap_widget_source", s_in.cap_widget_source)
+    if s_in.cap_widget_cdn_url is not None:
+        set_setting(db, "cap_widget_cdn_url", _validate_widget_url(s_in.cap_widget_cdn_url, "cap_widget_cdn_url"))
+    if s_in.cap_widget_wasm_url is not None:
+        set_setting(db, "cap_widget_wasm_url", _validate_widget_url(s_in.cap_widget_wasm_url, "cap_widget_wasm_url"))
     # reCAPTCHA
     if s_in.recaptcha_site_key is not None:
         set_setting(db, "recaptcha_site_key", s_in.recaptcha_site_key)

@@ -15,7 +15,9 @@ interface CaptchaSettings {
   cap_site_key: string | null
   cap_secret_configured: boolean
   cap_service_url: string
+  cap_widget_source: string
   cap_widget_cdn_url: string
+  cap_widget_wasm_url: string
   recaptcha_site_key: string | null
   recaptcha_secret_configured: boolean
   recaptcha_version: string
@@ -155,6 +157,9 @@ function SettingsTab({ settings, onChange, onError, onSuccess }: {
   // Cap fields
   const [capSiteKey, setCapSiteKey] = useState(settings.cap_site_key || '')
   const [capSecret, setCapSecret] = useState('')
+  const [widgetSource, setWidgetSource] = useState(settings.cap_widget_source || 'cdn')
+  const [widgetCdnUrl, setWidgetCdnUrl] = useState(settings.cap_widget_cdn_url || '')
+  const [widgetWasmUrl, setWidgetWasmUrl] = useState(settings.cap_widget_wasm_url || '')
   // reCAPTCHA fields
   const [recaptchaSiteKey, setRecaptchaSiteKey] = useState(settings.recaptcha_site_key || '')
   const [recaptchaSecret, setRecaptchaSecret] = useState('')
@@ -169,6 +174,9 @@ function SettingsTab({ settings, onChange, onError, onSuccess }: {
     setProvider(settings.captcha_provider)
     setTtl(settings.captcha_valid_seconds)
     setCapSiteKey(settings.cap_site_key || '')
+    setWidgetSource(settings.cap_widget_source || 'cdn')
+    setWidgetCdnUrl(settings.cap_widget_cdn_url || '')
+    setWidgetWasmUrl(settings.cap_widget_wasm_url || '')
     setRecaptchaSiteKey(settings.recaptcha_site_key || '')
     setRecaptchaVersion(settings.recaptcha_version)
     setRecaptchaMinScore(settings.recaptcha_min_score)
@@ -187,6 +195,9 @@ function SettingsTab({ settings, onChange, onError, onSuccess }: {
       if (provider === 'cap') {
         if (capSiteKey) payload.cap_site_key = capSiteKey
         if (capSecret) payload.cap_secret = capSecret
+        payload.cap_widget_source = widgetSource
+        payload.cap_widget_cdn_url = widgetCdnUrl
+        payload.cap_widget_wasm_url = widgetWasmUrl
       } else if (provider === 'recaptcha') {
         if (recaptchaSiteKey) payload.recaptcha_site_key = recaptchaSiteKey
         if (recaptchaSecret) payload.recaptcha_secret = recaptchaSecret
@@ -253,11 +264,42 @@ function SettingsTab({ settings, onChange, onError, onSuccess }: {
             <label className="block text-sm text-muted-foreground mb-1">{t('pages:captcha.settings.secret')} {settings.cap_secret_configured && <span className="text-green-400 text-xs">{t('pages:captcha.settings.secretConfigured')}</span>}</label>
             <input className="input w-full" type="password" value={capSecret} onChange={e => setCapSecret(e.target.value)} placeholder={t('pages:captcha.settings.secretPlaceholder')} />
           </div>
+          {/* Widget script source */}
+          <div className="pt-2 border-t border-border space-y-3">
+            <div>
+              <label className="block text-sm text-muted-foreground mb-1">{t('pages:captcha.settings.widgetSource')}</label>
+              <select className="input w-full" value={widgetSource} onChange={e => setWidgetSource(e.target.value)}>
+                <option value="cdn">{t('pages:captcha.settings.widgetSourceCdn')}</option>
+                <option value="service">{t('pages:captcha.settings.widgetSourceService')}</option>
+              </select>
+              <p className="text-xs text-muted-foreground mt-1">
+                {t(widgetSource === 'service' ? 'pages:captcha.settings.widgetSourceServiceHelp' : 'pages:captcha.settings.widgetSourceCdnHelp')}
+              </p>
+            </div>
+            {widgetSource === 'cdn' ? (
+              <>
+                <div>
+                  <label className="block text-sm text-muted-foreground mb-1">{t('pages:captcha.settings.widgetCdn')}</label>
+                  <input className="input w-full font-mono text-xs" value={widgetCdnUrl} onChange={e => setWidgetCdnUrl(e.target.value)} />
+                </div>
+                <div>
+                  <label className="block text-sm text-muted-foreground mb-1">{t('pages:captcha.settings.widgetWasm')}</label>
+                  <input className="input w-full font-mono text-xs" value={widgetWasmUrl} onChange={e => setWidgetWasmUrl(e.target.value)} />
+                  <p className="text-xs text-muted-foreground mt-1">{t('pages:captcha.settings.widgetWasmHelp')}</p>
+                </div>
+              </>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="text-muted-foreground">{t('pages:captcha.settings.widgetCdn')}</div>
+                <div className="font-mono text-secondary-foreground text-xs break-all">{settings.proxy_path}/assets/widget.js</div>
+                <div className="text-muted-foreground">{t('pages:captcha.settings.widgetWasm')}</div>
+                <div className="font-mono text-secondary-foreground text-xs break-all">{settings.proxy_path}/assets/cap_wasm_bg.wasm</div>
+              </div>
+            )}
+          </div>
           <div className="grid grid-cols-2 gap-3 text-sm pt-2 border-t border-border">
             <div className="text-muted-foreground">{t('pages:captcha.settings.serviceUrl')}</div>
             <div className="font-mono text-secondary-foreground text-xs">{settings.cap_service_url}</div>
-            <div className="text-muted-foreground">{t('pages:captcha.settings.widgetCdn')}</div>
-            <div className="font-mono text-secondary-foreground text-xs break-all">{settings.cap_widget_cdn_url}</div>
             <div className="text-muted-foreground">{t('pages:captcha.settings.challengeUrl')}</div>
             <div className="font-mono text-secondary-foreground text-xs">{settings.challenge_url}</div>
             <div className="text-muted-foreground">{t('pages:captcha.settings.proxyPath')}</div>

@@ -60,7 +60,7 @@ RUN cargo build --release -p haproxy-req-fp-module
 FROM haproxytech/haproxy-alpine:3.4
 
 USER root
-ARG DATAPLANEAPI_VERSION=3.4.3
+ARG DATAPLANEAPI_VERSION=3.4.7
 # dataplaneapi release arch is auto-detected from BuildKit's TARGETARCH
 # (amd64->x86_64, 386->i386; arm64/arm/ppc64le/s390x match as-is).
 # Requires BuildKit (DOCKER_BUILDKIT=1, default on modern Docker); the

@@ -95,8 +95,11 @@ class Settings(BaseSettings):
     CAPTCHA_SECRET: str | None = None
     # Path prefix for proxying captcha traffic through the HAProxy listener
     CAPTCHA_PROXY_PATH: str = "/_cap"
-    # CDN URL for the @cap.js/widget script (pinned version; change to @latest or self-host as needed)
+    # URL for the @cap.js/widget script (default pinned version; editable via
+    # the UI settings table — cap_widget_cdn_url — or set to a self-hosted path)
     CAPTCHA_WIDGET_CDN_URL: str = "https://cdn.jsdelivr.net/npm/@cap.js/widget@0.1.57/cap.min.js"
+    # URL for the @cap.js/wasm proof-of-work module (window.CAP_CUSTOM_WASM_URL)
+    CAPTCHA_WIDGET_WASM_URL: str = "https://cdn.jsdelivr.net/npm/@cap.js/wasm@0.0.7/browser/cap_wasm_bg.wasm"
     # Backend API host/port for the challenge page and verify endpoint proxy
     CAPTCHA_API_BACKEND_HOST: str = "api"
     CAPTCHA_API_BACKEND_PORT: int = 8000

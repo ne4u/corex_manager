@@ -205,8 +205,8 @@ def get_captcha_challenge(
     provider = _build_provider(db, provider_name, cfg)
     # Render provider-specific widget + script + CSP
     widget_html = provider.render_widget_html(site_key, cap_path)
-    script_html = provider.render_script_html(cfg)
-    csp = provider.get_csp_directives()
+    script_html = provider.render_script_html(cfg, db)
+    csp = provider.get_csp_directives(cfg, db)
     # The verify endpoint resolves everything it needs (rule attribution,
     # redirect target) from the server-side context — the only client input
     # it needs is the cid token itself.
