@@ -118,15 +118,52 @@ pub fn unwrap_resource_uri(uri: &str) -> Option<(String, String)> {
     Some((namespace.to_string(), original))
 }
 
-/// Split a namespaced name `{namespace}__{name}` into `(namespace, name)`.
-/// Returns `None` if there is no `__` separator.
+/// Gateway release advertised in MCP `serverInfo` and upstream `clientInfo`.
+pub const GATEWAY_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// Public namespace separator: `{namespace}--{name}`.
+///
+/// `__` is reserved by clients that qualify tools as `server__tool` and reject
+/// a second `__` (Grok). Namespaces may contain single hyphens (`corex-manager`)
+/// and tool names may contain underscores, so `--` still splits unambiguously.
+pub const NAMESPACE_SEP: &str = "--";
+
+/// Canonical separator stored in policy expressions (`mcp.tool`, `mcp.prompt`).
+/// Incoming `--` names are rewritten to this form before evaluation, and
+/// `tools/call` / `prompts/get` still accept names written with `__`.
+pub const POLICY_NAMESPACE_SEP: &str = "__";
+
+/// Split `{namespace}--{name}` or legacy `{namespace}__{name}`.
+///
+/// When both separators appear, the one that occurs first wins, so a `--`
+/// inside a legacy tool name (or a `__` inside a public tool name) stays
+/// with the tool. Returns `None` when neither separator is present.
 pub fn split_namespace(name: &str) -> Option<(&str, &str)> {
-    name.split_once("__")
+    let dash = name.find(NAMESPACE_SEP);
+    let under = name.find(POLICY_NAMESPACE_SEP);
+    match (dash, under) {
+        (Some(d), Some(u)) if d < u => name.split_once(NAMESPACE_SEP),
+        (Some(_), Some(_)) => name.split_once(POLICY_NAMESPACE_SEP),
+        (Some(_), None) => name.split_once(NAMESPACE_SEP),
+        (None, Some(_)) => name.split_once(POLICY_NAMESPACE_SEP),
+        (None, None) => None,
+    }
 }
 
-/// Prefix a name as `{namespace}__{name}`.
+/// Prefix a name as `{namespace}--{name}` for tools/list and prompts/list.
 pub fn prefix_name(namespace: &str, name: &str) -> String {
-    format!("{namespace}__{name}")
+    format!("{namespace}{NAMESPACE_SEP}{name}")
+}
+
+/// Rewrite a wire name to the policy form `{namespace}__{name}`.
+///
+/// `corex-manager--get_api` and `corex-manager__get_api` both become
+/// `corex-manager__get_api`. Names with no separator are returned unchanged.
+pub fn canonical_namespaced(name: &str) -> String {
+    match split_namespace(name) {
+        Some((ns, rest)) => format!("{ns}{POLICY_NAMESPACE_SEP}{rest}"),
+        None => name.to_string(),
+    }
 }
 
 // A tiny inline URL-encoder to avoid pulling another crate dependency.
@@ -188,12 +225,47 @@ mod tests {
 
     #[test]
     fn namespace_prefix_and_split() {
-        assert_eq!(prefix_name("jira", "create_issue"), "jira__create_issue");
+        assert_eq!(prefix_name("jira", "create_issue"), "jira--create_issue");
+        assert_eq!(
+            prefix_name("corex-manager", "get_api_armor_settings"),
+            "corex-manager--get_api_armor_settings"
+        );
+        assert_eq!(
+            split_namespace("jira--create_issue"),
+            Some(("jira", "create_issue"))
+        );
         assert_eq!(
             split_namespace("jira__create_issue"),
             Some(("jira", "create_issue"))
         );
+        assert_eq!(
+            split_namespace("corex-manager--get_api_armor_settings"),
+            Some(("corex-manager", "get_api_armor_settings"))
+        );
+        assert_eq!(
+            split_namespace("corex-manager__get_api_armor_settings"),
+            Some(("corex-manager", "get_api_armor_settings"))
+        );
+        // First separator wins when a tool name contains the other separator.
+        assert_eq!(
+            split_namespace("corex-manager--foo__bar"),
+            Some(("corex-manager", "foo__bar"))
+        );
+        assert_eq!(
+            split_namespace("corex-manager__foo--bar"),
+            Some(("corex-manager", "foo--bar"))
+        );
         assert_eq!(split_namespace("noseparator"), None);
+        assert_eq!(
+            canonical_namespaced("corex-manager--get_api"),
+            "corex-manager__get_api"
+        );
+        assert_eq!(
+            canonical_namespaced("corex-manager__get_api"),
+            "corex-manager__get_api"
+        );
+        assert_eq!(canonical_namespaced("plain"), "plain");
+        assert!(!prefix_name("corex-manager", "health").contains("__"));
     }
 
     #[test]

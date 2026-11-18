@@ -131,7 +131,7 @@ impl UpstreamClient {
             "params": {
                 "protocolVersion": PROTOCOL_VERSION,
                 "capabilities": {},
-                "clientInfo": {"name": "mcp-gateway", "version": "0.1.0"},
+                "clientInfo": {"name": "mcp-gateway", "version": corex_core::mcp_types::GATEWAY_VERSION},
             }
         });
         let headers = self.build_headers(server, None);

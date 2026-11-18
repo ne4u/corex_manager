@@ -22,6 +22,7 @@ use axum::response::{IntoResponse, Response};
 use serde_json::Value;
 
 use corex_core::config::{ConfigBundle, ServerConfig};
+use corex_core::mcp_types::{self, split_namespace};
 use corex_policy::auth::AuthContext;
 use corex_policy::policy::{
     check_prompt_access, check_resource_access, check_tool_access, filter_prompt_list,
@@ -193,9 +194,9 @@ fn is_response(body: &Value) -> bool {
     !obj.contains_key("method") && (obj.contains_key("result") || obj.contains_key("error"))
 }
 
-/// Prefix a tool/prompt name: {namespace}__{name}.
+/// Prefix a tool/prompt name: `{namespace}--{name}`.
 pub fn prefix_name(namespace: &str, name: &str) -> String {
-    format!("{namespace}__{name}")
+    mcp_types::prefix_name(namespace, name)
 }
 
 /// Wrap an upstream resource URI: mcp://{namespace}/{urlquoted original}.
@@ -621,7 +622,7 @@ async fn handle_initialize(
         "result": {
             "protocolVersion": PROTOCOL_VERSION,
             "capabilities": capabilities,
-            "serverInfo": {"name": "mcp-gateway", "version": "0.2.0"},
+            "serverInfo": {"name": "mcp-gateway", "version": mcp_types::GATEWAY_VERSION},
         }
     });
 
@@ -824,8 +825,8 @@ async fn handle_call(
         match ns {
             Some(n) => (n, orig),
             None => {
-                // Fall back to '__' split.
-                match name.split_once("__") {
+                // Fall back to the tool/prompt namespace separator.
+                match split_namespace(name) {
                     Some((n, o)) => (n.to_string(), o.to_string()),
                     None => {
                         return error_response(
@@ -839,7 +840,7 @@ async fn handle_call(
             }
         }
     } else {
-        match name.split_once("__") {
+        match split_namespace(name) {
             Some((n, o)) => (n.to_string(), o.to_string()),
             None => {
                 return error_response(
@@ -1158,7 +1159,7 @@ async fn handle_completion(
     let (namespace, _original) = if ref_type == "ref/resource" {
         unwrap_resource_uri(ref_name)
     } else {
-        match ref_name.split_once("__") {
+        match split_namespace(ref_name) {
             Some((n, o)) => (Some(n.to_string()), o.to_string()),
             None => (None, ref_name.to_string()),
         }
@@ -1374,7 +1375,8 @@ mod tests {
 
     #[test]
     fn prefix_and_unwrap() {
-        assert_eq!(prefix_name("jira", "create"), "jira__create");
+        assert_eq!(prefix_name("jira", "create"), "jira--create");
+        assert_eq!(mcp_types::GATEWAY_VERSION, env!("CARGO_PKG_VERSION"));
         let (ns, orig) = unwrap_resource_uri("mcp://jira/issues%2F123");
         assert_eq!(ns, Some("jira".into()));
         assert_eq!(orig, "issues/123");

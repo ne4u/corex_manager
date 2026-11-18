@@ -6,7 +6,7 @@
 //! - `hybrid`: use `expose` flag per server — exposed servers appear in the
 //!   virtual registry, non-exposed are accessible only via meta-tools.
 //!
-//! Meta-tools (namespaced as `gateway__*`):
+//! Meta-tools (namespaced as `gateway--*`):
 //! - `list_servers`: list all available servers for the team.
 //! - `list_tools`: list all tools across servers (with namespace prefix).
 //! - `search_tools`: search tools by name/description.
@@ -16,6 +16,7 @@
 use serde_json::Value;
 
 use corex_core::config::ServerConfig;
+use corex_core::mcp_types::{canonical_namespaced, prefix_name, split_namespace};
 use corex_proxy::Catalog;
 
 /// Discovery mode for a team.
@@ -36,19 +37,29 @@ impl DiscoveryMode {
     }
 }
 
-/// Meta-tool names (prefixed with `gateway__`).
-pub const META_LIST_SERVERS: &str = "gateway__list_servers";
-pub const META_LIST_TOOLS: &str = "gateway__list_tools";
-pub const META_SEARCH_TOOLS: &str = "gateway__search_tools";
-pub const META_DESCRIBE_TOOL: &str = "gateway__describe_tool";
-pub const META_REFRESH_TOOLS: &str = "gateway__refresh_tools";
+/// Meta-tool names (prefixed with `gateway--`).
+/// Legacy `gateway__*` calls normalize to these before dispatch.
+pub const META_LIST_SERVERS: &str = "gateway--list_servers";
+pub const META_LIST_TOOLS: &str = "gateway--list_tools";
+pub const META_SEARCH_TOOLS: &str = "gateway--search_tools";
+pub const META_DESCRIBE_TOOL: &str = "gateway--describe_tool";
+pub const META_REFRESH_TOOLS: &str = "gateway--refresh_tools";
 
-/// Check if a tool name is a meta-tool.
+/// Map a public or legacy meta-tool name onto its public constant.
+pub fn normalize_meta_tool(name: &str) -> Option<&'static str> {
+    match canonical_namespaced(name).as_str() {
+        "gateway__list_servers" => Some(META_LIST_SERVERS),
+        "gateway__list_tools" => Some(META_LIST_TOOLS),
+        "gateway__search_tools" => Some(META_SEARCH_TOOLS),
+        "gateway__describe_tool" => Some(META_DESCRIBE_TOOL),
+        "gateway__refresh_tools" => Some(META_REFRESH_TOOLS),
+        _ => None,
+    }
+}
+
+/// Check if a tool name is a meta-tool (`gateway--*` or legacy `gateway__*`).
 pub fn is_meta_tool(name: &str) -> bool {
-    matches!(
-        name,
-        META_LIST_SERVERS | META_LIST_TOOLS | META_SEARCH_TOOLS | META_DESCRIBE_TOOL | META_REFRESH_TOOLS
-    )
+    normalize_meta_tool(name).is_some()
 }
 
 /// Build the meta-tool definitions for `tools/list` injection.
@@ -81,7 +92,7 @@ pub fn meta_tool_definitions() -> Vec<Value> {
             "description": "Get the full schema for a specific tool.",
             "inputSchema": {
                 "type": "object",
-                "properties": {"name": {"type": "string", "description": "Full tool name (namespace__tool)"}},
+                "properties": {"name": {"type": "string", "description": "Full tool name (namespace--tool). Legacy namespace__tool is accepted."}},
                 "required": ["name"]
             },
             "_meta": {"mcp_server": "gateway", "mcp_meta_tool": true}
@@ -102,6 +113,9 @@ pub fn execute_meta_tool(
     servers: &[ServerConfig],
     catalogs: &[(i64, Catalog)],
 ) -> Value {
+    let Some(tool_name) = normalize_meta_tool(tool_name) else {
+        return serde_json::json!({"error": "Unknown meta-tool"});
+    };
     match tool_name {
         META_LIST_SERVERS => {
             let server_list: Vec<Value> = servers
@@ -127,7 +141,7 @@ pub fn execute_meta_tool(
                     for tool in &catalog.tools {
                         let mut prefixed = tool.clone();
                         if let Some(name) = prefixed.get("name").and_then(|v| v.as_str()).map(|s| s.to_string()) {
-                            prefixed["name"] = Value::String(format!("{ns}__{name}"));
+                            prefixed["name"] = Value::String(prefix_name(ns, &name));
                         }
                         all_tools.push(prefixed);
                     }
@@ -146,7 +160,7 @@ pub fn execute_meta_tool(
                         let desc = tool.get("description").and_then(|v| v.as_str()).unwrap_or("");
                         if name.to_lowercase().contains(&query) || desc.to_lowercase().contains(&query) {
                             let mut prefixed = tool.clone();
-                            prefixed["name"] = Value::String(format!("{ns}__{name}"));
+                            prefixed["name"] = Value::String(prefix_name(ns, name));
                             matches.push(prefixed);
                         }
                     }
@@ -156,14 +170,13 @@ pub fn execute_meta_tool(
         }
         META_DESCRIBE_TOOL => {
             let target = args.get("name").and_then(|v| v.as_str()).unwrap_or("");
-            // Split namespace__tool.
-            if let Some((ns, original)) = target.split_once("__") {
+            if let Some((ns, original)) = split_namespace(target) {
                 for (sid, catalog) in catalogs {
                     if servers.iter().any(|s| s.namespace == ns && s.id == *sid) {
                         for tool in &catalog.tools {
                             if tool.get("name").and_then(|v| v.as_str()) == Some(original) {
                                 let mut detailed = tool.clone();
-                                detailed["name"] = Value::String(target.to_string());
+                                detailed["name"] = Value::String(prefix_name(ns, original));
                                 return serde_json::json!({"tool": detailed});
                             }
                         }
@@ -218,8 +231,11 @@ mod tests {
 
     #[test]
     fn meta_tool_detection() {
+        assert!(is_meta_tool("gateway--list_servers"));
         assert!(is_meta_tool("gateway__list_servers"));
+        assert!(is_meta_tool("gateway--search_tools"));
         assert!(is_meta_tool("gateway__search_tools"));
+        assert!(!is_meta_tool("jira--create"));
         assert!(!is_meta_tool("jira__create"));
     }
 
@@ -270,6 +286,6 @@ mod tests {
         };
         let result = execute_meta_tool(META_SEARCH_TOOLS, &serde_json::json!({"query": "create"}), &servers, &[(1, catalog)]);
         assert_eq!(result["tools"].as_array().unwrap().len(), 1);
-        assert_eq!(result["tools"][0]["name"], "jira__create");
+        assert_eq!(result["tools"][0]["name"], "jira--create");
     }
 }

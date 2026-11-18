@@ -3,8 +3,8 @@
 //! Mirrors `mcp-gateway/skills.py`:
 //! - Loads skills from the config bundle, compiles `enable_when` expressions.
 //! - Injects enabled skills as virtual prompts in `prompts/list`.
-//! - Skills are namespaced as `skill__{name}`.
-//! - `prompts/get skill__{name}` renders the published body as a markdown
+//! - Skills are namespaced as `skill--{name}`.
+//! - `prompts/get skill--{name}` (legacy `skill__{name}` still accepted) renders the published body as a markdown
 //!   user message, plus attached files as embedded resources.
 
 use std::sync::Arc;
@@ -13,6 +13,7 @@ use parking_lot::RwLock;
 use serde_json::Value;
 
 use corex_core::config::SkillConfig;
+use corex_core::mcp_types::prefix_name;
 use corex_policy::auth::AuthContext;
 use corex_scan::expression::{parse_expression, evaluate, build_mcp_context, Expr};
 
@@ -123,7 +124,7 @@ impl SkillsRegistry {
 
     /// Return the namespaced prompt name for a skill.
     pub fn skill_prompt_name(skill_name: &str) -> String {
-        format!("{SKILL_NAMESPACE}__{skill_name}")
+        prefix_name(SKILL_NAMESPACE, skill_name)
     }
 
     /// Build a prompts/list entry for a skill.
@@ -217,7 +218,7 @@ mod tests {
 
     #[test]
     fn prompt_name_and_entry() {
-        assert_eq!(SkillsRegistry::skill_prompt_name("my_skill"), "skill__my_skill");
+        assert_eq!(SkillsRegistry::skill_prompt_name("my_skill"), "skill--my_skill");
         let _s = skill("test", true, true);
         let compiled = CompiledSkill {
             id: 1, team_id: 1, name: "test".into(), description: Some("d".into()),
@@ -226,7 +227,7 @@ mod tests {
             published_body: Some("body".into()), published_frontmatter: None, published_files: None,
         };
         let entry = SkillsRegistry::build_prompt_entry(&compiled);
-        assert_eq!(entry["name"], "skill__test");
+        assert_eq!(entry["name"], "skill--test");
         assert_eq!(entry["_meta"]["mcp_skill"], true);
     }
 

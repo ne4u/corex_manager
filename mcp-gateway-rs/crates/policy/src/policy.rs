@@ -10,6 +10,7 @@
 //! JSON-RPC error for deny: -32010 "policy denied".
 
 use corex_core::config::PolicyConfig;
+use corex_core::mcp_types::canonical_namespaced;
 use corex_scan::expression::{parse_expression, evaluate, build_mcp_context, EvalContext, Expr};
 
 pub const MCP_POLICY_DENIED: i32 = -32010;
@@ -175,8 +176,10 @@ pub fn check_tool_access(
     ip_src: &str,
     engine: &PolicyEngine,
 ) -> PolicyResult {
+    // Policies keep the `__` spelling. `ns--tool` and `ns__tool` both match.
+    let tool_name = canonical_namespaced(tool_name);
     let ctx = build_mcp_context(
-        method, server_namespace, tool_name, "", "",
+        method, server_namespace, &tool_name, "", "",
         &auth.name, &auth.kind, &auth.team_id.to_string(),
         args, Some(&auth.claims), ip_src,
     );
@@ -209,8 +212,9 @@ pub fn check_prompt_access(
     ip_src: &str,
     engine: &PolicyEngine,
 ) -> PolicyResult {
+    let prompt_name = canonical_namespaced(prompt_name);
     let ctx = build_mcp_context(
-        method, server_namespace, "", "", prompt_name,
+        method, server_namespace, "", "", &prompt_name,
         &auth.name, &auth.kind, &auth.team_id.to_string(),
         None, Some(&auth.claims), ip_src,
     );
@@ -346,5 +350,30 @@ mod tests {
         let filtered = filter_tool_list(&tools, "jira", &auth(), "", &engine);
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0]["name"], "jira__read");
+    }
+
+    #[test]
+    fn public_separator_matches_legacy_policy() {
+        let engine = PolicyEngine::load_sorted(&[
+            policy("deny_create", r#"mcp.tool = "jira__create""#, "deny", 0),
+            policy("allow_rest", r#"mcp.server = "jira""#, "allow", 1),
+        ]);
+        let denied = check_tool_access("tools/call", "jira--create", "jira", &auth(), None, "", &engine);
+        assert!(denied.denied());
+        assert_eq!(denied.rule_name, "deny_create");
+        let allowed = check_tool_access("tools/call", "corex-manager--get_api", "corex-manager", &auth(), None, "", &engine);
+        // No corex-manager allow rule, and the deny rule does not match the canonical name.
+        assert!(allowed.denied());
+        let engine = PolicyEngine::load_sorted(&[
+            policy("allow_tool", r#"mcp.tool = "corex-manager__get_api""#, "allow", 0),
+        ]);
+        let pr = check_tool_access(
+            "tools/call", "corex-manager--get_api", "corex-manager", &auth(), None, "", &engine,
+        );
+        assert!(pr.allowed());
+        let legacy = check_tool_access(
+            "tools/call", "corex-manager__get_api", "corex-manager", &auth(), None, "", &engine,
+        );
+        assert!(legacy.allowed());
     }
 }
