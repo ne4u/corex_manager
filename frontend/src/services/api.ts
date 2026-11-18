@@ -567,6 +567,10 @@ export const captcha = {
     get: () => api.get('/captcha/settings'),
     update: (data: Record<string, unknown>) => api.put('/captcha/settings', data),
   },
+  assets: {
+    info: () => api.get('/captcha/cap-assets'),
+    validate: (data: Record<string, unknown>) => api.post('/captcha/validate-assets', data),
+  },
   stats: {
     list: (params?: Record<string, unknown>) => api.get('/captcha/stats', { params }),
     timeseries: (ruleType: string, ruleId: number, hours?: number) =>

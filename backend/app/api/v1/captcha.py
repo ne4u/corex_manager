@@ -1,5 +1,6 @@
 """CAPTCHA configuration, stats, and Cap admin API proxy endpoints."""
 
+import asyncio
 import base64
 import json
 import logging
@@ -601,6 +602,216 @@ def get_challenge_events_route(
 # ---------------------------------------------------------------------------
 # Cap admin API proxy endpoints
 # ---------------------------------------------------------------------------
+
+
+class CapAssetsInfo(BaseModel):
+    # The installed Cap instance answered /settings/assets (capd only —
+    # older cap-standalone releases don't have it).
+    available: bool = False
+    cap_version: str | None = None  # capd version from /about
+    enabled: bool = False  # local assets server on → "service" source works
+    widget_version: str | None = None
+    wasm_version: str | None = None
+    suggested_widget_url: str | None = None
+    suggested_wasm_url: str | None = None
+    error: str | None = None
+
+
+@router.get("/captcha/cap-assets", response_model=CapAssetsInfo)
+async def get_cap_assets_info(
+    user=Depends(get_current_user),
+    _=Depends(rate_limit),
+):
+    """Detect the installed Cap instance's widget/WASM versions so the UI can
+    suggest version-matched CDN URLs.
+
+    Detection chain (best source first):
+      1. capd admin API ``GET /settings/assets`` — configured + builtWith
+         versions and the ``enabled`` flag. Older cap-standalone releases
+         don't have this endpoint.
+      2. Shared Valkey keys — both capd and cap-standalone write
+         ``asset:cache-config`` (JSON with ``versions.widget/wasm``) and capd
+         writes ``settings:assets``; ``asset:widget.js`` exists only after the
+         asset server has downloaded files.
+      3. Live ``GET {CAPTCHA_SERVICE_URL}/assets/widget.js`` probe — 200 means
+         the local asset server is actually serving (200=enabled, 404=off,
+         503=enabled but not downloaded yet).
+
+    Never raises for detection failures — returns ``available``/``error``.
+    """
+    from ...core.valkey_client import _get_client, cache_get
+
+    info = CapAssetsInfo()
+    widget_ver: str | None = None
+    wasm_ver: str | None = None
+    enabled: bool | None = None
+    api_error: str | None = None
+
+    # 1) capd admin API
+    api_answered = False
+    try:
+        res = await _cap_api_call("GET", "/settings/assets")
+        if res.status_code == 200:
+            api_answered = True
+            data = res.json() if res.content else {}
+            built = data.get("builtWith") or {}
+            widget_ver = data.get("widget") or built.get("widget")
+            wasm_ver = data.get("wasm") or built.get("wasm")
+            enabled = bool(data.get("enabled"))
+    except HTTPException as e:
+        api_error = e.detail if isinstance(e.detail, str) else str(e.detail)
+    except Exception as e:
+        api_error = f"Cap service unreachable: {e}"
+
+    # Best-effort capd version for display (standalone also 404s /about).
+    try:
+        about = await _cap_api_call("GET", "/about")
+        if about.status_code == 200:
+            info.cap_version = (about.json() or {}).get("ver")
+    except Exception:
+        pass
+
+    # 2) Shared Valkey keys (works for capd AND cap-standalone since both
+    # share REDIS_URL with this backend).
+    try:
+        saved = cache_get("settings:assets")
+        if isinstance(saved, dict):
+            widget_ver = widget_ver or saved.get("widget")
+            wasm_ver = wasm_ver or saved.get("wasm")
+            if enabled is None:
+                enabled = bool(saved.get("enabled"))
+        cache_cfg = cache_get("asset:cache-config")
+        if isinstance(cache_cfg, dict):
+            vers = cache_cfg.get("versions") or {}
+            widget_ver = widget_ver or vers.get("widget")
+            wasm_ver = wasm_ver or vers.get("wasm")
+        if enabled is None:
+            client = _get_client()
+            if client is not None and client.exists("asset:widget.js"):
+                enabled = True
+    except Exception:
+        pass
+
+    # 3) Live probe — the most reliable "is it actually serving" signal.
+    probe_status: int | None = None
+    try:
+        async with httpx.AsyncClient() as client:
+            r = await client.get(
+                f"{settings.CAPTCHA_SERVICE_URL.rstrip('/')}/assets/widget.js",
+                timeout=6,
+            )
+            probe_status = r.status_code
+    except Exception:
+        pass
+    if probe_status is not None:
+        enabled = probe_status == 200
+
+    info.enabled = bool(enabled)
+    info.widget_version = widget_ver
+    info.wasm_version = wasm_ver
+    info.available = api_answered or widget_ver is not None or probe_status is not None
+    # Suggest version-matched CDN URLs; 'latest' is a valid jsDelivr
+    # specifier when the exact version couldn't be detected.
+    info.suggested_widget_url = (
+        f"https://cdn.jsdelivr.net/npm/@cap.js/widget@{widget_ver or 'latest'}/cap.min.js"
+    )
+    info.suggested_wasm_url = (
+        f"https://cdn.jsdelivr.net/npm/@cap.js/wasm@{wasm_ver or 'latest'}/browser/cap_wasm_bg.wasm"
+    )
+    if not info.available:
+        info.error = api_error or "Installed Cap instance does not expose asset info"
+    elif probe_status == 404 and not widget_ver:
+        info.error = None  # service reachable but asset server off — enabled=false covers it
+    return info
+
+
+class CapAssetsValidateRequest(BaseModel):
+    # Values from the (possibly unsaved) form inputs; empty/None falls back to
+    # stored settings then env defaults, same as the challenge page renderer.
+    cap_widget_source: str | None = None
+    cap_widget_cdn_url: str | None = None
+    cap_widget_wasm_url: str | None = None
+
+
+class CapAssetCheck(BaseModel):
+    name: str  # "widget" or "wasm"
+    url: str
+    checked: bool = True  # False = can't verify from the backend
+    ok: bool = False
+    status: int | None = None
+    error: str | None = None
+
+
+class CapAssetsValidateResponse(BaseModel):
+    ok: bool = True
+    results: list[CapAssetCheck] = []
+
+
+async def _probe_asset_url(name: str, url: str, cap_path: str) -> CapAssetCheck:
+    """HEAD/GET a widget asset URL to confirm it actually exists.
+
+    Same-origin /_cap/* paths are checked directly against the Cap service
+    (the /_cap service proxy strips the prefix before forwarding). Other
+    same-origin paths can't be verified from the backend.
+    """
+    if url.startswith(cap_path + "/"):
+        target = f"{settings.CAPTCHA_SERVICE_URL.rstrip('/')}{url[len(cap_path):]}"
+    elif url.startswith("http://") or url.startswith("https://"):
+        target = url
+    elif url.startswith("/"):
+        return CapAssetCheck(name=name, url=url, checked=False, error="same-origin path not under the Cap proxy — can't verify from server")
+    else:
+        return CapAssetCheck(name=name, url=url, checked=False, error="invalid URL")
+    try:
+        async with httpx.AsyncClient(follow_redirects=True) as client:
+            res = await client.head(target, timeout=8)
+            if res.status_code == 405:  # HEAD not allowed — fall back to GET
+                res = await client.get(target, timeout=8)
+        return CapAssetCheck(
+            name=name,
+            url=url,
+            ok=200 <= res.status_code < 300,
+            status=res.status_code,
+        )
+    except Exception as e:
+        return CapAssetCheck(name=name, url=url, error=str(e))
+
+
+@router.post("/captcha/validate-assets", response_model=CapAssetsValidateResponse)
+async def validate_cap_assets(
+    body: CapAssetsValidateRequest,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+    _=Depends(rate_limit),
+):
+    """Probe the configured widget/WASM URLs to confirm the assets exist."""
+    source = body.cap_widget_source or get_setting(db, "cap_widget_source", "cdn") or "cdn"
+    if source == "service":
+        cap_path = settings.CAPTCHA_PROXY_PATH.rstrip("/")
+        widget_url = f"{cap_path}/assets/widget.js"
+        wasm_url = f"{cap_path}/assets/cap_wasm_bg.wasm"
+    else:
+        widget_url = (
+            (body.cap_widget_cdn_url or "").strip()
+            or get_setting(db, "cap_widget_cdn_url")
+            or settings.CAPTCHA_WIDGET_CDN_URL
+        )
+        wasm_url = (
+            (body.cap_widget_wasm_url or "").strip()
+            or get_setting(db, "cap_widget_wasm_url")
+            or settings.CAPTCHA_WIDGET_WASM_URL
+        )
+    cap_path = settings.CAPTCHA_PROXY_PATH.rstrip("/")
+    results = list(
+        await asyncio.gather(
+            _probe_asset_url("widget", widget_url, cap_path),
+            _probe_asset_url("wasm", wasm_url, cap_path),
+        )
+    )
+    return CapAssetsValidateResponse(
+        ok=all(r.ok or not r.checked for r in results),
+        results=results,
+    )
 
 
 @router.get("/captcha/keys")

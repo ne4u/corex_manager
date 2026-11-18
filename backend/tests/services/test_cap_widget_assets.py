@@ -132,3 +132,322 @@ def test_settings_update_widget_url_empty_resets_to_env(client):
     res = client.put("/api/v1/captcha/settings", json={"cap_widget_cdn_url": ""})
     assert res.status_code == 200
     assert res.json()["cap_widget_cdn_url"] == get_settings().CAPTCHA_WIDGET_CDN_URL
+
+
+# ---------------------------------------------------------------------------
+# Cap assets detection endpoint (suggest CDN URLs from the installed instance)
+# ---------------------------------------------------------------------------
+
+
+class _FakeRes:
+    def __init__(self, status_code=200, payload=None):
+        self.status_code = status_code
+        self._payload = payload or {}
+        self.content = b"{}" if payload is not None else b""
+        self.text = ""
+
+    def json(self):
+        return self._payload
+
+
+def _patch_cap_api(monkeypatch, routes):
+    async def fake_call(method, path, json_body=None):
+        return routes.get(path, _FakeRes(404))
+
+    monkeypatch.setattr("app.api.v1.captcha._cap_api_call", fake_call)
+
+
+def _patch_probe(monkeypatch, status=None):
+    """Stub the live /assets/widget.js probe. status=None = unreachable."""
+
+    import httpx as _httpx
+
+    class _FakeClient:
+        def __init__(self, **kw):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def get(self, url, timeout=6):
+            if status is None:
+                raise ConnectionError("no route")
+            return _FakeRes(status)
+
+    monkeypatch.setattr(_httpx, "AsyncClient", _FakeClient)
+
+
+def _patch_valkey(monkeypatch, store):
+    """Give the endpoint a fake shared-Valkey view (Cap's asset:* keys)."""
+
+    class _FakeCli:
+        def get(self, key):
+            return store.get(key)
+
+        def exists(self, key):
+            return key in store
+
+    monkeypatch.setattr("app.core.valkey_client._get_client", lambda: _FakeCli())
+
+
+def test_cap_assets_endpoint_suggests_versioned_urls(client, monkeypatch):
+    _patch_cap_api(
+        monkeypatch,
+        {
+            "/settings/assets": _FakeRes(
+                200,
+                {
+                    "enabled": True,
+                    "widget": "0.1.58",
+                    "wasm": "0.0.8",
+                    "builtWith": {"widget": "0.1.57", "wasm": "0.0.7"},
+                },
+            ),
+            "/about": _FakeRes(200, {"ver": "4.0.15"}),
+        },
+    )
+    _patch_probe(monkeypatch, 200)
+    _patch_valkey(monkeypatch, {})
+    res = client.get("/api/v1/captcha/cap-assets")
+    assert res.status_code == 200
+    d = res.json()
+    assert d["available"] is True
+    assert d["enabled"] is True
+    assert d["cap_version"] == "4.0.15"
+    assert d["widget_version"] == "0.1.58"
+    assert d["wasm_version"] == "0.0.8"
+    assert d["suggested_widget_url"] == "https://cdn.jsdelivr.net/npm/@cap.js/widget@0.1.58/cap.min.js"
+    assert d["suggested_wasm_url"] == "https://cdn.jsdelivr.net/npm/@cap.js/wasm@0.0.8/browser/cap_wasm_bg.wasm"
+
+
+def test_cap_assets_endpoint_falls_back_to_built_with(client, monkeypatch):
+    _patch_cap_api(
+        monkeypatch,
+        {
+            "/settings/assets": _FakeRes(
+                200, {"enabled": False, "builtWith": {"widget": "0.1.60", "wasm": "0.0.9"}}
+            ),
+            "/about": _FakeRes(404),
+        },
+    )
+    _patch_probe(monkeypatch, 404)
+    _patch_valkey(monkeypatch, {})
+    d = client.get("/api/v1/captcha/cap-assets").json()
+    assert d["available"] is True
+    assert d["enabled"] is False
+    assert d["suggested_widget_url"].endswith("widget@0.1.60/cap.min.js")
+    assert d["suggested_wasm_url"].endswith("wasm@0.0.9/browser/cap_wasm_bg.wasm")
+
+
+def test_cap_assets_endpoint_unsupported_instance(client, monkeypatch):
+    # Older cap-standalone without the assets server: no API, no cached
+    # Valkey keys, and the /assets probe 404s — still counts as "detected"
+    # (service reachable, just disabled).
+    _patch_cap_api(monkeypatch, {})
+    _patch_probe(monkeypatch, 404)
+    _patch_valkey(monkeypatch, {})
+    d = client.get("/api/v1/captcha/cap-assets").json()
+    assert d["available"] is True
+    assert d["enabled"] is False
+    assert d["suggested_widget_url"].endswith("widget@latest/cap.min.js")
+
+
+def test_cap_assets_endpoint_no_info_at_all(client, monkeypatch):
+    # Nothing answered — no API, no Valkey keys, no probe response.
+    _patch_cap_api(monkeypatch, {})
+    _patch_probe(monkeypatch, None)
+    _patch_valkey(monkeypatch, {})
+    d = client.get("/api/v1/captcha/cap-assets").json()
+    assert d["available"] is False
+    assert d["error"]
+
+
+def test_cap_assets_endpoint_valkey_fallback(client, monkeypatch):
+    # cap-standalone has no /settings/assets, but both standalone and capd
+    # write asset:cache-config into the shared Valkey.
+    import json as _json
+
+    _patch_cap_api(monkeypatch, {})
+    _patch_valkey(
+        monkeypatch,
+        {
+            "asset:cache-config": _json.dumps(
+                {"versions": {"widget": "0.1.58", "wasm": "0.0.8"}, "lastUpdate": 1}
+            ),
+            "asset:widget.js": "(()=>{})",
+        },
+    )
+    _patch_probe(monkeypatch, 200)
+    d = client.get("/api/v1/captcha/cap-assets").json()
+    assert d["available"] is True
+    assert d["enabled"] is True
+    assert d["widget_version"] == "0.1.58"
+    assert d["wasm_version"] == "0.0.8"
+    assert d["suggested_widget_url"].endswith("widget@0.1.58/cap.min.js")
+
+
+def test_cap_assets_endpoint_unreachable(client, monkeypatch):
+    async def boom(method, path, json_body=None):
+        raise ConnectionError("refused")
+
+    monkeypatch.setattr("app.api.v1.captcha._cap_api_call", boom)
+    _patch_probe(monkeypatch, None)
+    _patch_valkey(monkeypatch, {})
+    d = client.get("/api/v1/captcha/cap-assets").json()
+    assert d["available"] is False
+    assert "unreachable" in d["error"]
+
+
+# ---------------------------------------------------------------------------
+# Asset existence validation endpoint
+# ---------------------------------------------------------------------------
+
+
+def test_validate_assets_uses_form_urls(client, monkeypatch):
+    from app.api.v1.captcha import CapAssetCheck
+
+    seen = []
+
+    async def fake_probe(name, url, cap_path):
+        seen.append((name, url))
+        return CapAssetCheck(name=name, url=url, ok=True, status=200)
+
+    monkeypatch.setattr("app.api.v1.captcha._probe_asset_url", fake_probe)
+    res = client.post(
+        "/api/v1/captcha/validate-assets",
+        json={
+            "cap_widget_source": "cdn",
+            "cap_widget_cdn_url": "https://x.test/cap.js",
+            "cap_widget_wasm_url": "https://x.test/cap.wasm",
+        },
+    )
+    assert res.status_code == 200
+    assert res.json()["ok"] is True
+    assert ("widget", "https://x.test/cap.js") in seen
+    assert ("wasm", "https://x.test/cap.wasm") in seen
+
+
+def test_validate_assets_service_mode_checks_cap_paths(client, monkeypatch):
+    from app.api.v1.captcha import CapAssetCheck
+
+    seen = []
+
+    async def fake_probe(name, url, cap_path):
+        seen.append(url)
+        return CapAssetCheck(name=name, url=url, ok=False, status=404)
+
+    monkeypatch.setattr("app.api.v1.captcha._probe_asset_url", fake_probe)
+    res = client.post("/api/v1/captcha/validate-assets", json={"cap_widget_source": "service"})
+    assert "/_cap/assets/widget.js" in seen
+    assert "/_cap/assets/cap_wasm_bg.wasm" in seen
+    assert res.json()["ok"] is False
+
+
+def test_validate_assets_empty_input_falls_back_to_defaults(client, monkeypatch):
+    from app.api.v1.captcha import CapAssetCheck
+
+    seen = []
+
+    async def fake_probe(name, url, cap_path):
+        seen.append(url)
+        return CapAssetCheck(name=name, url=url, ok=True, status=200)
+
+    monkeypatch.setattr("app.api.v1.captcha._probe_asset_url", fake_probe)
+    client.post("/api/v1/captcha/validate-assets", json={"cap_widget_source": "cdn", "cap_widget_cdn_url": ""})
+    assert get_settings().CAPTCHA_WIDGET_CDN_URL in seen
+
+
+def test_probe_maps_cap_path_to_service_url(monkeypatch):
+    import asyncio
+    import httpx as _httpx
+    from app.api.v1.captcha import _probe_asset_url
+
+    targets = []
+
+    class _Resp:
+        status_code = 200
+
+    class _FakeClient:
+        def __init__(self, **kw):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def head(self, url, timeout=8):
+            targets.append(url)
+            return _Resp()
+
+    monkeypatch.setattr(_httpx, "AsyncClient", _FakeClient)
+    r = asyncio.run(_probe_asset_url("widget", "/_cap/assets/widget.js", "/_cap"))
+    assert r.ok and r.status == 200
+    assert targets == [f"{get_settings().CAPTCHA_SERVICE_URL.rstrip('/')}/assets/widget.js"]
+
+
+def test_probe_head_405_falls_back_to_get(monkeypatch):
+    import asyncio
+    import httpx as _httpx
+    from app.api.v1.captcha import _probe_asset_url
+
+    class _Resp:
+        def __init__(self, code):
+            self.status_code = code
+
+    class _FakeClient:
+        def __init__(self, **kw):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def head(self, url, timeout=8):
+            return _Resp(405)
+
+        async def get(self, url, timeout=8):
+            return _Resp(200)
+
+    monkeypatch.setattr(_httpx, "AsyncClient", _FakeClient)
+    r = asyncio.run(_probe_asset_url("widget", "https://x.test/cap.js", "/_cap"))
+    assert r.ok and r.status == 200
+
+
+def test_probe_same_origin_non_cap_path_unchecked():
+    import asyncio
+    from app.api.v1.captcha import _probe_asset_url
+
+    r = asyncio.run(_probe_asset_url("widget", "/static/cap.js", "/_cap"))
+    assert r.checked is False
+    assert not r.ok
+
+
+def test_probe_unreachable_url(monkeypatch):
+    import asyncio
+    import httpx as _httpx
+    from app.api.v1.captcha import _probe_asset_url
+
+    class _FakeClient:
+        def __init__(self, **kw):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def head(self, url, timeout=8):
+            raise ConnectionError("refused")
+
+    monkeypatch.setattr(_httpx, "AsyncClient", _FakeClient)
+    r = asyncio.run(_probe_asset_url("widget", "https://down.test/cap.js", "/_cap"))
+    assert r.checked and not r.ok
+    assert r.error

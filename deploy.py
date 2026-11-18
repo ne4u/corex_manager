@@ -179,9 +179,11 @@ BUILDABLE_SERVICES = {"api", "corex", "frontend", "mcp-gateway-rs"}
 # Files that trigger a full redeploy (all services) when changed.
 # `.env` is deliberately absent: it is in RSYNC_EXCLUDES (so it is never hashed
 # and could never appear in the change set) and the remote copy is seeded once
-# from .env.example and then owned by the host. Edit the remote .env by hand and
-# use --force-rebuild to pick it up.
-FULL_REDEPLOY_PATHS = {"docker-compose.yml", "docker-compose.ha.yml", ".env.example"}
+# from .env.example and then owned by the host. `.env.example` is also absent:
+# changes to it have no runtime effect on an existing deploy (the remote .env
+# is already seeded), so it only warrants an advisory note, not a rebuild.
+# Edit the remote .env by hand and use --force-rebuild to pick it up.
+FULL_REDEPLOY_PATHS = {"docker-compose.yml", "docker-compose.ha.yml"}
 
 
 # ---------------------------------------------------------------------------
@@ -228,7 +230,7 @@ SWARM_OPTIONAL_IMAGE_NAMES = {
 }
 
 # Files that trigger a full redeploy in Swarm mode.
-SWARM_FULL_REDEPLOY_PATHS = {"docker-swarm.yml", ".env.example"}
+SWARM_FULL_REDEPLOY_PATHS = {"docker-swarm.yml"}
 
 
 # ---------------------------------------------------------------------------
@@ -338,6 +340,94 @@ def _remote_docker(host: str, user: str, ssh_pass: str, sudo_prefix: str, remote
     else:
         command = f"cd {shlex.quote(remote_path)} && {joined}"
     return _ssh_cmd(host, user, command, ssh_pass)
+
+
+def _remote_compose_services(
+    host: str, user: str, ssh_pass: str, sudo_prefix: str, remote_path: str, ha_enabled: bool
+) -> list[str]:
+    """List all services defined in the remote compose project."""
+    cmd = _compose_cmd(ha_enabled, "config --services")
+    if sudo_prefix:
+        command = f"{sudo_prefix}bash -c {shlex.quote(f'cd {shlex.quote(remote_path)} && {cmd}')}"
+    else:
+        command = f"cd {shlex.quote(remote_path)} && {cmd}"
+    rc, out = _ssh_capture(host, user, command, ssh_pass)
+    return out.split() if rc == 0 else []
+
+
+def _build_and_start(
+    host: str,
+    user: str,
+    ssh_pass: str,
+    sudo_prefix: str,
+    remote_path: str,
+    ha_enabled: bool,
+    targets: set[str],
+    include_other_services: bool,
+) -> tuple[int, set[str]]:
+    """Build the given services and start them on the remote host.
+
+    Builds are attempted as a single `docker compose build` call for speed;
+    on failure each service is retried individually so one broken service
+    doesn't block the rest. Services whose builds fail are excluded from the
+    `up` call (compose would otherwise try to rebuild the missing image
+    itself and fail again).
+
+    Returns (rc, failed). A non-empty `failed` set means a partial deploy —
+    callers must NOT upload the manifest so the next run retries them.
+    """
+    failed: set[str] = set()
+    build_targets = " ".join(sorted(targets))
+    rc = _remote_docker(
+        host, user, ssh_pass, sudo_prefix, remote_path,
+        _compose_cmd(ha_enabled, f"build {build_targets}"),
+    )
+    if rc != 0:
+        # Isolate which service(s) failed — retry each individually.
+        for svc in sorted(targets):
+            print(f"\n  Retrying build individually: {svc}...")
+            brc = _remote_docker(
+                host, user, ssh_pass, sudo_prefix, remote_path,
+                _compose_cmd(ha_enabled, f"build {svc}"),
+            )
+            if brc != 0:
+                failed.add(svc)
+                print(f"  ✗ build failed for {svc} — it will be skipped.", file=sys.stderr)
+        if not failed:
+            # Combined build failed but every individual build passed —
+            # treat the individual results as authoritative.
+            rc = 0
+    built = sorted(targets - failed)
+    if include_other_services:
+        if failed:
+            all_svcs = _remote_compose_services(host, user, ssh_pass, sudo_prefix, remote_path, ha_enabled)
+            if all_svcs:
+                up_args = " ".join(s for s in all_svcs if s not in failed)
+                rc = _remote_docker(
+                    host, user, ssh_pass, sudo_prefix, remote_path,
+                    _compose_cmd(ha_enabled, f"up -d {up_args}"),
+                )
+            elif built:
+                # Couldn't enumerate services — at least start what built.
+                rc = _remote_docker(
+                    host, user, ssh_pass, sudo_prefix, remote_path,
+                    _compose_cmd(ha_enabled, f"up -d --no-deps {' '.join(built)}"),
+                )
+            else:
+                rc = 1
+        else:
+            rc = _remote_docker(
+                host, user, ssh_pass, sudo_prefix, remote_path,
+                _compose_cmd(ha_enabled, "up -d"),
+            )
+    elif built:
+        rc = _remote_docker(
+            host, user, ssh_pass, sudo_prefix, remote_path,
+            _compose_cmd(ha_enabled, f"up -d --no-deps {' '.join(built)}"),
+        )
+    else:
+        rc = 1
+    return rc, failed
 
 
 def _prompt(args: argparse.Namespace) -> tuple[str, str, str, str, str]:
@@ -596,16 +686,19 @@ def _print_deploy_plan(
             print(f"    {f}")
         if len(changed_files) > 30:
             print(f"    ... and {len(changed_files) - 30} more")
-    else:
+    elif not full_redeploy:
         print("\n  No files changed since last deploy.")
+    # When full_redeploy is set with no changed files, there is no manifest to
+    # diff against — saying "no files changed" would be misleading.
 
     if force_rebuild:
         print(f"\n  Force rebuild: {', '.join(force_rebuild)}")
 
     if full_redeploy:
-        print("\n  Full redeploy: yes (compose/env changed or no manifest)")
+        reason = "compose/env file changed" if changed_files else "no manifest found on remote"
+        print(f"\n  Full redeploy: yes ({reason})")
     else:
-        print(f"\n  Full redeploy: no")
+        print("\n  Full redeploy: no")
 
     if services_to_rebuild:
         print(f"  Services to rebuild: {', '.join(sorted(services_to_rebuild))}")
@@ -757,16 +850,17 @@ def _print_k8s_deploy_plan(
             print(f"    {f}")
         if len(changed_files) > 30:
             print(f"    ... and {len(changed_files) - 30} more")
-    else:
+    elif not full_redeploy:
         print("\n  No files changed since last deploy.")
 
     if force_rebuild:
         print(f"\n  Force rebuild: {', '.join(force_rebuild)}")
 
     if full_redeploy:
-        print("\n  Full redeploy: yes (compose/env changed or no manifest)")
+        reason = "compose/env file changed" if changed_files else "no manifest found on remote"
+        print(f"\n  Full redeploy: yes ({reason})")
     else:
-        print(f"\n  Full redeploy: no")
+        print("\n  Full redeploy: no")
 
     if services_to_rebuild:
         print(f"  Images to rebuild: {', '.join(sorted(services_to_rebuild))}")
@@ -863,11 +957,15 @@ def _deploy_docker(args: argparse.Namespace) -> int:
         if deleted:
             print(f"  Deleted: {len(deleted)} files")
 
+        if ".env.example" in all_changes:
+            print("  Note: .env.example changed — no rebuild needed, but review")
+            print("        the remote .env for new/changed variables.")
+
         # Check for full-redeploy triggers
         full_redeploy = any(p in all_changes for p in FULL_REDEPLOY_PATHS)
 
         if full_redeploy:
-            print("  compose/env file changed — full redeploy.")
+            print("  compose file changed — full redeploy.")
             services_to_rebuild = set(BUILDABLE_SERVICES)
             services_to_restart = set()
         elif not all_changes:
@@ -958,13 +1056,13 @@ def _deploy_docker(args: argparse.Namespace) -> int:
     # ------------------------------------------------------------------
     # Execute deploy plan
     # ------------------------------------------------------------------
+    failed_builds: set[str] = set()
     if full_redeploy:
         # Full redeploy — build all services, then start
         print("\nFull redeploy — building and starting all services...")
-        rc = _remote_docker(
-            host, user, ssh_password, sudo_prefix, remote_path,
-            _compose_cmd(ha_enabled, "build"),
-            _compose_cmd(ha_enabled, "up -d"),
+        rc, failed_builds = _build_and_start(
+            host, user, ssh_password, sudo_prefix, remote_path, ha_enabled,
+            set(BUILDABLE_SERVICES), include_other_services=True,
         )
     elif not services_to_rebuild and not services_to_restart:
         # No changes — ensure all containers are running (no build)
@@ -977,10 +1075,9 @@ def _deploy_docker(args: argparse.Namespace) -> int:
         # Rebuild changed services (with layer cache, no --no-cache)
         build_targets = " ".join(sorted(services_to_rebuild))
         print(f"\nBuilding services: {build_targets}...")
-        rc = _remote_docker(
-            host, user, ssh_password, sudo_prefix, remote_path,
-            _compose_cmd(ha_enabled, f"build {build_targets}"),
-            _compose_cmd(ha_enabled, f"up -d --no-deps {build_targets}"),
+        rc, failed_builds = _build_and_start(
+            host, user, ssh_password, sudo_prefix, remote_path, ha_enabled,
+            services_to_rebuild, include_other_services=False,
         )
         # Restart services that only need a restart (e.g., backend/app/ changes)
         if rc == 0 and services_to_restart:
@@ -1007,6 +1104,20 @@ def _deploy_docker(args: argparse.Namespace) -> int:
             _compose_cmd(ha_enabled, "up -d --force-recreate coraza-spoa-init"),
             _compose_cmd(ha_enabled, "restart coraza-spoa"),
         )
+
+    if failed_builds:
+        # Partial deploy: the working services are up, but the manifest is
+        # NOT uploaded so the next run still sees these files as changed and
+        # retries the failed service(s).
+        print(
+            f"\nError: build failed for: {', '.join(sorted(failed_builds))}",
+            file=sys.stderr,
+        )
+        print(
+            "Other services were deployed — fix the failure and re-run deploy.py to retry.",
+            file=sys.stderr,
+        )
+        return 1
 
     if rc != 0:
         print("Error: docker compose build/up failed.", file=sys.stderr)
@@ -1152,11 +1263,15 @@ def _deploy_swarm(args: argparse.Namespace) -> int:
         if deleted:
             print(f"  Deleted: {len(deleted)} files")
 
+        if ".env.example" in all_changes:
+            print("  Note: .env.example changed — no rebuild needed, but review")
+            print("        the remote .env for new/changed variables.")
+
         # Check for full-redeploy triggers (Swarm-specific)
         full_redeploy = any(p in all_changes for p in SWARM_FULL_REDEPLOY_PATHS)
 
         if full_redeploy:
-            print("  Swarm stack/env file changed — full redeploy.")
+            print("  Swarm stack file changed — full redeploy.")
             services_to_rebuild = set(BUILDABLE_SERVICES)
             services_to_restart = set()
         elif not all_changes:
@@ -1439,10 +1554,14 @@ def _deploy_k8s(args: argparse.Namespace, target: str) -> int:
         if deleted:
             print(f"  Deleted: {len(deleted)} files")
 
+        if ".env.example" in all_changes:
+            print("  Note: .env.example changed — no rebuild needed, but review")
+            print("        the remote .env for new/changed variables.")
+
         full_redeploy = any(p in all_changes for p in FULL_REDEPLOY_PATHS)
 
         if full_redeploy:
-            print("  compose/env file changed — full redeploy.")
+            print("  compose file changed — full redeploy.")
             services_to_rebuild = set(BUILDABLE_SERVICES)
         elif not all_changes:
             print("  No changes detected.")

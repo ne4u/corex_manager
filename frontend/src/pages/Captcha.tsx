@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Bot, Settings as SettingsIcon, BarChart3, KeyRound, Plus, Trash2, Save, RefreshCw, Copy, RotateCw } from 'lucide-react'
+import { Bot, Settings as SettingsIcon, BarChart3, KeyRound, Plus, Trash2, Save, RefreshCw, Copy, RotateCw, CheckCircle2 } from 'lucide-react'
 import { captcha, getErrorDetail } from '../services/api'
 import { Tabs } from '../components/ui'
 import { useDateTime } from '../contexts/DateTimeContext'
@@ -160,6 +160,66 @@ function SettingsTab({ settings, onChange, onError, onSuccess }: {
   const [widgetSource, setWidgetSource] = useState(settings.cap_widget_source || 'cdn')
   const [widgetCdnUrl, setWidgetCdnUrl] = useState(settings.cap_widget_cdn_url || '')
   const [widgetWasmUrl, setWidgetWasmUrl] = useState(settings.cap_widget_wasm_url || '')
+  const [widgetDetecting, setWidgetDetecting] = useState(false)
+  const [widgetDetectMsg, setWidgetDetectMsg] = useState('')
+  const [capAssets, setCapAssets] = useState<{ enabled: boolean } | null>(null)
+  const [validating, setValidating] = useState(false)
+  const [assetChecks, setAssetChecks] = useState<
+    { name: string; url: string; checked: boolean; ok: boolean; status: number | null; error: string | null }[] | null
+  >(null)
+
+  // Probe the effective widget/WASM URLs server-side to confirm the assets
+  // actually exist (remote URLs are HEAD'd; /_cap/* paths are checked
+  // directly against the Cap service).
+  const validateAssetUrls = async () => {
+    setValidating(true)
+    setAssetChecks(null)
+    onError('')
+    try {
+      const res = await captcha.assets.validate({
+        cap_widget_source: widgetSource,
+        cap_widget_cdn_url: widgetCdnUrl,
+        cap_widget_wasm_url: widgetWasmUrl,
+      })
+      setAssetChecks(res.data.results || [])
+    } catch (e) {
+      onError(getErrorDetail(e))
+    } finally {
+      setValidating(false)
+    }
+  }
+
+  // Ask the installed Cap instance which widget/WASM versions it serves
+  // (capd /settings/assets) and fill the URL inputs with version-matched
+  // jsDelivr URLs.
+  const detectWidgetVersions = async () => {
+    setWidgetDetecting(true)
+    setWidgetDetectMsg('')
+    onError('')
+    try {
+      const res = await captcha.assets.info()
+      const d = res.data
+      if (!d.available) {
+        setCapAssets(null)
+        setWidgetDetectMsg(d.error || t('pages:captcha.settings.widgetDetectFailed'))
+        return
+      }
+      setCapAssets(d)
+      if (d.suggested_widget_url) setWidgetCdnUrl(d.suggested_widget_url)
+      if (d.suggested_wasm_url) setWidgetWasmUrl(d.suggested_wasm_url)
+      setWidgetDetectMsg(
+        t('pages:captcha.settings.widgetDetected', {
+          widget: d.widget_version || 'latest',
+          wasm: d.wasm_version || 'latest',
+        })
+      )
+    } catch (e) {
+      setCapAssets(null)
+      setWidgetDetectMsg(getErrorDetail(e))
+    } finally {
+      setWidgetDetecting(false)
+    }
+  }
   // reCAPTCHA fields
   const [recaptchaSiteKey, setRecaptchaSiteKey] = useState(settings.recaptcha_site_key || '')
   const [recaptchaSecret, setRecaptchaSecret] = useState('')
@@ -276,6 +336,50 @@ function SettingsTab({ settings, onChange, onError, onSuccess }: {
                 {t(widgetSource === 'service' ? 'pages:captcha.settings.widgetSourceServiceHelp' : 'pages:captcha.settings.widgetSourceCdnHelp')}
               </p>
             </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={detectWidgetVersions}
+                disabled={widgetDetecting}
+                className="btn-secondary px-3 py-1.5 text-sm flex items-center gap-1.5"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${widgetDetecting ? 'animate-spin' : ''}`} />
+                {t('pages:captcha.settings.widgetDetect')}
+              </button>
+              <button
+                type="button"
+                onClick={validateAssetUrls}
+                disabled={validating}
+                className="btn-secondary px-3 py-1.5 text-sm flex items-center gap-1.5"
+              >
+                <CheckCircle2 className={`w-3.5 h-3.5 ${validating ? 'animate-spin' : ''}`} />
+                {t('pages:captcha.settings.widgetValidate')}
+              </button>
+              {widgetDetectMsg && <span className="text-xs text-muted-foreground">{widgetDetectMsg}</span>}
+            </div>
+            {assetChecks && assetChecks.length > 0 && (
+              <ul className="text-xs space-y-0.5">
+                {assetChecks.map(r => (
+                  <li
+                    key={r.name}
+                    className={r.checked ? (r.ok ? 'text-green-400' : 'text-red-400') : 'text-muted-foreground'}
+                  >
+                    {r.name}:{' '}
+                    {!r.checked
+                      ? r.error || t('pages:captcha.settings.widgetCheckSkipped')
+                      : r.ok
+                        ? t('pages:captcha.settings.widgetCheckReachable', { status: r.status })
+                        : r.error || t('pages:captcha.settings.widgetCheckFailed', { status: r.status ?? '?' })}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {widgetSource === 'service' && capAssets && !capAssets.enabled && (
+              <p className="text-xs text-amber-400">{t('pages:captcha.settings.widgetAssetsDisabled')}</p>
+            )}
+            {widgetSource === 'service' && capAssets?.enabled && (
+              <p className="text-xs text-green-400">{t('pages:captcha.settings.widgetAssetsEnabled')}</p>
+            )}
             {widgetSource === 'cdn' ? (
               <>
                 <div>
