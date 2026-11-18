@@ -427,6 +427,15 @@ _LEADER_ID = f"{os.getpid()}:{secrets.token_hex(4)}"
 # locks) we fall back to True (single-worker assumption).
 _PG_ADVISORY_KEY = 0x434F524558  # "COREX" as a bigint
 _pg_lock_conn = None
+# Set only when this process wins acquire_leader_lock. A later acquire that
+# loses SET NX must not clear it: NX fails even when this process already
+# holds the key. Cleared when renewal fails or the lock is released.
+_leader_held = False
+
+
+def holds_leader_lock() -> bool:
+    """Return True when this process currently holds the leader lock."""
+    return _leader_held
 
 
 def _pg_try_advisory_lock() -> bool:
@@ -490,15 +499,24 @@ def acquire_leader_lock(ttl: int = 30) -> bool:
     neither is available (e.g. SQLite local dev), returns True — the
     single-worker fallback so background work continues.
     """
+    global _leader_held
     client = _get_client()
     if client:
         try:
             ok = client.set(_LEADER_KEY, _LEADER_ID, nx=True, ex=ttl)
-            return bool(ok)
+            acquired = bool(ok)
+            if acquired:
+                _leader_held = True
+            # False means the key already exists. This process may already
+            # hold it, so do not clear _leader_held here.
+            return acquired
         except Exception:
             _reset_client()
             # Fall through to PostgreSQL advisory lock
-    return _pg_try_advisory_lock()
+    acquired = _pg_try_advisory_lock()
+    if acquired:
+        _leader_held = True
+    return acquired
 
 
 def renew_leader_lock(ttl: int = 30) -> bool:
@@ -510,6 +528,7 @@ def renew_leader_lock(ttl: int = 30) -> bool:
     so no renewal is needed — returns True if we hold it, otherwise tries
     to acquire it (handles the case where the connection died).
     """
+    global _leader_held
     client = _get_client()
     if client:
         _renew_script = """
@@ -521,14 +540,20 @@ def renew_leader_lock(ttl: int = 30) -> bool:
         """
         try:
             result = client.eval(_renew_script, 1, _LEADER_KEY, _LEADER_ID, ttl)
-            return bool(result)
+            ok = bool(result)
+            if not ok:
+                _leader_held = False
+            return ok
         except Exception:
             _reset_client()
             # Fall through to PostgreSQL advisory lock
     # Valkey unavailable — the PG advisory lock is session-level, so if we
     # hold it we're still the leader. If we don't (e.g. connection died),
     # try to re-acquire.
-    return _pg_lock_conn is not None or _pg_try_advisory_lock()
+    ok = _pg_lock_conn is not None or _pg_try_advisory_lock()
+    if not ok:
+        _leader_held = False
+    return ok
 
 
 def release_leader_lock() -> None:
@@ -536,6 +561,8 @@ def release_leader_lock() -> None:
 
     Releases both the Valkey lock and the PostgreSQL advisory lock.
     """
+    global _leader_held
+    _leader_held = False
     client = _get_client()
     if client:
         _release_script = """

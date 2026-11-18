@@ -13,7 +13,7 @@ dependencies = [
 
 [[package]]
 name = "api-armor-body-parser"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "api-armor-graphql",
  "api-armor-jwt-validator",
@@ -26,14 +26,14 @@ dependencies = [
 
 [[package]]
 name = "api-armor-graphql"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "sha2",
 ]
 
 [[package]]
 name = "api-armor-jwt-validator"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "base64",
  "hmac",
@@ -45,7 +45,7 @@ dependencies = [
 
 [[package]]
 name = "api-armor-schema-validator"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "serde",
  "serde_json",
@@ -245,7 +245,7 @@ dependencies = [
 
 [[package]]
 name = "haproxy-api-armor-module"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "api-armor-body-parser",
  "api-armor-jwt-validator",

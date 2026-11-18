@@ -11,6 +11,7 @@ Called from haproxy.write_config() before config validation.
 """
 
 import json
+import logging
 import os
 import re
 from datetime import UTC, datetime
@@ -21,7 +22,22 @@ from sqlalchemy.orm import Session
 from ..core.config import get_settings
 from ..models.api_armor import ApiKeyList, ApiProfile, ApiSchema, AuthPolicy
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
+
+
+def ensure_haproxy_writable_dir(path: str) -> None:
+    """Create ``path`` so HAProxy can add files inside it.
+
+    The API often creates directories as root with mode 0755, while HAProxy
+    may run as another user and must create ``profiling.log`` here. This
+    directory is on the private data volume, so mode 0777 stays local to it.
+    """
+    os.makedirs(path, exist_ok=True)
+    try:
+        os.chmod(path, 0o777)
+    except OSError as exc:
+        logger.warning("Could not make %s writable by HAProxy: %s", path, exc)
 
 
 # Filename sanitizer. Must match the safe-name logic used for other data files.
@@ -245,7 +261,7 @@ def write_api_armor_files(db: Session) -> dict[str, Any]:
     Returns a summary dict describing every file written.
     """
     base_dir = settings.API_ARMOR_DIR
-    os.makedirs(base_dir, exist_ok=True)
+    ensure_haproxy_writable_dir(base_dir)
 
     result = {
         "base_dir": base_dir,

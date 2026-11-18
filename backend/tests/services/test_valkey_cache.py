@@ -231,3 +231,31 @@ def test_pg_release_advisory_lock_noop_when_not_holding(monkeypatch):
 def test_leader_id_is_stable_per_process():
     assert valkey_client.leader_id() == valkey_client.leader_id()
     assert ":" in valkey_client.leader_id()
+
+
+def test_leader_held_flag_survives_failed_reacquire(monkeypatch):
+    """A second acquire loses SET NX even when this process owns the key.
+
+    That failure must not clear the in-process flag. Renewal failure and
+    release do clear it.
+    """
+    client = MagicMock()
+    client.set.return_value = True
+    monkeypatch.setattr(valkey_client, "_get_client", lambda: client)
+    monkeypatch.setattr(valkey_client, "_leader_held", False)
+
+    assert valkey_client.acquire_leader_lock(ttl=30) is True
+    assert valkey_client.holds_leader_lock() is True
+
+    client.set.return_value = None
+    assert valkey_client.acquire_leader_lock(ttl=30) is False
+    assert valkey_client.holds_leader_lock() is True
+
+    client.eval.return_value = 0
+    assert valkey_client.renew_leader_lock(ttl=30) is False
+    assert valkey_client.holds_leader_lock() is False
+
+    client.set.return_value = True
+    assert valkey_client.acquire_leader_lock(ttl=30) is True
+    valkey_client.release_leader_lock()
+    assert valkey_client.holds_leader_lock() is False

@@ -69,13 +69,34 @@ DIMENSIONS = [
 ]
 
 
+def profiling_log_path() -> str:
+    """Absolute path HAProxy is told to append profiling lines to.
+
+    Matches ``setenv API_ARMOR_PROFILING_LOG_PATH`` in the generated config,
+    which uses ``os.path.abspath(API_ARMOR_PROFILE_LOG_PATH)``.
+    """
+    return os.path.abspath(settings.API_ARMOR_PROFILE_LOG_PATH)
+
+
+def _thread_alive(worker: Any) -> bool:
+    thread = getattr(worker, "_thread", None) if worker is not None else None
+    return thread is not None and thread.is_alive()
+
+
+def _setting_on(db: Session, key: str, default: str = "false") -> bool:
+    return str(get_setting(db, key, default) or "").lower() in ("true", "1", "yes")
+
+
+def api_armor_learning_on(db: Session, flag: str) -> bool:
+    """True when the master toggle and one learning flag are both on."""
+    return _setting_on(db, "api_armor_enabled", str(settings.API_ARMOR_ENABLED)) and _setting_on(db, flag)
+
+
 class ApiArmorProfiler:
     """Background thread that tails the API Armor profiling log and upserts profiles."""
 
     def __init__(self, log_path: str | None = None, sample_interval: float = 5.0):
-        self.log_path = log_path or getattr(
-            settings, "API_ARMOR_PROFILING_LOG_PATH", "/app/data/api-armor/profiling.log"
-        )
+        self.log_path = log_path or profiling_log_path()
         self.sample_interval = sample_interval
         self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
@@ -333,34 +354,83 @@ def finalize_profile(db: Session, profile_id: int, min_samples: int = 100) -> bo
     return True
 
 
-# Singleton instance
+# Singleton instance. The lock serializes start/stop across the settings
+# request and the leader-renewal thread so two callers cannot each spawn
+# a tailer.
 _profiler: ApiArmorProfiler | None = None
+_learner_lock = threading.Lock()
+
+
+def ensure_profiling_log_dir() -> None:
+    """Create the profiling-log directory so HAProxy can append to it.
+
+    The API often creates this directory as root with mode 0755. HAProxy may
+    run as a different user and then cannot create profiling.log; the module
+    used to drop those lines. The directory is on the private data volume.
+    """
+    from .api_armor_writer import ensure_haproxy_writable_dir
+
+    directory = os.path.dirname(profiling_log_path()) or "."
+    ensure_haproxy_writable_dir(directory)
 
 
 def start_profiler() -> None:
-    """Start the API Armor profiler if enabled."""
+    """Start the API Armor profiler if enabled.
+
+    Returns immediately when the tailer thread is already alive. A disabled
+    setting does not stop a running thread; ``sync_api_armor_learners`` does.
+    """
     global _profiler
-    db = SessionLocal()
-    try:
-        enabled = get_setting(db, "api_armor_enabled", str(settings.API_ARMOR_ENABLED)).lower() in ("true", "1", "yes")
-        profiling_enabled = get_setting(db, "api_armor_profiling_learning_enabled", "false").lower() in (
-            "true",
-            "1",
-            "yes",
-        )
-        if enabled and profiling_enabled:
+    with _learner_lock:
+        if _thread_alive(_profiler):
+            return
+        db = SessionLocal()
+        try:
+            if not api_armor_learning_on(db, "api_armor_profiling_learning_enabled"):
+                logger.info("API Armor profiling not enabled, skipping profiler start")
+                return
             interval = float(get_setting(db, "api_armor_profiler_interval", "5"))
-            _profiler = ApiArmorProfiler(sample_interval=interval)
-            _profiler.start()
-        else:
-            logger.info("API Armor profiling not enabled, skipping profiler start")
-    finally:
-        db.close()
+        finally:
+            db.close()
+        ensure_profiling_log_dir()
+        _profiler = ApiArmorProfiler(sample_interval=interval)
+        _profiler.start()
 
 
 def stop_profiler() -> None:
     """Stop the API Armor profiler if running."""
     global _profiler
-    if _profiler:
-        _profiler.stop()
-        _profiler = None
+    with _learner_lock:
+        if _profiler:
+            _profiler.stop()
+            _profiler = None
+
+
+def sync_api_armor_learners(db: Session | None = None) -> None:
+    """Start or stop each learner so it matches the current settings.
+
+    A running thread is left alone. Interval changes apply the next time
+    that thread is started. A caller-supplied session is not closed.
+    """
+    owns_session = db is None
+    if owns_session:
+        db = SessionLocal()
+    try:
+        profiling_on = api_armor_learning_on(db, "api_armor_profiling_learning_enabled")
+        schema_on = api_armor_learning_on(db, "api_armor_schema_learning_enabled")
+    finally:
+        if owns_session and db is not None:
+            db.close()
+
+    if profiling_on:
+        start_profiler()
+    else:
+        stop_profiler()
+
+    # Imported lazily so this module can be imported by the schema learner.
+    from .api_armor_schema_learner import start_schema_learner, stop_schema_learner
+
+    if schema_on:
+        start_schema_learner()
+    else:
+        stop_schema_learner()

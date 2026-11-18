@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from ..core.config import get_settings
 from ..core.database import SessionLocal
 from ..models.api_armor import ApiSchema
+from .api_armor_profiler import api_armor_learning_on, ensure_profiling_log_dir, profiling_log_path
 from .api_armor_schemas import merge_learned_schema
 from .settings import get_setting
 
@@ -32,9 +33,7 @@ class ApiArmorSchemaLearner:
     """Background thread that tails the profiling log and learns schemas."""
 
     def __init__(self, log_path: str | None = None, sample_interval: float = 5.0):
-        self.log_path = log_path or getattr(
-            settings, "API_ARMOR_PROFILING_LOG_PATH", "/app/data/api-armor/profiling.log"
-        )
+        self.log_path = log_path or profiling_log_path()
         self.sample_interval = sample_interval
         self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
@@ -193,28 +192,37 @@ _learner: ApiArmorSchemaLearner | None = None
 
 
 def start_schema_learner() -> None:
-    """Start the API Armor schema learner if globally enabled."""
-    global _learner
-    if _learner:
-        return
+    """Start the API Armor schema learner if globally enabled.
 
-    db = SessionLocal()
-    try:
-        enabled = get_setting(db, "api_armor_enabled", str(settings.API_ARMOR_ENABLED)).lower() in ("true", "1", "yes")
-        learning_enabled = get_setting(db, "api_armor_schema_learning_enabled", "false").lower() in ("true", "1", "yes")
-        if enabled and learning_enabled:
+    Returns immediately when the tailer thread is already alive. A disabled
+    setting does not stop a running thread; ``sync_api_armor_learners`` does.
+    """
+    global _learner
+    from .api_armor_profiler import _learner_lock
+
+    with _learner_lock:
+        if _learner is not None and _learner._thread is not None and _learner._thread.is_alive():
+            return
+
+        db = SessionLocal()
+        try:
+            if not api_armor_learning_on(db, "api_armor_schema_learning_enabled"):
+                logger.info("API Armor schema learning not enabled, skipping learner start")
+                return
             interval = float(get_setting(db, "api_armor_schema_learn_interval", "30"))
-            _learner = ApiArmorSchemaLearner(sample_interval=interval)
-            _learner.start()
-        else:
-            logger.info("API Armor schema learning not enabled, skipping learner start")
-    finally:
-        db.close()
+        finally:
+            db.close()
+        ensure_profiling_log_dir()
+        _learner = ApiArmorSchemaLearner(sample_interval=interval)
+        _learner.start()
 
 
 def stop_schema_learner() -> None:
     """Stop the API Armor schema learner if running."""
     global _learner
-    if _learner:
-        _learner.stop()
-        _learner = None
+    from .api_armor_profiler import _learner_lock
+
+    with _learner_lock:
+        if _learner:
+            _learner.stop()
+            _learner = None

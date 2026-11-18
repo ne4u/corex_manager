@@ -33,9 +33,8 @@ _COMMON_PATCHES = [
     "app.services.coraza_config.write_coraza_spoa_config",
     "app.services.certificates.migrate_cert_bundles",
     "app.services.settings.get_setting",
-    "app.services.api_armor_profiler.start_profiler",
+    "app.services.api_armor_profiler.sync_api_armor_learners",
     "app.services.api_armor_profiler.stop_profiler",
-    "app.services.api_armor_schema_learner.start_schema_learner",
     "app.services.api_armor_schema_learner.stop_schema_learner",
     "app.main.acquire_leader_lock",
     "app.main.renew_leader_lock",
@@ -86,6 +85,7 @@ def test_init_db_called_when_leader():
             for p in patchers:
                 p.stop()
         mock_init.assert_called_once()
+        mocks["app.services.api_armor_profiler.sync_api_armor_learners"].assert_called()
 
 
 def test_init_db_not_called_when_non_leader():
@@ -103,3 +103,4 @@ def test_init_db_not_called_when_non_leader():
         mock_init.assert_not_called()
         mocks["app.main.start_metrics_sampler"].assert_not_called()
         mocks["app.main.start_task_worker"].assert_not_called()
+        mocks["app.services.api_armor_profiler.sync_api_armor_learners"].assert_not_called()

@@ -5,6 +5,7 @@ protection, schema validation, auth validation, behavioral profiling).
 """
 
 import json
+import logging
 import re
 from typing import Any
 
@@ -17,6 +18,7 @@ from ...models.api_armor import ApiSchema, OpenApiSpec
 from ...services.settings import get_setting, set_setting
 from ..deps import get_current_user, get_db, rate_limit, require_write
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
 router = APIRouter()
 
@@ -146,6 +148,17 @@ def _update_api_armor_settings(db: Session, updates: dict) -> dict:
                 raise HTTPException(status_code=400, detail=f"Invalid path regex pattern '{pattern}': {e}")
         set_setting(db, "api_armor_path_patterns", json.dumps(path_patterns))
     db.commit()
+    # The leader tails the profiling log. A save on a non-leader is picked
+    # up by the leader renewal loop. Failure to sync must not fail the save.
+    try:
+        from ...core.valkey_client import holds_leader_lock
+
+        if holds_leader_lock():
+            from ...services.api_armor_profiler import sync_api_armor_learners
+
+            sync_api_armor_learners(db)
+    except Exception as exc:
+        logger.warning("API Armor learner sync after settings update failed: %s", exc)
     return _get_api_armor_settings(db)
 
 

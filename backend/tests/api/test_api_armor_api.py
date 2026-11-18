@@ -75,6 +75,42 @@ def test_update_api_armor_learning_toggles(client, db):
     assert data["api_armor_profiling_learning_enabled"] is True
 
 
+def test_settings_update_syncs_learners_only_on_leader(client, db, monkeypatch):
+    """The leader starts tailers when learning is saved. Other workers only persist."""
+    from app.services.settings import set_setting
+
+    set_setting(db, "req_fp_enabled", "true")
+    calls = []
+    monkeypatch.setattr("app.core.valkey_client.holds_leader_lock", lambda: False)
+    monkeypatch.setattr(
+        "app.services.api_armor_profiler.sync_api_armor_learners",
+        lambda db=None: calls.append(db),
+    )
+
+    resp = client.put(
+        "/api/v1/api-armor/settings",
+        json={
+            "api_armor_schema_learning_enabled": True,
+            "api_armor_profiling_learning_enabled": True,
+        },
+    )
+    assert resp.status_code == 200
+    assert calls == []
+
+    monkeypatch.setattr("app.core.valkey_client.holds_leader_lock", lambda: True)
+    resp = client.put(
+        "/api/v1/api-armor/settings",
+        json={
+            "api_armor_enabled": True,
+            "api_armor_schema_learning_enabled": True,
+            "api_armor_profiling_learning_enabled": True,
+        },
+    )
+    assert resp.status_code == 200
+    assert len(calls) == 1
+    assert calls[0] is not None
+
+
 def test_update_api_armor_retention(client, db):
     """PUT /api-armor/settings updates profile retention days."""
     resp = client.put(

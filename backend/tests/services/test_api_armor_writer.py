@@ -2,6 +2,7 @@
 
 import json
 import os
+import stat
 
 from app.models.api_armor import ApiKeyList, ApiKeyListEntry, ApiProfile, ApiSchema, AuthPolicy
 from app.services.api_armor_writer import write_api_armor_files
@@ -65,6 +66,8 @@ def test_write_api_armor_files_creates_schema_index(db, monkeypatch):
 
     result = write_api_armor_files(db)
     assert result["base_dir"] == tmp
+    # HAProxy may run as a different user and must create profiling.log here.
+    assert stat.S_IMODE(os.stat(tmp).st_mode) == 0o777
     assert os.path.exists(os.path.join(tmp, "schema-index.json"))
     assert os.path.exists(os.path.join(tmp, "schemas"))
 

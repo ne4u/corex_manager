@@ -39,6 +39,17 @@ from fastapi.testclient import TestClient
 _config_service._CONFIG_STATUS_TTL = 0
 
 
+@pytest.fixture(autouse=True)
+def _reset_leader_held():
+    """The leader flag is process-global. Keep one test's acquire from
+    making a later test look like the leader and start background threads."""
+    from app.core import valkey_client
+
+    valkey_client._leader_held = False
+    yield
+    valkey_client._leader_held = False
+
+
 class LifespanOff:
     """ASGI wrapper that suppresses startup/shutdown lifespan events.
 

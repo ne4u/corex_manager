@@ -66,6 +66,15 @@ async def lifespan(app: FastAPI):
                 if not renew_leader_lock(_LEADER_LOCK_TTL):
                     logging.getLogger(__name__).warning("Lost leader lock; a peer will take over")
                     break
+                # A settings save that landed on a non-leader is picked up
+                # here. Losing the lock does not stop learners: the peer
+                # does not take background work until it restarts.
+                try:
+                    from .services.api_armor_profiler import sync_api_armor_learners
+
+                    sync_api_armor_learners()
+                except Exception as exc:
+                    logging.getLogger(__name__).warning("API Armor learner sync failed: %s", exc)
 
         _leader_renewer_stop = threading.Event()
         threading.Thread(target=_renew_leader, daemon=True).start()
@@ -210,13 +219,16 @@ async def lifespan(app: FastAPI):
         except Exception as _exc:
             logging.getLogger(__name__).warning("beacon_trust re-seed on startup failed: %s", _exc)
         start_beacon_trust_persist()
-        # API Armor — start profiler and schema learner if enabled
-        from .services.api_armor_profiler import start_profiler as start_api_armor_profiler
+        # API Armor — start profiler and schema learner when learning is on.
+        # Later settings saves re-enter sync from the leader renewal loop.
         from .services.api_armor_profiler import stop_profiler as stop_api_armor_profiler
-        from .services.api_armor_schema_learner import start_schema_learner, stop_schema_learner
+        from .services.api_armor_profiler import sync_api_armor_learners
+        from .services.api_armor_schema_learner import stop_schema_learner
 
-        start_api_armor_profiler()
-        start_schema_learner()
+        try:
+            sync_api_armor_learners()
+        except Exception as exc:
+            logging.getLogger(__name__).warning("API Armor learner sync failed: %s", exc)
     else:
         # Non-leader workers still need these imports resolved for the
         # shutdown path below (which is guarded by is_leader).

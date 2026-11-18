@@ -17,6 +17,7 @@ use api_armor_jwt_validator::{validate_jwt_with_claims, validate_api_key, extrac
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock, OnceLock};
 use std::time::SystemTime;
 
@@ -676,10 +677,40 @@ fn parse_body_lua(_lua: &Lua, txn: Txn) -> LuaResult<()> {
     Ok(())
 }
 
+/// Append one profiling line, creating the parent directory when it is missing.
+///
+/// Returns the OS error text so the caller can log it. Open failures used to
+/// be ignored, which made a permissions problem look like "nothing to learn".
+fn append_profiling_line(path: &str, line: &str) -> Result<(), String> {
+    use std::io::Write;
+
+    let file_path = Path::new(path);
+    if let Some(parent) = file_path.parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent).map_err(|err| format!("create {}: {err}", parent.display()))?;
+        }
+    }
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(file_path)
+        .map_err(|err| format!("open {}: {err}", file_path.display()))?;
+    writeln!(file, "{line}").map_err(|err| format!("write {}: {err}", file_path.display()))
+}
+
+/// Log the first profiling-log failure to stderr. Later failures stay quiet
+/// so a stuck directory does not emit one warning per request.
+fn warn_profiling_log_once(flag: &AtomicBool, message: &str) -> bool {
+    if flag.swap(true, Ordering::Relaxed) {
+        return false;
+    }
+    eprintln!("{message}");
+    true
+}
+
 /// Write a JSON line to the API Armor profiling log.
 /// Contains all dimensions for multi-dimensional behavioral profiling.
 fn write_profiling_log(txn: &Txn, parsed: &ParsedBody, content_type: &str) -> LuaResult<()> {
-    use std::io::Write;
 
     // Profiling/log data is only needed when the backend sampler is learning
     // schemas or profiles. Either flag enables the log write.
@@ -760,15 +791,16 @@ fn write_profiling_log(txn: &Txn, parsed: &ParsedBody, content_type: &str) -> Lu
         profile["body_sample"] = sample;
     }
 
-    // Write to log file (append mode, one JSON line per request)
-    // Use open with append to avoid locking overhead
-    if let Ok(mut file) = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&log_path)
-    {
-        let line = serde_json::to_string(&profile).unwrap_or_default();
-        let _ = writeln!(file, "{}", line);
+    // Append one JSON line. A failed create/open used to be dropped with no
+    // trace while the request still returned 200. Warn once (HAProxy log and
+    // stderr) and keep serving the request.
+    static PROFILE_LOG_WARNED: AtomicBool = AtomicBool::new(false);
+    let line = serde_json::to_string(&profile).unwrap_or_default();
+    if let Err(err) = append_profiling_line(&log_path, &line) {
+        let msg = format!("API Armor profiling log write failed ({log_path}): {err}");
+        if warn_profiling_log_once(&PROFILE_LOG_WARNED, &msg) {
+            let _ = txn.log(LogLevel::Warning, msg);
+        }
     }
 
     Ok(())
@@ -816,6 +848,39 @@ fn chrono_now() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn append_profiling_line_creates_parent_and_appends() {
+        let dir = std::env::temp_dir().join(format!("api-armor-prof-{}", std::process::id()));
+        let path = dir.join("nested").join("profiling.log");
+        let path_str = path.to_string_lossy().to_string();
+        let _ = std::fs::remove_dir_all(&dir);
+        append_profiling_line(&path_str, r#"{"a":1}"#).unwrap();
+        append_profiling_line(&path_str, r#"{"a":2}"#).unwrap();
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(text, "{\"a\":1}\n{\"a\":2}\n");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn append_profiling_line_reports_create_error() {
+        let dir = std::env::temp_dir().join(format!("api-armor-prof-bad-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let blocker = dir.join("not-a-dir");
+        std::fs::write(&blocker, b"x").unwrap();
+        let path = blocker.join("profiling.log");
+        let err = append_profiling_line(&path.to_string_lossy(), "line").unwrap_err();
+        assert!(err.contains("create"), "{err}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn warn_profiling_log_once_only_the_first_call() {
+        let flag = AtomicBool::new(false);
+        assert!(warn_profiling_log_once(&flag, "api armor profiling log test warning"));
+        assert!(!warn_profiling_log_once(&flag, "api armor profiling log test warning"));
+    }
 
     #[test]
     fn test_parse_json_body() {
