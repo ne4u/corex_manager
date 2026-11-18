@@ -250,17 +250,19 @@ def _rate_key_track_expr(rate_key: str, rate_header: str | None = None) -> str:
 
 
 def _safe_regex(value: str) -> str:
-    """Sanitize a regex value while preserving regex metacharacters.
+    """Sanitize a regex and return it as one double-quoted HAProxy word.
 
-    The result is emitted as a bare HAProxy config word, so backslashes are
-    doubled (word parsing consumes '\\' -> '\') and '$' is escaped — a bare
-    '$' mid-word triggers HAProxy environment-variable expansion and fails
-    config parsing ("forbidden first char in environment variable name").
+    Backslashes are doubled and '$' is written as '\\$'. HAProxy only turns
+    that into a real end anchor inside quotes. The same '\\$' in a bare word
+    stays a literal dollar, so a host pattern such as ``firestop.dev$`` never
+    matches. Quotes in the pattern are escaped after backslashes are doubled
+    so the added backslash is not doubled again.
     """
     if not isinstance(value, str):
         value = str(value)
     value = _REGEX_SANITIZE_RE.sub("", value).strip()
-    return value.replace("\\", "\\\\").replace("$", "\\$")
+    value = value.replace("\\", "\\\\").replace('"', '\\"').replace("$", "\\$")
+    return f'"{value}"'
 
 
 def _safe_fcgi_param_value(value: str) -> str:

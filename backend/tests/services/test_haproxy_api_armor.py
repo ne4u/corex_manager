@@ -194,7 +194,7 @@ def test_api_armor_scope_path(db):
     set_setting(db, "api_armor_path_patterns", '["^/api/v1/.*"]')
     db.commit()
     cfg = haproxy.generate_config(db)
-    assert "acl is_api_armor_path path_reg -i ^/api/v1/.*" in cfg
+    assert 'acl is_api_armor_path path_reg -i "^/api/v1/.*"' in cfg
     assert "wait-for-body time 10s if is_api_armor is_api_armor_path" in cfg
     assert "lua.api_body_parse" in cfg
     assert "{ var(txn.api_body) -m found } is_api_armor_path" in cfg
