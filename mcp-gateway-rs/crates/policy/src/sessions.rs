@@ -19,6 +19,16 @@ pub struct SessionData {
     pub upstreams: std::collections::BTreeMap<String, String>,
 }
 
+/// Result of the one-round-trip session + revocation + rate-limit batch.
+pub struct SessionCheck {
+    pub data: Option<SessionData>,
+    /// Identity- or jti-level revocation hit.
+    pub revoked: bool,
+    /// Post-increment per-tool rate-limit count (None when no limit applies
+    /// or Valkey is unavailable — the caller treats that as fail-open).
+    pub rl_count: Option<i64>,
+}
+
 #[derive(Clone)]
 pub struct SessionStore {
     client: Option<ValkeyClient>,
@@ -53,6 +63,52 @@ impl SessionStore {
         let c = self.client.as_ref()?;
         let raw = c.get(&format!("sess:{session_id}")).await.ok()??;
         serde_json::from_str(&raw).ok()
+    }
+
+    /// Fetch + touch the session, check identity/jti revocation, and
+    /// optionally increment a per-tool rate-limit counter — all in a single
+    /// Valkey round trip.
+    ///
+    /// `session_id` may be None/empty (e.g. `initialize`), in which case only
+    /// the revocation EXISTS commands are piped. `rl` is `(key_suffix,
+    /// window_seconds)` — e.g. `("123:my-tool", 60)`.
+    ///
+    /// Failure semantics match the previous separate calls: revocation
+    /// fails open, a missing/unparseable session yields `data: None`, and a
+    /// Valkey outage returns `data: None` (sessions are fail-closed today).
+    pub async fn fetch_bundle(
+        &self,
+        session_id: Option<&str>,
+        identity_id: i64,
+        jti: Option<&str>,
+        rl: Option<(&str, u64)>,
+    ) -> SessionCheck {
+        let Some(c) = &self.client else {
+            return SessionCheck { data: None, revoked: false, rl_count: None };
+        };
+        let session_id = session_id.filter(|s| !s.is_empty());
+        match c
+            .session_bundle(session_id, SESSION_TTL, identity_id, jti, rl)
+            .await
+        {
+            Ok(b) => SessionCheck {
+                data: b
+                    .session_json
+                    .and_then(|s| serde_json::from_str(&s).ok()),
+                revoked: b.identity_revoked || b.jti_revoked,
+                rl_count: b.rl_count,
+            },
+            Err(e) => {
+                ValkeyClient::log_failure("session_bundle", &e);
+                // Best-effort fallback: try a plain GET so a transient pipe
+                // error does not strand a healthy session.
+                let data = match session_id {
+                    Some(sid) => self.get(sid).await,
+                    None => None,
+                };
+                SessionCheck { data, revoked: false, rl_count: None }
+            }
+        }
     }
 
     /// Slide the TTL forward.

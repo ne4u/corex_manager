@@ -4816,11 +4816,12 @@ def generate_mcp_gateway_backend(db: Session) -> str:
     return f"""backend mcp_gateway
     mode http
     option http-keep-alive
-    http-reuse never
+    http-reuse safe
     timeout server 300s
     timeout tunnel 300s
     http-request set-header Cache-Control no-store
-    option httpchk GET /healthz
+    option httpchk
+    http-check send meth GET uri /healthz ver HTTP/1.1 hdr host {host} hdr connection close
     http-check expect status 200
     stick-table type string len 128 size 10k expire 1h{peers}
     stick on req.hdr(Mcp-Session-Id)

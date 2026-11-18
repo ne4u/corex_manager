@@ -1,8 +1,11 @@
-//! Rate limiting — Valkey-backed sliding-window quotas, `mcp:gw:` prefixed.
+//! Rate limiting — Valkey-backed fixed-window quotas, `mcp:gw:` prefixed.
 //!
-//! Mirrors `mcp-gateway/ratelimit.py`:
-//! - Per-identity/tool sliding window (ZSET): `mcp:gw:rl:{id}:{tool}`
-//! - Per-IP sliding window: `mcp:gw:rl:ip:{ip}`
+//! Mirrors `mcp-gateway/ratelimit.py`, with one algorithm change: the ZSET
+//! sliding window was replaced by a fixed 60-second bucket (`INCR` +
+//! `EXPIRE … NX` in a single round trip). A sorted-set member per request
+//! cannot sustain high quotas. Configured quotas are unchanged.
+//! - Per-identity/tool fixed window: `mcp:gw:rl:{id}:{tool}`
+//! - Per-IP fixed window: `mcp:gw:rl:ip:{ip}`
 //! - Concurrent request leases (INCR + TTL): `mcp:gw:conc:{id}`
 //! - Per-team RPM overrides from the config bundle
 //! - Configurable fail mode: fail-open (default) or fail-closed
@@ -12,7 +15,7 @@
 use crate::valkey::ValkeyClient;
 
 pub const MCP_RATE_LIMITED: i32 = -32029;
-const WINDOW_SECONDS: u64 = 60;
+pub const WINDOW_SECONDS: u64 = 60;
 const CONCURRENT_SAFETY_TTL: u64 = 300;
 
 /// Configuration for the rate limiter.
@@ -59,7 +62,7 @@ impl RateLimiter {
         Self { client, config }
     }
 
-    /// Check if a request is within the per-identity/tool sliding window.
+    /// Check if a request is within the per-identity/tool fixed window.
     pub async fn check_rate_limit(&self, identity_id: i64, tool: &str, max_rpm: i64) -> RateLimitDecision {
         if max_rpm <= 0 {
             return RateLimitDecision { allowed: true, remaining: max_rpm };
@@ -67,7 +70,7 @@ impl RateLimiter {
         let Some(c) = &self.client else {
             return self.fail_open(max_rpm);
         };
-        match c.sliding_window(&format!("rl:{identity_id}:{tool}"), max_rpm, WINDOW_SECONDS).await {
+        match c.fixed_window(&format!("rl:{identity_id}:{tool}"), max_rpm, WINDOW_SECONDS).await {
             Ok((allowed, remaining)) => RateLimitDecision { allowed, remaining },
             Err(e) => {
                 ValkeyClient::log_failure("rate_limit", &e);
@@ -85,7 +88,7 @@ impl RateLimiter {
         let Some(c) = &self.client else {
             return self.fail_open(limit);
         };
-        match c.sliding_window(&format!("rl:ip:{ip}"), limit, WINDOW_SECONDS).await {
+        match c.fixed_window(&format!("rl:ip:{ip}"), limit, WINDOW_SECONDS).await {
             Ok((allowed, remaining)) => RateLimitDecision { allowed, remaining },
             Err(e) => {
                 ValkeyClient::log_failure("ip_rate_limit", &e);
@@ -105,11 +108,8 @@ impl RateLimiter {
             return !self.config.fail_closed;
         };
         let key = format!("conc:{identity_id}");
-        match c.incr(&key).await {
+        match c.incr_expire_nx(&key, CONCURRENT_SAFETY_TTL).await {
             Ok(count) => {
-                if count == 1 {
-                    let _ = c.expire(&key, CONCURRENT_SAFETY_TTL).await;
-                }
                 if count > limit {
                     let _ = c.decr(&key).await;
                     return false;

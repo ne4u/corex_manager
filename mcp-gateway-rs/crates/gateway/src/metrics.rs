@@ -23,6 +23,9 @@ pub struct Metrics {
     upstream_errors_total: Arc<AtomicU64>,
     tools_listed_total: Arc<AtomicU64>,
     tools_called_total: Arc<AtomicU64>,
+    events_dropped_total: Arc<AtomicU64>,
+    auth_cache_hits_total: Arc<AtomicU64>,
+    auth_cache_misses_total: Arc<AtomicU64>,
     // Latency histogram for tools/call (cumulative bucket counts).
     latency_buckets: Arc<[AtomicU64; 11]>, // 10 boundaries + +Inf
     latency_sum: Arc<AtomicU64>,
@@ -42,6 +45,9 @@ impl Metrics {
             upstream_errors_total: Arc::new(AtomicU64::new(0)),
             tools_listed_total: Arc::new(AtomicU64::new(0)),
             tools_called_total: Arc::new(AtomicU64::new(0)),
+            events_dropped_total: Arc::new(AtomicU64::new(0)),
+            auth_cache_hits_total: Arc::new(AtomicU64::new(0)),
+            auth_cache_misses_total: Arc::new(AtomicU64::new(0)),
             latency_buckets: Arc::new([
                 AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
                 AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),
@@ -63,6 +69,16 @@ impl Metrics {
     pub fn inc_upstream_errors(&self) { self.upstream_errors_total.fetch_add(1, Ordering::Relaxed); }
     pub fn inc_tools_listed(&self) { self.tools_listed_total.fetch_add(1, Ordering::Relaxed); }
     pub fn inc_tools_called(&self) { self.tools_called_total.fetch_add(1, Ordering::Relaxed); }
+
+    /// Shared counter the async event logger bumps when its queue overflows.
+    pub fn events_dropped_counter(&self) -> Arc<AtomicU64> {
+        self.events_dropped_total.clone()
+    }
+
+    /// Shared counters the auth cache bumps on hit/miss.
+    pub fn auth_cache_counters(&self) -> (Arc<AtomicU64>, Arc<AtomicU64>) {
+        (self.auth_cache_hits_total.clone(), self.auth_cache_misses_total.clone())
+    }
 
     /// Observe a tools/call latency in milliseconds.
     pub fn observe_latency(&self, latency_ms: u64) {
@@ -93,6 +109,9 @@ impl Metrics {
             ("mcp_gateway_upstream_errors_total", self.upstream_errors_total.load(Ordering::Relaxed)),
             ("mcp_gateway_tools_listed_total", self.tools_listed_total.load(Ordering::Relaxed)),
             ("mcp_gateway_tools_called_total", self.tools_called_total.load(Ordering::Relaxed)),
+            ("mcp_gateway_events_dropped_total", self.events_dropped_total.load(Ordering::Relaxed)),
+            ("mcp_gateway_auth_cache_hits_total", self.auth_cache_hits_total.load(Ordering::Relaxed)),
+            ("mcp_gateway_auth_cache_misses_total", self.auth_cache_misses_total.load(Ordering::Relaxed)),
         ];
         for (name, value) in &counters {
             out.push_str(&format!("# TYPE {name} counter\n{name} {value}\n"));
@@ -131,6 +150,9 @@ impl Metrics {
             upstream_errors_total: self.upstream_errors_total.load(Ordering::Relaxed),
             tools_listed_total: self.tools_listed_total.load(Ordering::Relaxed),
             tools_called_total: self.tools_called_total.load(Ordering::Relaxed),
+            events_dropped_total: self.events_dropped_total.load(Ordering::Relaxed),
+            auth_cache_hits_total: self.auth_cache_hits_total.load(Ordering::Relaxed),
+            auth_cache_misses_total: self.auth_cache_misses_total.load(Ordering::Relaxed),
             latency_sum_ms: self.latency_sum.load(Ordering::Relaxed),
             latency_count: self.latency_count.load(Ordering::Relaxed),
             latency_buckets: LATENCY_BUCKETS
@@ -156,6 +178,9 @@ pub struct MetricsSnapshot {
     pub upstream_errors_total: u64,
     pub tools_listed_total: u64,
     pub tools_called_total: u64,
+    pub events_dropped_total: u64,
+    pub auth_cache_hits_total: u64,
+    pub auth_cache_misses_total: u64,
     pub latency_sum_ms: u64,
     pub latency_count: u64,
     pub latency_buckets: Vec<(f64, u64)>,

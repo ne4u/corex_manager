@@ -307,7 +307,7 @@ checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 
 [[package]]
 name = "corex-core"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -331,7 +331,7 @@ dependencies = [
 
 [[package]]
 name = "corex-gateway"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "axum",
  "base64",
@@ -362,7 +362,7 @@ dependencies = [
 
 [[package]]
 name = "corex-policy"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "base64",
  "bcrypt",
@@ -377,6 +377,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "sha2",
  "thiserror",
  "tokio",
  "tracing",
@@ -384,7 +385,7 @@ dependencies = [
 
 [[package]]
 name = "corex-proxy"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "chrono",
  "corex-core",
@@ -404,7 +405,7 @@ dependencies = [
 
 [[package]]
 name = "corex-scan"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "corex-core",
  "once_cell",

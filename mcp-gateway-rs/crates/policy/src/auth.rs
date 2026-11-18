@@ -10,15 +10,17 @@
 //! 5-min lockout), matching the Python gateway.
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use chrono::{DateTime, Utc};
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
-use parking_lot::Mutex;
+use parking_lot::{Mutex, RwLock};
 use serde::Deserialize;
+use sha2::{Digest, Sha256};
 
 use corex_core::config::{ConfigBundle, IdentityConfig};
-
-use crate::revocation::RevocationStore;
 
 /// JSON-RPC error code for auth failures (HTTP 401 with WWW-Authenticate).
 pub const MCP_UNAUTHORIZED: i32 = -32001;
@@ -27,6 +29,8 @@ const AUTH_FAIL_WINDOW: u64 = 60;
 const AUTH_FAIL_THRESHOLD: usize = 10;
 const AUTH_LOCKOUT_SECONDS: i64 = 300;
 const JWKS_TTL: u64 = 300;
+const AUTH_CACHE_DEFAULT_TTL_SECONDS: u64 = 60;
+const AUTH_CACHE_MAX_ENTRIES: usize = 10_000;
 
 #[derive(Debug, Clone)]
 pub struct AuthError(pub String);
@@ -171,14 +175,130 @@ impl JwksCache {
     }
 }
 
+/// Successful-verify memo for bearer tokens (PAT and JWT).
+///
+/// bcrypt::verify at cost 12 is ~200 ms of CPU — far too expensive to run on
+/// every request. This cache memoizes a *successful* verify keyed by the
+/// SHA-256 of the token (the raw token is never stored). Entries expire after
+/// `MCP_AUTH_CACHE_TTL_SECONDS` (default 60 s) and the whole cache is cleared
+/// on config reload, so a rotated hash or disabled identity cannot keep
+/// passing. Revocation is still checked against Valkey on every request,
+/// including cache hits.
+///
+/// Concurrent misses for the same token share a single verify (single-flight)
+/// so a thundering herd cannot stack up bcrypt work.
+#[derive(Clone)]
+pub struct AuthCache {
+    verified: Arc<RwLock<HashMap<String, (AuthContext, Instant)>>>,
+    inflight: Arc<Mutex<HashMap<String, Arc<tokio::sync::OnceCell<Result<AuthContext, AuthError>>>>>>,
+    ttl: Duration,
+    hits: Arc<AtomicU64>,
+    misses: Arc<AtomicU64>,
+}
+
+impl Default for AuthCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl AuthCache {
+    pub fn new() -> Self {
+        Self::with_counters(Arc::new(AtomicU64::new(0)), Arc::new(AtomicU64::new(0)))
+    }
+
+    /// Construct a cache whose hit/miss counters are shared (e.g. with the
+    /// metrics registry so `/metrics` can report them).
+    pub fn with_counters(hits: Arc<AtomicU64>, misses: Arc<AtomicU64>) -> Self {
+        let ttl_secs = std::env::var("MCP_AUTH_CACHE_TTL_SECONDS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(AUTH_CACHE_DEFAULT_TTL_SECONDS);
+        Self {
+            verified: Arc::new(RwLock::new(HashMap::new())),
+            inflight: Arc::new(Mutex::new(HashMap::new())),
+            ttl: Duration::from_secs(ttl_secs),
+            hits,
+            misses,
+        }
+    }
+
+    /// Drop all cached verifies. Called after every successful config reload.
+    pub fn clear(&self) {
+        self.verified.write().clear();
+        self.inflight.lock().clear();
+    }
+
+    /// (hits, misses) counters for the metrics endpoint.
+    pub fn stats(&self) -> (u64, u64) {
+        (
+            self.hits.load(Ordering::Relaxed),
+            self.misses.load(Ordering::Relaxed),
+        )
+    }
+
+    /// Return a cached verify result, or run `verify` once and cache it.
+    /// Only successful verifies are cached — failures are never memoized so
+    /// brute-force accounting stays accurate.
+    async fn get_or_verify<F, Fut>(&self, token: &str, verify: F) -> Result<AuthContext, AuthError>
+    where
+        F: FnOnce() -> Fut,
+        Fut: std::future::Future<Output = Result<AuthContext, AuthError>>,
+    {
+        let key = sha256_hex(token);
+
+        // Fast path — fresh entry.
+        if let Some((ctx, ts)) = self.verified.read().get(&key) {
+            if ts.elapsed() < self.ttl {
+                self.hits.fetch_add(1, Ordering::Relaxed);
+                return Ok(ctx.clone());
+            }
+        }
+        self.misses.fetch_add(1, Ordering::Relaxed);
+
+        // Single-flight: concurrent misses for the same token share one verify.
+        let cell = {
+            let mut m = self.inflight.lock();
+            m.entry(key.clone())
+                .or_insert_with(|| Arc::new(tokio::sync::OnceCell::new()))
+                .clone()
+        };
+        let result = cell.get_or_init(|| verify()).await.clone();
+        self.inflight.lock().remove(&key);
+
+        match result {
+            Ok(ctx) => {
+                let mut m = self.verified.write();
+                if m.len() >= AUTH_CACHE_MAX_ENTRIES {
+                    m.clear();
+                }
+                m.insert(key, (ctx.clone(), Instant::now()));
+                Ok(ctx)
+            }
+            Err(e) => Err(e),
+        }
+    }
+}
+
+fn sha256_hex(s: &str) -> String {
+    let mut h = Sha256::new();
+    h.update(s.as_bytes());
+    h.finalize().iter().map(|b| format!("{b:02x}")).collect()
+}
+
 /// Authenticate a bearer token.
+///
+/// Verification is memoized in `cache` (SHA-256 keyed, TTL, cleared on config
+/// reload). Revocation is deliberately NOT checked here — the caller batches
+/// the `rev:*` EXISTS commands into the same Valkey round trip as the session
+/// fetch so every request, including cache hits, is still revocation-checked.
 pub async fn authenticate(
     token: &str,
     config: &ConfigBundle,
     client_ip: &str,
     brute: &BruteForceState,
     jwks: &JwksCache,
-    revocation: &RevocationStore,
+    cache: &AuthCache,
 ) -> Result<AuthContext, AuthError> {
     if let Some(until) = brute.check(client_ip) {
         return Err(AuthError(format!(
@@ -186,49 +306,70 @@ pub async fn authenticate(
         )));
     }
 
+    match cache.get_or_verify(token, || verify_token(token, config, jwks)).await {
+        Ok(ctx) => {
+            brute.record_success(client_ip);
+            Ok(ctx)
+        }
+        Err(e) => {
+            brute.record_failure(client_ip);
+            Err(e)
+        }
+    }
+}
+
+/// Verify a bearer token against the config bundle (no revocation, no
+/// brute-force accounting — those stay in `authenticate`).
+async fn verify_token(
+    token: &str,
+    config: &ConfigBundle,
+    jwks: &JwksCache,
+) -> Result<AuthContext, AuthError> {
     if is_pat(token) {
         let (prefix, _) = parse_pat(token);
-        if let Some(ident) = verify_pat(prefix, token, &config.identities) {
-            if !revocation.is_token_valid(ident.id, None).await {
-                brute.record_failure(client_ip);
-                return Err(AuthError("Identity revoked".into()));
+        if let Some(ident) = pat_candidate(prefix, &config.identities) {
+            // bcrypt::verify is CPU-bound (~200 ms at cost 12) — keep it off the
+            // async workers.
+            let hash = ident.pat_hash.clone().unwrap_or_default();
+            let token_owned = token.to_string();
+            let ok = tokio::task::spawn_blocking(move || {
+                bcrypt::verify(&token_owned, &hash).unwrap_or(false)
+            })
+            .await
+            .unwrap_or(false);
+            if ok {
+                return Ok(AuthContext {
+                    identity_id: ident.id,
+                    team_id: ident.team_id,
+                    name: ident.name.clone(),
+                    subject: if ident.subject.is_empty() { ident.name.clone() } else { ident.subject.clone() },
+                    kind: "pat".into(),
+                    claims: serde_json::Value::Null,
+                });
             }
-            brute.record_success(client_ip);
-            return Ok(AuthContext {
-                identity_id: ident.id,
-                team_id: ident.team_id,
-                name: ident.name.clone(),
-                subject: if ident.subject.is_empty() { ident.name.clone() } else { ident.subject.clone() },
-                kind: "pat".into(),
-                claims: serde_json::Value::Null,
-            });
         }
-        brute.record_failure(client_ip);
         return Err(AuthError("Invalid or expired PAT".into()));
     }
 
-    // Try JWT.
-    match verify_jwt(token, &config.identities, config.jwt_issuer.as_deref(), config.jwt_audience.as_deref(), config.jwt_jwks_url.as_deref(), jwks).await {
-        Some((ident, claims)) => {
-            let jti = claims.get("jti").and_then(|v| v.as_str()).map(|s| s.to_string());
-            if !revocation.is_token_valid(ident.id, jti.as_deref()).await {
-                brute.record_failure(client_ip);
-                return Err(AuthError("Token revoked".into()));
-            }
-            brute.record_success(client_ip);
-            Ok(AuthContext {
-                identity_id: ident.id,
-                team_id: ident.team_id,
-                name: ident.name.clone(),
-                subject: if ident.subject.is_empty() { ident.name.clone() } else { ident.subject.clone() },
-                kind: "jwt".into(),
-                claims,
-            })
-        }
-        None => {
-            brute.record_failure(client_ip);
-            Err(AuthError("Invalid or expired JWT".into()))
-        }
+    match verify_jwt(
+        token,
+        &config.identities,
+        config.jwt_issuer.as_deref(),
+        config.jwt_audience.as_deref(),
+        config.jwt_jwks_url.as_deref(),
+        jwks,
+    )
+    .await
+    {
+        Some((ident, claims)) => Ok(AuthContext {
+            identity_id: ident.id,
+            team_id: ident.team_id,
+            name: ident.name.clone(),
+            subject: if ident.subject.is_empty() { ident.name.clone() } else { ident.subject.clone() },
+            kind: "jwt".into(),
+            claims,
+        }),
+        None => Err(AuthError("Invalid or expired JWT".into())),
     }
 }
 
@@ -241,7 +382,10 @@ fn parse_pat(token: &str) -> (&str, &str) {
     (&token[..idx], &token[idx + 1..])
 }
 
-fn verify_pat<'a>(prefix: &str, token: &str, identities: &'a [IdentityConfig]) -> Option<&'a IdentityConfig> {
+/// Find the enabled, unexpired PAT identity for a prefix. The bcrypt check of
+/// `ident.pat_hash` against the token is the caller's job (runs on the
+/// blocking pool).
+fn pat_candidate<'a>(prefix: &str, identities: &'a [IdentityConfig]) -> Option<&'a IdentityConfig> {
     for ident in identities {
         if ident.kind != "pat" {
             continue;
@@ -257,11 +401,7 @@ fn verify_pat<'a>(prefix: &str, token: &str, identities: &'a [IdentityConfig]) -
                 return None;
             }
         }
-        let Some(hash) = &ident.pat_hash else { return None };
-        // bcrypt::verify expects the full token (prefix.secret) and the hash.
-        if bcrypt::verify(token, hash).unwrap_or(false) {
-            return Some(ident);
-        }
+        return Some(ident);
     }
     None
 }
@@ -420,13 +560,119 @@ mod tests {
         let token = "mcp_test.secretvalue";
         let hash = bcrypt::hash(token, 4).unwrap();
         let idents = vec![pat_identity("mcp_test", &hash, true)];
-        let found = verify_pat("mcp_test", token, &idents);
+        let found = pat_candidate("mcp_test", &idents);
         assert!(found.is_some());
+        assert!(bcrypt::verify(token, found.unwrap().pat_hash.as_deref().unwrap()).unwrap_or(false));
         // Wrong prefix.
-        assert!(verify_pat("mcp_other", token, &idents).is_none());
+        assert!(pat_candidate("mcp_other", &idents).is_none());
         // Disabled.
         let idents2 = vec![pat_identity("mcp_test", &hash, false)];
-        assert!(verify_pat("mcp_test", token, &idents2).is_none());
+        assert!(pat_candidate("mcp_test", &idents2).is_none());
+    }
+
+    #[tokio::test]
+    async fn auth_cache_hit_skips_verify() {
+        let token = "mcp_test.secretvalue";
+        let hash = bcrypt::hash(token, 4).unwrap();
+        let config = ConfigBundle {
+            identities: vec![pat_identity("mcp_test", &hash, true)],
+            ..Default::default()
+        };
+        let cache = AuthCache::new();
+        let brute = BruteForceState::new();
+        let jwks = JwksCache::new();
+
+        // First call verifies and caches.
+        let ctx = authenticate(token, &config, "", &brute, &jwks, &cache)
+            .await
+            .unwrap();
+        assert_eq!(ctx.identity_id, 1);
+        assert_eq!(cache.stats(), (0, 1));
+
+        // Second call with an EMPTY config would fail a real verify — a cache
+        // hit proves no verify ran.
+        let empty = ConfigBundle::default();
+        let ctx2 = authenticate(token, &empty, "", &brute, &jwks, &cache)
+            .await
+            .unwrap();
+        assert_eq!(ctx2.identity_id, 1);
+        assert_eq!(cache.stats(), (1, 1));
+    }
+
+    #[tokio::test]
+    async fn auth_cache_wrong_token_fails_and_is_not_cached() {
+        let hash = bcrypt::hash("mcp_test.secretvalue", 4).unwrap();
+        let config = ConfigBundle {
+            identities: vec![pat_identity("mcp_test", &hash, true)],
+            ..Default::default()
+        };
+        let cache = AuthCache::new();
+        let brute = BruteForceState::new();
+        let jwks = JwksCache::new();
+
+        assert!(authenticate("mcp_test.wrong", &config, "", &brute, &jwks, &cache)
+            .await
+            .is_err());
+        // Failures are never cached — map stays empty, miss count grows.
+        assert!(cache.verified.read().is_empty());
+        assert_eq!(cache.stats(), (0, 1));
+    }
+
+    #[tokio::test]
+    async fn auth_cache_clear_drops_entries() {
+        let token = "mcp_test.secretvalue";
+        let hash = bcrypt::hash(token, 4).unwrap();
+        let config = ConfigBundle {
+            identities: vec![pat_identity("mcp_test", &hash, true)],
+            ..Default::default()
+        };
+        let cache = AuthCache::new();
+        let brute = BruteForceState::new();
+        let jwks = JwksCache::new();
+
+        authenticate(token, &config, "", &brute, &jwks, &cache)
+            .await
+            .unwrap();
+        cache.clear();
+        // After clear (config reload), an empty bundle fails again.
+        let empty = ConfigBundle::default();
+        assert!(authenticate(token, &empty, "", &brute, &jwks, &cache)
+            .await
+            .is_err());
+    }
+
+    #[tokio::test]
+    async fn auth_cache_single_flight_one_verify() {
+        // Concurrent misses for the same token must share one verify closure.
+        let counter = Arc::new(AtomicU64::new(0));
+        let cache = AuthCache::new();
+        let ctx = AuthContext {
+            identity_id: 7, team_id: 2, name: "ci".into(), subject: "ci".into(),
+            kind: "pat".into(), claims: serde_json::Value::Null,
+        };
+        let mut handles = Vec::new();
+        for _ in 0..8 {
+            let cache = cache.clone();
+            let counter = counter.clone();
+            let ctx = ctx.clone();
+            handles.push(tokio::spawn(async move {
+                let counter = counter.clone();
+                cache
+                    .get_or_verify("mcp_x.secret", || {
+                        let ctx = ctx.clone();
+                        async move {
+                            counter.fetch_add(1, Ordering::Relaxed);
+                            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+                            Ok(ctx)
+                        }
+                    })
+                    .await
+            }));
+        }
+        for h in handles {
+            h.await.unwrap().unwrap();
+        }
+        assert_eq!(counter.load(Ordering::Relaxed), 1, "single-flight must run one verify");
     }
 
     #[test]

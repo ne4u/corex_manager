@@ -60,7 +60,7 @@ impl HealthChecker {
     ///
     /// The server list is re-read from the shared (hot-reloaded) config on
     /// every cycle so servers added or enabled after startup are checked.
-    pub async fn run(&self, config: Arc<RwLock<Option<ConfigBundle>>>) {
+    pub async fn run(&self, config: Arc<RwLock<Option<Arc<ConfigBundle>>>>) {
         loop {
             self.check_all(&current_servers(&config)).await;
             tokio::select! {
@@ -150,10 +150,10 @@ impl HealthChecker {
 }
 
 /// Snapshot the current server list from the shared (hot-reloaded) config.
-pub(crate) fn current_servers(config: &Arc<RwLock<Option<ConfigBundle>>>) -> Vec<ServerConfig> {
+pub(crate) fn current_servers(config: &Arc<RwLock<Option<Arc<ConfigBundle>>>>) -> Vec<ServerConfig> {
     config
         .read()
-        .as_ref()
+        .as_deref()
         .map(|c| c.servers.clone())
         .unwrap_or_default()
 }

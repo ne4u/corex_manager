@@ -73,7 +73,8 @@ impl UpstreamClient {
             .timeout(timeout)
             .connect_timeout(connect)
             .redirect(reqwest::redirect::Policy::none()) // SSRF-safe: handle manually
-            .pool_max_idle_per_host(10)
+            .pool_max_idle_per_host(256)
+            .tcp_nodelay(true)
             .build()
             .unwrap_or_else(|_| reqwest::Client::new());
         self.clients.lock().insert(sid, client.clone());

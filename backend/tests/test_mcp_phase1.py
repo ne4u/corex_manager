@@ -141,9 +141,13 @@ def test_mcp_gateway_backend_emitted_when_enabled(db):
     assert "backend mcp_gateway" in config
     assert "stick on req.hdr(Mcp-Session-Id)" in config
     assert "option http-keep-alive" in config
+    assert "http-reuse safe" in config
+    assert "http-reuse never" not in config
     assert "timeout tunnel 300s" in config
     assert "Cache-Control no-store" in config
-    assert "option httpchk GET /healthz" in config
+    assert "option httpchk" in config
+    assert "http-check send meth GET uri /healthz ver HTTP/1.1" in config
+    assert "hdr connection close" in config
     assert "http-check expect status 200" in config
     # Default backend is the Rust gateway on port 8089.
     assert "server mcp-gateway-rs mcp-gateway-rs:8089 check inter 5s fall 3 rise 2" in config

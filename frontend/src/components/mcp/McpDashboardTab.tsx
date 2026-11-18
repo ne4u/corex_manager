@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { RefreshCw, Bell, Activity, Zap, AlertTriangle, Gauge, Clock, ServerCrash, Server } from 'lucide-react'
+import { RefreshCw, Bell, Activity, Zap, AlertTriangle, Gauge, Clock, ServerCrash, Server, Database, FileWarning } from 'lucide-react'
 import { mcp } from '../../services/api'
 import { Badge } from '../ui'
 import { useDateTime } from '../../contexts/DateTimeContext'
@@ -30,6 +30,9 @@ interface GatewayMetrics {
   upstream_errors_total: number
   tools_listed_total: number
   tools_called_total: number
+  events_dropped_total: number
+  auth_cache_hits_total: number
+  auth_cache_misses_total: number
   latency_sum_ms: number
   latency_count: number
   latency_buckets: { le: number; count: number }[]
@@ -200,6 +203,9 @@ export default function McpDashboardTab() {
                   <MetricChip icon={AlertTriangle} label={t('pages:mcpGateway.settings.mGuardrailBlocked')} value={gatewayStatus.metrics.guardrail_blocked_total} variant="error" />
                   <MetricChip icon={ServerCrash} label={t('pages:mcpGateway.settings.mUpstreamErrors')} value={gatewayStatus.metrics.upstream_errors_total} variant="error" />
                   <MetricChip icon={Activity} label={t('pages:mcpGateway.settings.mAuthSuccess')} value={gatewayStatus.metrics.auth_success_total} variant="success" />
+                  <MetricChip icon={Database} label={t('pages:mcpGateway.settings.mAuthCacheHits')} value={gatewayStatus.metrics.auth_cache_hits_total} variant="success" />
+                  <MetricChip icon={Database} label={t('pages:mcpGateway.settings.mAuthCacheMisses')} value={gatewayStatus.metrics.auth_cache_misses_total} />
+                  <MetricChip icon={FileWarning} label={t('pages:mcpGateway.settings.mEventsDropped')} value={gatewayStatus.metrics.events_dropped_total} variant={gatewayStatus.metrics.events_dropped_total > 0 ? 'warning' : undefined} />
                 </div>
 
                 {/* Latency histogram */}

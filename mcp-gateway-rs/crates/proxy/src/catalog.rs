@@ -153,7 +153,7 @@ impl CatalogWorker {
     ///
     /// The server list is re-read from the shared (hot-reloaded) config on
     /// every cycle so servers added or enabled after startup are refreshed.
-    pub async fn run(&self, config: Arc<RwLock<Option<ConfigBundle>>>) {
+    pub async fn run(&self, config: Arc<RwLock<Option<Arc<ConfigBundle>>>>) {
         // Initial refresh + quick retries in case upstreams are still booting.
         for i in 0..5u32 {
             self.refresh_all(&current_servers(&config)).await;

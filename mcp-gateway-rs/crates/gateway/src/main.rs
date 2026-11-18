@@ -10,9 +10,8 @@ use tracing_subscriber::EnvFilter;
 
 use corex_core::config::ConfigBundle;
 use corex_core::crypto;
-use corex_policy::auth::{BruteForceState, JwksCache};
+use corex_policy::auth::{AuthCache, BruteForceState, JwksCache};
 use corex_policy::ratelimit::{RateLimitConfig, RateLimiter};
-use corex_policy::revocation::RevocationStore;
 use corex_policy::sessions::SessionStore;
 use corex_proxy::{CatalogStore, CircuitBreaker, HealthChecker, ProcessManager, UpstreamClient};
 use corex_scan::dlp;
@@ -43,7 +42,7 @@ async fn main() {
     let secrets_key = std::env::var("MCP_SECRETS_KEY").expect("MCP_SECRETS_KEY required");
 
     let config = load_config(&config_path, &secrets_key);
-    let config_arc = Arc::new(RwLock::new(Some(config.clone())));
+    let config_arc = Arc::new(RwLock::new(Some(Arc::new(config.clone()))));
 
     // Connect to Valkey (optional — degrades gracefully).
     let valkey = corex_policy::valkey::ValkeyClient::connect().await.ok();
@@ -57,32 +56,38 @@ async fn main() {
     skills.load(&config.skills);
 
     let ssrf = corex_core::ssrf::SsrfPolicy::from_env();
+    // Trust configured upstream hosts so SSRF checks take the allowlist fast
+    // path instead of a blocking DNS resolution on every request.
+    ssrf.update_allowed_upstreams(config.servers.iter().filter_map(|s| s.url.clone()));
     let breaker = CircuitBreaker::new();
-    let upstream = UpstreamClient::new(breaker, ssrf);
+    let upstream = UpstreamClient::new(breaker, ssrf.clone());
     let stdio = ProcessManager::new();
 
     let catalog_store = Arc::new(CatalogStore::new(valkey.clone()));
     let sessions = SessionStore::new(valkey.clone());
-    let revocation = RevocationStore::new(valkey.clone());
     let rate_limiter = RateLimiter::new(valkey, RateLimitConfig::default());
+    let metrics_registry = metrics::Metrics::new();
 
     let state = GatewayState {
         config: config_arc,
         policy_engine: Arc::new(RwLock::new(policy_engine)),
-        dlp_rules: Arc::new(RwLock::new(dlp_rules)),
-        guardrail_rules: Arc::new(RwLock::new(guardrail_rules)),
+        dlp_rules: Arc::new(RwLock::new(Arc::new(dlp_rules))),
+        guardrail_rules: Arc::new(RwLock::new(Arc::new(guardrail_rules))),
         skills,
         upstream: upstream.clone(),
         stdio: stdio.clone(),
         catalog_store: catalog_store.clone(),
         sessions,
-        revocation,
         rate_limiter,
         brute: Arc::new(BruteForceState::new()),
         jwks: Arc::new(JwksCache::new()),
-        events: events::EventLogger::new(),
+        auth_cache: {
+            let (hits, misses) = metrics_registry.auth_cache_counters();
+            AuthCache::with_counters(hits, misses)
+        },
+        events: events::EventLogger::with_drop_counter(metrics_registry.events_dropped_counter()),
         alerter: alerting::Alerter::new(),
-        metrics: metrics::Metrics::new(),
+        metrics: metrics_registry,
     };
 
     // Start catalog worker. The worker re-reads the (hot-reloaded) config each
@@ -124,8 +129,17 @@ async fn main() {
     let config_arc_clone = state.config.clone();
     let secrets_key_clone = secrets_key.clone();
     let config_path_clone = config_path.clone();
+    let ssrf_clone = ssrf.clone();
+    let auth_cache_clone = state.auth_cache.clone();
     tokio::spawn(async move {
-        watch_config(config_path_clone, secrets_key_clone, config_arc_clone).await;
+        watch_config(
+            config_path_clone,
+            secrets_key_clone,
+            config_arc_clone,
+            ssrf_clone,
+            auth_cache_clone,
+        )
+        .await;
     });
 
     // Build router and serve.
@@ -133,7 +147,10 @@ async fn main() {
     let router = build_router(state);
     let listener = tokio::net::TcpListener::bind(&bind_addr).await.expect("failed to bind");
     tracing::info!("MCP Gateway listening on {bind_addr}");
-    axum::serve(listener, router).await.expect("server error");
+    axum::serve(listener, router)
+        .tcp_nodelay(true)
+        .await
+        .expect("server error");
 }
 
 /// Load the config bundle from a file, decrypting if needed.
@@ -187,7 +204,9 @@ fn load_config(path: &str, secrets_key: &str) -> ConfigBundle {
 async fn watch_config(
     path: String,
     secrets_key: String,
-    config_arc: Arc<RwLock<Option<ConfigBundle>>>,
+    config_arc: Arc<RwLock<Option<Arc<ConfigBundle>>>>,
+    ssrf: corex_core::ssrf::SsrfPolicy,
+    auth_cache: AuthCache,
 ) {
     let mut last_mtime = std::fs::metadata(&path).map(|m| m.modified().ok()).ok().flatten();
     loop {
@@ -200,7 +219,11 @@ async fn watch_config(
             last_mtime = Some(current_mtime);
             tracing::info!("Config file changed, reloading: {path}");
             let config = load_config(&path, &secrets_key);
-            *config_arc.write() = Some(config);
+            ssrf.update_allowed_upstreams(config.servers.iter().filter_map(|s| s.url.clone()));
+            // Drop memoized verifies so a disabled identity or rotated PAT
+            // hash cannot keep authenticating.
+            auth_cache.clear();
+            *config_arc.write() = Some(Arc::new(config));
         }
     }
 }

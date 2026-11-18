@@ -12,9 +12,12 @@ use parking_lot::RwLock;
 use url::Url;
 
 /// SSRF policy state (allowlists + flags).
+///
+/// The state is held behind an `Arc` so `is_url_safe` can clone the pointer
+/// instead of deep-copying the allowlist vectors on every call.
 #[derive(Clone)]
 pub struct SsrfPolicy {
-    inner: Arc<RwLock<SsrfState>>,
+    inner: Arc<RwLock<Arc<SsrfState>>>,
 }
 
 #[derive(Clone)]
@@ -29,13 +32,13 @@ struct SsrfState {
 impl Default for SsrfPolicy {
     fn default() -> Self {
         Self {
-            inner: Arc::new(RwLock::new(SsrfState {
+            inner: Arc::new(RwLock::new(Arc::new(SsrfState {
                 enabled: env_flag("MCP_SSRF_PROTECTION", true),
                 block_private: env_flag("MCP_SSRF_BLOCK_PRIVATE", false),
                 allowed_ips: Vec::new(),
                 allowed_hosts: Vec::new(),
                 dynamic_allowed: Vec::new(),
-            })),
+            }))),
         }
     }
 }
@@ -52,7 +55,7 @@ impl SsrfPolicy {
         let policy = Self::default();
         // Parse MCP_UPSTREAM_ALLOWLIST=ip,host,...
         if let Ok(env) = std::env::var("MCP_UPSTREAM_ALLOWLIST") {
-            let mut state = policy.inner.write();
+            let mut state = (**policy.inner.read()).clone();
             for entry in env.split(',') {
                 let entry = entry.trim().to_lowercase();
                 if entry.is_empty() {
@@ -64,6 +67,7 @@ impl SsrfPolicy {
                     state.allowed_hosts.push(entry);
                 }
             }
+            *policy.inner.write() = Arc::new(state);
         }
         policy
     }
@@ -79,12 +83,15 @@ impl SsrfPolicy {
                 }
             }
         }
-        self.inner.write().dynamic_allowed = allowed;
+        let mut state = (**self.inner.read()).clone();
+        state.dynamic_allowed = allowed;
+        *self.inner.write() = Arc::new(state);
     }
 
     /// Validate a URL. Returns `(safe, reason)`.
     pub async fn is_url_safe(&self, url: &str) -> (bool, String) {
-        let state: SsrfState = (*self.inner.read()).clone();
+        // Cheap Arc clone — no deep copy of the allowlist vectors.
+        let state: Arc<SsrfState> = self.inner.read().clone();
 
         if !state.enabled {
             return (true, "SSRF protection disabled".into());
@@ -214,13 +221,13 @@ mod tests {
     fn policy() -> SsrfPolicy {
         // Fresh policy with SSRF enabled, private allowed.
         SsrfPolicy {
-            inner: Arc::new(RwLock::new(SsrfState {
+            inner: Arc::new(RwLock::new(Arc::new(SsrfState {
                 enabled: true,
                 block_private: false,
                 allowed_ips: Vec::new(),
                 allowed_hosts: Vec::new(),
                 dynamic_allowed: Vec::new(),
-            })),
+            }))),
         }
     }
 

@@ -28,9 +28,8 @@ use corex_policy::policy::{
     check_prompt_access, check_resource_access, check_tool_access, filter_prompt_list,
     filter_resource_list, filter_tool_list, PolicyEngine,
 };
-use corex_policy::ratelimit::{get_team_rpm, RateLimiter};
-use corex_policy::revocation::RevocationStore;
-use corex_policy::sessions::SessionStore;
+use corex_policy::ratelimit::{get_team_rpm, RateLimiter, WINDOW_SECONDS};
+use corex_policy::sessions::{SessionData, SessionStore};
 use corex_scan::dlp::{self, CompiledDlpRule};
 use corex_scan::guardrails::{self, CompiledGuardrailRule};
 
@@ -61,34 +60,35 @@ pub const MCP_GUARDRAIL_BLOCKED: i32 = -32021;
 /// Shared gateway state.
 #[derive(Clone)]
 pub struct GatewayState {
-    pub config: Arc<parking_lot::RwLock<Option<ConfigBundle>>>,
+    /// The live config bundle, behind `Arc` so a snapshot is a pointer clone.
+    pub config: Arc<parking_lot::RwLock<Option<Arc<ConfigBundle>>>>,
     pub policy_engine: Arc<parking_lot::RwLock<PolicyEngine>>,
-    pub dlp_rules: Arc<parking_lot::RwLock<Vec<CompiledDlpRule>>>,
-    pub guardrail_rules: Arc<parking_lot::RwLock<Vec<CompiledGuardrailRule>>>,
+    pub dlp_rules: Arc<parking_lot::RwLock<Arc<Vec<CompiledDlpRule>>>>,
+    pub guardrail_rules: Arc<parking_lot::RwLock<Arc<Vec<CompiledGuardrailRule>>>>,
     pub skills: SkillsRegistry,
     pub upstream: UpstreamClient,
     pub stdio: ProcessManager,
     pub catalog_store: Arc<CatalogStore>,
     pub sessions: SessionStore,
-    pub revocation: RevocationStore,
     pub rate_limiter: RateLimiter,
     pub brute: Arc<corex_policy::auth::BruteForceState>,
     pub jwks: Arc<corex_policy::auth::JwksCache>,
+    pub auth_cache: corex_policy::auth::AuthCache,
     pub events: EventLogger,
     pub alerter: Alerter,
     pub metrics: Metrics,
 }
 
 impl GatewayState {
-    /// Get the current config bundle.
-    pub fn config(&self) -> Option<ConfigBundle> {
+    /// Get the current config bundle (cheap Arc clone).
+    pub fn config(&self) -> Option<Arc<ConfigBundle>> {
         self.config.read().clone()
     }
 
     /// Get enabled servers for a team.
     pub fn team_servers(&self, team_id: i64) -> Vec<ServerConfig> {
         let config = self.config.read();
-        match config.as_ref() {
+        match config.as_deref() {
             Some(c) => c.servers.iter().filter(|s| s.enabled && s.team_id == team_id).cloned().collect(),
             None => vec![],
         }
@@ -97,7 +97,7 @@ impl GatewayState {
     /// Get the discovery mode for a team.
     pub fn discovery_mode(&self, team_id: i64) -> DiscoveryMode {
         let config = self.config.read();
-        match config.as_ref() {
+        match config.as_deref() {
             Some(c) => {
                 let team = c.teams.iter().find(|t| t.id == team_id);
                 match team.and_then(|t| t.discovery_mode.as_deref()) {
@@ -113,7 +113,7 @@ impl GatewayState {
     pub fn server_by_namespace(&self, namespace: &str, team_id: i64) -> Option<ServerConfig> {
         let config = self.config.read();
         config
-            .as_ref()?
+            .as_deref()?
             .servers
             .iter()
             .find(|s| s.namespace == namespace && s.team_id == team_id && s.enabled)
@@ -124,7 +124,7 @@ impl GatewayState {
     pub fn identity_name(&self, identity_id: i64) -> Option<String> {
         let config = self.config.read();
         config
-            .as_ref()?
+            .as_deref()?
             .identities
             .iter()
             .find(|i| i.id == identity_id)
@@ -135,7 +135,7 @@ impl GatewayState {
     pub fn team_name(&self, team_id: i64) -> Option<String> {
         let config = self.config.read();
         config
-            .as_ref()?
+            .as_deref()?
             .teams
             .iter()
             .find(|t| t.id == team_id)
@@ -146,7 +146,7 @@ impl GatewayState {
     pub fn server_name(&self, server_id: i64) -> Option<String> {
         let config = self.config.read();
         config
-            .as_ref()?
+            .as_deref()?
             .servers
             .iter()
             .find(|s| s.id == server_id)
@@ -310,7 +310,7 @@ pub async fn handle_post(
         &client_ip,
         &state.brute,
         &state.jwks,
-        &state.revocation,
+        &state.auth_cache,
     )
     .await
     {
@@ -331,11 +331,43 @@ pub async fn handle_post(
     let method = body.get("method").and_then(|v| v.as_str()).unwrap_or("");
     let params = body.get("params").cloned().unwrap_or(Value::Object(Default::default()));
 
+    // Session handling.
+    let session_id = headers.get("mcp-session-id").and_then(|v| v.to_str().ok()).unwrap_or("");
+
+    // One Valkey round trip for the whole request:
+    //   EXISTS rev:identity:{id} (+ rev:jti:{jti} for JWTs),
+    //   GET + EXPIRE sess:{id} when a session id is present,
+    //   INCR rl:{id}:{tool} (+ EXPIRE … NX) when the method is a call and a
+    //   quota is configured.
+    // The rate-limit counter is incremented before policy evaluation, so
+    // denied calls also consume quota (documented semantic change).
+    let jti = auth_ctx.claims.get("jti").and_then(|v| v.as_str());
+    let rl = call_rl(&config, method, &params, &auth_ctx);
+    let sess_arg = if method != "initialize" && !session_id.is_empty() {
+        Some(session_id)
+    } else {
+        None
+    };
+    let check = state
+        .sessions
+        .fetch_bundle(
+            sess_arg,
+            auth_ctx.identity_id,
+            jti,
+            rl.as_ref().map(|(k, _)| (k.as_str(), WINDOW_SECONDS)),
+        )
+        .await;
+    if check.revoked {
+        state.metrics.inc_auth_failure();
+        state.alerter.record_event("auth_failed");
+        log_event_unauth(&state, &req_id, "", "auth_failed", "auth_failed", "Token revoked");
+        return unauthorized_response(&headers);
+    }
+
     // Notifications/responses → 202 Accepted.
     if is_notification(&body) || is_response(&body) {
-        let session_id = headers.get("mcp-session-id").and_then(|v| v.to_str().ok()).unwrap_or("");
         if !session_id.is_empty() && !method.is_empty() {
-            handle_notification(&state, session_id, method, &params, &auth_ctx).await;
+            handle_notification(&state, session_id, method, &params, &auth_ctx, check.data.as_ref()).await;
         }
         log_event(
             &state, &req_id, "", &auth_ctx, None, method,
@@ -352,9 +384,6 @@ pub async fn handle_post(
         );
         return error_response(&msg_id, JSONRPC_INVALID_REQUEST, "Invalid Request", StatusCode::BAD_REQUEST);
     }
-
-    // Session handling.
-    let session_id = headers.get("mcp-session-id").and_then(|v| v.to_str().ok()).unwrap_or("");
 
     // initialize creates the session.
     if method == "initialize" {
@@ -382,7 +411,7 @@ pub async fn handle_post(
             StatusCode::BAD_REQUEST,
         );
     }
-    let session_data = match state.sessions.get(session_id).await {
+    let session_data = match check.data {
         Some(d) => d,
         None => {
             log_event(
@@ -406,7 +435,6 @@ pub async fn handle_post(
         );
         return error_response(&msg_id, MCP_GATEWAY_ERROR, "Session identity mismatch", StatusCode::FORBIDDEN);
     }
-    state.sessions.refresh(session_id).await;
 
     // Route to handler.
     match method {
@@ -449,9 +477,9 @@ pub async fn handle_post(
             );
             resp
         }
-        "tools/call" => handle_call(&state, session_id, &msg_id, &params, &auth_ctx, "tool").await,
-        "resources/read" => handle_call(&state, session_id, &msg_id, &params, &auth_ctx, "resource").await,
-        "prompts/get" => handle_call(&state, session_id, &msg_id, &params, &auth_ctx, "prompt").await,
+        "tools/call" => handle_call(&state, session_id, &msg_id, &params, &auth_ctx, "tool", &session_data, rl_decision(check.rl_count, &rl)).await,
+        "resources/read" => handle_call(&state, session_id, &msg_id, &params, &auth_ctx, "resource", &session_data, rl_decision(check.rl_count, &rl)).await,
+        "prompts/get" => handle_call(&state, session_id, &msg_id, &params, &auth_ctx, "prompt", &session_data, rl_decision(check.rl_count, &rl)).await,
         "resources/subscribe" => {
             let resp = handle_resource_subscribe(&state, &msg_id, &params, &auth_ctx).await;
             log_event(
@@ -469,7 +497,7 @@ pub async fn handle_post(
             resp
         }
         "completion/complete" => {
-            let resp = handle_completion(&state, &msg_id, &params, &auth_ctx).await;
+            let resp = handle_completion(&state, &msg_id, &params, &auth_ctx, &session_data).await;
             log_event(
                 &state, &req_id, session_id, &auth_ctx, None, "completion/complete",
                 "", "", "allow", "ok", "", None, None, None,
@@ -564,7 +592,43 @@ fn extract_client_ip(headers: &HeaderMap) -> String {
         .unwrap_or_default()
 }
 
-/// Handle initialize — create session, init upstreams, merge capabilities.
+/// Per-tool rate-limit key suffix + limit for call methods. Returns None for
+/// non-call methods, empty names, and disabled quotas. The counter is
+/// incremented in the session batch; the limit is enforced in `handle_call`.
+fn call_rl(
+    config: &ConfigBundle,
+    method: &str,
+    params: &Value,
+    auth: &AuthContext,
+) -> Option<(String, i64)> {
+    if !matches!(method, "tools/call" | "resources/read" | "prompts/get") {
+        return None;
+    }
+    let name = params
+        .get("name")
+        .or_else(|| params.get("uri"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    if name.is_empty() {
+        return None;
+    }
+    let default_rpm = config.default_rpm as i64;
+    let max_rpm = get_team_rpm(&config.team_rpm_overrides, auth.team_id, default_rpm);
+    if max_rpm <= 0 {
+        return None;
+    }
+    Some((format!("{}:{}", auth.identity_id, name), max_rpm))
+}
+
+/// Pair the batched rate-limit count with the configured limit for
+/// enforcement inside `handle_call`.
+fn rl_decision(rl_count: Option<i64>, rl: &Option<(String, i64)>) -> Option<(i64, i64)> {
+    rl_count.zip(rl.as_ref().map(|(_, max)| *max))
+}
+
+/// Handle initialize — create session and answer capabilities from the
+/// catalog. Upstreams are initialized lazily on the first call to each
+/// server (see `upstream_session_id`) so a client handshake never fans out.
 async fn handle_initialize(
     state: &GatewayState,
     msg_id: &Value,
@@ -573,18 +637,12 @@ async fn handle_initialize(
 ) -> Response {
     let servers = state.team_servers(auth.team_id);
 
-    // Initialize upstream sessions and check catalogs for capabilities.
+    // Capabilities come from catalogs already in memory — no upstream calls.
     let mut has_tools = false;
     let mut has_resources = false;
     let mut has_prompts = false;
 
     for server in &servers {
-        let _upstream_sid = if server.transport_type == "stdio" {
-            state.stdio.initialize_upstream(server).await
-        } else {
-            state.upstream.initialize(server).await
-        };
-        // Check catalog for capabilities.
         if let Some(catalog) = state.catalog_store.get(server.id).await {
             if !catalog.tools.is_empty() {
                 has_tools = true;
@@ -785,6 +843,10 @@ async fn handle_prompts_list(state: &GatewayState, msg_id: &Value, auth: &AuthCo
 }
 
 /// Handle a call (tools/call, resources/read, prompts/get) — route by namespace.
+///
+/// `session` was fetched (and its TTL slid) in the request batch; `rl` is the
+/// already-incremented rate-limit count paired with the configured limit.
+#[allow(clippy::too_many_arguments)]
 async fn handle_call(
     state: &GatewayState,
     session_id: &str,
@@ -792,6 +854,8 @@ async fn handle_call(
     params: &Value,
     auth: &AuthContext,
     kind: &str,
+    session: &SessionData,
+    rl: Option<(i64, i64)>,
 ) -> Response {
     // Derive the JSON-RPC method from the call kind for event logging.
     let method = match kind {
@@ -913,24 +977,21 @@ async fn handle_call(
         return error_response(msg_id, MCP_POLICY_DENIED, &format!("Policy denied: {}", pr.rule_name), StatusCode::OK);
     }
 
-    // Rate limiting.
+    // Rate limiting — the counter was incremented in the request batch;
+    // enforce the result here. `rl` is None when no quota is configured or
+    // Valkey is unavailable (fail-open, same as before).
     if !pr.skip_ratelimit {
-        let config = state.config();
-        let default_rpm = config.as_ref().map(|c| c.default_rpm as i64).unwrap_or(600);
-        let max_rpm = config
-            .as_ref()
-            .map(|c| get_team_rpm(&c.team_rpm_overrides, auth.team_id, default_rpm))
-            .unwrap_or(default_rpm);
-        let decision = state.rate_limiter.check_rate_limit(auth.identity_id, name, max_rpm).await;
-        if !decision.allowed {
-            state.metrics.inc_rate_limited();
-            state.alerter.record_event("rate_limited");
-            log_event(
-                state, &req_id, session_id, auth, Some(server.id), method,
-                name, kind, "rate_limited", "rate_limited",
-                &format!("Rate limit exceeded for {name}"), None, bytes_in, None,
-            );
-            return error_response(msg_id, MCP_RATE_LIMITED, &format!("Rate limit exceeded for {name}"), StatusCode::OK);
+        if let Some((count, max_rpm)) = rl {
+            if count > max_rpm {
+                state.metrics.inc_rate_limited();
+                state.alerter.record_event("rate_limited");
+                log_event(
+                    state, &req_id, session_id, auth, Some(server.id), method,
+                    name, kind, "rate_limited", "rate_limited",
+                    &format!("Rate limit exceeded for {name}"), None, bytes_in, None,
+                );
+                return error_response(msg_id, MCP_RATE_LIMITED, &format!("Rate limit exceeded for {name}"), StatusCode::OK);
+            }
         }
     }
 
@@ -994,8 +1055,43 @@ async fn handle_call(
         "params": forward_params,
     });
 
-    // Get upstream session.
-    let upstream_sid = state.sessions.get_upstream_session(session_id, server.id).await;
+    // Get upstream session from the already-fetched session payload. On first
+    // use, initialize the upstream lazily and persist the resulting session id
+    // (concurrent first calls may double-initialize; last stored wins).
+    let mut upstream_sid = session.upstreams.get(&server.id.to_string()).cloned();
+    if upstream_sid.is_none() {
+        upstream_sid = if server.transport_type == "stdio" {
+            // Idempotent: initialize_upstream is a no-op once the process is up.
+            state
+                .stdio
+                .initialize_upstream(&server)
+                .await
+                .map(|_| format!("stdio:{}", server.id))
+        } else {
+            match state.upstream.initialize(&server).await {
+                Some(sid) => {
+                    // Complete the MCP handshake before forwarding the call.
+                    let note = serde_json::json!({
+                        "jsonrpc": "2.0",
+                        "method": "notifications/initialized",
+                        "params": {},
+                    });
+                    let _ = state
+                        .upstream
+                        .send_notification(&server, &note, Some(sid.as_str()).filter(|s| !s.is_empty()))
+                        .await;
+                    Some(sid)
+                }
+                None => None,
+            }
+        };
+        if let Some(sid) = &upstream_sid {
+            state
+                .sessions
+                .set_upstream_session(session_id, server.id, sid)
+                .await;
+        }
+    }
 
     // Concurrent request limiting.
     let config = state.config();
@@ -1013,7 +1109,9 @@ async fn handle_call(
     let upstream_resp = if server.transport_type == "stdio" {
         state.stdio.send_request(&server, &upstream_body).await
     } else {
-        let r = state.upstream.send_request(&server, &upstream_body, upstream_sid.as_deref()).await;
+        // Some("") marks an initialized stateless upstream — send no header.
+        let sid = upstream_sid.as_deref().filter(|s| !s.is_empty());
+        let r = state.upstream.send_request(&server, &upstream_body, sid).await;
         (r.status, r.body)
     };
     state.rate_limiter.release_concurrent_slot(auth.identity_id).await;
@@ -1146,6 +1244,7 @@ async fn handle_completion(
     msg_id: &Value,
     params: &Value,
     auth: &AuthContext,
+    session: &SessionData,
 ) -> Response {
     // Extract the ref type and name.
     let ref_obj = match params.get("ref") {
@@ -1181,7 +1280,7 @@ async fn handle_completion(
         "method": "completion/complete",
         "params": params,
     });
-    let upstream_sid = state.sessions.get_upstream_session("", server.id).await;
+    let upstream_sid = session.upstreams.get(&server.id.to_string()).cloned();
     let resp = if server.transport_type == "stdio" {
         state.stdio.send_request(&server, &upstream_body).await
     } else {
@@ -1198,12 +1297,16 @@ async fn handle_completion(
 }
 
 /// Handle a client notification (no response expected).
+///
+/// `session` is the payload already fetched in the request batch; upstream
+/// session ids come from its `upstreams` map (no extra Valkey reads).
 async fn handle_notification(
     state: &GatewayState,
     session_id: &str,
     method: &str,
     params: &Value,
     auth: &AuthContext,
+    session: Option<&SessionData>,
 ) {
     if method == "notifications/cancelled" {
         // Cancellation — in-flight tracking is per-request, so we log it.
@@ -1211,11 +1314,17 @@ async fn handle_notification(
         return;
     }
 
+    let upstream_sid = |server_id: i64| -> Option<String> {
+        session
+            .and_then(|d| d.upstreams.get(&server_id.to_string()).cloned())
+    };
+
     if method == "notifications/initialized" {
-        // Fan-out to all upstream servers for this session.
+        // Fan-out to upstream servers that already have a session. Servers
+        // without one get initialized (and notified) lazily on first call.
         let servers = state.team_servers(auth.team_id);
         for server in &servers {
-            let upstream_sid = state.sessions.get_upstream_session(session_id, server.id).await;
+            let Some(sid) = upstream_sid(server.id) else { continue };
             let notification = serde_json::json!({
                 "jsonrpc": "2.0",
                 "method": method,
@@ -1224,7 +1333,7 @@ async fn handle_notification(
             if server.transport_type == "stdio" {
                 let _ = state.stdio.send_notification(server, &notification).await;
             } else {
-                let _ = state.upstream.send_notification(server, &notification, upstream_sid.as_deref()).await;
+                let _ = state.upstream.send_notification(server, &notification, Some(&sid)).await;
             }
         }
         return;
@@ -1233,7 +1342,7 @@ async fn handle_notification(
     // Forward other notifications to all upstream servers.
     let servers = state.team_servers(auth.team_id);
     for server in &servers {
-        let upstream_sid = state.sessions.get_upstream_session(session_id, server.id).await;
+        let sid = upstream_sid(server.id);
         let notification = serde_json::json!({
             "jsonrpc": "2.0",
             "method": method,
@@ -1242,7 +1351,7 @@ async fn handle_notification(
         if server.transport_type == "stdio" {
             let _ = state.stdio.send_notification(server, &notification).await;
         } else {
-            let _ = state.upstream.send_notification(server, &notification, upstream_sid.as_deref()).await;
+            let _ = state.upstream.send_notification(server, &notification, sid.as_deref()).await;
         }
     }
 }

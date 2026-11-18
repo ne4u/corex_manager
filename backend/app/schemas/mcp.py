@@ -717,6 +717,9 @@ class GatewayMetricsSnapshot(BaseModel):
     upstream_errors_total: int = 0
     tools_listed_total: int = 0
     tools_called_total: int = 0
+    events_dropped_total: int = 0
+    auth_cache_hits_total: int = 0
+    auth_cache_misses_total: int = 0
     latency_sum_ms: int = 0
     latency_count: int = 0
     latency_buckets: list[dict[str, Any]] = []
